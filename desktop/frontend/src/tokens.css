@@ -1,0 +1,53 @@
+:root {
+  --bg-app: #0d0f13;
+  --bg-surface: #13161c;
+  --bg-raised: #191d25;
+  --bg-hover: #1e232c;
+  --bg-term: #0a0c10;
+  --bg-overlay: rgba(5, 6, 9, 0.6);
+  --bg-overlay-strong: rgba(5, 6, 9, 0.92);
+
+  --border: #252a34;
+  --border-strong: #353c4a;
+
+  --text: #e6e9ef;
+  --text-soft: #a3abbb;
+  --text-dim: #7c8597;
+
+  --waiting: #f5a524;
+  --finished: #3ecf8e;
+  --working: #4cb4ff;
+  --idle: #6b7385;
+  --accent: #a78bfa;
+  --danger: #f5586a;
+
+  --type-feature: #6ea8ff;
+  --type-bug: #f5586a;
+  --type-refactor: #b794f6;
+  --type-chore: #8b93a5;
+
+  --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --fs-label: 0.75rem;
+  --fs-small: 0.8125rem;
+  --fs-body: 0.90625rem;
+  --fs-title: 1.0625rem;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  --topbar-h: 2.5rem;
+  --edge-strip-w: 2.75rem;
+
+  --bg-note: #181613;
+  --bg-note-card: #211e19;
+  --border-note: #322d24;
+  --text-note: #ebe5d8;
+  --text-note-dim: #9a927f;
+
+  --z-sidebar-overlay: 20;
+  --z-popup: 30;
+  --z-overlay: 40;
+  --z-toast: 50;
+}
