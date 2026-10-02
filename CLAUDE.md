@@ -53,4 +53,4 @@ Issues on `nednella/agentos` are the queue. One issue → branch `issue-<n>` in 
 worktree → one draft PR → Ned merges → the app cleans up. Conventional commits, one
 logical change each. Manual issues follow `.github/ISSUE_TEMPLATE/issue.md`: a
 `## Description` written by a human, never edited by a session; a session appends its
-findings below it under `## Recon`.
+findings below it under `## Agent Review`.
