@@ -39,6 +39,8 @@
 
   --topbar-h: 2.5rem;
   --edge-strip-w: 2.75rem;
+  --traffic-light-zone: 96px;
+  --topbar-corner-pad: 1.375rem;
 
   --bg-note: #181613;
   --bg-note-card: #211e19;

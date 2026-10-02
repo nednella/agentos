@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
-import { KillButton } from './KillButton'
+import { ConfirmRow } from './ConfirmRow'
 import { PRBadge } from './PRBadge'
 import { StateBadge } from './StateBadge'
 
@@ -15,9 +15,12 @@ const PR_ACTION = {
 }
 
 export function ViewportHeader({ session }: ViewportHeaderProps) {
-  const { renameSession, report, focus, typeInto, ackPR } = useAgentos()
+  const { renameSession, report, focus, typeInto, ackPR, killSession } = useAgentos()
   const now = useNow()
   const [renaming, setRenaming] = useState(false)
+  const [killing, setKilling] = useState(false)
+
+  useEffect(() => setKilling(false), [session.id])
   const action = session.pr && session.prAttention ? PR_ACTION[session.prAttention] : null
 
   const finishRename = () => {
@@ -71,8 +74,30 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </span>
         </div>
         <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
-        <KillButton id={session.id} />
+        <button className="btn btn-ghost" onClick={() => setKilling(true)} title="Kill this session" disabled={killing}>
+          Kill
+        </button>
       </div>
+      {killing && (
+        <div className="pt-1.5">
+          <ConfirmRow
+            danger
+            label="Kill this session"
+            message={
+              <>
+                Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
+                <code className="mono">claude --resume</code>.
+              </>
+            }
+            confirmLabel="Kill"
+            onCancel={() => setKilling(false)}
+            onConfirm={() => {
+              setKilling(false)
+              report(() => killSession(session.id))
+            }}
+          />
+        </div>
+      )}
       {session.detail && (
         <span
           className="mono short:hidden truncate text-small"

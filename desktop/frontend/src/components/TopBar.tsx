@@ -52,8 +52,8 @@ export function TopBar() {
 
   return (
     <header
-      className="grid flex-none items-center gap-2 border-b border-line pr-3"
-      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: '78px', gridTemplateColumns: '1fr auto 1fr' }}
+      className="grid flex-none items-center gap-2 border-b border-line"
+      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: 'var(--traffic-light-zone)', paddingRight: 'var(--topbar-corner-pad)', gridTemplateColumns: '1fr auto 1fr' }}
     >
       <div className="flex min-w-0 items-center gap-3" style={noDrag}>
         {badge ? (

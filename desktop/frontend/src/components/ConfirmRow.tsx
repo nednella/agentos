@@ -1,5 +1,8 @@
+import type { ReactNode } from 'react'
+
 type ConfirmRowProps = {
-  message: string
+  message: ReactNode
+  label?: string
   confirmLabel: string
   cancelLabel?: string
   danger?: boolean
@@ -8,12 +11,12 @@ type ConfirmRowProps = {
   onCancel(): void
 }
 
-export function ConfirmRow({ message, confirmLabel, cancelLabel = 'Cancel', danger = false, inline = false, onConfirm, onCancel }: ConfirmRowProps) {
+export function ConfirmRow({ message, label = 'Confirm', confirmLabel, cancelLabel = 'Cancel', danger = false, inline = false, onConfirm, onCancel }: ConfirmRowProps) {
   return (
     <div
       className={`flex items-center gap-2 ${inline ? '' : 'w-full'}`}
       role="alertdialog"
-      aria-label={message}
+      aria-label={label}
       onKeyDown={(e) => {
         if (e.key !== 'Escape') return
         e.stopPropagation()

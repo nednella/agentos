@@ -27,6 +27,7 @@ export type Action = {
   hidden?: boolean
   command?: {
     name: string
+    aliases?: string[]
     syntax: string
     summary: string
     complete?(args: string[]): Candidate[]
@@ -142,16 +143,16 @@ export function useActions(): Action[] {
       },
     },
     {
-      id: 'stop-session',
-      label: current ? `Stop session ${describe(current)}` : 'Stop session',
+      id: 'kill-session',
+      label: current ? `Kill session ${describe(current)}` : 'Kill session',
       group: 'Sessions',
       confirm: true,
-      command: { name: 'stop', syntax: 'stop [n]', summary: 'Stop a session (default: the current one)', complete: sessionCandidates },
+      command: { name: 'kill', aliases: ['stop'], syntax: 'kill [n]', summary: 'Kill a session; its conversation stays on disk (default: the current one)', complete: sessionCandidates },
       async run(args) {
         const target = args.length ? findSession(a.sessions, args.join(' ')) : current
-        if (!target) throw 'No session to stop'
+        if (!target) throw 'No session to kill'
         await a.killSession(target.id)
-        return `Stopped ${describe(target)}`
+        return `Killed ${describe(target)}`
       },
     },
     {
