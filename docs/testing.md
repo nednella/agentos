@@ -23,7 +23,7 @@ projects:
 ```
 
 Clean up afterwards: `tmux -L $AGENTOS_TMUX_SOCKET kill-server`, kill the app and any browser started on
-`$S/data/browser`, `rm -rf $S`. Check with `pgrep -fl "$S"`.
+`$S/data/<key>/browser`, `rm -rf $S`. Check with `pgrep -fl "$S"`.
 
 ## Unit and integration tests
 

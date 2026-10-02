@@ -483,7 +483,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	if h.rec.count("stats") < 4 {
 		t.Errorf("stats events = %d", h.rec.count("stats"))
 	}
-	if _, err := os.Stat(filepath.Join(h.state, "data", "stats", "main.jsonl")); err != nil {
+	if _, err := os.Stat(filepath.Join(h.state, "data", "main", "stats.jsonl")); err != nil {
 		t.Errorf("stats file: %v", err)
 	}
 }
@@ -559,12 +559,12 @@ func TestCauseOf(t *testing.T) {
 
 func TestNotesV4(t *testing.T) {
 	h := newHarness(t)
-	notesDir := filepath.Join(h.state, "data", "notes")
+	notesDir := filepath.Join(h.state, "data", "main")
 	if err := os.MkdirAll(notesDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	old := `[{"id":"a","text":"old done","createdAt":1,"updatedAt":1,"done":true,"issue":0,"issueUrl":""},{"id":"b","text":"old open","createdAt":2,"updatedAt":2,"done":false,"issue":0,"issueUrl":""}]`
-	if err := os.WriteFile(filepath.Join(notesDir, "main.json"), []byte(old), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(notesDir, "notes.json"), []byte(old), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	notes := h.app.Snapshot().Notes
@@ -611,7 +611,7 @@ func TestNoteImages(t *testing.T) {
 	b64 := base64.StdEncoding.EncodeToString(onePixelPNG)
 
 	n, err := h.app.AddNoteImage(n.ID, b64, "image/png")
-	if err != nil || len(n.Images) != 1 || !strings.HasPrefix(n.Images[0], "/media/notes-media/main/") || !strings.HasSuffix(n.Images[0], ".png") {
+	if err != nil || len(n.Images) != 1 || !strings.HasPrefix(n.Images[0], "/media/main/notes-media/") || !strings.HasSuffix(n.Images[0], ".png") {
 		t.Fatalf("AddNoteImage = %+v, %v", n, err)
 	}
 	url := n.Images[0]
@@ -629,7 +629,7 @@ func TestNoteImages(t *testing.T) {
 	if _, err := h.app.AddNoteImage("nope", b64, "image/png"); err == nil {
 		t.Error("an image for an unknown note was accepted")
 	}
-	if files, _ := os.ReadDir(filepath.Join(h.state, "data", mediaFolder, "main")); len(files) != 1 {
+	if files, _ := os.ReadDir(filepath.Join(h.state, "data", "main", mediaFolder)); len(files) != 1 {
 		t.Errorf("%d files stored, want 1", len(files))
 	}
 
@@ -649,13 +649,13 @@ func TestNoteImages(t *testing.T) {
 		t.Errorf("GET %s = %d %s", url, code, ctype)
 	}
 	for _, p := range []string{
-		"/media/notes/main.json",
-		"/media/notes-media/../notes/main.json",
-		"/media/notes-media/main/../../notes/main.json",
-		"/media/notes-media/main/..%2f..%2fnotes%2fmain.json",
+		"/media/main/notes.json",
+		"/media/main/notes-media/../notes.json",
+		"/media/main/notes-media/../../main/notes.json",
+		"/media/main/notes-media/..%2fnotes.json",
 		"/media/../../../etc/passwd",
-		"/media/notes-media/main/",
-		"/media/notes-media/main/missing.png",
+		"/media/main/notes-media/",
+		"/media/main/notes-media/missing.png",
 		"/other",
 	} {
 		if code, _, _ := get(p); code != 404 {
@@ -680,7 +680,7 @@ func TestNoteImages(t *testing.T) {
 		t.Errorf("gh call = %q", create)
 	}
 
-	if _, err := h.app.RemoveNoteImage(n.ID, "/media/notes-media/main/other.png"); err == nil {
+	if _, err := h.app.RemoveNoteImage(n.ID, "/media/main/notes-media/other.png"); err == nil {
 		t.Error("removed a picture the note does not have")
 	}
 	n, err = h.app.RemoveNoteImage(n.ID, url)

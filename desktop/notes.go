@@ -48,7 +48,7 @@ type Notes struct {
 	mu sync.Mutex
 }
 
-func (s *Notes) path(key string) string { return filepath.Join(s.dir, "notes", key+".json") }
+func (s *Notes) path(key string) string { return filepath.Join(s.dir, key, "notes.json") }
 
 // load needs mu.
 func (s *Notes) load(key string) ([]Note, error) {

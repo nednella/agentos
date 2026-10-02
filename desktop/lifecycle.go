@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -83,17 +82,17 @@ type Lifecycle struct {
 	release   func(ctx context.Context, id string) []string // closes the session's browser tab, removes its evidence
 
 	pollMu sync.Mutex // one poll at a time
+	logMu  sync.Mutex // the clean-up log files
 
 	mu     sync.Mutex
 	tracks map[string]*track
-	acks   map[string]map[string]ack  // project key -> PR number -> ack
-	live   map[string]map[string]bool // project key -> session id -> its PR was seen open
+	files  map[string]*prsFile // by project key
 }
 
 func newLifecycle(run runner, dataDir, stateDir string, s *Sessions, emit func(string, any), closeTerm func(string)) *Lifecycle {
 	return &Lifecycle{
 		run: run, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, closeTerm: closeTerm,
-		tracks: map[string]*track{}, acks: map[string]map[string]ack{}, live: map[string]map[string]bool{},
+		tracks: map[string]*track{}, files: map[string]*prsFile{},
 	}
 }
 
@@ -216,28 +215,49 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) bool {
 	return false
 }
 
-func (l *Lifecycle) livePath(key string) string {
-	return filepath.Join(l.dataDir, "prs", key+".live.json")
+func (l *Lifecycle) prsPath(key string) string { return filepath.Join(l.dataDir, key, "prs.json") }
+
+// prsFile is what is remembered of a project's PRs: what the user has seen of each,
+// and which sessions saw their PR open.
+type prsFile struct {
+	Acks map[string]ack  `json:"acks"` // PR number -> ack
+	Live map[string]bool `json:"live"` // session id -> its PR was seen draft or open
+}
+
+// prs needs mu.
+func (l *Lifecycle) prs(key string) *prsFile {
+	if f, ok := l.files[key]; ok {
+		return f
+	}
+	f := &prsFile{}
+	if data, err := os.ReadFile(l.prsPath(key)); err == nil {
+		_ = json.Unmarshal(data, f)
+	}
+	if f.Acks == nil {
+		f.Acks = map[string]ack{}
+	}
+	if f.Live == nil {
+		f.Live = map[string]bool{}
+	}
+	l.files[key] = f
+	return f
 }
 
 // liveFile is the sessions of a project whose PR was seen open, by session id. It needs mu.
-func (l *Lifecycle) liveFile(key string) map[string]bool {
-	if live, ok := l.live[key]; ok {
-		return live
-	}
-	live := map[string]bool{}
-	if data, err := os.ReadFile(l.livePath(key)); err == nil {
-		_ = json.Unmarshal(data, &live)
-	}
-	l.live[key] = live
-	return live
-}
+func (l *Lifecycle) liveFile(key string) map[string]bool { return l.prs(key).Live }
 
-// saveLive needs mu.
-func (l *Lifecycle) saveLive(key string) {
-	data, err := json.Marshal(l.live[key])
+// ackFile needs mu.
+func (l *Lifecycle) ackFile(key string) map[string]ack { return l.prs(key).Acks }
+
+func (l *Lifecycle) saveLive(key string) { l.savePRs(key) }
+
+func (l *Lifecycle) saveAcks(key string) { l.savePRs(key) }
+
+// savePRs needs mu.
+func (l *Lifecycle) savePRs(key string) {
+	data, err := json.Marshal(l.prs(key))
 	if err == nil {
-		err = atomicfile.Write(l.livePath(key), data, 0o600)
+		err = atomicfile.Write(l.prsPath(key), data, 0o600)
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: saving PR state: %v\n", err)
@@ -267,32 +287,6 @@ func (l *Lifecycle) attentionFor(key string, pr *PR) string {
 		return "comments"
 	}
 	return ""
-}
-
-// ackFile needs mu.
-func (l *Lifecycle) ackFile(key string) map[string]ack {
-	if acks, ok := l.acks[key]; ok {
-		return acks
-	}
-	acks := map[string]ack{}
-	if data, err := os.ReadFile(l.ackPath(key)); err == nil {
-		_ = json.Unmarshal(data, &acks)
-	}
-	l.acks[key] = acks
-	return acks
-}
-
-func (l *Lifecycle) ackPath(key string) string { return filepath.Join(l.dataDir, "prs", key+".json") }
-
-// saveAcks needs mu.
-func (l *Lifecycle) saveAcks(key string) {
-	data, err := json.Marshal(l.acks[key])
-	if err == nil {
-		err = atomicfile.Write(l.ackPath(key), data, 0o600)
-	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "agentos: saving PR acknowledgements: %v\n", err)
-	}
 }
 
 // Ack marks the session's PR comments and failing checks as seen.
@@ -583,45 +577,39 @@ func display(dir, path string) string {
 }
 
 func (l *Lifecycle) cleanupPath(key string) string {
-	return filepath.Join(l.dataDir, "cleanups", key+".jsonl")
+	return filepath.Join(l.dataDir, key, "cleanups.json")
+}
+
+// readCleanups is the project's log, oldest first.
+func (l *Lifecycle) readCleanups(key string) []Cleanup {
+	var log []Cleanup
+	if data, err := os.ReadFile(l.cleanupPath(key)); err == nil {
+		_ = json.Unmarshal(data, &log)
+	}
+	return log
 }
 
 func (l *Lifecycle) appendCleanup(key string, c Cleanup) error {
-	line, err := json.Marshal(c)
+	l.logMu.Lock()
+	defer l.logMu.Unlock()
+	data, err := json.Marshal(append(l.readCleanups(key), c))
 	if err != nil {
-		return fmt.Errorf("encoding clean-up: %w", err)
+		return fmt.Errorf("encoding clean-up log: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(l.cleanupPath(key)), 0o700); err != nil {
-		return fmt.Errorf("creating clean-up folder: %w", err)
-	}
-	f, err := os.OpenFile(l.cleanupPath(key), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("opening clean-up log: %w", err)
-	}
-	defer f.Close()
-	if _, err := f.Write(append(line, '\n')); err != nil {
-		return fmt.Errorf("writing clean-up log: %w", err)
-	}
-	return nil
+	return atomicfile.Write(l.cleanupPath(key), data, 0o600)
 }
 
 // Cleanups is the project's clean-up log, newest first.
 func (l *Lifecycle) Cleanups(key string) []Cleanup {
-	out := []Cleanup{}
-	f, err := os.Open(l.cleanupPath(key))
-	if errors.Is(err, fs.ErrNotExist) || err != nil {
-		return out
+	l.logMu.Lock()
+	out := l.readCleanups(key)
+	l.logMu.Unlock()
+	if out == nil {
+		out = []Cleanup{}
 	}
-	defer f.Close()
-	sc := bufio.NewScanner(f)
-	sc.Buffer(nil, 1<<20)
-	for sc.Scan() {
-		var c Cleanup
-		if json.Unmarshal(sc.Bytes(), &c) == nil {
-			if c.Removed == nil {
-				c.Removed = []string{}
-			}
-			out = append(out, c)
+	for i := range out {
+		if out[i].Removed == nil {
+			out[i].Removed = []string{}
 		}
 	}
 	slices.Reverse(out)

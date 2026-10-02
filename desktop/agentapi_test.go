@@ -294,7 +294,7 @@ func TestCLIsAgainstTheApp(t *testing.T) {
 		if len(items) != 3 {
 			t.Fatalf("evidence = %+v", items)
 		}
-		if items[0].Kind != "image" || items[0].Caption != "pixel" || items[0].Source != "agent" || !strings.HasPrefix(items[0].URL, "/media/evidence/main/") {
+		if items[0].Kind != "image" || items[0].Caption != "pixel" || items[0].Source != "agent" || !strings.HasPrefix(items[0].URL, "/media/main/evidence/") {
 			t.Errorf("image = %+v", items[0])
 		}
 		if items[1].Kind != "text" || items[1].Text != "all green\nno regressions\n" || items[1].Caption != "notes.txt" || items[1].URL != "" {
@@ -429,7 +429,7 @@ func TestEvidenceStore(t *testing.T) {
 	e := newEvidenceStore(t.TempDir())
 	id := "main/3"
 	img, err := e.AddImage(id, onePixelPNG, "c", "user")
-	if err != nil || !strings.HasPrefix(img.URL, "/media/evidence/main/3/") {
+	if err != nil || !strings.HasPrefix(img.URL, "/media/main/evidence/3/") {
 		t.Fatalf("AddImage = %+v, %v", img, err)
 	}
 	if _, err := e.AddImage(id, []byte("<svg/>"), "", "user"); err == nil {
@@ -448,7 +448,7 @@ func TestEvidenceStore(t *testing.T) {
 	if err := again.Delete(id, img.ID); err != nil || again.Count(id) != 1 || exists(mediaFile(map[string]string{evidenceFolder: e.dir}, img.URL)) {
 		t.Errorf("Delete: %v", err)
 	}
-	if n := again.Purge(id); n != 1 || again.Count(id) != 0 || exists(filepath.Join(e.dir, "evidence", "main", "3")) {
+	if n := again.Purge(id); n != 1 || again.Count(id) != 0 || exists(filepath.Join(e.dir, "main", "evidence", "3")) {
 		t.Errorf("Purge removed %d", n)
 	}
 	if got := again.List("not a session"); len(got) != 0 {

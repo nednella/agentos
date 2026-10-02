@@ -182,7 +182,7 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	if b.binary == "" {
 		return nil, errors.New("no Brave, Chrome, Chromium or Edge browser found")
 	}
-	profile := filepath.Join(b.dataDir, "browser", key)
+	profile := filepath.Join(b.dataDir, key, "browser")
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		return nil, fmt.Errorf("creating the browser profile: %w", err)
 	}
@@ -1002,20 +1002,25 @@ func (b *Browsers) Screenshot(ctx context.Context, id string, full bool, ref str
 	return data, nil
 }
 
-// stopStrayBrowser ends a browser that an earlier run of the app left on the profile (the app was killed
-// without stopping it). The profile's lock names the process; it is only stopped if it runs on this profile.
-func stopStrayBrowser(profile string) {
+// lockedPID is the process the profile's lock names, and whether it still runs on this profile.
+func lockedPID(profile string) (pid int, running bool) {
 	target, err := os.Readlink(filepath.Join(profile, "SingletonLock"))
 	if err != nil {
-		return
+		return 0, false
 	}
 	i := strings.LastIndexByte(target, '-')
-	pid, err := strconv.Atoi(target[i+1:])
+	pid, err = strconv.Atoi(target[i+1:])
 	if i < 0 || err != nil || pid <= 1 {
-		return
+		return 0, false
 	}
 	cmdline, err := exec.Command("ps", "-p", strconv.Itoa(pid), "-o", "command=").Output()
-	if err == nil && strings.Contains(string(cmdline), "--user-data-dir="+profile) {
+	return pid, err == nil && strings.Contains(string(cmdline), "--user-data-dir="+profile)
+}
+
+// stopStrayBrowser ends a browser that an earlier run of the app left on the profile (the app was killed
+// without stopping it), and clears its lock.
+func stopStrayBrowser(profile string) {
+	if pid, running := lockedPID(profile); running {
 		_ = syscall.Kill(-pid, syscall.SIGKILL)
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 		time.Sleep(200 * time.Millisecond)

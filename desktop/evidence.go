@@ -50,7 +50,7 @@ func (e *EvidenceStore) folder(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(e.dir, evidenceFolder, name.Project, strconv.Itoa(name.N)), nil
+	return filepath.Join(e.dir, name.Project, evidenceFolder, strconv.Itoa(name.N)), nil
 }
 
 // load needs mu.
@@ -145,7 +145,7 @@ func (e *EvidenceStore) AddImage(id string, data []byte, caption, source string)
 	}
 	parsed, _ := session.ParseName(id)
 	item := Evidence{ID: name, Kind: "image", Caption: caption, Source: source, At: time.Now().UnixMilli(),
-		URL: path.Join(mediaPrefix, evidenceFolder, parsed.Project, strconv.Itoa(parsed.N), name+ext)}
+		URL: path.Join(mediaPrefix, parsed.Project, evidenceFolder, strconv.Itoa(parsed.N), name+ext)}
 	return e.add(id, item, filepath.Join(dir, name+ext))
 }
 

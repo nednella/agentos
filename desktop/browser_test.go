@@ -126,7 +126,7 @@ func profileRunning(profile string) bool {
 func TestBrowserAgentCLI(t *testing.T) {
 	h, s := browserHarness(t)
 	srv := demoServer(t)
-	profile := filepath.Join(h.state, "data", "browser", "main")
+	profile := filepath.Join(h.state, "data", "main", "browser")
 
 	out := h.mustCLI(t, s.ID, "browser", "open", srv.URL)
 	if !strings.Contains(out, "Demo") || !strings.Contains(out, srv.URL) {
@@ -214,7 +214,7 @@ func TestBrowserAgentCLI(t *testing.T) {
 		}
 		items := h.app.Evidence(s.ID)
 		if len(items) != 1 || items[0].Caption != "the demo page" || items[0].Source != "agent" || items[0].Kind != "image" ||
-			!strings.HasPrefix(items[0].URL, "/media/evidence/main/") {
+			!strings.HasPrefix(items[0].URL, "/media/main/evidence/") {
 			t.Fatalf("evidence = %+v", items)
 		}
 		srvMedia := httptest.NewServer(h.app.mediaHandler())

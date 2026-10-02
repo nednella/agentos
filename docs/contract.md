@@ -79,7 +79,7 @@ type Note = {
   updatedAt: number
   pinned: boolean
   archived: boolean
-  images: string[]      // "/media/notes-media/<project key>/<file>"
+  images: string[]      // "/media/<project key>/notes-media/<file>"
   issue: number         // GitHub issue filed from the note, 0 if none
   issueUrl: string
 }
@@ -95,7 +95,7 @@ type Snapshot = {
 type Evidence = {
   id: string
   kind: 'image' | 'text'
-  url: string           // "/media/evidence/<project key>/<n>/<file>" for images, "" for text
+  url: string           // "/media/<project key>/evidence/<n>/<file>" for images, "" for text
   text: string          // for kind 'text'
   caption: string
   source: 'agent' | 'user'
@@ -281,7 +281,7 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 ## Media
 
 Pictures are served by the Go side under `/media/…`, in the window and in the `AGENTOS_HTTP` mode: note images at
-`/media/notes-media/<project key>/<file>` and evidence at `/media/evidence/<project key>/<n>/<file>`. Only png, jpeg, gif and webp files of those two
+`/media/<project key>/notes-media/<file>` and evidence at `/media/<project key>/evidence/<n>/<file>`. Only png, jpeg, gif and webp files of those two
 folders are served. Use the URL in `<img src>`.
 
 ## Config file
@@ -324,13 +324,17 @@ ready, plan, you, idea wins. Only the lanes `ready`, `plan`, `inbox` and `idea` 
 
 ### Where things are stored
 
+Everything is grouped by project (`<key>` is the project name, lower-cased, with other characters as `-`).
+
 | What | Where |
 |---|---|
-| notes, note images, stats, digests | `data_dir` (default `~/.local/share/agentos`): `notes/<key>.json`, `notes-media/<key>/`, `stats/<key>.jsonl`, `digest/<key>.json` |
-| evidence, PR tracking, clean-up log, browser profile | always `~/.local/share/agentos`: `evidence/`, `prs/`, `cleanups/`, `browser/<key>/` |
+| notes, note images, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
+| evidence, PR tracking, clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
 | state files, sockets, tmux config, last project | `~/.local/state/agentos` |
 
-All files are written by writing a temp file and renaming it into place; folders are created as needed.
+All files are written by writing a temp file and renaming it into place; folders are created as needed. On start the app moves files of the older
+layout (grouped by kind: `notes/<key>.json`, `stats/`, `digest/`, `evidence/<key>/`, `prs/`, `cleanups/`, `browser/<key>/`) into the project
+folders, once, and never over a file that is already there.
 
 ### Environment
 
