@@ -272,6 +272,19 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			return nil, f.Repo
 		}
 		return []byte(`{"nameWithOwner":"acme/widgets"}`), nil
+	case args[0] == "api" && strings.HasSuffix(args[1], "/comments?per_page=100"):
+		if !strings.Contains(args[1], "/issues/7/") {
+			return []byte("[]"), nil
+		}
+		return []byte(`[{"user":{"login":"amy"},"created_at":"2026-09-03T10:00:00Z","body_html":"<p>Agreed.</p>"}]`), nil
+	case args[0] == "api":
+		if strings.HasSuffix(args[1], "/issues/7") {
+			return []byte(`{"number":7,"body_html":"<h2>Description</h2>\n<p>Fix it.</p>","comments":1}`), nil
+		}
+		if strings.HasSuffix(args[1], "/issues/11") {
+			return []byte(`{"number":11,"body_html":"","comments":0}`), nil
+		}
+		return nil, fmt.Errorf("gh api: HTTP 404: Not Found")
 	case args[0] == "issue" && args[1] == "create":
 		f.mu.Unlock()
 		time.Sleep(f.Delay)
@@ -567,6 +580,9 @@ func (h *Harness) TermClose(id string) { h.terminal.TermClose(id) }
 func (h *Harness) Issues(refresh bool) ([]issues.Issue, error) { return h.issues.Issues(refresh) }
 func (h *Harness) StartIssue(number int) (sessions.Session, error) {
 	return h.issues.StartIssue(number)
+}
+func (h *Harness) IssueDetail(number int) (issues.IssueDetail, error) {
+	return h.issues.IssueDetail(number)
 }
 
 func (h *Harness) AddNote(text string) (notes.Note, error) { return h.notes.AddNote(text) }

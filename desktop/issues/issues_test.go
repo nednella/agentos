@@ -155,3 +155,37 @@ func TestRepoFailureIsWarnedAboutAndNotRemembered(t *testing.T) {
 		t.Errorf("recovery was not announced: %+v", warnings)
 	}
 }
+
+func TestIssueDetail(t *testing.T) {
+	h := newHarness(t)
+
+	got, err := h.IssueDetail(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Number != 7 || got.BodyHTML != "<h2>Description</h2>\n<p>Fix it.</p>" || len(got.Comments) != 1 {
+		t.Fatalf("detail = %+v", got)
+	}
+	if c := got.Comments[0]; c.Author != "amy" || c.BodyHTML != "<p>Agreed.</p>" || c.CreatedAt != time.Date(2026, 9, 3, 10, 0, 0, 0, time.UTC).UnixMilli() {
+		t.Errorf("comment = %+v", c)
+	}
+	calls := h.GH.CallLog()
+	if len(calls) < 2 || !strings.HasSuffix(calls[len(calls)-2], "issues/7 -H Accept: application/vnd.github.html+json") || !strings.Contains(calls[len(calls)-1], "issues/7/comments") {
+		t.Errorf("gh calls = %v", calls)
+	}
+
+	empty, err := h.IssueDetail(11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if raw, _ := json.Marshal(empty); string(raw) != `{"number":11,"bodyHTML":"","comments":[]}` {
+		t.Errorf("empty issue json = %s", raw)
+	}
+	if calls := h.GH.CallLog(); strings.Contains(calls[len(calls)-1], "/comments") {
+		t.Error("the comments of an issue without any were read")
+	}
+
+	if _, err := h.IssueDetail(999); err == nil || !strings.Contains(err.Error(), "#999") {
+		t.Errorf("unknown issue: err = %v", err)
+	}
+}
