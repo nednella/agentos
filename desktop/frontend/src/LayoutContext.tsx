@@ -116,7 +116,7 @@ function fit(width: number, prefs: BandPrefs, root: number): Fitted {
 type LayoutProviderProps = { children: ReactNode }
 
 export function LayoutProvider({ children }: LayoutProviderProps) {
-  const { selectedId, sidebarTab, setSidebarTab, focus } = useAgentos()
+  const { selectedId, sidebarTab, setSidebarTab, focus, pushToast, dismissToast } = useAgentos()
   const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
@@ -126,6 +126,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
   const [statsOpen, setStatsOpen] = useState(devFlags.view === 'stats')
   const [digestOpen, setDigestOpen] = useState(devFlags.view === 'digest')
+  const zoomToast = useRef<number | null>(null)
 
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(scale))
@@ -229,6 +230,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         const next = step === 0 ? DEFAULT_SCALE : SCALES[Math.min(Math.max((at < 0 ? 2 : at) + step, 0), SCALES.length - 1)]
         setScale(next)
         writeStored('agentos.scale', next)
+        if (zoomToast.current !== null) dismissToast(zoomToast.current)
+        zoomToast.current = pushToast({ tone: 'info', text: `Text size ${Math.round(next * 100)}%` })
       },
       setMobilePanel,
       setWidth(panel, rem, commit) {
