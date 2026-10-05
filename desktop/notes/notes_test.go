@@ -300,8 +300,20 @@ func TestNoteImages(t *testing.T) {
 			create = c
 		}
 	}
-	if strings.Contains(create, "screenshot") {
-		t.Errorf("the issue mentions a picture that no longer exists: %q", create)
+	if want := " --attach " + file + "#Picture 1"; !strings.HasSuffix(create, want) {
+		t.Errorf("gh call = %q, want it to end with %q", create, want)
+	}
+
+	h.GH.CreateErr = errors.New("gh: exit status 1: uploading big.png: too large")
+	n, _ = h.AddNote("filed without its picture")
+	n, _ = h.AddNoteImage(n.ID, b64, "image/png")
+	file = h.Notes().MediaFile(n.Images[0])
+	err = h.NoteToIssue(n.ID)
+	if err == nil || !strings.Contains(err.Error(), "filed https://github.com/acme/widgets/issues/9 but") {
+		t.Errorf("NoteToIssue = %v, want the filed issue named", err)
+	}
+	if _, err := h.Notes().Get("main", n.ID); err != nil || !exists(file) {
+		t.Error("a half-filed note or its picture was deleted")
 	}
 }
 

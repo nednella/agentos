@@ -243,17 +243,18 @@ func Eventually(t *testing.T, what string, cond func() bool) {
 // FakeGH answers the gh calls with canned output; any other command runs for real.
 
 type FakeGH struct {
-	mu     sync.Mutex
-	calls  []string
-	Repo   error
-	Create string        // what gh issue create prints
-	Delay  time.Duration // how long gh issue create takes
-	pr     string        // what gh pr list prints
-	PRErr  error         // what gh pr list fails with, if set
-	pulls  string        // the body gh api prints for the repo's pull request list
-	etag   string        // its ETag: a request carrying it gets a 304
-	hooks  []*io.PipeWriter
-	hooked bool // gh webhook forward works
+	mu        sync.Mutex
+	calls     []string
+	Repo      error
+	Create    string        // what gh issue create prints
+	CreateErr error         // what gh issue create fails with, if set; it still prints Create
+	Delay     time.Duration // how long gh issue create takes
+	pr        string        // what gh pr list prints
+	PRErr     error         // what gh pr list fails with, if set
+	pulls     string        // the body gh api prints for the repo's pull request list
+	etag      string        // its ETag: a request carrying it gets a 304
+	hooks     []*io.PipeWriter
+	hooked    bool // gh webhook forward works
 }
 
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -302,7 +303,7 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		f.mu.Unlock()
 		time.Sleep(f.Delay)
 		f.mu.Lock()
-		return []byte(f.Create), nil
+		return []byte(f.Create), f.CreateErr
 	case args[0] == "issue":
 		return []byte(`[
 			{"number":7,"title":"Fix the thing","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
