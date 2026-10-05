@@ -39,10 +39,10 @@ export function QueueSearch({ shown }: QueueSearchProps) {
   }
 
   return (
-    <div className="flex flex-col gap-1 border-b border-line px-3 pt-2 pb-1.5">
-      <div className="flex items-center gap-1">
+    <div className="flex flex-col gap-1.5 border-b border-line px-3 pt-2.5 pb-2">
+      <div className="flex items-center gap-1.5">
         <div className="relative min-w-0 flex-1">
-          <span className="pointer-events-none absolute top-1.5 left-2 text-dim">
+          <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-dim">
             <Icon name="search" size={13} />
           </span>
           <input
@@ -51,7 +51,7 @@ export function QueueSearch({ shown }: QueueSearchProps) {
             spellCheck={false}
             placeholder="Search: text, @author, label:, type:, is:running"
             aria-label="Search issues"
-            className="field w-full pr-7 pl-7 text-small"
+            className="field w-full pr-7 pl-8 text-small"
             onChange={(e) => update(e.target.value)}
             onKeyDown={(e) => {
               if (completion && (e.key === 'Tab' || e.key === 'Enter')) {
