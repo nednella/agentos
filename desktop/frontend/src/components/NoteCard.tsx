@@ -185,7 +185,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
       {confirm.armed === 'file' && (
         <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: 'var(--border-note)' }}>
           <ConfirmRow
-            message={`File as issue “${title}”? The note${note.images.length > 0 ? ' and its pictures are' : ' is'} deleted afterwards.`}
+            message={`File as issue “${title}”${note.images.length > 0 ? ' with its pictures' : ''}? The note is deleted afterwards.`}
             confirmLabel="File"
             onCancel={confirm.disarm}
             onConfirm={() => {
