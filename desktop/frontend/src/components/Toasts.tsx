@@ -8,11 +8,12 @@ const EDGE: Record<Toast['tone'], string> = {
   pr: 'border-l-danger',
   waiting: 'border-l-waiting',
   replied: 'border-l-idle',
+  opened: 'border-l-idle',
   info: 'border-l-accent',
   evidence: 'border-l-accent',
 }
 
-const ACTION_LABEL: Partial<Record<string, string>> = { replied: 'Open', evidence: 'View' }
+const ACTION_LABEL: Partial<Record<string, string>> = { replied: 'Open', opened: 'Open', evidence: 'View' }
 
 export function Toasts() {
   const { toasts, select, dismissToast, setSessionView } = useAgentos()
@@ -31,7 +32,7 @@ export function Toasts() {
             className={`toast-in pointer-events-auto flex items-center gap-3 rounded-md border border-l-3 border-line-strong bg-raised py-2 pr-2 pl-3 ${EDGE[tone]}`}
           >
             {tone === 'waiting' && <StateDot state="waiting" />}
-            {tone === 'replied' && <StateDot state="idle" />}
+            {(tone === 'replied' || tone === 'opened') && <StateDot state="idle" />}
             {tone === 'pr' && <span className="mono text-small font-semibold text-danger">PR</span>}
             <span className="text-body">{toast.text}</span>
             {sessionId && (

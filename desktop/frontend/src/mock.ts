@@ -341,6 +341,10 @@ export function createMock(params: URLSearchParams) {
       const target = sessions[2]
       if (target) emit('attention', { id: target.id, state: 'replied' })
     }, 1500)
+    setTimeout(() => {
+      const target = sessions.find((s) => s.pr?.state === 'draft')
+      if (target) emit('attention', { id: target.id, state: 'opened' })
+    }, 2500)
   }
 
   function owner(s: MockSession): ProjectData {
