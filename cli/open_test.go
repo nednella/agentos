@@ -39,8 +39,11 @@ func TestBareAgentosOpensTheFirstAppItFinds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var opened []string
-			cmd := newRootCmdWith(func(_ context.Context, path string) error { opened = append(opened, path); return nil },
-				func() []string { return tt.places })
+			cmd := newRootCmdWith(launcher{
+				open:     func(_ context.Context, path string) error { opened = append(opened, path); return nil },
+				places:   func() []string { return tt.places },
+				attached: func() bool { return true },
+			})
 			var out bytes.Buffer
 			cmd.SetOut(&out)
 			cmd.SetErr(&out)
@@ -53,6 +56,36 @@ func TestBareAgentosOpensTheFirstAppItFinds(t *testing.T) {
 				}
 			case err != nil || !slices.Equal(opened, []string{tt.want}):
 				t.Errorf("err = %v, opened %v, want %s", err, opened, tt.want)
+			}
+		})
+	}
+}
+
+func TestBareAgentosWithNoTerminalIsTheAppStarting(t *testing.T) {
+	for name, tt := range map[string]struct {
+		attached bool
+		http     string
+		window   bool
+	}{
+		"typed at a terminal":       {true, "", false},
+		"started by Finder or open": {false, "", true},
+		"asked for a browser":       {true, "127.0.0.1:1", true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("AGENTOS_HTTP", tt.http)
+			var opened, window int
+			cmd := newRootCmdWith(launcher{
+				open:     func(context.Context, string) error { opened++; return nil },
+				places:   func() []string { return []string{t.TempDir()} },
+				window:   func() error { window++; return nil },
+				attached: func() bool { return tt.attached },
+			})
+			cmd.SetArgs(nil)
+			if err := cmd.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if (window == 1) != tt.window || opened == window {
+				t.Errorf("window ran %d times, open ran %d times", window, opened)
 			}
 		})
 	}

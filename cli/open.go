@@ -25,17 +25,30 @@ func openWithMac(ctx context.Context, path string) error {
 	return nil
 }
 
-// openApp is what bare "agentos" does: open the desktop app.
-func openApp(open opener, appPlaces func() []string) func(*cobra.Command, []string) error {
+// openApp is what bare "agentos" does. Typed at a terminal, it shows the app, starting it
+// when needed. With no terminal it is the app itself starting: Finder, open and the dock
+// pass no arguments. AGENTOS_HTTP asks for the app in a browser, from a terminal.
+func openApp(l launcher) func(*cobra.Command, []string) error {
 	return func(cmd *cobra.Command, _ []string) error {
-		places := appPlaces()
-		for _, place := range places {
-			if info, err := os.Stat(place); err == nil && info.IsDir() {
-				return open(cmd.Context(), place)
-			}
+		if l.window != nil && (!l.attached() || os.Getenv("AGENTOS_HTTP") != "") {
+			return l.window()
 		}
-		return fmt.Errorf("%s not found; looked in:\n  %s", appBundle, strings.Join(places, "\n  "))
+		bundle, err := findApp(l.places())
+		if err != nil {
+			return err
+		}
+		return l.open(cmd.Context(), bundle)
 	}
+}
+
+// findApp is the first of places that holds the app.
+func findApp(places []string) (string, error) {
+	for _, place := range places {
+		if info, err := os.Stat(place); err == nil && info.IsDir() {
+			return place, nil
+		}
+	}
+	return "", fmt.Errorf("%s not found; looked in:\n  %s", appBundle, strings.Join(places, "\n  "))
 }
 
 // appPlaces are where the app may be, in the order to look: next to this command (or the bundle it
