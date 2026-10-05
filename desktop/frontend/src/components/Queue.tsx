@@ -7,7 +7,6 @@ import type { Issue, Lane } from '../types'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
-import { Icon } from './Icon'
 import { IssueRow } from './IssueRow'
 import { Notice } from './Notice'
 import { QueueLaneHeader } from './QueueLaneHeader'
@@ -23,7 +22,7 @@ const CLOSED_KEY = 'agentos.queue.closed'
 type QueueProps = { nav: NavRef }
 
 export function Queue({ nav }: QueueProps) {
-  const { project, issues, issuesLoading, issueFilter, refreshIssues, report } = useAgentos()
+  const { project, issues, issueFilter } = useAgentos()
   if (project && !project.repo) {
     return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} />
   }
@@ -32,21 +31,7 @@ export function Queue({ nav }: QueueProps) {
 
   return (
     <>
-      <div className="flex h-9 flex-none items-center gap-2 px-4">
-        <span className="mono text-small text-dim">{filtering ? `${shown.length} of ${issues.length}` : `${issues.length} issues`}</span>
-        <button
-          className="btn btn-ghost ml-auto h-6 w-6 justify-center px-0"
-          title="Refresh issues and PRs (⌘R)"
-          aria-label="Refresh issues"
-          disabled={issuesLoading}
-          onClick={() => report(refreshIssues)}
-        >
-          <span className={issuesLoading ? 'inline-flex animate-spin' : 'inline-flex'}>
-            <Icon name="refresh" size={13} />
-          </span>
-        </button>
-      </div>
-      <QueueSearch />
+      <QueueSearch shown={filtering ? shown.length : null} />
       <QueueList nav={nav} shown={shown} filtering={filtering} />
     </>
   )
