@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -153,6 +154,53 @@ func TestRepoFailureIsWarnedAboutAndNotRemembered(t *testing.T) {
 	}
 	if len(warnings) != 2 || warnings[1] != (warn.Warning{Source: "github"}) {
 		t.Errorf("recovery was not announced: %+v", warnings)
+	}
+}
+
+// A refresh asks gh for the repo again; the one it knows must not vanish from the project list meanwhile.
+func TestRefreshKeepsTheKnownRepo(t *testing.T) {
+	gh := &apptest.FakeGH{}
+	var repoCalls atomic.Int32
+	asked, answer := make(chan struct{}), make(chan struct{})
+	runner := func(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+		if name == "gh" && args[0] == "repo" && repoCalls.Add(1) == 2 {
+			close(asked)
+			<-answer
+		}
+		return gh.Run(ctx, dir, name, args...)
+	}
+	is := issues.New(runner, nil, func(string, any) {})
+	ctx, proj := context.Background(), project.Project{Dir: "/x"}
+	if _, err := is.List(ctx, proj, false); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := is.List(ctx, proj, true)
+		done <- err
+	}()
+	<-asked
+	if repo := is.CachedRepo("/x"); repo != "acme/widgets" {
+		t.Errorf("while gh was asked again, cached repo = %q", repo)
+	}
+	close(answer)
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	if repoCalls.Load() != 2 || gh.IssueCalls() != 2 {
+		t.Errorf("gh repo view ran %d times, gh issue list %d times; want 2 and 2", repoCalls.Load(), gh.IssueCalls())
+	}
+
+	gh.Repo = errors.New("gh repo view: exit status 1: error connecting to api.github.com")
+	if _, err := is.List(ctx, proj, true); err != nil {
+		t.Fatal(err)
+	}
+	if repo := is.CachedRepo("/x"); repo != "acme/widgets" {
+		t.Errorf("after a failed lookup, cached repo = %q", repo)
+	}
+	if repo := is.Repo(ctx, "/x"); repo != "acme/widgets" {
+		t.Errorf("after a failed lookup, repo = %q", repo)
 	}
 }
 
