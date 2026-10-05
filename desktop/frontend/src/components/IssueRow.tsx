@@ -10,19 +10,18 @@ import { TypeMark } from './TypeMark'
 type IssueRowProps = { issue: Issue; cursor: boolean }
 
 export function IssueRow({ issue, cursor }: IssueRowProps) {
-  const { sessions, select, startIssue, report } = useAgentos()
-  const { mode, issueOpen, toggleIssue } = useLayout()
+  const { sessions, overlay, select, startIssue, setOverlay, report } = useAgentos()
+  const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
   const dense = mode === 'compact'
-  const open = issueOpen === issue.number
+  const open = typeof overlay === 'object' && overlay?.issue === issue.number
 
   return (
     <div className="row row-inset group h-9 items-center gap-1 pr-1.5 pl-3" data-cursor={cursor} data-selected={open}>
       <button
         className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
-        title={open ? 'Back to the terminal' : 'Read the issue'}
-        aria-expanded={open}
-        onClick={() => toggleIssue(issue.number)}
+        title="Read the issue"
+        onClick={() => setOverlay({ issue: issue.number })}
       >
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />

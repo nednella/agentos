@@ -16,7 +16,7 @@ export type Toast = {
 export type SessionView = 'terminal' | 'browser' | 'evidence'
 export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
-export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
+export type Overlay = 'palette' | 'projects' | 'shortcuts' | { issue: number } | null
 export type SidebarTab = 'queue' | 'notes'
 export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
 export type PendingImage = { base64: string; mime: string }
