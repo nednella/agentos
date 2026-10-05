@@ -1,10 +1,15 @@
 package project
 
 import (
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// DefaultPRPoll is how often pull requests are polled when pr_poll is not set.
+const DefaultPRPoll = 30 * time.Second
 
 var defaultLanes = map[string]string{
 	"ready": "ready", "needs-plan": "plan", "needs-human": "you", "idea": "idea",
@@ -73,3 +78,15 @@ func (p Project) BrowserOn() bool { return p.Browser == nil || *p.Browser }
 
 // DigestOn says whether the weekly digest runs by itself.
 func (p Project) DigestOn() bool { return p.Digest != "off" }
+
+// PRPollEvery is how often the project's pull requests are polled.
+func (p Project) PRPollEvery() (time.Duration, error) {
+	if p.PRPoll == "" {
+		return DefaultPRPoll, nil
+	}
+	d, err := time.ParseDuration(p.PRPoll)
+	if err != nil || d < time.Second {
+		return 0, fmt.Errorf("pr_poll must be a duration of at least 1s, like 30s, not %q", p.PRPoll)
+	}
+	return d, nil
+}

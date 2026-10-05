@@ -49,6 +49,13 @@ func TestLoad(t *testing.T) {
 			want: Config{Agent: "bash", Projects: []Project{{Name: "api", Dir: "/srv/api"}}},
 		},
 		{name: "project without dir", path: write("projects:\n  - {name: api}\n"), wantErr: true},
+		{
+			name: "pull request watch",
+			path: write("projects:\n  - {name: api, dir: /srv/api, pr_watch: poll, pr_poll: 1m}\n"),
+			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", PRWatch: "poll", PRPoll: "1m"}}},
+		},
+		{name: "unknown pr_watch", path: write("projects:\n  - {name: api, dir: /srv/api, pr_watch: push}\n"), wantErr: true},
+		{name: "bad pr_poll", path: write("projects:\n  - {name: api, dir: /srv/api, pr_poll: often}\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
 	}
 	for _, tt := range tests {

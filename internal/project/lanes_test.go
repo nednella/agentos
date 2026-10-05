@@ -1,6 +1,9 @@
 package project
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLane(t *testing.T) {
 	custom := Project{Lanes: map[string]string{"go": "ready", "later": "idea", "blocked": "you"}}
@@ -80,6 +83,26 @@ func TestDigestOn(t *testing.T) {
 	}{{"", true}, {"weekly", true}, {"off", false}} {
 		if got := (Project{Digest: tt.digest}).DigestOn(); got != tt.want {
 			t.Errorf("DigestOn(%q) = %v, want %v", tt.digest, got, tt.want)
+		}
+	}
+}
+
+func TestPRPollEvery(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    time.Duration
+		wantErr bool
+	}{
+		{"", 30 * time.Second, false},
+		{"45s", 45 * time.Second, false},
+		{"2m", 2 * time.Minute, false},
+		{"500ms", 0, true},
+		{"soon", 0, true},
+	}
+	for _, tt := range tests {
+		got, err := (Project{PRPoll: tt.in}).PRPollEvery()
+		if (err != nil) != tt.wantErr || got != tt.want {
+			t.Errorf("PRPollEvery(%q) = %v, %v; want %v, err %v", tt.in, got, err, tt.want, tt.wantErr)
 		}
 	}
 }
