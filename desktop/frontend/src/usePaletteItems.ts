@@ -47,7 +47,7 @@ export function usePaletteItems(query: string): PaletteItem[] {
       keys: action.shortcut ? formatShortcut(action.shortcut) : undefined,
       confirm: action.confirm,
       prompt: action.palette ? { label: action.palette.prompt ?? '', initial: action.palette.initial ?? '' } : undefined,
-      run: (args) => action.run(args, 'ui'),
+      run: (args) => action.run(args),
     }))
 
   const projects: PaletteItem[] = a.projects

@@ -40,6 +40,9 @@ func (a *App) askerSession(req control.Request) (string, error) {
 
 // askerProject is the project key of the asking session, else the current project.
 func (a *App) askerProject(req control.Request) string {
+	if req.Project != "" {
+		return req.Project
+	}
 	if name, err := session.ParseName(req.Session); err == nil {
 		return name.Project
 	}
@@ -67,6 +70,10 @@ func (a *App) runControl(ctx context.Context, req control.Request) (string, erro
 		}
 		return "note saved: " + n.title(), nil
 	case "stats":
+		if req.Opts["open"] != "" {
+			a.contextProject(req)
+			return a.ui("stats"), nil
+		}
 		days := 7
 		if v := req.Opts["days"]; v != "" {
 			var err error
@@ -86,12 +93,16 @@ func (a *App) runControl(ctx context.Context, req control.Request) (string, erro
 	case "digest-add":
 		return a.controlDigestAdd(req)
 	}
+	if out, ok, err := a.controlApp(ctx, req); ok {
+		return out, err
+	}
 	return "", fmt.Errorf("unknown command %q", req.Cmd)
 }
 
 func (a *App) controlBrowser(ctx context.Context, req control.Request) (string, error) {
 	if len(req.Args) == 0 {
-		return control.BrowserHelp, nil
+		a.contextProject(req)
+		return a.ui("browser"), nil
 	}
 	sub, args := req.Args[0], req.Args[1:]
 	if sub == "help" {

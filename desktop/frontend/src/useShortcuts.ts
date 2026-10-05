@@ -17,7 +17,7 @@ export function useShortcuts() {
       const action = registry.find((x) => x.shortcut && matchShortcut(e, x.shortcut) && !(x.shortcut.unlessTyping && isEditingText(e.target)))
       if (action) {
         e.preventDefault()
-        agentos.report(() => action.run([], 'ui'))
+        agentos.report(() => action.run([]))
       }
     }
     const onEscape = (e: KeyboardEvent) => {

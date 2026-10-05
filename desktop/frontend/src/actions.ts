@@ -2,9 +2,8 @@ import { useAgentos } from './AgentosContext'
 import type { Overlay } from './AgentosContext'
 import { isFiltering } from './issueFilter'
 import { useLayout } from './LayoutContext'
-import type { Project, Session } from './types'
+import type { Session } from './types'
 
-export type Candidate = { value: string; label: string; detail?: string }
 export type Shortcut = {
   key: string
   shift?: boolean
@@ -17,8 +16,6 @@ export type Shortcut = {
 }
 export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Notes' | 'Queue' | 'App'
 
-type Via = 'ui' | 'command'
-
 export type Action = {
   id: string
   label: string
@@ -26,16 +23,10 @@ export type Action = {
   shortcut?: Shortcut
   keysLabel?: string
   hidden?: boolean
-  command?: {
-    name: string
-    aliases?: string[]
-    syntax: string
-    summary: string
-    complete?(args: string[]): Candidate[]
-  }
+  uiCommand?: string
   palette?: false | { prompt?: string; initial?: string }
   confirm?: boolean
-  run(args: string[], via: Via): string | void | Promise<string | void>
+  run(args: string[]): string | void | Promise<string | void>
 }
 
 const KEY_LABELS: Record<string, string> = { arrowleft: '←', arrowright: '→', arrowup: '↑', arrowdown: '↓' }
@@ -76,17 +67,6 @@ function findSession(sessions: Session[], query: string): Session {
   throw `No session matches "${query}"`
 }
 
-function findProject(projects: Project[], query: string): Project {
-  const name = query.trim().toLowerCase()
-  if (!name) throw 'Give a project name'
-  const exact = projects.find((p) => p.name.toLowerCase() === name)
-  if (exact) return exact
-  const matches = projects.filter((p) => p.name.toLowerCase().startsWith(name))
-  if (matches.length === 1) return matches[0]
-  if (matches.length > 1) throw `${matches.length} projects match "${query}"`
-  throw `No project named "${query}"`
-}
-
 const describe = (s: Session) => `${s.n} ${s.title}`
 
 export function useActions(): Action[] {
@@ -99,31 +79,14 @@ export function useActions(): Action[] {
     layout.focusPanel('terminal')
   }
 
-  const sessionCandidates = (args: string[]): Candidate[] =>
-    a.sessions
-      .filter((s) => includes(describe(s), args[args.length - 1] ?? ''))
-      .map((s) => ({ value: String(s.n), label: s.title, detail: `#${s.n}` }))
-
-  const projectCandidates = (partial: string, extra: string[] = []): Candidate[] => [
-    ...extra.filter((e) => e.startsWith(partial)).map((e) => ({ value: e, label: e, detail: 'subcommand' })),
-    ...a.projects
-      .filter((p) => p.name.toLowerCase().startsWith(partial.toLowerCase()))
-      .map((p) => ({ value: p.name, label: p.name, detail: `${p.sessions} sessions` })),
-  ]
-
   const actions: Action[] = [
     {
       id: 'new-session',
       label: 'New session',
       group: 'Sessions',
       shortcut: { key: 'n' },
-      command: { name: 'new', syntax: 'new [title]', summary: 'Start a session' },
-      run(args, via) {
-        if (via === 'ui') {
-          a.setComposing(true)
-          return
-        }
-        return a.newSession(args.join(' ')).then((s) => `Started session ${describe(s)}`)
+      run() {
+        a.setComposing(true)
       },
     },
     {
@@ -131,7 +94,7 @@ export function useActions(): Action[] {
       label: 'Open session',
       group: 'Sessions',
       palette: false,
-      command: { name: 'open', syntax: 'open <n|title>', summary: 'Jump to a session', complete: sessionCandidates },
+      uiCommand: 'open',
       run(args) {
         const session = findSession(a.sessions, args.join(' '))
         a.select(session.id)
@@ -143,7 +106,7 @@ export function useActions(): Action[] {
       label: 'Next that needs you',
       group: 'Sessions',
       shortcut: { key: 'e' },
-      command: { name: 'next', syntax: 'next', summary: 'Jump to the next session that needs you' },
+      uiCommand: 'next',
       run() {
         a.nextAttention()
       },
@@ -153,7 +116,6 @@ export function useActions(): Action[] {
       label: current ? `Kill session ${describe(current)}` : 'Kill session',
       group: 'Sessions',
       confirm: true,
-      command: { name: 'kill', aliases: ['stop'], syntax: 'kill [n]', summary: 'Kill a session; its conversation stays on disk (default: the current one)', complete: sessionCandidates },
       async run(args) {
         const target = args.length ? findSession(a.sessions, args.join(' ')) : current
         if (!target) throw 'No session to kill'
@@ -166,7 +128,6 @@ export function useActions(): Action[] {
       label: current ? `Rename session ${describe(current)}` : 'Rename session',
       group: 'Sessions',
       palette: { prompt: 'New title', initial: current?.title },
-      command: { name: 'rename', syntax: 'rename <title>', summary: 'Rename the current session' },
       async run(args) {
         if (!current) throw 'No session to rename'
         if (args.length === 0) throw 'Give the new title: rename <title>'
@@ -179,16 +140,6 @@ export function useActions(): Action[] {
       label: 'Start issue',
       group: 'Queue',
       palette: false,
-      command: {
-        name: 'issue',
-        syntax: 'issue <number…>',
-        summary: 'Start a session from one or more issues',
-        complete: (args) =>
-          a.issues
-            .filter((i) => !i.sessionId && includes(`${i.number} ${i.title}`, args[args.length - 1] ?? ''))
-            .slice(0, 12)
-            .map((i) => ({ value: String(i.number), label: i.title, detail: `#${i.number}` })),
-      },
       async run(args) {
         const numbers = args.map((x) => Number(x.replace(/^#/, '')))
         if (numbers.length === 0 || numbers.some((n) => !Number.isInteger(n))) throw 'Give issue numbers: issue 394 393'
@@ -210,39 +161,6 @@ export function useActions(): Action[] {
       run: openOverlay('projects'),
     },
     {
-      id: 'project',
-      label: 'Project',
-      group: 'Projects',
-      palette: false,
-      command: {
-        name: 'project',
-        syntax: 'project <name> | add [path] | remove <name>',
-        summary: 'Switch, add or remove a project',
-        complete: (args) =>
-          args[0] === 'remove' || args.length > 2
-            ? projectCandidates(args[args.length - 1] ?? '')
-            : projectCandidates(args[0] ?? '', ['add', 'remove']),
-      },
-      async run(args) {
-        if (args.length === 0) {
-          a.setOverlay('projects')
-          return
-        }
-        if (args[0] === 'add') {
-          await a.addProject(args.slice(1).join(' ') || undefined)
-          return 'Added project'
-        }
-        if (args[0] === 'remove') {
-          const target = findProject(a.projects, args.slice(1).join(' '))
-          await a.removeProject(target.name)
-          return `Removed project ${target.name}`
-        }
-        const target = findProject(a.projects, args.join(' '))
-        await a.switchProject(target.name)
-        return `Switched to ${target.name}`
-      },
-    },
-    {
       id: 'add-project',
       label: 'Add project…',
       group: 'Projects',
@@ -255,7 +173,6 @@ export function useActions(): Action[] {
       label: 'New note',
       group: 'Notes',
       palette: { prompt: 'Note text' },
-      command: { name: 'note', syntax: 'note <text>', summary: 'Capture a note' },
       async run(args) {
         if (args.length === 0) {
           layout.showSidebarTab('notes')
@@ -270,7 +187,7 @@ export function useActions(): Action[] {
       id: 'show-notes',
       label: 'Show notes',
       group: 'Notes',
-      command: { name: 'notes', syntax: 'notes', summary: 'Show the notes tab and focus the jot box' },
+      uiCommand: 'notes',
       run() {
         layout.showSidebarTab('notes')
         a.focus('note-input')
@@ -280,7 +197,7 @@ export function useActions(): Action[] {
       id: 'show-queue',
       label: 'Search the queue',
       group: 'Queue',
-      command: { name: 'queue', syntax: 'queue', summary: 'Show the queue tab and focus its search' },
+      uiCommand: 'queue',
       run() {
         layout.showSidebarTab('queue')
         a.focus('queue-filter')
@@ -291,7 +208,7 @@ export function useActions(): Action[] {
       label: 'Filter the queue…',
       group: 'Queue',
       palette: { prompt: 'Filter, e.g. @mariam-k label:idea -type:bug', initial: a.issueFilter },
-      command: { name: 'filter', syntax: 'filter [query]', summary: 'Filter the queue (no query clears it)' },
+      uiCommand: 'filter',
       run(args) {
         layout.showSidebarTab('queue')
         a.setIssueFilter(args.join(' '))
@@ -303,7 +220,7 @@ export function useActions(): Action[] {
       label: 'Refresh issues and PRs',
       group: 'Queue',
       shortcut: { key: 'r' },
-      command: { name: 'refresh', syntax: 'refresh', summary: 'Reload issues and pull requests from GitHub' },
+      uiCommand: 'refresh',
       async run() {
         await Promise.all([a.refreshIssues(), a.refreshPRs()])
         return 'Issues and pull requests refreshed'
@@ -324,11 +241,11 @@ export function useActions(): Action[] {
       run: layout.toggleSessions,
     },
     {
-      id: 'focus-command',
-      label: 'Focus command line',
+      id: 'focus-shell',
+      label: 'Focus the shell',
       group: 'Navigate',
       shortcut: { key: 's' },
-      run: () => layout.focusPanel('command'),
+      run: () => layout.focusPanel('shell'),
     },
     {
       id: 'panel-sidebar',
@@ -379,14 +296,14 @@ export function useActions(): Action[] {
       label: 'Stats: what interrupts you',
       group: 'App',
       shortcut: { key: 's', shift: true },
-      command: { name: 'stats', syntax: 'stats', summary: 'Show or hide the interruption stats' },
+      uiCommand: 'stats',
       run: layout.toggleStats,
     },
     {
       id: 'show-terminal',
       label: 'Show terminal',
       group: 'Sessions',
-      command: { name: 'term', syntax: 'term', summary: "Show the session's terminal" },
+      uiCommand: 'term',
       run() {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -397,7 +314,7 @@ export function useActions(): Action[] {
       id: 'show-browser',
       label: 'Show browser',
       group: 'Sessions',
-      command: { name: 'browser', syntax: 'browser [url]', summary: "Show the session's browser, or open a page in it" },
+      uiCommand: 'browser',
       async run(args) {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -413,7 +330,7 @@ export function useActions(): Action[] {
       id: 'show-evidence',
       label: 'Show evidence',
       group: 'Sessions',
-      command: { name: 'evidence', syntax: 'evidence', summary: "Show what the session has captured" },
+      uiCommand: 'evidence',
       run() {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -441,14 +358,14 @@ export function useActions(): Action[] {
       label: 'Weekly digest',
       group: 'App',
       shortcut: { key: 'd', shift: true },
-      command: { name: 'digest', syntax: 'digest', summary: 'Show or hide the weekly digest' },
+      uiCommand: 'digest',
       run: layout.toggleDigest,
     },
     {
       id: 'harness',
       label: "Check this project's harness",
       group: 'Projects',
-      command: { name: 'harness', syntax: 'harness', summary: "Start a session that reviews the project's harness" },
+      uiCommand: 'harness',
       async run() {
         await a.harnessCheck()
         return 'Started the harness check'
@@ -458,7 +375,7 @@ export function useActions(): Action[] {
       id: 'open-pr',
       label: current?.pr ? `Open PR #${current.pr.number}` : 'Open the pull request',
       group: 'Sessions',
-      command: { name: 'pr', syntax: 'pr', summary: "Open the current session's pull request" },
+      uiCommand: 'pr',
       async run() {
         if (!current) throw 'No session selected'
         await a.openPR(current)
@@ -470,7 +387,6 @@ export function useActions(): Action[] {
       label: current ? `Clean up session ${describe(current)}` : 'Clean up session',
       group: 'Sessions',
       confirm: true,
-      command: { name: 'cleanup', syntax: 'cleanup [n]', summary: 'Remove the worktree, branch and session once its PR is done', complete: sessionCandidates },
       async run(args) {
         const target = args.length ? findSession(a.sessions, args.join(' ')) : current
         if (!target) throw 'No session to clean up'
@@ -505,16 +421,7 @@ export function useActions(): Action[] {
       label: 'Keyboard shortcuts',
       group: 'App',
       shortcut: { key: '/' },
-      command: { name: 'help', syntax: 'help', summary: 'Show the shortcuts' },
       run: openOverlay('shortcuts'),
-    },
-    {
-      id: 'clear',
-      label: 'Clear',
-      group: 'App',
-      palette: false,
-      command: { name: 'clear', syntax: 'clear', summary: 'Clear the message line' },
-      run: () => '',
     },
   ]
 

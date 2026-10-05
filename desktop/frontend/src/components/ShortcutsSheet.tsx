@@ -6,59 +6,46 @@ import { Icon } from './Icon'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 
-type Row = { id: string; label: string; syntax?: string; summary?: string; keys?: string }
+type Row = { id: string; label: string; keys?: string; mono?: boolean }
 type Group = { title: string; ids: string[]; extra?: Row[] }
 
 const GROUPS: Group[] = [
-  { title: 'Sessions', ids: ['new-session', 'open-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'open-pr', 'cleanup', 'harness'] },
-  { title: 'Navigate', ids: ['panel-sidebar', 'focus-command', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'project', 'palette', 'shortcuts'] },
-  { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues', 'start-issue'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
+  { title: 'Sessions', ids: ['new-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'open-pr', 'cleanup', 'harness'] },
+  { title: 'Navigate', ids: ['panel-sidebar', 'focus-shell', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'palette', 'shortcuts'] },
+  { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
   { title: 'Views', ids: ['stats', 'digest', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
   {
-    title: 'Command line',
-    ids: ['clear'],
+    title: 'Shell',
+    ids: [],
     extra: [
-      { id: 'tab', label: 'Complete a command or argument', keys: 'Tab' },
-      { id: 'history', label: 'Walk the history', keys: '↑ ↓' },
-      { id: 'esc', label: 'Back to the terminal', keys: 'Esc' },
+      { id: 'shell-keys', label: 'Back to the terminal', keys: 'Esc Esc' },
+      { id: 'shell-ex-1', label: 'agentos issue 394 393', mono: true },
+      { id: 'shell-ex-2', label: 'agentos open 2', mono: true },
+      { id: 'shell-ex-3', label: 'agentos filter @nednella type:bug', mono: true },
+      { id: 'shell-ex-4', label: 'agentos next', mono: true },
     ],
   },
   { title: 'In a list', ids: [], extra: LIST_KEYS.map((k) => ({ id: k.keys, label: k.summary, keys: k.keys })) },
 ]
 
 const LEFT = ['Sessions', 'Queue', 'In a list']
-const RIGHT = ['Navigate', 'Notes', 'Views', 'Command line']
+const RIGHT = ['Navigate', 'Notes', 'Views', 'Shell']
 const listed = new Set(GROUPS.flatMap((g) => g.ids))
 
 function toRow(action: Action): Row {
   const keys = action.keysLabel ?? (action.shortcut ? formatShortcut(action.shortcut) : undefined)
-  if (action.shortcut) return { id: action.id, label: action.keysLabel ? 'Open session n' : action.label, syntax: action.command?.syntax, keys }
-  return { id: action.id, label: action.command?.name ?? action.label, syntax: action.command?.syntax, summary: action.command?.summary }
+  return { id: action.id, label: action.keysLabel ? 'Open session n' : action.label, keys }
 }
 
-const matches = (row: Row, query: string) =>
-  [row.label, row.syntax, row.summary, row.keys].some((text) => text?.toLowerCase().includes(query))
+const matches = (row: Row, query: string) => [row.label, row.keys].some((text) => text?.toLowerCase().includes(query))
 
 type RowViewProps = { row: Row }
 
 function RowView({ row }: RowViewProps) {
   return (
     <li className="flex h-7 items-center gap-3 border-b border-line last:border-b-0">
-      {row.summary || (row.syntax && !row.keys) ? (
-        <>
-          <code className="mono flex-none text-small text-accent">{row.syntax ?? row.label}</code>
-          <span className="min-w-0 flex-1 truncate text-small text-dim" title={row.summary}>
-            {row.summary}
-          </span>
-        </>
-      ) : (
-        <>
-          <span className="min-w-0 truncate text-body">{row.label}</span>
-          {row.syntax && <code className="mono hidden flex-none text-label text-dim sm:inline">{row.syntax}</code>}
-          <span className="flex-1" />
-        </>
-      )}
+      <span className={`min-w-0 flex-1 truncate ${row.mono ? 'mono text-small text-accent' : 'text-body'}`}>{row.label}</span>
       {row.keys && <Keycap>{row.keys}</Keycap>}
     </li>
   )
@@ -74,13 +61,13 @@ export function ShortcutsSheet() {
     const needle = query.trim().toLowerCase()
     const build = (group: Group) => {
       const rows = [
-        ...group.ids.map((id) => byId.get(id)).filter((a): a is Action => Boolean(a && (a.shortcut || a.command) && !a.hidden)).map(toRow),
+        ...group.ids.map((id) => byId.get(id)).filter((a): a is Action => Boolean(a && a.shortcut && !a.hidden)).map(toRow),
         ...(group.extra ?? []),
       ]
       return { title: group.title, rows: needle ? rows.filter((r) => matches(r, needle)) : rows }
     }
     const all = GROUPS.map(build)
-    const leftovers = actions.filter((a) => !listed.has(a.id) && (a.shortcut || a.command) && !a.hidden).map(toRow)
+    const leftovers = actions.filter((a) => !listed.has(a.id) && a.shortcut && !a.hidden).map(toRow)
     if (leftovers.length > 0) all.push({ title: 'More', rows: needle ? leftovers.filter((r) => matches(r, needle)) : leftovers })
     return all.filter((g) => g.rows.length > 0)
   }, [actions, query])
@@ -92,6 +79,7 @@ export function ShortcutsSheet() {
     list.map((g) => (
       <section key={g.title} className="min-w-0">
         <h3 className="label pb-0.5">{g.title}</h3>
+        {g.title === 'Shell' && <p className="pb-1 text-small text-dim">A zsh in the project folder. Run agentos &lt;command&gt; here, or in any terminal, to drive the app.</p>}
         <ul>
           {g.rows.map((row) => (
             <RowView key={row.id} row={row} />

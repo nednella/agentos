@@ -17,7 +17,7 @@ export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
 export type SidebarTab = 'queue' | 'notes'
-export type FocusTarget = 'terminal' | 'command' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
+export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
 export type PendingImage = { base64: string; mime: string }
 
 type Agentos = {
@@ -40,6 +40,8 @@ type Agentos = {
   sidebarTab: SidebarTab
   composing: boolean
   focusRequest: { target: FocusTarget; n: number }
+  shellId: string
+  openShell(): Promise<void>
   select(id: string): void
   stepSession(delta: number): void
   newSession(title?: string): Promise<Session>
@@ -118,6 +120,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [views, setViews] = useState<Record<string, SessionView>>({})
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
+  const [shellId, setShellId] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
@@ -183,13 +186,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   }, [])
 
   const enterProject = useCallback(
-    (snap: { project: Project; projects: Project[]; sessions: Session[]; notes: Note[] }) => {
+    (snap: { project: Project; projects: Project[]; sessions: Session[]; notes: Note[]; shell: string }) => {
       if (projectRef.current && selectedRef.current) lastSelected.current.set(projectRef.current.name, selectedRef.current)
       projectRef.current = snap.project
       selectId(null)
       setProject(snap.project)
       setProjects(snap.projects)
       setNotes(snap.notes)
+      setShellId(snap.shell)
       setRawIssues([])
       setIssueFilterState(readStored(filterKey(snap.project.name), ''))
       report(async () => setCleanups(await api.cleanups()))
@@ -306,6 +310,12 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       sidebarTab,
       composing,
       focusRequest,
+      shellId,
+      async openShell() {
+        if (shellId) return
+        const shell = await api.shellOpen()
+        setShellId(shell.id)
+      },
       select: selectId,
       stepSession(delta) {
         const list = sessionsRef.current
@@ -469,7 +479,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast: (key) => setToasts((list) => list.filter((t) => t.key !== key)),
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report, pushToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, loadIssues, focus, report, pushToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

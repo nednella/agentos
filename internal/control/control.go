@@ -58,7 +58,7 @@ type Response struct {
 func SocketPath(stateDir string) string { return filepath.Join(stateDir, socketFile) }
 
 // ErrNotRunning means no app is listening.
-var ErrNotRunning = errors.New("the agentos app is not running: start it and try again")
+var ErrNotRunning = errors.New("agentos is not running: open the app and try again")
 
 // Call sends req and waits for the answer.
 func Call(ctx context.Context, socket string, req Request) (Response, error) {

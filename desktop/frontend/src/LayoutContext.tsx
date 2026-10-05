@@ -7,8 +7,8 @@ import { readStored, writeStored } from './storage'
 
 export type Band = 'compact' | 'medium' | 'wide'
 export type LayoutMode = 'narrow' | Band
-export type Panel = 'sidebar' | 'terminal' | 'sessions' | 'command'
-export type MobilePanel = 'queue' | 'notes' | 'session' | 'sessions'
+export type Panel = 'sidebar' | 'terminal' | 'sessions' | 'shell'
+export type MobilePanel = 'queue' | 'notes' | 'session' | 'sessions' | 'shell'
 export type SidePanel = 'sidebar' | 'sessions'
 
 export const SCALES = [0.85, 0.92, 1, 1.1, 1.2, 1.35, 1.5]
@@ -25,11 +25,16 @@ const DEFAULT_RANGE: Record<SidePanel, [number, number]> = { sidebar: [11, 26], 
 const MIN_REM: Record<SidePanel, number> = { sidebar: 11, sessions: 9.5 }
 const MAX_REM = 32
 const LAYOUT_KEY = 'agentos.layout.v2'
+const SHELL_ROW_REM = 1.0325
+const SHELL_PAD_REM = 0.5
+export const shellRemForRows = (rows: number) => rows * SHELL_ROW_REM + SHELL_PAD_REM
+const SHELL_DEFAULT_REM = shellRemForRows(6)
+const SHELL_MIN_REM = shellRemForRows(3)
 
-type BandPrefs = { sidebarOpen: boolean; sessionsOpen: boolean; sidebar: number | null; sessions: number | null }
+type BandPrefs = { sidebarOpen: boolean; sessionsOpen: boolean; shellOpen: boolean; sidebar: number | null; sessions: number | null; shell: number | null }
 type AllPrefs = Record<Band, BandPrefs>
 
-const fresh = (band: Band): BandPrefs => ({ sidebarOpen: true, sessionsOpen: band !== 'compact', sidebar: null, sessions: null })
+const fresh = (band: Band): BandPrefs => ({ sidebarOpen: true, sessionsOpen: band !== 'compact', shellOpen: true, sidebar: null, sessions: null, shell: null })
 
 type Layout = {
   mode: LayoutMode
@@ -37,6 +42,8 @@ type Layout = {
   scale: number
   sidebarOpen: boolean
   sessionsOpen: boolean
+  shellOpen: boolean
+  shellRem: number
   sidebarPeek: boolean
   sessionsPeek: boolean
   mobilePanel: MobilePanel
@@ -48,6 +55,9 @@ type Layout = {
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
   resetWidth(panel: SidePanel): void
+  setShellOpen(open: boolean): void
+  setShellHeight(rem: number, commit: boolean): void
+  resetShellHeight(): void
   toggleSidebar(): void
   toggleSessions(): void
   setSidebarOpen(open: boolean): void
@@ -183,12 +193,16 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         if (panel === 'sidebar') setMobilePanel(sidebarTab)
         if (panel === 'sessions') setMobilePanel('sessions')
         if (panel === 'terminal') setMobilePanel('session')
+        if (panel === 'shell') setMobilePanel('shell')
       } else if (panel === 'sidebar') setPeek(prefs.sidebarOpen ? null : 'sidebar')
       else if (panel === 'sessions') setPeek(sessionsOpen ? null : 'sessions')
-      else setPeek(null)
+      else {
+        setPeek(null)
+        if (panel === 'shell') updatePrefs({ shellOpen: true })
+      }
       focus(panel)
     },
-    [focus, narrow, prefs.sidebarOpen, sessionsOpen, sidebarTab],
+    [focus, narrow, prefs.sidebarOpen, sessionsOpen, sidebarTab, updatePrefs],
   )
 
   const value = useMemo<Layout>(
@@ -198,6 +212,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       scale,
       sidebarOpen,
       sessionsOpen,
+      shellOpen: narrow ? mobilePanel === 'shell' : prefs.shellOpen,
+      shellRem: Math.min(Math.max(prefs.shell ?? SHELL_DEFAULT_REM, SHELL_MIN_REM), (0.6 * window.innerHeight) / (16 * scale)),
       sidebarPeek: !narrow && !prefs.sidebarOpen && peek === 'sidebar',
       sessionsPeek: !narrow && !sessionsOpen && peek === 'sessions',
       mobilePanel,
@@ -221,6 +237,16 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         else setStored((all) => ({ ...all, [band]: { ...fresh(band), ...all[band], [panel]: next } }))
       },
       resetWidth: (panel) => updatePrefs({ [panel]: null }),
+      setShellOpen(open) {
+        if (narrow) setMobilePanel(open ? 'shell' : 'session')
+        else updatePrefs({ shellOpen: open })
+      },
+      setShellHeight(rem, commit) {
+        const next = Math.max(rem, SHELL_MIN_REM)
+        if (commit) updatePrefs({ shell: next })
+        else setStored((all) => ({ ...all, [band]: { ...fresh(band), ...all[band], shell: next } }))
+      },
+      resetShellHeight: () => updatePrefs({ shell: null }),
       toggleSidebar: () => setSidebarOpen(!sidebarOpen),
       toggleSessions: () => setSessionsOpen(!sessionsOpen),
       setSidebarOpen,
@@ -249,7 +275,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, peek, mobilePanel, fitted.widths, fitted.full, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fitted.widths, fitted.full, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

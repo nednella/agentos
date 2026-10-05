@@ -91,6 +91,7 @@ type Snapshot = {
   project: Project
   projects: Project[]   // every known project: configured, current, and any with live sessions
   sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
+  shell: string         // the current project's shell session id ("<key>/shell"), "" until ShellOpen
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
   version: string
 }
@@ -189,6 +190,7 @@ type Digest = {
 | `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | |
 | `TypeInto(id, text)` | | types text into the prompt, not sent; line breaks cannot submit it |
+| `ShellOpen()` | `{ id: string }` | makes sure the current project has a shell session (a login shell in the project folder, kept in the hidden tmux, with `AGENTOS_PROJECT` set) and returns its id; attach with `TermOpen` like any session. It is not a session: not in `sessions`, the counts, clean-up or the hook states |
 | `HarnessCheck()` | `Session` | starts a session titled "Harness check" with the review prompt typed in |
 
 ### Terminal
@@ -282,6 +284,7 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 | `evidence` | `{ id, items }` | a session's evidence changed |
 | `browser:frame` | `{ id, data, width, height }` | `data` is base64 JPEG; width and height are the viewport's CSS pixels |
 | `browser:state` | `BrowserState` | URL, title, loading or open changed |
+| `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed |
 
 ## Media
@@ -350,6 +353,21 @@ browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `AGENT
 
 ## Command line
 
-`agentos` opens the app. For agents inside a session: `agentos browser help` (open, snapshot, click, type, press, select, hover, scroll, wait,
-wait-for, text, eval, console, screenshot), `agentos show <file> [--caption …] | --text …`, `agentos note <text>`, `agentos stats [--days N] [--json]`.
-Used by the app itself: `agentos hook <Event>`, `agentos guard`, `agentos digest add`. Also `agentos kill [--all]` and `agentos version`.
+`agentos` opens the app. Every command below except `kill` without a number talks to the running app over its control socket, and exits 1 with
+"agentos is not running" when there is none. The project is `AGENTOS_PROJECT` (set in the shell session) or the asking session's, else the current one;
+the app switches to it. Commands that start or change sessions do the work and say what happened ("started 2 sessions: #394 (3), #393 (4)");
+view commands send a `ui:command` event and answer "ok".
+
+| Command | Does |
+|---|---|
+| `issue <n...>` | starts a session per issue; an issue with a live session is reported as already running |
+| `new [title]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most |
+| `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
+| `refresh`, `pr [n]`, `cleanup [n]`, `harness`, `digest --run` | reload issues and PRs, show PRs, clean up or list what waits, start the harness check, start a digest run |
+| `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view |
+| `stats [--days N] [--json]` | print the interruption tally |
+
+`agentos kill` without a number stops this project's agents directly through tmux (works with the app closed); `--all` does it for every project and
+stops the shells too. For agents inside a session: `agentos browser help` (open, snapshot, click, type, press, select, hover, scroll, wait,
+wait-for, text, eval, console, screenshot), `agentos show <file> [--caption …] | --text …`, `agentos note <text>`. Used by the app itself:
+`agentos hook <Event>`, `agentos guard`, `agentos digest add`. Also `agentos version`; `agentos help` lists the commands by group.

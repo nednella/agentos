@@ -76,6 +76,7 @@ export type Snapshot = {
   sessions: Session[]
   notes: Note[]
   version: string
+  shell: string
 }
 
 export type WaitKind = 'permission' | 'question' | 'idle'
@@ -161,6 +162,7 @@ export type EventMap = {
   issues: Issue[]
   cleanups: Cleanup[]
   stats: undefined
+  'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }
   digest: Digest
   'browser:frame': { id: string; data: string; width: number; height: number }

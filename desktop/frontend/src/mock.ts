@@ -205,6 +205,35 @@ export function createMock(params: URLSearchParams) {
     }))
   }
 
+  type Shell = { id: string; project: string; buffer: string; line: string; opened: boolean }
+  const shells = new Map<string, Shell>()
+
+  const prompt = (project: string) => `\x1b[38;2;167;139;250m${project}\x1b[0m \x1b[2m❯\x1b[0m `
+
+  function shellWrite(shell: Shell, text: string) {
+    shell.buffer += text
+    if (shell.opened) emit('term:data', { id: shell.id, data: toBase64(text) })
+  }
+
+  function shellRun(shell: Shell, line: string) {
+    const [name, ...args] = line.trim().split(/\s+/)
+    if (!name) return
+    if (name === 'agentos') {
+      const [command = '', ...rest] = args
+      emit('ui:command', { name: command, args: rest })
+      shellWrite(shell, `\r\n\x1b[2mok: agentos ${args.join(' ')}\x1b[0m`)
+      return
+    }
+    if (name === 'ls') shellWrite(shell, '\r\napp-frontend  api  e2e  locales  CLAUDE.md  package.json')
+    else if (name === 'pwd') shellWrite(shell, `\r\n${current.dir}`)
+    else if (name === 'clear') shellWrite(shell, '\x1bc')
+    else shellWrite(shell, `\r\nzsh: command not found: ${name}`)
+  }
+
+  function isShell(id: string) {
+    return id.startsWith('shell-')
+  }
+
   function snapshot(): Snapshot {
     return {
       project: projectView(current),
@@ -212,6 +241,7 @@ export function createMock(params: URLSearchParams) {
       sessions: currentSessions(),
       notes: currentNotes(),
       version: 'mock',
+      shell: shells.get(current.name)?.id ?? '',
     }
   }
 
@@ -728,17 +758,54 @@ export function createMock(params: URLSearchParams) {
       emit('issues', currentIssues())
       return session
     },
+    ShellOpen: async () => {
+      const existing = shells.get(current.name)
+      if (existing) return { id: existing.id }
+      const shell: Shell = { id: `shell-${current.name}`, project: current.name, buffer: `\x1b[2m${current.dir}\x1b[0m\r\n${prompt(current.name)}`, line: '', opened: false }
+      shells.set(current.name, shell)
+      return { id: shell.id }
+    },
     TermOpen: async (id: string) => {
+      if (isShell(id)) {
+        const shell = [...shells.values()].find((x) => x.id === id)
+        if (!shell) throw 'No such shell'
+        shell.opened = true
+        emit('term:data', { id, data: toBase64(`\x1bc${shell.buffer}`) })
+        return
+      }
       const s = find(id)
       s.opened = true
       emit('term:data', { id, data: toBase64(`\x1bc${s.buffer}`) })
     },
     TermWrite: async (id: string, data: string) => {
+      if (isShell(id)) {
+        const shell = [...shells.values()].find((x) => x.id === id)
+        if (!shell) return
+        for (const ch of data) {
+          if (ch === '\r') {
+            const line = shell.line
+            shell.line = ''
+            shellRun(shell, line)
+            shellWrite(shell, `\r\n${prompt(shell.project)}`)
+          } else if (ch === '\x7f') {
+            if (shell.line) {
+              shell.line = shell.line.slice(0, -1)
+              shellWrite(shell, '\b \b')
+            }
+          } else if (ch >= ' ') {
+            shell.line += ch
+            shellWrite(shell, ch)
+          }
+        }
+        return
+      }
       const echo = data.replace(/\r/g, '\r\n').replace(/\x7f/g, '\b \b')
       write(find(id), echo)
     },
     TermResize: async () => undefined,
     TermClose: async (id: string) => {
+      const shell = [...shells.values()].find((x) => x.id === id)
+      if (shell) shell.opened = false
       const s = sessions.find((x) => x.id === id)
       if (s) s.opened = false
     },

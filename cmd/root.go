@@ -36,7 +36,15 @@ func newRootCmd() *cobra.Command {
 			return openApp(cmd.Context(), cmd.OutOrStdout())
 		},
 	}
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.AddGroup(
+		&cobra.Group{ID: groupWork, Title: "Work:"},
+		&cobra.Group{ID: groupViews, Title: "Views:"},
+		&cobra.Group{ID: groupProject, Title: "Projects:"},
+		&cobra.Group{ID: groupSession, Title: "From inside a session:"},
+	)
 	root.AddCommand(newHookCmd(), newGuardCmd(), newBrowserCmd(), newShowCmd(), newNoteCmd(), newStatsCmd(), newDigestCmd(), newKillCmd(), newVersionCmd())
+	root.AddCommand(newAppCmds()...)
 	return root
 }
 

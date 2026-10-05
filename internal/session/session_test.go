@@ -136,6 +136,7 @@ func TestParseName(t *testing.T) {
 		{"api/", Name{}, true},
 		{"api/x", Name{}, true},
 		{"api/0", Name{}, true},
+		{"api/shell", Name{Project: "api"}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
@@ -147,6 +148,16 @@ func TestParseName(t *testing.T) {
 				t.Errorf("round trip = %q, want %q", got.String(), tt.in)
 			}
 		})
+	}
+}
+
+func TestShellName(t *testing.T) {
+	n, err := ParseName("api/shell")
+	if err != nil || !n.IsShell() || n.String() != "api/shell" {
+		t.Errorf("ParseName = %+v, %v", n, err)
+	}
+	if (Name{"api", 3}).IsShell() {
+		t.Error("an agent is not a shell")
 	}
 }
 

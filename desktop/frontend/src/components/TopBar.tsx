@@ -81,12 +81,12 @@ export function TopBar() {
       </button>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
         {width >= NEXT_FULL_MIN ? (
-          <button className="btn" onClick={() => find('next-attention').run([], 'ui')}>
+          <button className="btn" onClick={() => find('next-attention').run([])}>
             Next
             <Keycap>{keys('next-attention')}</Keycap>
           </button>
         ) : (
-          <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([], 'ui')}>
+          <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
             <Icon name="next" />
           </button>
         )}
@@ -98,7 +98,7 @@ export function TopBar() {
               title={`Stats (${keys('stats')})`}
               aria-label="Stats"
               aria-pressed={statsOpen}
-              onClick={() => find('stats').run([], 'ui')}
+              onClick={() => find('stats').run([])}
             >
               <Icon name="chart" />
             </button>
@@ -108,7 +108,7 @@ export function TopBar() {
               title={`Weekly digest (${keys('digest')})${digestUnseen ? ', new items' : ''}`}
               aria-label={digestUnseen ? 'Weekly digest, new items' : 'Weekly digest'}
               aria-pressed={digestOpen}
-              onClick={() => find('digest').run([], 'ui')}
+              onClick={() => find('digest').run([])}
             >
               <Icon name="digest" />
               {digestUnseen && <span className="dot absolute top-1.5 right-1.5" style={{ ['--c' as string]: 'var(--accent)' }} />}

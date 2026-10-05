@@ -22,6 +22,7 @@ type Backend = {
   NoteToSession(id: string): Promise<Session>
   Issues(refresh: boolean): Promise<Issue[]>
   StartIssue(number: number): Promise<Session>
+  ShellOpen(): Promise<{ id: string }>
   TermOpen(id: string, cols: number, rows: number): Promise<void>
   TermWrite(id: string, data: string): Promise<void>
   TermResize(id: string, cols: number, rows: number): Promise<void>
@@ -92,6 +93,7 @@ export const api = {
   noteToSession: (id: string) => backend.NoteToSession(id),
   issues: (refresh: boolean) => backend.Issues(refresh),
   startIssue: (number: number) => backend.StartIssue(number),
+  shellOpen: () => backend.ShellOpen(),
   termOpen: (id: string, cols: number, rows: number) => backend.TermOpen(id, cols, rows),
   // A terminal can close (project switch, session end) while keys or a resize
   // are still in flight; that is not an error worth surfacing.

@@ -34,6 +34,7 @@ type Snapshot struct {
 	Projects []Project `json:"projects"`
 	Sessions []Session `json:"sessions"`
 	Notes    []Note    `json:"notes"`
+	Shell    string    `json:"shell"` // the current project's shell session, "" until ShellOpen
 	Version  string    `json:"version"`
 }
 
@@ -247,7 +248,7 @@ func (a *App) Snapshot() Snapshot {
 	cur := a.sessions.Current()
 	repo := a.issues.Repo(a.ctx, cur.Dir)
 	projects := a.sessions.Projects()
-	snap := Snapshot{Projects: projects, Sessions: a.sessions.List(), Version: version.Version}
+	snap := Snapshot{Projects: projects, Sessions: a.sessions.List(), Version: version.Version, Shell: a.sessions.ShellID()}
 	snap.Project = Project{Name: cur.Name, Dir: cur.Dir}
 	for i, p := range projects {
 		if p.Dir == cur.Dir {
@@ -261,6 +262,18 @@ func (a *App) Snapshot() Snapshot {
 		snap.Notes = []Note{}
 	}
 	return snap
+}
+
+// ShellInfo names a shell session.
+type ShellInfo struct {
+	ID string `json:"id"`
+}
+
+// ShellOpen makes sure the current project has a shell session and returns its id.
+// Attach to it with TermOpen like any session; it is not a session row.
+func (a *App) ShellOpen() (ShellInfo, error) {
+	id, err := a.sessions.OpenShell()
+	return ShellInfo{ID: id}, err
 }
 
 func (a *App) NewSession(title, prefill string) (Session, error) {
