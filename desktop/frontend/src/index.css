@@ -183,6 +183,20 @@
     color: var(--danger);
   }
 
+  .field {
+    height: 1.875rem;
+    min-width: 0;
+    padding: 0 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-app);
+    outline: none;
+  }
+
+  .field:focus {
+    border-color: var(--accent);
+  }
+
   .panel {
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -260,6 +274,12 @@
     background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
 
+  .link {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   .divider {
     position: relative;
     flex: none;
@@ -304,6 +324,48 @@
       animation: none !important;
       transition: none !important;
     }
+  }
+
+  .reveal {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  @media (hover: hover) {
+    .reveal {
+      max-width: 0;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.12s;
+    }
+
+    .group:hover .reveal,
+    .group:focus-within .reveal {
+      max-width: 20rem;
+      opacity: 1;
+    }
+  }
+
+  [data-mode='narrow'] .reveal {
+    max-width: 20rem;
+    opacity: 1;
+  }
+
+  .fold {
+    display: grid;
+    grid-template-rows: 1fr;
+    transition: grid-template-rows 0.18s var(--ease);
+  }
+
+  .fold[data-open='false'] {
+    grid-template-rows: 0fr;
+  }
+
+  .fold > div {
+    min-height: 0;
+    overflow: hidden;
   }
 
   .side-shell {

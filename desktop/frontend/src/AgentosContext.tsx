@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { api, devFlags, errorMessage, on } from './api'
+import { readStored, writeStored } from './storage'
 import type { Issue, Note, Project, Session } from './types'
 
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
@@ -13,16 +14,21 @@ type Agentos = {
   sessions: Session[]
   selectedId: string | null
   issues: Issue[]
+  issuesLoading: boolean
+  issueFilter: string
   notes: Note[]
   overlay: Overlay
   sidebarTab: SidebarTab
   focusRequest: { target: FocusTarget; n: number }
   select(id: string): void
+  startIssue(number: number, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
   addProject(dir?: string): Promise<void>
   removeProject(name: string): Promise<void>
+  refreshIssues(): Promise<void>
   setSidebarTab(tab: SidebarTab): void
   setOverlay(overlay: Overlay): void
+  setIssueFilter(query: string): void
   focus(target: FocusTarget): void
   report(run: () => unknown): void
 }
@@ -35,6 +41,8 @@ export function useAgentos(): Agentos {
   return value
 }
 
+const filterKey = (project: string) => `agentos.filter.${project}`
+
 type AgentosProviderProps = { children: ReactNode }
 
 export function AgentosProvider({ children }: AgentosProviderProps) {
@@ -43,6 +51,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [rawIssues, setRawIssues] = useState<Issue[]>([])
+  const [issuesLoading, setIssuesLoading] = useState(true)
+  const [issueFilter, setIssueFilterState] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
@@ -88,7 +98,12 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   )
 
   const loadIssues = useCallback(async (refresh: boolean) => {
-    setRawIssues(await api.issues(refresh))
+    setIssuesLoading(true)
+    try {
+      setRawIssues(await api.issues(refresh))
+    } finally {
+      setIssuesLoading(false)
+    }
   }, [])
 
   const enterProject = useCallback(
@@ -100,6 +115,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setProjects(snap.projects)
       setNotes(snap.notes)
       setRawIssues([])
+      setIssueFilterState(readStored(filterKey(snap.project.name), ''))
       applySessions(snap.sessions)
       report(() => loadIssues(false))
     },
@@ -127,6 +143,15 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     [rawIssues, sessions],
   )
 
+  const addSession = useCallback(
+    (created: Session, background = false) => {
+      setSessions((list) => (list.some((s) => s.id === created.id) ? list : [...list, created]))
+      if (!background) selectId(created.id)
+      return created
+    },
+    [selectId],
+  )
+
   const value = useMemo<Agentos>(
     () => ({
       project,
@@ -134,11 +159,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       sessions,
       selectedId,
       issues,
+      issuesLoading,
+      issueFilter,
       notes,
       overlay,
       sidebarTab,
       focusRequest,
       select: selectId,
+      async startIssue(number, background = false) {
+        return addSession(await api.startIssue(number), background)
+      },
       async switchProject(name) {
         if (name === projectRef.current?.name) return
         enterProject(await api.switchProject(name))
@@ -151,12 +181,17 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         if (snap.project.name === projectRef.current?.name) setProjects(snap.projects)
         else enterProject(snap)
       },
+      refreshIssues: () => loadIssues(true),
       setSidebarTab,
       setOverlay,
+      setIssueFilter(query) {
+        setIssueFilterState(query)
+        if (projectRef.current) writeStored(filterKey(projectRef.current.name), query)
+      },
       focus,
       report,
     }),
-    [project, projects, sessions, selectedId, issues, notes, overlay, sidebarTab, focusRequest, selectId, enterProject, loadIssues, focus, report],
+    [project, projects, sessions, selectedId, issues, issuesLoading, issueFilter, notes, overlay, sidebarTab, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

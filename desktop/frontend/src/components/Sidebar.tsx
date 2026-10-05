@@ -8,6 +8,7 @@ import { useFocusRequest } from '../useFocusRequest'
 import { useToggleAnimation } from '../useToggleAnimation'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
+import { Queue } from './Queue'
 
 export type NavHandler = (e: KeyboardEvent) => boolean
 export type NavRef = MutableRefObject<NavHandler | null>
@@ -93,6 +94,7 @@ function SidebarPanel({ panel, nav, overlay, full, widthRem }: SidebarPanelProps
           </>
         )}
       </div>
+      {sidebarTab === 'queue' && <Queue nav={nav} />}
     </aside>
   )
 }
