@@ -60,7 +60,7 @@ type Project = {
   name: string
   dir: string
   repo: string          // "owner/name", or ""; filled for the current project, and for others once known
-  needsYou: number      // sessions waiting, or idle after a reply landed (not just started)
+  needsYou: number      // sessions waiting; the same count the top bar shows
   working: number
   sessions: number      // all running sessions; ended ones do not count
 }

@@ -550,16 +550,15 @@ func (s *Sessions) projectViews() []Project {
 				continue
 			}
 			state := session.Idle
-			rec, ok := s.records[in.Name.String()]
-			if ok {
+			if rec, ok := s.records[in.Name.String()]; ok {
 				state = rec.State
 			}
-			switch {
-			case state == session.Ended:
+			switch state {
+			case session.Ended:
 				continue
-			case state == session.Waiting, state == session.Idle && ok && rec.Event != "SessionStart":
+			case session.Waiting:
 				v.NeedsYou++
-			case state == session.Working:
+			case session.Working:
 				v.Working++
 			}
 			v.Sessions++

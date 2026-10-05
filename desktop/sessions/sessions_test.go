@@ -256,6 +256,11 @@ func TestProjectCountsFollowTheSessions(t *testing.T) {
 	if h.Rec.Count("projects") == 0 {
 		t.Error("no projects event")
 	}
+	h.Hook(t, b.ID, "Stop", `{}`)
+	eventually(t, "a replied session to count as idle, not needing you", func() bool {
+		got := counts()
+		return got.NeedsYou == 1 && got.Working == 0
+	})
 	h.Hook(t, a.ID, "SessionEnd", `{}`)
 	eventually(t, "an ended session to leave the counts", func() bool { return counts().Sessions == 1 })
 }
