@@ -22,10 +22,10 @@ func TestBundleOf(t *testing.T) {
 
 func TestRecordBundle(t *testing.T) {
 	dir := t.TempDir()
-	if err := recordBundleOf("/repo/bin/agentos-desktop", dir); err != nil || exists(bus.AppPath(dir)) {
+	if err := recordBundleOf(bundleOf("/repo/bin/agentos-desktop"), dir); err != nil || exists(bus.AppPath(dir)) {
 		t.Errorf("a binary outside a bundle recorded a path: %v", err)
 	}
-	if err := recordBundleOf("/Apps/agentos.app/Contents/MacOS/agentos", dir); err != nil {
+	if err := recordBundleOf(bundleOf("/Apps/agentos.app/Contents/MacOS/agentos"), dir); err != nil {
 		t.Fatal(err)
 	}
 	if got, _ := os.ReadFile(bus.AppPath(dir)); string(got) != "/Apps/agentos.app\n" {

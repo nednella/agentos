@@ -31,6 +31,9 @@ type Repos interface {
 	Repo(ctx context.Context, dir string) string
 }
 
+// Releases knows whether a newer release of the app is out.
+type Releases interface{ Available() string }
+
 // Snapshot is everything the screen needs on load.
 type Snapshot struct {
 	Project  sessions.Project   `json:"project"`
@@ -38,7 +41,8 @@ type Snapshot struct {
 	Sessions []sessions.Session `json:"sessions"`
 	Notes    []notes.Note       `json:"notes"`
 	Version  string             `json:"version"`
-	Shell    string             `json:"shell"` // the current project's shell session, "" until it is opened
+	Update   string             `json:"update"` // a newer release's version, "" when the app is current
+	Shell    string             `json:"shell"`  // the current project's shell session, "" until it is opened
 }
 
 // Service is bound to the front end.
@@ -47,13 +51,14 @@ type Service struct {
 	sessions Sessions
 	notes    Notes
 	repos    Repos
+	releases Releases
 	stateDir string
 	pickDir  func() (string, error) // "" when the user cancels
 	ctx      func() context.Context
 }
 
-func NewService(r *Registry, s Sessions, n Notes, repos Repos, stateDir string, pickDir func() (string, error), ctx func() context.Context) *Service {
-	return &Service{registry: r, sessions: s, notes: n, repos: repos, stateDir: stateDir, pickDir: pickDir, ctx: ctx}
+func NewService(r *Registry, s Sessions, n Notes, repos Repos, releases Releases, stateDir string, pickDir func() (string, error), ctx func() context.Context) *Service {
+	return &Service{registry: r, sessions: s, notes: n, repos: repos, releases: releases, stateDir: stateDir, pickDir: pickDir, ctx: ctx}
 }
 
 // Snapshot is everything the screen needs; call it on load.
@@ -61,7 +66,7 @@ func (s *Service) Snapshot() Snapshot {
 	cur := s.sessions.Current()
 	repo := s.repos.Repo(s.ctx(), cur.Dir)
 	projects := s.sessions.Projects()
-	snap := Snapshot{Projects: projects, Sessions: s.sessions.List(), Version: version.Version, Shell: s.sessions.ShellID()}
+	snap := Snapshot{Projects: projects, Sessions: s.sessions.List(), Version: version.Version, Update: s.releases.Available(), Shell: s.sessions.ShellID()}
 	snap.Project = sessions.Project{Key: cur.Key(), Name: cur.Name, Dir: cur.Dir}
 	for i, p := range projects {
 		if p.Dir == cur.Dir {

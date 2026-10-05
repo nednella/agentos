@@ -17,7 +17,9 @@ import (
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
+	"github.com/nednella/agentos/desktop/update"
 	"github.com/nednella/agentos/internal/session"
+	upd "github.com/nednella/agentos/internal/update"
 )
 
 // Host is what the window provides. The services never touch Wails directly.
@@ -25,6 +27,7 @@ type Host struct {
 	Emit      func(event string, payload any)
 	Clipboard func(text string)
 	PickDir   func() (string, error) // "" when the user cancels
+	Quit      func()                 // closes the app, as the user would
 }
 
 // App is the services, wired together.
@@ -36,6 +39,7 @@ type App struct {
 	evidence *evidence.Store
 	browsers *browser.Browsers
 	digests  *digest.Manager
+	updates  *update.Updater
 	router   *control.Router
 	media    http.Handler
 	stateDir string
@@ -79,7 +83,10 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	}, sess.Touch)
 	mgr := digest.NewManager(digest.New(c.DataDir), sess, store, claude, h.Emit, c.StateDir, ctx)
 	a.digests = mgr
-	proj := projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx)
+	a.updates = update.New(func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return runner(ctx, "", name, args...)
+	}, c.StateDir, Bundle(), h.Emit, upd.Relaunch, h.Quit)
+	proj := projects.NewService(c.Registry, sess, store, iss, a.updates, c.StateDir, h.PickDir, ctx)
 	sessSvc := sessions.NewService(sess, ctx)
 	a.router = control.New(sess, func(name string) error { _, err := proj.SwitchProject(name); return err }, h.Emit)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
@@ -92,6 +99,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		"browser":    browser.NewCommands(browsers, a.router, a.router, proofs, changes).Browser,
 		"stats":      stats.NewCommands(waits, a.router, a.router).Stats,
 		"project":    projects.NewCommands(proj).Project,
+		"relaunch":   update.NewCommands(a.updates).Relaunch,
 	})
 	a.handleScoped(map[string]control.Handler{
 		"issue":   ic.Issue,
@@ -116,6 +124,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		browser.NewService(browsers, proofs, changes, ctx),
 		digest.NewService(mgr),
 		stats.NewService(waits, sess),
+		update.NewService(a.updates, ctx),
 	}
 	return a
 }
@@ -144,6 +153,7 @@ func (a *App) Start(ctx context.Context) error {
 	}
 	a.router.Listen(a.stateDir)
 	go a.digests.Loop(ctx)
+	go a.updates.Loop(ctx)
 	return nil
 }
 
@@ -169,3 +179,6 @@ func (a *App) Browsers() *browser.Browsers { return a.browsers }
 
 // Digests is the digest manager, for tests.
 func (a *App) Digests() *digest.Manager { return a.digests }
+
+// Updates is the updater, for tests.
+func (a *App) Updates() *update.Updater { return a.updates }
