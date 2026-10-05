@@ -231,3 +231,14 @@ func TestBrowserAgentCLI(t *testing.T) {
 		eventually(t, "the browser to stop", func() bool { return !profileRunning(profile) })
 	})
 }
+
+func TestBrowserWithoutArgumentsShowsTheView(t *testing.T) {
+	h := newHarness(t)
+	resp := h.Ask(t, ctl.Request{Cmd: "browser"})
+	if got := h.Rec.LastUI(); !resp.OK || resp.Out != "ok" || got.Name != "browser" || len(got.Args) != 0 {
+		t.Errorf("browser = %+v, ui %+v", resp, got)
+	}
+	if help := h.Ask(t, ctl.Request{Cmd: "browser", Args: []string{"help"}}); !help.OK || !strings.Contains(help.Out, "drive the session's browser") {
+		t.Errorf("browser help = %+v", help)
+	}
+}

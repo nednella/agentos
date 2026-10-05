@@ -32,3 +32,11 @@ func TestStatsCommand(t *testing.T) {
 		t.Error("--days 0 was accepted")
 	}
 }
+
+func TestStatsOpenShowsTheView(t *testing.T) {
+	h := newHarness(t)
+	resp := h.Ask(t, ctl.Request{Cmd: "stats", Opts: map[string]string{"open": "1"}})
+	if got := h.Rec.LastUI(); !resp.OK || resp.Out != "ok" || got.Name != "stats" || len(got.Args) != 0 {
+		t.Errorf("stats --open = %+v, ui %+v", resp, got)
+	}
+}

@@ -14,16 +14,27 @@ import (
 // Asker says which project an agent command is about.
 type Asker interface{ AskerProject(req ctl.Request) string }
 
+// Scene shows things on the screen of the project a command comes from.
+type Scene interface {
+	UI(req ctl.Request, name string, args ...string) string
+}
+
 // Commands answers agentos stats.
 type Commands struct {
 	waits *Waits
 	asker Asker
+	scene Scene
 }
 
-func NewCommands(w *Waits, a Asker) *Commands { return &Commands{waits: w, asker: a} }
+func NewCommands(w *Waits, a Asker, scene Scene) *Commands {
+	return &Commands{waits: w, asker: a, scene: scene}
+}
 
-// Stats prints the interruption tally of the asking session's project.
+// Stats prints the interruption tally of the asking session's project, or with --open shows the stats view.
 func (c *Commands) Stats(_ context.Context, req ctl.Request) (string, error) {
+	if req.Opts["open"] != "" {
+		return c.scene.UI(req, "stats"), nil
+	}
 	days := 7
 	if v := req.Opts["days"]; v != "" {
 		var err error

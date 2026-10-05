@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/browser"
+	"github.com/nednella/agentos/desktop/control"
 	"github.com/nednella/agentos/desktop/digest"
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/app"
@@ -150,6 +151,12 @@ func (r *Recorder) Last(name string) any {
 		}
 	}
 	return nil
+}
+
+// LastUI is the latest command the app told the front end to run.
+func (r *Recorder) LastUI() control.UICommand {
+	cmd, _ := r.Last("ui:command").(control.UICommand)
+	return cmd
 }
 
 func (r *Recorder) LastSessions() []sessions.Session {

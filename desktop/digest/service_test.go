@@ -127,3 +127,15 @@ func TestDigestAutomaticRuns(t *testing.T) {
 		t.Errorf("a project with the digest off ran %d times, next run %d", n, off.Digest().NextRunAt)
 	}
 }
+
+func TestDigestCommand(t *testing.T) {
+	h := newHarness(t)
+	if resp := h.Ask(t, ctl.Request{Cmd: "digest"}); !resp.OK || resp.Out != "ok" || h.Rec.LastUI().Name != "digest" {
+		t.Errorf("digest = %+v, ui %+v", resp, h.Rec.LastUI())
+	}
+	resp := h.Ask(t, ctl.Request{Cmd: "digest", Opts: map[string]string{"run": "1"}})
+	if !resp.OK || resp.Out != "digest started" {
+		t.Fatalf("digest --run = %+v", resp)
+	}
+	eventually(t, "the run to call claude", func() bool { return len(h.Claude.Calls()) > 0 })
+}

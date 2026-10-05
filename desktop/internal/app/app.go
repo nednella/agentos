@@ -77,16 +77,36 @@ func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
 	}, sess.Touch)
 	mgr := digest.NewManager(digest.New(c.DataDir), sess, store, claude, h.Emit, c.StateDir, ctx)
 	a.digests = mgr
-	a.router = control.New(sess)
-	a.router.Handle("digest-add", digest.NewCommands(mgr).Add)
-	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
+	proj := projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx)
+	sessSvc := sessions.NewService(sess, ctx)
+	a.router = control.New(sess, func(name string) error { _, err := proj.SwitchProject(name); return err }, h.Emit)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
-	a.router.Handle("show", evidence.NewCommands(proofs, a.router, changes).Show)
-	a.router.Handle("browser", browser.NewCommands(browsers, a.router, proofs, changes).Browser)
-	a.router.Handle("stats", stats.NewCommands(waits, a.router).Stats)
+	digests, sc, ic := digest.NewCommands(mgr, a.router), sessions.NewCommands(sess, a.router), issues.NewCommands(iss, sessSvc)
+	a.handle(map[string]control.Handler{
+		"digest-add": digests.Add,
+		"digest":     digests.Digest,
+		"note":       notes.NewCommands(store, a.router, sess, h.Emit).Note,
+		"show":       evidence.NewCommands(proofs, a.router, changes).Show,
+		"browser":    browser.NewCommands(browsers, a.router, a.router, proofs, changes).Browser,
+		"stats":      stats.NewCommands(waits, a.router, a.router).Stats,
+		"project":    projects.NewCommands(proj).Project,
+	})
+	a.handleScoped(map[string]control.Handler{
+		"issue":   ic.Issue,
+		"refresh": ic.Refresh,
+		"new":     sc.New,
+		"open":    sc.Open,
+		"kill":    sc.Kill,
+		"pr":      sc.PR,
+		"cleanup": sc.Cleanup,
+		"harness": sc.Harness,
+	})
+	for _, view := range []string{"queue", "notes", "evidence", "term", "next", "filter"} {
+		a.router.Handle(view, a.router.View(view))
+	}
 	a.services = []any{
-		projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx),
-		sessions.NewService(sess, ctx),
+		proj,
+		sessSvc,
 		terminal.NewService(terms),
 		issues.NewService(iss, ctx),
 		notes.NewService(store, sess, sess, iss, runner, h.Emit, ctx),
@@ -96,6 +116,19 @@ func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
 		stats.NewService(waits, sess),
 	}
 	return a
+}
+
+func (a *App) handle(handlers map[string]control.Handler) {
+	for cmd, h := range handlers {
+		a.router.Handle(cmd, h)
+	}
+}
+
+// handleScoped registers commands that work in the project they come from.
+func (a *App) handleScoped(handlers map[string]control.Handler) {
+	for cmd, h := range handlers {
+		a.router.Handle(cmd, a.router.Scope(h))
+	}
 }
 
 // Services are the structs to bind to the front end.

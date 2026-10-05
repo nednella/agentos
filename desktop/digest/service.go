@@ -25,10 +25,31 @@ func (s *Service) DigestToNote(itemID string) (notes.Note, error) { return s.m.t
 // DismissDigestItem removes an item.
 func (s *Service) DismissDigestItem(itemID string) error { return s.m.dismiss(itemID) }
 
-// Commands answers agentos digest add, which the digest run uses to hand in its findings.
-type Commands struct{ m *Manager }
+// Scene shows things on the screen of the project a command comes from.
+type Scene interface {
+	Enter(req ctl.Request)
+	UI(req ctl.Request, name string, args ...string) string
+}
 
-func NewCommands(m *Manager) *Commands { return &Commands{m: m} }
+// Commands answers agentos digest, and agentos digest add, which the digest run uses to hand in its findings.
+type Commands struct {
+	m     *Manager
+	scene Scene
+}
+
+func NewCommands(m *Manager, scene Scene) *Commands { return &Commands{m: m, scene: scene} }
+
+// Digest shows the digest, or with --run starts a run for the project.
+func (c *Commands) Digest(_ context.Context, req ctl.Request) (string, error) {
+	if req.Opts["run"] == "" {
+		return c.scene.UI(req, "digest"), nil
+	}
+	c.scene.Enter(req)
+	if err := c.m.runCurrent(); err != nil {
+		return "", err
+	}
+	return "digest started", nil
+}
 
 // Add files an item found by the run in progress.
 func (c *Commands) Add(_ context.Context, req ctl.Request) (string, error) {

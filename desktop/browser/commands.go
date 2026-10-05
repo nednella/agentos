@@ -13,22 +13,28 @@ type Asker interface {
 	AskerSession(req control.Request) (string, error)
 }
 
+// Scene shows things on the screen of the project a command comes from.
+type Scene interface {
+	UI(req control.Request, name string, args ...string) string
+}
+
 // Commands answers agentos browser.
 type Commands struct {
 	browsers *Browsers
 	asker    Asker
+	scene    Scene
 	store    *evidence.Store
 	changes  evidence.Changes
 }
 
-func NewCommands(b *Browsers, a Asker, s *evidence.Store, c evidence.Changes) *Commands {
-	return &Commands{browsers: b, asker: a, store: s, changes: c}
+func NewCommands(b *Browsers, a Asker, scene Scene, s *evidence.Store, c evidence.Changes) *Commands {
+	return &Commands{browsers: b, asker: a, scene: scene, store: s, changes: c}
 }
 
-// Browser runs one agentos browser command in the asking session's tab.
+// Browser runs one agentos browser command in the asking session's tab; without one it shows the browser view.
 func (c *Commands) Browser(ctx context.Context, req control.Request) (string, error) {
 	if len(req.Args) == 0 {
-		return control.BrowserHelp, nil
+		return c.scene.UI(req, "browser"), nil
 	}
 	sub, args := req.Args[0], req.Args[1:]
 	if sub == "help" {
