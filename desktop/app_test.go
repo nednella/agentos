@@ -922,14 +922,14 @@ func TestDataDirSplit(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, path := range []string{
-		filepath.Join(synced, "notes", "p.json"), filepath.Join(synced, "stats", "p.jsonl"), filepath.Join(synced, "digest", "p.json"),
-		filepath.Join(local, "evidence", "p", "1", "index.json"),
+		filepath.Join(synced, "p", "notes.json"), filepath.Join(synced, "p", "stats.jsonl"), filepath.Join(synced, "p", "digest.json"),
+		filepath.Join(local, "p", "evidence", "1", "index.json"),
 	} {
 		if !exists(path) {
 			t.Errorf("%s was not written", path)
 		}
 	}
-	for _, path := range []string{filepath.Join(local, "notes"), filepath.Join(synced, "evidence"), filepath.Join(synced, "browser")} {
+	for _, path := range []string{filepath.Join(local, "p", "notes.json"), filepath.Join(synced, "p", "evidence"), filepath.Join(synced, "p", "browser")} {
 		if exists(path) {
 			t.Errorf("%s should not exist", path)
 		}

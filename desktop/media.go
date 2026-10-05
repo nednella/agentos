@@ -27,20 +27,24 @@ var imageTypes = map[string]string{
 	"image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp",
 }
 
-// mediaFile maps a /media/ URL to a picture in the folder that holds that kind
-// of picture (roots maps the URL's first folder to its dir), or "" for anything else.
+// mediaFile maps a /media/<project key>/<folder>/... URL to a picture in the folder that holds that kind
+// of picture (roots maps the URL's second folder to its dir), or "" for anything else.
 func mediaFile(roots map[string]string, url string) string {
 	rel, ok := strings.CutPrefix(path.Clean(url), mediaPrefix)
 	if !ok {
 		return ""
 	}
-	folder, _, _ := strings.Cut(rel, "/")
+	parts := strings.SplitN(rel, "/", 3)
+	if len(parts) < 3 {
+		return ""
+	}
+	key, folder := parts[0], parts[1]
 	dir, ok := roots[folder]
 	if !ok {
 		return ""
 	}
 	file := filepath.Join(dir, filepath.FromSlash(rel))
-	if !strings.HasPrefix(file, filepath.Join(dir, folder)+string(filepath.Separator)) || !slices.Contains(mapValues(imageTypes), strings.ToLower(filepath.Ext(file))) {
+	if !strings.HasPrefix(file, filepath.Join(dir, key, folder)+string(filepath.Separator)) || !slices.Contains(mapValues(imageTypes), strings.ToLower(filepath.Ext(file))) {
 		return ""
 	}
 	return file
@@ -116,7 +120,7 @@ func (s *Notes) AddImage(key, id, b64, mime string) (Note, error) {
 	if _, err := rand.Read(name); err != nil {
 		return Note{}, fmt.Errorf("naming the picture: %w", err)
 	}
-	url := path.Join(mediaPrefix, mediaFolder, key, hex.EncodeToString(name)+ext)
+	url := path.Join(mediaPrefix, key, mediaFolder, hex.EncodeToString(name)+ext)
 	file := s.mediaPath(url)
 	if file == "" {
 		return Note{}, errors.New("the picture has no place to go")

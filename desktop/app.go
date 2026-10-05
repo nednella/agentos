@@ -144,6 +144,8 @@ type App struct {
 	run      runner
 	runEnv   envRunner
 	media    map[string]string // folder of a /media/ URL -> the dir that holds it
+	dataDir  string            // notes, stats and digests
+	localDir string            // everything that must stay on this machine
 
 	browsers *Browsers
 	evidence *EvidenceStore
@@ -174,6 +176,7 @@ func newApp(c config, h host, run runner) *App {
 	}
 	a.life = newLifecycle(run, c.localDir, c.stateDir, a.sessions, h.emit, a.terms.Close)
 	a.sessions.life = a.life
+	a.dataDir, a.localDir = c.dataDir, c.localDir
 	a.media = map[string]string{mediaFolder: c.dataDir, evidenceFolder: c.localDir}
 	a.sessions.browsers, a.sessions.ev = a.browsers, a.evidence
 	a.sessions.onGone = a.sessionGone
@@ -189,6 +192,7 @@ func newApp(c config, h host, run runner) *App {
 // start begins listening for hooks; it runs until ctx ends.
 func (a *App) start(ctx context.Context) error {
 	a.ctx = ctx
+	migrateLayout(a.dataDir, a.localDir, log.Printf)
 	if err := a.sessions.Start(ctx); err != nil {
 		return err
 	}

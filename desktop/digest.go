@@ -71,7 +71,7 @@ func newDigests(dataDir string) *Digests {
 	return &Digests{dir: dataDir, started: time.Now(), running: map[string]int{}, errors: map[string]string{}}
 }
 
-func (d *Digests) path(key string) string { return filepath.Join(d.dir, "digest", key+".json") }
+func (d *Digests) path(key string) string { return filepath.Join(d.dir, key, "digest.json") }
 
 // read needs mu.
 func (d *Digests) read(key string) digestFile {

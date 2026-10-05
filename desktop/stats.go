@@ -87,7 +87,7 @@ type Waits struct {
 
 func newWaits(dir string) *Waits { return &Waits{dir: dir, open: map[string]Wait{}} }
 
-func (w *Waits) path(key string) string { return filepath.Join(w.dir, "stats", key+".jsonl") }
+func (w *Waits) path(key string) string { return filepath.Join(w.dir, key, "stats.jsonl") }
 
 // Begin opens a wait for the session.
 func (w *Waits) Begin(id string, wait Wait) {
