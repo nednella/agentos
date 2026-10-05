@@ -193,5 +193,5 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     xterm.current?.focus()
   }, [active, focusRequest, focusTarget])
 
-  return <div ref={host} className={`absolute inset-0 px-3 py-2 ${active ? '' : 'hidden'}`} aria-hidden={!active} />
+  return <div ref={host} className={`absolute inset-0 ${active ? '' : 'hidden'}`} aria-hidden={!active} />
 }
