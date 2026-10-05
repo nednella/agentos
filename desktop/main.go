@@ -39,7 +39,7 @@ func run() error {
 	}
 	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
 		hub := &eventHub{subs: map[chan []byte]struct{}{}}
-		app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}})
+		app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}}, execRunner)
 		quitOnSignal(app)
 		return serveHTTP(app, hub, assets, addr)
 	}
@@ -56,7 +56,7 @@ func run() error {
 				_ = runtime.ClipboardSetText(*c, text)
 			}
 		},
-	})
+	}, execRunner)
 	quitOnSignal(app)
 
 	return wails.Run(&options.App{

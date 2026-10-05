@@ -15,7 +15,10 @@ import (
 	"github.com/nednella/agentos/internal/session"
 )
 
-const titleOption = "@agentos-name"
+const (
+	titleOption = "@agentos-name"
+	issueOption = "@agentos-issue"
+)
 
 const conf = `
 set -g status off
@@ -56,6 +59,7 @@ type Info struct {
 	Name    session.Name
 	Title   string
 	Path    string
+	Issue   string // the GitHub issue number the session was started for, or ""
 	Created time.Time
 }
 
@@ -91,7 +95,7 @@ func cleanEnv() []string {
 
 // List returns the agent sessions. No running server means no sessions.
 func (t *Tmux) List(ctx context.Context) ([]Info, error) {
-	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{session_created}")
+	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{session_created}")
 	if err != nil {
 		var exit *exec.ExitError
 		if msg := err.Error(); errors.As(err, &exit) && (strings.Contains(msg, "no server running") || strings.Contains(msg, "error connecting")) {
@@ -102,15 +106,15 @@ func (t *Tmux) List(ctx context.Context) ([]Info, error) {
 	var infos []Info
 	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 4 {
+		if len(f) != 5 {
 			continue
 		}
 		name, err := session.ParseName(f[0])
 		if err != nil {
 			continue
 		}
-		info := Info{Name: name, Title: f[1], Path: f[2]}
-		if secs, err := strconv.ParseInt(f[3], 10, 64); err == nil {
+		info := Info{Name: name, Title: f[1], Path: f[2], Issue: f[3]}
+		if secs, err := strconv.ParseInt(f[4], 10, 64); err == nil {
 			info.Created = time.Unix(secs, 0)
 		}
 		infos = append(infos, info)
@@ -146,6 +150,14 @@ func (t *Tmux) Kill(ctx context.Context, name session.Name) error {
 func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) error {
 	if _, err := t.run(ctx, "set-option", "-t", name.String(), titleOption, oneLine(title)); err != nil {
 		return fmt.Errorf("renaming session %s: %w", name, err)
+	}
+	return nil
+}
+
+// SetIssue records which GitHub issue a session was started for.
+func (t *Tmux) SetIssue(ctx context.Context, name session.Name, issue int) error {
+	if _, err := t.run(ctx, "set-option", "-t", name.String(), issueOption, strconv.Itoa(issue)); err != nil {
+		return fmt.Errorf("tagging session %s: %w", name, err)
 	}
 	return nil
 }

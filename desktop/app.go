@@ -99,16 +99,23 @@ func pickAgent(name string) agent.Agent {
 // App is the one struct bound to the front end. Every exported method is part of the contract.
 type App struct {
 	ctx      context.Context
+	host     host
 	sessions *Sessions
 	terms    *Terms
+	issues   *Issues
 }
 
-func newApp(c config, h host) *App {
-	return &App{
+func newApp(c config, h host, run runner) *App {
+	a := &App{
 		ctx:      context.Background(),
+		host:     h,
 		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.projects, c.project, h.emit),
 		terms:    newTerms(c.tmux, h.emit, h.clipboard),
+		issues:   newIssues(run),
 	}
+	a.sessions.repoOf = a.issues.CachedRepo
+	a.sessions.onIssues = a.emitIssues
+	return a
 }
 
 // start begins listening for hooks; it runs until ctx ends.
@@ -121,11 +128,13 @@ func (a *App) stop() { a.terms.CloseAll() }
 
 func (a *App) Snapshot() Snapshot {
 	cur := a.sessions.Current()
+	repo := a.issues.Repo(a.ctx, cur.Dir)
 	projects := a.sessions.Projects()
 	snap := Snapshot{Projects: projects, Sessions: a.sessions.List(), Version: version.Version}
 	snap.Project = Project{Name: cur.Name, Dir: cur.Dir}
 	for i, p := range projects {
 		if p.Dir == cur.Dir {
+			projects[i].Repo = repo
 			snap.Project = projects[i]
 		}
 	}
@@ -133,7 +142,7 @@ func (a *App) Snapshot() Snapshot {
 }
 
 func (a *App) NewSession(title, prefill string) (Session, error) {
-	return a.sessions.Create(title, prefill)
+	return a.sessions.Create(title, prefill, 0)
 }
 
 func (a *App) KillSession(id string) error {
@@ -151,6 +160,52 @@ func (a *App) SwitchProject(name string) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	return a.Snapshot(), nil
+}
+
+func (a *App) Issues(refresh bool) ([]Issue, error) {
+	list, err := a.issues.List(a.ctx, a.sessions.Current(), refresh)
+	if err != nil {
+		return nil, err
+	}
+	return a.withSessions(list), nil
+}
+
+func (a *App) withSessions(list []Issue) []Issue {
+	live := a.sessions.IssueSessions()
+	for i := range list {
+		list[i].SessionID = live[list[i].Number]
+	}
+	return list
+}
+
+// emitIssues sends the cached issues, when there are any, with their current sessions.
+func (a *App) emitIssues() {
+	if list, ok := a.issues.Cached(a.sessions.Current().Dir); ok {
+		a.host.emit("issues", a.withSessions(list))
+	}
+}
+
+// StartIssue opens a session for the issue. An issue that already has a live
+// session gets that session back instead of a second agent.
+func (a *App) StartIssue(number int) (Session, error) {
+	list, err := a.Issues(false)
+	if err != nil {
+		return Session{}, err
+	}
+	for _, is := range list {
+		if is.Number != number {
+			continue
+		}
+		if is.SessionID != "" {
+			for _, s := range a.sessions.List() {
+				if s.ID == is.SessionID {
+					return s, nil
+				}
+			}
+		}
+		return a.sessions.Create(is.sessionTitle(), a.sessions.Current().IssueCommand(is.Lane, number), number)
+	}
+	return Session{}, fmt.Errorf("issue #%d is not open in this project", number)
 }
 
 func (a *App) TermOpen(id string, cols, rows int) error { return a.terms.Open(id, cols, rows) }

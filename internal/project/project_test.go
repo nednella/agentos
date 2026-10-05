@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 )
 
@@ -59,7 +60,7 @@ func TestLoad(t *testing.T) {
 				t.Fatalf("got %+v, want %+v", got, tt.want)
 			}
 			for i := range got.Projects {
-				if got.Projects[i] != tt.want.Projects[i] {
+				if !reflect.DeepEqual(got.Projects[i], tt.want.Projects[i]) {
 					t.Errorf("project %d = %+v, want %+v", i, got.Projects[i], tt.want.Projects[i])
 				}
 			}
@@ -107,7 +108,7 @@ func TestResolve(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := cfg.Resolve(tt.cwd); got != tt.want {
+			if got := cfg.Resolve(tt.cwd); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("Resolve(%q) = %+v, want %+v", tt.cwd, got, tt.want)
 			}
 		})
@@ -131,7 +132,10 @@ func TestLoadDataDir(t *testing.T) {
 
 func TestSaveRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "new", "config.yaml")
-	want := Config{Agent: "claude", Projects: []Project{{Name: "a", Dir: "/srv/a"}, {Name: "b", Dir: "/srv/b"}}}
+	want := Config{Agent: "claude", Projects: []Project{
+		{Name: "a", Dir: "/srv/a", Commands: map[string]string{"ready": "/x {n}"}, Lanes: map[string]string{"go": "ready"}},
+		{Name: "b", Dir: "/srv/b"},
+	}}
 	if err := Save(path, want); err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +143,7 @@ func TestSaveRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Agent != want.Agent || len(got.Projects) != 2 || got.Projects[0] != want.Projects[0] || got.Projects[1] != want.Projects[1] {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
 }

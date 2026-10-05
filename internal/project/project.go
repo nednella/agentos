@@ -13,8 +13,10 @@ import (
 
 // Project is the unit agentos is scoped to: a name and the folder agents start in.
 type Project struct {
-	Name string `yaml:"name"`
-	Dir  string `yaml:"dir"`
+	Name     string            `yaml:"name"`
+	Dir      string            `yaml:"dir"`
+	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea
+	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.

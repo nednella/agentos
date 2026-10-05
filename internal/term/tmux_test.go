@@ -52,6 +52,9 @@ func TestSessionLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := tmux.SetIssue(ctx, name, 394); err != nil {
+		t.Fatal(err)
+	}
 	infos, err := tmux.List(ctx)
 	if err != nil || len(infos) != 2 {
 		t.Fatalf("List = %v, %v", infos, err)
@@ -62,6 +65,9 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 	if got := byName[other].Title; got != "tabs and ünïcode" {
 		t.Errorf("second title = %q", got)
+	}
+	if byName[name].Issue != "394" || byName[other].Issue != "" {
+		t.Errorf("issues = %q and %q", byName[name].Issue, byName[other].Issue)
 	}
 	if got := byName[name]; got.Title != "first agent" || !strings.HasSuffix(got.Path, dir[strings.LastIndex(dir, "/"):]) || got.Created.IsZero() {
 		t.Errorf("first session = %+v", got)

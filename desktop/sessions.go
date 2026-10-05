@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -47,6 +48,7 @@ type Session struct {
 	Detail      string        `json:"detail"`
 	LastEventAt int64         `json:"lastEventAt"`
 	CreatedAt   int64         `json:"createdAt"`
+	Issue       int           `json:"issue"`
 	History     []Change      `json:"history"`
 	EndedAt     int64         `json:"endedAt"` // unix ms; 0 while the session runs
 }
@@ -55,6 +57,7 @@ type Session struct {
 type Project struct {
 	Name     string `json:"name"`
 	Dir      string `json:"dir"`
+	Repo     string `json:"repo"`
 	NeedsYou int    `json:"needsYou"`
 	Working  int    `json:"working"`
 	Sessions int    `json:"sessions"`
@@ -83,6 +86,9 @@ type Sessions struct {
 	loaded     bool // the first refresh is in, so later changes may raise attention
 	lastSent   string
 	lastProjs  string
+	lastIssues string
+	repoOf     func(dir string) string
+	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
 	prefillFor time.Duration
 }
@@ -91,6 +97,7 @@ func newSessions(tmux *term.Tmux, ag agent.Agent, stateDir string, configured []
 	return &Sessions{
 		tmux: tmux, agent: ag, stateDir: stateDir, emit: emit,
 		project: current, configured: configured,
+		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
 		seen:       map[string]session.State{},
@@ -170,6 +177,7 @@ func (e *endedSession) record() session.Record {
 	rec := e.rec
 	rec.State = session.Ended
 	rec.Title, rec.Path, rec.EndedAt = e.info.Title, e.info.Path, e.at.UnixMilli()
+	rec.Issue, _ = strconv.Atoi(e.info.Issue)
 	if !e.info.Created.IsZero() {
 		rec.Created = e.info.Created.UnixMilli()
 	}
@@ -200,6 +208,9 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 		return
 	}
 	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path}
+	if rec.Issue > 0 {
+		info.Issue = strconv.Itoa(rec.Issue)
+	}
 	if rec.Created > 0 {
 		info.Created = time.UnixMilli(rec.Created)
 	}
@@ -337,6 +348,7 @@ func (s *Sessions) sync() {
 		}
 	}
 	s.announceProjects()
+	s.announceIssues()
 	list := s.list()
 	b, err := json.Marshal(list)
 	if err != nil || string(b) == s.lastSent {
@@ -360,11 +372,30 @@ func (s *Sessions) announceProjects() {
 	s.emit("projects", views)
 }
 
+// announceIssues asks for a fresh issues event when the sessions tied to issues change. It needs mu.
+func (s *Sessions) announceIssues() {
+	var sig strings.Builder
+	sig.WriteString(s.project.Key())
+	for _, v := range s.list() {
+		if v.Issue > 0 && v.State != session.Ended {
+			fmt.Fprintf(&sig, " %d=%s", v.Issue, v.ID)
+		}
+	}
+	if sig.String() == s.lastIssues {
+		return
+	}
+	first := s.lastIssues == ""
+	s.lastIssues = sig.String()
+	if !first {
+		go s.onIssues()
+	}
+}
+
 // projectViews lists every known project with its session counts. It needs mu.
 func (s *Sessions) projectViews() []Project {
 	var views []Project
 	for _, p := range s.projects() {
-		v := Project{Name: p.Name, Dir: p.Dir}
+		v := Project{Name: p.Name, Dir: p.Dir, Repo: s.repoOf(p.Dir)}
 		for _, in := range s.info {
 			if in.Name.Project != p.Key() {
 				continue
@@ -416,11 +447,12 @@ func (s *Sessions) list() []Session {
 	for _, ss := range rail {
 		in := byName[ss.Name]
 		id := ss.Name.String()
+		issue, _ := strconv.Atoi(in.Issue)
 		view := Session{
 			ID: id, N: ss.Name.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(),
-			History:   slices.Clone(s.history[id]),
+			CreatedAt: in.Created.UnixMilli(), Issue: issue,
+			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {
 			view.LastEventAt = ss.At.UnixMilli()
@@ -482,9 +514,20 @@ func (s *Sessions) SwitchProject(name string) (project.Project, error) {
 	return project.Project{}, fmt.Errorf("no project %q", name)
 }
 
+// IssueSessions maps issue numbers to the live session started for each, in the current project.
+func (s *Sessions) IssueSessions() map[int]string {
+	out := map[int]string{}
+	for _, v := range s.List() {
+		if v.Issue > 0 && v.State != session.Ended {
+			out[v.Issue] = v.ID
+		}
+	}
+	return out
+}
+
 // Create starts the agent in the current project. A non-empty prefill is typed
 // into its prompt, without Enter, once the agent is ready.
-func (s *Sessions) Create(title, prefill string) (Session, error) {
+func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -517,7 +560,7 @@ func (s *Sessions) Create(title, prefill string) (Session, error) {
 	}
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	err := s.start(tctx, name, title, proj.Dir, env, s.agent.Command(name.String()))
+	err := s.start(tctx, name, title, proj.Dir, env, s.agent.Command(name.String()), issue)
 	if err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
@@ -527,6 +570,9 @@ func (s *Sessions) Create(title, prefill string) (Session, error) {
 
 	s.mu.Lock()
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Created: time.Now()}
+	if issue > 0 {
+		in.Issue = strconv.Itoa(issue)
+	}
 	if !slices.ContainsFunc(s.info, func(i term.Info) bool { return i.Name == name }) {
 		s.info = append(s.info, in)
 	}
@@ -545,12 +591,18 @@ func (s *Sessions) Create(title, prefill string) (Session, error) {
 	return view, nil
 }
 
-func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string) error {
+func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int) error {
 	// A number is reused, so a leftover file must not leak its old state into the new session.
 	if err := bus.RemoveState(s.stateDir, name.String()); err != nil {
 		return err
 	}
-	return s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows)
+	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
+		return err
+	}
+	if issue > 0 {
+		return s.tmux.SetIssue(ctx, name, issue)
+	}
+	return nil
 }
 
 func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text string) {

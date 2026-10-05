@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -78,6 +79,18 @@ func (r *recorder) countAttention(state string) int {
 	return n
 }
 
+// last is the payload of the latest event of that name, or nil.
+func (r *recorder) last(name string) any {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, e := range slices.Backward(r.events) {
+		if e.name == name {
+			return e.payload
+		}
+	}
+	return nil
+}
+
 func (r *recorder) lastSessions() []Session {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -102,12 +115,64 @@ func eventually(t *testing.T, what string, cond func() bool) {
 
 // harness is an app on a private tmux socket, state dir and config, with a plain
 // bash as its agent. A test must never use the default socket: it holds live sessions.
+// fakeGH answers the gh calls with canned output; any other command runs for real.
+
+type fakeGH struct {
+	mu    sync.Mutex
+	calls []string
+	repo  error
+}
+
+func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+	if name != "gh" {
+		return execRunner(ctx, dir, name, args...)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, strings.Join(args, " "))
+	switch {
+	case args[0] == "repo":
+		if f.repo != nil {
+			return nil, f.repo
+		}
+		return []byte(`{"nameWithOwner":"acme/widgets"}`), nil
+	case args[0] == "issue":
+		return []byte(`[
+			{"number":7,"title":"Fix the thing","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
+			{"number":8,"title":"Plan it","url":"https://x/8","labels":[{"name":"needs-plan"},{"name":"type:feature"}]},
+			{"number":9,"title":"Human","url":"https://x/9","labels":[{"name":"needs-human"}]},
+			{"number":10,"title":"Maybe","url":"https://x/10","labels":[{"name":"idea"},{"name":"type:chore"}]},
+			{"number":11,"title":"New","url":"https://x/11","labels":[]},
+			{"number":12,"title":"Other","url":"https://x/12","labels":[{"name":"roadmap"}]}
+		]`), nil
+	}
+	return nil, fmt.Errorf("unexpected %s %v", name, args)
+}
+
+func (f *fakeGH) issueCalls() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "issue list") {
+			n++
+		}
+	}
+	return n
+}
+
 type harness struct {
 	app    *App
 	rec    *recorder
+	gh     *fakeGH
 	socket string
 	dir    string
 	state  string
+}
+
+// noGH is a runner for tests that must not reach GitHub.
+func noGH(context.Context, string, string, ...string) ([]byte, error) {
+	return nil, errors.New("gh is not available in this test")
 }
 
 func newHarness(t *testing.T) *harness { return newHarnessWith(t, nil) }
@@ -124,7 +189,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 	}
 	dir := t.TempDir()
 	confPath := filepath.Join(state, "config.yaml")
-	conf := fmt.Sprintf("agent: bash\nprojects:\n  - name: main\n    dir: %s\n", dir)
+	conf := fmt.Sprintf("agent: bash\nprojects:\n  - name: main\n    dir: %s\n    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n", dir)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -138,8 +203,8 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 	if err != nil {
 		t.Fatal(err)
 	}
-	rec := &recorder{}
-	app := newApp(cfg, host{emit: rec.emit, clipboard: rec.clip})
+	rec, gh := &recorder{}, &fakeGH{}
+	app := newApp(cfg, host{emit: rec.emit, clipboard: rec.clip}, gh.run)
 	app.sessions.prefillFor = 300 * time.Millisecond
 	if tweak != nil {
 		tweak(app)
@@ -154,7 +219,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 		_ = exec.Command("tmux", "-L", socket, "kill-server").Run()
 		os.RemoveAll(state)
 	})
-	return &harness{app: app, rec: rec, socket: socket, dir: dir, state: state}
+	return &harness{app: app, rec: rec, gh: gh, socket: socket, dir: dir, state: state}
 }
 
 // hook runs the built agentos command as Claude Code would.
@@ -228,7 +293,7 @@ func (h *harness) restart(t *testing.T) *App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}})
+	app := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}}, h.gh.run)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	t.Cleanup(app.stop)

@@ -107,7 +107,7 @@ func TestBrowserModeServesTheAppAndTheShim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}})
+	app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}}, noGH)
 	assets, err := fs.Sub(assetsFS, assetsRoot)
 	if err != nil {
 		t.Fatal(err)
