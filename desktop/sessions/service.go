@@ -38,3 +38,8 @@ func (v *Service) Cleanup(id string, force bool) error { return v.s.life.Cleanup
 
 // Cleanups is the current project's clean-up log, newest first.
 func (v *Service) Cleanups() []Cleanup { return v.s.life.Cleanups(v.s.Current().Key()) }
+
+// HarnessCheck starts a session titled "Harness check" with the review prompt typed in, not sent.
+func (v *Service) HarnessCheck() (Session, error) {
+	return v.s.Create("Harness check", harnessPrompt, 0)
+}

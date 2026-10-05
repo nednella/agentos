@@ -581,3 +581,5 @@ func (h *Harness) BrowserScreenshot(id, caption string) (evidence.Evidence, erro
 	return h.browser.BrowserScreenshot(id, caption)
 }
 func (h *Harness) BrowserClose(id string) { h.browser.BrowserClose(id) }
+
+func (h *Harness) HarnessCheck() (sessions.Session, error) { return h.sessions.HarnessCheck() }
