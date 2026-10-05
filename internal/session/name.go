@@ -29,8 +29,8 @@ func (n Name) IsShell() bool { return n.N == 0 }
 
 // ParseName decodes a tmux session name. It fails for sessions agentos did not create.
 func ParseName(s string) (Name, error) {
-	i := strings.LastIndexByte(s, '/')
-	if i <= 0 {
+	i := strings.IndexByte(s, '/')
+	if i <= 0 || i != strings.LastIndexByte(s, '/') || strings.Contains(s[:i], "..") {
 		return Name{}, fmt.Errorf("session name %q is not <project>/<n>", s)
 	}
 	if s[i+1:] == shellSuffix {
@@ -41,6 +41,15 @@ func ParseName(s string) (Name, error) {
 		return Name{}, fmt.Errorf("session name %q has no positive number", s)
 	}
 	return Name{Project: s[:i], N: n}, nil
+}
+
+// ProjectKey is the project key in a session id, or "project" when the id does not parse.
+func ProjectKey(id string) string {
+	name, err := ParseName(id)
+	if err != nil {
+		return "project"
+	}
+	return name.Project
 }
 
 // NextN returns the lowest number not in use.

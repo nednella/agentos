@@ -1,9 +1,12 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -116,11 +119,121 @@ func ExpandHome(p string) string {
 	return filepath.Join(home, p[1:])
 }
 
-// Save writes the config file, creating its folder.
+// Save writes the config file, creating its folder. An existing file is edited, not
+// rewritten: projects and settings that did not change keep their comments, their
+// layout and their "~" paths.
 func Save(path string, c Config) error {
-	data, err := yaml.Marshal(c)
+	data, err := encode(path, c)
 	if err != nil {
-		return fmt.Errorf("encoding config: %w", err)
+		return err
 	}
 	return atomicfile.Write(path, data, 0o600)
+}
+
+func encode(path string, c Config) ([]byte, error) {
+	var doc yaml.Node
+	if old, err := os.ReadFile(path); err == nil {
+		_ = yaml.Unmarshal(old, &doc)
+	}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		if err := doc.Encode(c); err != nil {
+			return nil, fmt.Errorf("encoding config: %w", err)
+		}
+		return render(&doc)
+	}
+	root := doc.Content[0]
+	syncScalar(root, "agent", c.Agent, nil)
+	syncScalar(root, "data_dir", c.DataDir, ExpandHome)
+	if err := syncProjects(root, c.Projects); err != nil {
+		return nil, err
+	}
+	return render(&doc)
+}
+
+func render(doc *yaml.Node) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(doc); err != nil {
+		return nil, fmt.Errorf("encoding config: %w", err)
+	}
+	if err := enc.Close(); err != nil {
+		return nil, fmt.Errorf("encoding config: %w", err)
+	}
+	return buf.Bytes(), nil
+}
+
+// field is the value node of key in a mapping node, or nil.
+func field(m *yaml.Node, key string) *yaml.Node {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			return m.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// syncScalar makes the key hold want. A value that already means want, once norm has run on it, stays as written.
+func syncScalar(m *yaml.Node, key, want string, norm func(string) string) {
+	node := field(m, key)
+	switch {
+	case node == nil && want != "":
+		m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &yaml.Node{Kind: yaml.ScalarNode, Value: want})
+	case node == nil:
+	case want == "":
+		for i := 0; i+1 < len(m.Content); i += 2 {
+			if m.Content[i].Value == key {
+				m.Content = slices.Delete(m.Content, i, i+2)
+				return
+			}
+		}
+	default:
+		have := node.Value
+		if norm != nil {
+			have = norm(have)
+		}
+		if have != want {
+			node.Value, node.Tag, node.Style = want, "", 0
+		}
+	}
+}
+
+// syncProjects makes the projects list hold want. A project whose entry already means the same keeps its text.
+func syncProjects(root *yaml.Node, want []Project) error {
+	seq := field(root, "projects")
+	if seq == nil || seq.Kind != yaml.SequenceNode {
+		seq = &yaml.Node{Kind: yaml.SequenceNode}
+		if i := slices.IndexFunc(root.Content, func(n *yaml.Node) bool { return n.Value == "projects" }); i >= 0 && i%2 == 0 {
+			root.Content[i+1] = seq
+		} else {
+			root.Content = append(root.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "projects"}, seq)
+		}
+	}
+	if len(seq.Content) == 0 {
+		seq.Style = 0
+	}
+	var next []*yaml.Node
+	for _, p := range want {
+		i := slices.IndexFunc(seq.Content, func(n *yaml.Node) bool { return sameProject(n, p) })
+		if i >= 0 {
+			next = append(next, seq.Content[i])
+			continue
+		}
+		var n yaml.Node
+		if err := n.Encode(p); err != nil {
+			return fmt.Errorf("encoding project %s: %w", p.Name, err)
+		}
+		next = append(next, &n)
+	}
+	seq.Content = next
+	return nil
+}
+
+func sameProject(n *yaml.Node, p Project) bool {
+	var have Project
+	if n.Decode(&have) != nil {
+		return false
+	}
+	have.Dir = ExpandHome(have.Dir)
+	return reflect.DeepEqual(have, p)
 }

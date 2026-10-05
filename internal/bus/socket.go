@@ -92,7 +92,10 @@ func (l *Listener) serve(conn net.Conn) {
 	sc := bufio.NewScanner(conn)
 	for sc.Scan() {
 		var rec session.Record
-		if json.Unmarshal(sc.Bytes(), &rec) == nil && rec.Session != "" {
+		if json.Unmarshal(sc.Bytes(), &rec) != nil {
+			continue
+		}
+		if _, err := session.ParseName(rec.Session); err == nil {
 			l.deliver(rec)
 		}
 	}

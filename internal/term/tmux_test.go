@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nednella/agentos/internal/session"
 )
@@ -38,7 +39,7 @@ func TestSessionLifecycle(t *testing.T) {
 	tmux := newTestTmux(t)
 	ctx := context.Background()
 
-	if infos, err := tmux.List(ctx); err != nil || len(infos) != 0 {
+	if infos, err := list(tmux, ctx); err != nil || len(infos) != 0 {
 		t.Fatalf("List without a server = %v, %v", infos, err)
 	}
 
@@ -55,7 +56,7 @@ func TestSessionLifecycle(t *testing.T) {
 	if err := tmux.SetIssue(ctx, name, 394); err != nil {
 		t.Fatal(err)
 	}
-	infos, err := tmux.List(ctx)
+	infos, err := list(tmux, ctx)
 	if err != nil || len(infos) != 2 {
 		t.Fatalf("List = %v, %v", infos, err)
 	}
@@ -76,14 +77,14 @@ func TestSessionLifecycle(t *testing.T) {
 	if err := tmux.Rename(ctx, name, "renamed"); err != nil {
 		t.Fatal(err)
 	}
-	if infos, _ = tmux.List(ctx); !strings.Contains(fmt.Sprint(infos), "renamed") {
+	if infos, _ = list(tmux, ctx); !strings.Contains(fmt.Sprint(infos), "renamed") {
 		t.Errorf("rename did not show: %v", infos)
 	}
 
 	if err := tmux.Kill(ctx, name); err != nil {
 		t.Fatal(err)
 	}
-	if infos, _ = tmux.List(ctx); len(infos) != 1 || infos[0].Name != other {
+	if infos, _ = list(tmux, ctx); len(infos) != 1 || infos[0].Name != other {
 		t.Errorf("after kill: %v", infos)
 	}
 	if err := tmux.Kill(ctx, name); err == nil {
@@ -97,7 +98,7 @@ func TestListSkipsSessionsAgentosDidNotMake(t *testing.T) {
 	if _, err := tmux.run(ctx, "new-session", "-d", "-s", "not-ours", "sleep", "60"); err != nil {
 		t.Fatal(err)
 	}
-	if infos, err := tmux.List(ctx); err != nil || len(infos) != 0 {
+	if infos, err := list(tmux, ctx); err != nil || len(infos) != 0 {
 		t.Errorf("List = %v, %v", infos, err)
 	}
 }
@@ -118,10 +119,86 @@ func TestShellSessionsAreListedApart(t *testing.T) {
 	if err != nil || len(infos) != 1 || infos[0].Name != agent || len(shells) != 1 || shells[0] != "demo" {
 		t.Fatalf("ListAll = %v, %v, %v", infos, shells, err)
 	}
-	if infos, err = tmux.List(ctx); err != nil || len(infos) != 1 {
+	if infos, err = list(tmux, ctx); err != nil || len(infos) != 1 {
 		t.Errorf("List = %v, %v", infos, err)
 	}
 	if !tmux.Has(ctx, shell) || !tmux.Has(ctx, agent) || tmux.Has(ctx, session.Name{Project: "demo", N: 2}) || tmux.Has(ctx, session.Name{Project: "dem"}) {
 		t.Error("Has gave a wrong answer")
+	}
+}
+
+func list(t *Tmux, ctx context.Context) ([]Info, error) {
+	infos, _, err := t.ListAll(ctx)
+	return infos, err
+}
+
+func TestTargetsMatchTheWholeName(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	one, ten := session.Name{Project: "p", N: 1}, session.Name{Project: "p", N: 10}
+	for _, n := range []session.Name{one, ten} {
+		if err := tmux.NewSession(ctx, n, "title", t.TempDir(), nil, []string{"sleep", "60"}, 100, 30); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tmux.Rename(ctx, one, "renamed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmux.SetIssue(ctx, one, 7); err != nil {
+		t.Fatal(err)
+	}
+	infos, _ := list(tmux, ctx)
+	for _, in := range infos {
+		if in.Name == ten && (in.Title != "title" || in.Issue != "") {
+			t.Errorf("p/10 changed with p/1: %+v", in)
+		}
+	}
+	if err := tmux.Kill(ctx, one); err != nil {
+		t.Fatal(err)
+	}
+	if !tmux.Has(ctx, ten) || tmux.Has(ctx, one) {
+		t.Error("killing p/1 did not leave exactly p/10")
+	}
+	if err := tmux.Kill(ctx, one); err == nil {
+		t.Error("killing p/1 again hit p/10")
+	}
+}
+
+func TestTrailingSemicolonSurvives(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	name := session.Name{Project: "demo", N: 1}
+	if err := tmux.NewSession(ctx, name, "fix a;", t.TempDir(), nil, []string{"cat"}, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmux.Rename(ctx, name, "then b;"); err != nil {
+		t.Fatal(err)
+	}
+	infos, _ := list(tmux, ctx)
+	if len(infos) != 1 || infos[0].Title != "then b;" {
+		t.Fatalf("title = %+v", infos)
+	}
+	for _, text := range []string{"one line;", "two\nlines;"} {
+		if err := tmux.Type(ctx, name, text); err != nil {
+			t.Fatalf("Type(%q): %v", text, err)
+		}
+	}
+	time.Sleep(300 * time.Millisecond)
+	out, err := tmux.run(ctx, "capture-pane", "-p", "-t", target(name))
+	if err != nil || !strings.Contains(out, "one line;") || !strings.Contains(out, "lines;") {
+		t.Errorf("pane = %q, %v", out, err)
+	}
+}
+
+func TestListFailureIsNotNoSessions(t *testing.T) {
+	for msg, want := range map[string]bool{
+		"tmux list-sessions: exit status 1: no server running on /tmp/x":                            true,
+		"tmux list-sessions: exit status 1: error connecting to /tmp/x (No such file or directory)": true,
+		"tmux list-sessions: exit status 1: error connecting to /tmp/x (Permission denied)":         false,
+		"tmux list-sessions: exit status 1: protocol version mismatch":                              false,
+	} {
+		if got := noServer(msg); got != want {
+			t.Errorf("noServer(%q) = %v", msg, got)
+		}
 	}
 }

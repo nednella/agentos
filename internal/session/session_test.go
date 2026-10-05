@@ -130,14 +130,17 @@ func TestParseName(t *testing.T) {
 	}{
 		{"api/3", Name{"api", 3}, false},
 		{"my-app/12", Name{"my-app", 12}, false},
-		{"a/b/7", Name{"a/b", 7}, false},
+		{"a/b/7", Name{}, true},
+		{"../7", Name{}, true},
+		{"a..b/7", Name{}, true},
+		{"../../x/shell", Name{}, true},
 		{"api", Name{}, true},
 		{"/3", Name{}, true},
 		{"api/", Name{}, true},
 		{"api/x", Name{}, true},
 		{"api/0", Name{}, true},
 		{"api/shell", Name{Project: "api"}, false},
-		{"a/b/shell", Name{Project: "a/b"}, false},
+		{"a/b/shell", Name{}, true},
 		{"api/shells", Name{}, true},
 		{"/shell", Name{}, true},
 	}
@@ -165,6 +168,14 @@ func TestNextN(t *testing.T) {
 	for _, tt := range tests {
 		if got := NextN(tt.used); got != tt.want {
 			t.Errorf("NextN(%v) = %d, want %d", tt.used, got, tt.want)
+		}
+	}
+}
+
+func TestProjectKey(t *testing.T) {
+	for in, want := range map[string]string{"api/3": "api", "api/shell": "api", "../3": "project", "nonsense": "project"} {
+		if got := ProjectKey(in); got != want {
+			t.Errorf("ProjectKey(%q) = %q, want %q", in, got, want)
 		}
 	}
 }

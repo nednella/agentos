@@ -1,7 +1,9 @@
 package control
 
 import (
+	"bufio"
 	"context"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,5 +75,60 @@ func TestTimeout(t *testing.T) {
 		if got := (Request{TimeoutMs: tt.ms}).Timeout(); got != tt.want {
 			t.Errorf("Timeout(%d) = %v, want %v", tt.ms, got, tt.want)
 		}
+	}
+}
+
+func TestCloseCancelsCommandsInFlight(t *testing.T) {
+	dir, err := os.MkdirTemp("", "aosc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	socket := SocketPath(dir)
+	started := make(chan struct{})
+	srv, err := Listen(socket, func(ctx context.Context, _ Request) Response {
+		close(started)
+		<-ctx.Done()
+		return Response{Error: "cancelled"}
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	go func() { _, _ = Call(context.Background(), socket, Request{Cmd: "slow", TimeoutMs: 60_000}) }()
+	<-started
+
+	closed := make(chan struct{})
+	go func() { srv.Close(); close(closed) }()
+	select {
+	case <-closed:
+	case <-time.After(3 * time.Second):
+		t.Fatal("Close waited for a command that was not cancelled")
+	}
+}
+
+func TestOversizedRequestIsRefused(t *testing.T) {
+	dir, err := os.MkdirTemp("", "aosc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	socket := SocketPath(dir)
+	srv, err := Listen(socket, func(context.Context, Request) Response { return Response{OK: true} })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer srv.Close()
+
+	conn, err := net.Dial("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.Write([]byte(strings.Repeat("a", maxLine+1))); err != nil {
+		t.Fatal(err)
+	}
+	reply, err := bufio.NewReader(conn).ReadString('\n')
+	if err != nil || !strings.Contains(reply, "not valid") {
+		t.Errorf("reply = %q, %v", reply, err)
 	}
 }

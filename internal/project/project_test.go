@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -146,4 +147,76 @@ func TestSaveRoundTrip(t *testing.T) {
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
+}
+
+func TestSaveKeepsCommentsAndTildePaths(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home dir")
+	}
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	original := `# my agentos setup
+data_dir: ~/Notes/agentos # synced
+agent: claude
+projects:
+  # the main one
+  - name: api
+    dir: ~/code/api   # work
+    commands:
+      ready: "/work {n}"
+  - {name: web, dir: ~/code/web}
+`
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("adding a project", func(t *testing.T) {
+		cfg.Projects = append(cfg.Projects, Project{Name: "new", Dir: "/srv/new"})
+		if err := Save(path, cfg); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := os.ReadFile(path)
+		for _, want := range []string{"# my agentos setup", "~/Notes/agentos # synced", "# the main one", "~/code/api", "# work", "{name: web, dir: ~/code/web}", "/srv/new"} {
+			if !strings.Contains(string(got), want) {
+				t.Errorf("the saved file lost %q:\n%s", want, got)
+			}
+		}
+		if strings.Contains(string(got), home) {
+			t.Errorf("a ~ path was written out in full:\n%s", got)
+		}
+		reloaded, err := Load(path)
+		if err != nil || !reflect.DeepEqual(reloaded, Config{DataDir: cfg.DataDir, Agent: "claude", Projects: cfg.Projects}) {
+			t.Errorf("reload = %+v, %v", reloaded, err)
+		}
+	})
+
+	t.Run("removing a project", func(t *testing.T) {
+		cfg.Projects = cfg.Projects[1:]
+		if err := Save(path, cfg); err != nil {
+			t.Fatal(err)
+		}
+		got, _ := os.ReadFile(path)
+		if strings.Contains(string(got), "name: api") || !strings.Contains(string(got), "# my agentos setup") || !strings.Contains(string(got), "~/code/web") {
+			t.Errorf("saved file:\n%s", got)
+		}
+		reloaded, err := Load(path)
+		if err != nil || len(reloaded.Projects) != 2 || reloaded.Projects[0].Name != "web" || reloaded.Projects[1].Name != "new" {
+			t.Errorf("reload = %+v, %v", reloaded, err)
+		}
+	})
+
+	t.Run("removing every project", func(t *testing.T) {
+		cfg.Projects = nil
+		if err := Save(path, cfg); err != nil {
+			t.Fatal(err)
+		}
+		reloaded, err := Load(path)
+		if err != nil || len(reloaded.Projects) != 0 || reloaded.Agent != "claude" {
+			t.Errorf("reload = %+v, %v", reloaded, err)
+		}
+	})
 }

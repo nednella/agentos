@@ -142,3 +142,31 @@ func TestSendWithoutAListenerFails(t *testing.T) {
 		t.Error("Send to nobody succeeded")
 	}
 }
+
+func TestListenerIgnoresBadSessionNames(t *testing.T) {
+	socket := SocketPath(tempDir(t))
+	var mu sync.Mutex
+	var got []string
+	ln, err := Listen(socket, func(rec session.Record) {
+		mu.Lock()
+		defer mu.Unlock()
+		got = append(got, rec.Session)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ln.Close()
+
+	ctx := context.Background()
+	for _, name := range []string{"../../x/1", "a/b/1", "nonsense", "p/1"} {
+		if err := Send(ctx, socket, session.Record{Session: name}); err != nil {
+			t.Fatal(err)
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 1 || got[0] != "p/1" {
+		t.Errorf("delivered %v, want only p/1", got)
+	}
+}

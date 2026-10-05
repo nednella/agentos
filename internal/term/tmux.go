@@ -93,18 +93,14 @@ func cleanEnv() []string {
 	return out
 }
 
-// List returns the agent sessions. No running server means no sessions.
-func (t *Tmux) List(ctx context.Context) ([]Info, error) {
-	infos, _, err := t.ListAll(ctx)
-	return infos, err
-}
-
 // ListAll returns the agent sessions and the projects that have a shell session.
+// No running server means no sessions; any other failure is an error, because
+// callers must not read it as "everything ended".
 func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
 	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{session_created}")
 	if err != nil {
 		var exit *exec.ExitError
-		if msg := err.Error(); errors.As(err, &exit) && (strings.Contains(msg, "no server running") || strings.Contains(msg, "error connecting")) {
+		if errors.As(err, &exit) && noServer(err.Error()) {
 			return nil, nil, nil
 		}
 		return nil, nil, err
@@ -133,9 +129,27 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
 	return infos, shells, nil
 }
 
+// noServer recognises tmux's message for a socket nobody listens on.
+func noServer(msg string) bool {
+	return strings.Contains(msg, "no server running") ||
+		strings.Contains(msg, "error connecting") && (strings.Contains(msg, "No such file") || strings.Contains(msg, "Connection refused"))
+}
+
+// target names a session for -t. The "=" makes tmux match the whole name: without
+// it "p/1" also matches "p/10". The ":" lets commands that take a pane accept it.
+func target(name session.Name) string { return "=" + name.String() + ":" }
+
+// arg escapes a trailing ";", which tmux would take as the end of the command.
+func arg(s string) string {
+	if strings.HasSuffix(s, ";") {
+		return s[:len(s)-1] + `\;`
+	}
+	return s
+}
+
 // Has says whether a tmux session of that name exists.
 func (t *Tmux) Has(ctx context.Context, name session.Name) bool {
-	_, err := t.run(ctx, "has-session", "-t", "="+name.String())
+	_, err := t.run(ctx, "has-session", "-t", target(name))
 	return err == nil
 }
 
@@ -150,7 +164,7 @@ func (t *Tmux) NewSession(ctx context.Context, name session.Name, title, dir str
 	}
 	args = append(args, "--")
 	args = append(args, argv...)
-	args = append(args, ";", "set-option", "-t", name.String(), titleOption, oneLine(title))
+	args = append(args, ";", "set-option", "-t", target(name), titleOption, arg(oneLine(title)))
 	if _, err := t.run(ctx, args...); err != nil {
 		return fmt.Errorf("starting session %s: %w", name, err)
 	}
@@ -158,14 +172,14 @@ func (t *Tmux) NewSession(ctx context.Context, name session.Name, title, dir str
 }
 
 func (t *Tmux) Kill(ctx context.Context, name session.Name) error {
-	if _, err := t.run(ctx, "kill-session", "-t", name.String()); err != nil {
+	if _, err := t.run(ctx, "kill-session", "-t", target(name)); err != nil {
 		return fmt.Errorf("stopping session %s: %w", name, err)
 	}
 	return nil
 }
 
 func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) error {
-	if _, err := t.run(ctx, "set-option", "-t", name.String(), titleOption, oneLine(title)); err != nil {
+	if _, err := t.run(ctx, "set-option", "-t", target(name), titleOption, arg(oneLine(title))); err != nil {
 		return fmt.Errorf("renaming session %s: %w", name, err)
 	}
 	return nil
@@ -173,7 +187,7 @@ func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) erro
 
 // SetIssue records which GitHub issue a session was started for.
 func (t *Tmux) SetIssue(ctx context.Context, name session.Name, issue int) error {
-	if _, err := t.run(ctx, "set-option", "-t", name.String(), issueOption, strconv.Itoa(issue)); err != nil {
+	if _, err := t.run(ctx, "set-option", "-t", target(name), issueOption, strconv.Itoa(issue)); err != nil {
 		return fmt.Errorf("tagging session %s: %w", name, err)
 	}
 	return nil
@@ -181,7 +195,7 @@ func (t *Tmux) SetIssue(ctx context.Context, name session.Name, issue int) error
 
 // AttachArgv is the command that shows a session in a terminal.
 func (t *Tmux) AttachArgv(name session.Name) []string {
-	return t.argv("attach-session", "-t", name.String())
+	return t.argv("attach-session", "-t", target(name))
 }
 
 // Env is the environment for a process that attaches to the server.
@@ -192,12 +206,12 @@ func (t *Tmux) Env() []string { return cleanEnv() }
 func (t *Tmux) Type(ctx context.Context, name session.Name, text string) error {
 	if strings.Contains(text, "\n") {
 		const buf = "agentos-prefill"
-		if _, err := t.run(ctx, "set-buffer", "-b", buf, "--", text, ";", "paste-buffer", "-p", "-r", "-d", "-b", buf, "-t", name.String()); err != nil {
+		if _, err := t.run(ctx, "set-buffer", "-b", buf, "--", arg(text), ";", "paste-buffer", "-p", "-r", "-d", "-b", buf, "-t", target(name)); err != nil {
 			return fmt.Errorf("pasting into session %s: %w", name, err)
 		}
 		return nil
 	}
-	if _, err := t.run(ctx, "send-keys", "-t", name.String(), "-l", "--", text); err != nil {
+	if _, err := t.run(ctx, "send-keys", "-t", target(name), "-l", "--", arg(text)); err != nil {
 		return fmt.Errorf("typing into session %s: %w", name, err)
 	}
 	return nil

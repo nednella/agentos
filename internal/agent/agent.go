@@ -1,9 +1,6 @@
 package agent
 
-import (
-	"fmt"
-	"strings"
-)
+import "strings"
 
 // Agent builds the command a session runs.
 type Agent interface {
@@ -24,7 +21,3 @@ func New(name, exe string) Agent {
 type Plain struct{ Argv []string }
 
 func (p Plain) Command(string) []string { return p.Argv }
-
-func shellQuote(s string) string {
-	return fmt.Sprintf("'%s'", strings.ReplaceAll(s, "'", `'\''`))
-}

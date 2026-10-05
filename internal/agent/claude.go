@@ -1,6 +1,10 @@
 package agent
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/nednella/agentos/internal/util"
+)
 
 var claudeEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
@@ -23,7 +27,7 @@ type hookGroup struct {
 func (c Claude) Command(string) []string {
 	hooks := make(map[string][]hookGroup, len(claudeEvents))
 	for _, ev := range claudeEvents {
-		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: shellQuote(c.Exe) + " hook " + ev}}}}
+		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: util.ShellQuote(c.Exe) + " hook " + ev}}}}
 	}
 	settings, _ := json.Marshal(struct {
 		Hooks map[string][]hookGroup `json:"hooks"`

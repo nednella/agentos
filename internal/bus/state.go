@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
@@ -29,11 +30,32 @@ func DefaultDir() (string, error) {
 
 func SocketPath(dir string) string { return filepath.Join(dir, socketFile) }
 
+// AppPath is the file in which the app records the bundle it runs from, for the command that opens it.
+func AppPath(dir string) string { return filepath.Join(dir, "app-path") }
+
 // DirOf is the state dir that holds the socket at path: hooks learn the dir from AGENTOS_SOCKET.
 func DirOf(socket string) string { return filepath.Dir(socket) }
 
 func stateFile(dir, name string) string {
 	return filepath.Join(dir, "sessions", name+".json")
+}
+
+// LockState holds the exclusive lock of a session's state file until unlock is called, so
+// hooks that run at once read and write one after the other.
+func LockState(dir, name string) (unlock func(), err error) {
+	path := stateFile(dir, name) + ".lock"
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, fmt.Errorf("creating state dir: %w", err)
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("opening lock of %s: %w", name, err)
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		f.Close()
+		return nil, fmt.Errorf("locking state of %s: %w", name, err)
+	}
+	return func() { _ = f.Close() }, nil // closing the file releases the lock
 }
 
 // WriteState saves rec.

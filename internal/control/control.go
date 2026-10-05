@@ -96,8 +96,9 @@ type Handler func(ctx context.Context, req Request) Response
 
 // Server answers commands until closed.
 type Server struct {
-	ln net.Listener
-	wg sync.WaitGroup
+	ln     net.Listener
+	wg     sync.WaitGroup
+	cancel context.CancelFunc
 }
 
 // Listen starts answering at socket with handle. Close stops it.
@@ -118,23 +119,24 @@ func Listen(socket string, handle Handler) (*Server, error) {
 		return nil, fmt.Errorf("listening on %s: %w", socket, err)
 	}
 	_ = os.Chmod(socket, 0o600)
-	s := &Server{ln: ln}
+	ctx, cancel := context.WithCancel(context.Background())
+	s := &Server{ln: ln, cancel: cancel}
 	s.wg.Go(func() {
 		for {
 			conn, err := ln.Accept()
 			if err != nil {
 				return
 			}
-			s.wg.Go(func() { serve(conn, handle) })
+			s.wg.Go(func() { serve(ctx, conn, handle) })
 		}
 	})
 	return s, nil
 }
 
-func serve(conn net.Conn, handle Handler) {
+func serve(base context.Context, conn net.Conn, handle Handler) {
 	defer conn.Close()
 	_ = conn.SetReadDeadline(time.Now().Add(requestTimeout))
-	line, err := bufio.NewReaderSize(conn, 1<<16).ReadBytes('\n')
+	line, err := bufio.NewReaderSize(io.LimitReader(conn, maxLine+1), 1<<16).ReadBytes('\n')
 	if err != nil && len(line) == 0 {
 		return
 	}
@@ -143,7 +145,7 @@ func serve(conn net.Conn, handle Handler) {
 	if err := json.Unmarshal(line, &req); err != nil || len(line) > maxLine {
 		resp.Error = "the request is not valid"
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), req.Timeout())
+		ctx, cancel := context.WithTimeout(base, req.Timeout())
 		defer cancel()
 		resp = handle(ctx, req)
 	}
@@ -155,8 +157,9 @@ func serve(conn net.Conn, handle Handler) {
 	_, _ = conn.Write(append(out, '\n'))
 }
 
-// Close stops the server and waits for the commands in flight.
+// Close stops the server, cancels the commands in flight and waits for them.
 func (s *Server) Close() {
+	s.cancel()
 	_ = s.ln.Close()
 	s.wg.Wait()
 }
