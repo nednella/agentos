@@ -4,6 +4,7 @@ import { useLayout } from '../LayoutContext'
 import { imageFiles, readImage } from '../images'
 import type { PreviewImage } from '../images'
 import { AutoTextarea } from './AutoTextarea'
+import { Keycap } from './Keycap'
 import { NoteImages } from './NoteImages'
 
 export function NoteInput() {
@@ -58,15 +59,21 @@ export function NoteInput() {
             <NoteImages urls={images.map((i) => i.preview)} onRemove={(url) => setImages((list) => list.filter((i) => i.preview !== url))} />
           </div>
         )}
-        <div className="composer-bar">
-          <span className="text-label opacity-0 transition-opacity group-focus-within:opacity-100" style={{ color: 'var(--text-note-dim)' }}>
-            Enter adds · Shift+Enter new line · paste an image to attach
-          </span>
-          <button className="btn btn-accent ml-auto h-6 px-2 text-label" disabled={!noteDraft.trim() && images.length === 0} onMouseDown={(e) => e.preventDefault()} onClick={submit}>
+        <div className="composer-bar justify-end">
+          <button className="btn btn-accent h-6 px-2 text-label" disabled={!noteDraft.trim() && images.length === 0} onMouseDown={(e) => e.preventDefault()} onClick={submit}>
             Add
           </button>
         </div>
       </div>
+      <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-label opacity-0 transition-opacity group-focus-within:opacity-100" style={{ color: 'var(--text-note-dim)' }}>
+        <span>
+          <Keycap>Enter</Keycap> adds
+        </span>
+        <span>
+          <Keycap>⇧Enter</Keycap> new line
+        </span>
+        <span>paste to attach images</span>
+      </p>
     </div>
   )
 }
