@@ -3,11 +3,11 @@ import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { imageFiles, readImage } from '../images'
 import type { PreviewImage } from '../images'
-import { AutoTextarea, growTextarea } from './AutoTextarea'
+import { AutoTextarea } from './AutoTextarea'
 import { NoteImages } from './NoteImages'
 
 export function NoteInput() {
-  const { addNote, report, focusRequest } = useAgentos()
+  const { addNote, report, focusRequest, noteDraft, setNoteDraft } = useAgentos()
   const { returnToTerminal } = useLayout()
   const input = useRef<HTMLTextAreaElement>(null)
   const [images, setImages] = useState<PreviewImage[]>([])
@@ -26,21 +26,18 @@ export function NoteInput() {
   }
 
   const submit = () => {
-    const el = input.current
-    if (!el) return
-    const text = el.value
-    if (!text.trim() && images.length === 0) return
-    const attached = images
-    el.value = ''
-    growTextarea(el)
+    if (!noteDraft.trim() && images.length === 0) return
+    setNoteDraft('')
     setImages([])
-    report(() => addNote(text, attached))
+    report(() => addNote(noteDraft, images))
   }
 
   return (
     <div className="group flex flex-col gap-1.5 px-3 pt-3 pb-2" onDragOver={(e) => e.preventDefault()} onDrop={(e) => attach(imageFiles(e.dataTransfer)) && e.preventDefault()}>
       <AutoTextarea
         taRef={input}
+        value={noteDraft}
+        onChange={(e) => setNoteDraft(e.target.value)}
         placeholder="Jot something down…"
         aria-label="New note"
         className="note-jot text-body"

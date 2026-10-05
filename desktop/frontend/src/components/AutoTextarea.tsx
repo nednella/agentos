@@ -16,7 +16,7 @@ export function AutoTextarea({ taRef, onInput, className = '', ...props }: AutoT
 
   useEffect(() => {
     if (inner.current) grow(inner.current)
-  }, [])
+  }, [props.value])
 
   return (
     <textarea

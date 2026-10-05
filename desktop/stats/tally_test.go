@@ -11,7 +11,7 @@ import (
 
 func TestWaitsAreRecorded(t *testing.T) {
 	h := newHarness(t)
-	s, err := h.Sessions().Create("#3 work", "", 3)
+	s, err := h.Sessions().Create("#3 work", "", false, 3)
 	if err != nil {
 		t.Fatal(err)
 	}
