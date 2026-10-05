@@ -80,3 +80,38 @@ func newShowCmd() *cobra.Command {
 	cmd.Flags().StringVar(&text, "text", "", "a text card instead of a file")
 	return cmd
 }
+
+func newBrowserCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:                "browser [command] [args]",
+		Short:              "Drive this session's browser (agentos browser help)",
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help") {
+				fmt.Fprintln(cmd.OutOrStdout(), control.BrowserHelp)
+				return nil
+			}
+			if len(args) == 0 {
+				return askApp(cmd, control.Request{Cmd: "browser"})
+			}
+			pos, opts, err := parseFlags(args[1:], []string{"caption", "timeout"}, []string{"full", "append"})
+			if err != nil {
+				return err
+			}
+			return askApp(cmd, control.Request{Cmd: "browser", Args: append([]string{args[0]}, pos...), Opts: opts, TimeoutMs: browserTimeout(args[0], pos, opts)})
+		},
+	}
+}
+
+// browserTimeout is how long the app may spend on a browser command: a page load
+// can take 30 seconds, and a wait takes the time it was asked for on top.
+func browserTimeout(sub string, pos []string, opts map[string]string) int {
+	waited := opts["timeout"]
+	if sub == "wait" && len(pos) > 0 {
+		waited = pos[0]
+	}
+	if ms, err := strconv.Atoi(waited); err == nil && ms > 0 {
+		return min(ms+15_000, 115_000)
+	}
+	return 75_000
+}
