@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"regexp"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -16,7 +15,7 @@ import (
 	"github.com/nednella/agentos/internal/project"
 )
 
-var issueURL = regexp.MustCompile(`https://[^\s/]+/[^\s/]+/[^\s/]+/issues/(\d+)`)
+var issueURL = regexp.MustCompile(`https://[^\s/]+/[^\s/]+/[^\s/]+/issues/\d+`)
 
 // Projects knows the current project.
 type Projects interface{ Current() project.Project }
@@ -117,9 +116,10 @@ func (s *Service) DeleteNote(id string) error {
 	return err
 }
 
-// NoteToIssue files the note on GitHub: its first line is the title, the rest the body.
-// A second call for a note that is being filed fails, so one note never becomes two issues.
-func (s *Service) NoteToIssue(id string) (Note, error) {
+// NoteToIssue files the note on GitHub, its first line as the title and the rest as the body,
+// then deletes the note. A second call for a note that is being filed fails, so one note never
+// becomes two issues.
+func (s *Service) NoteToIssue(id string) error {
 	cur := s.project.Current()
 	filing := cur.Key() + "/" + id
 	s.filingMu.Lock()
@@ -127,7 +127,7 @@ func (s *Service) NoteToIssue(id string) (Note, error) {
 	s.filing[filing] = true
 	s.filingMu.Unlock()
 	if busy {
-		return Note{}, errors.New("this note is already being filed as an issue")
+		return errors.New("this note is already being filed as an issue")
 	}
 	defer func() {
 		s.filingMu.Lock()
@@ -137,35 +137,30 @@ func (s *Service) NoteToIssue(id string) (Note, error) {
 
 	n, err := s.notes.Get(cur.Key(), id)
 	if err != nil {
-		return Note{}, err
-	}
-	if n.Issue > 0 {
-		return Note{}, fmt.Errorf("this note is already issue #%d", n.Issue)
+		return err
 	}
 	if n.title() == "" {
-		return Note{}, errors.New("the note has no text to use as the issue title")
+		return errors.New("the note has no text to use as the issue title")
 	}
 	if s.issues.Repo(s.ctx(), cur.Dir) == "" {
-		return Note{}, errors.New("this project has no GitHub repo")
+		return errors.New("this project has no GitHub repo")
 	}
 	ctx, cancel := context.WithTimeout(s.ctx(), run.GHTimeout)
 	defer cancel()
 	out, err := s.run(ctx, cur.Dir, "gh", "issue", "create", "--title", n.title(), "--body", issueBody(n), "--assignee", "@me")
 	if err != nil {
-		return Note{}, fmt.Errorf("filing the issue: %w", err)
+		return fmt.Errorf("filing the issue: %w", err)
 	}
-	m := issueURL.FindStringSubmatch(string(out))
-	if m == nil {
-		return Note{}, fmt.Errorf("gh did not print an issue address: %q", strings.TrimSpace(string(out)))
+	url := issueURL.FindString(string(out))
+	if url == "" {
+		return fmt.Errorf("gh did not print an issue address: %q", strings.TrimSpace(string(out)))
 	}
-	number, _ := strconv.Atoi(m[1])
-	n, err = s.notes.SetIssue(cur.Key(), id, number, m[0])
-	if err != nil {
-		return Note{}, fmt.Errorf("filed %s but could not save it on the note: %w", m[0], err)
+	if err := s.notes.Delete(cur.Key(), id); err != nil {
+		return fmt.Errorf("filed %s but could not delete the note: %w", url, err)
 	}
 	s.emitNotes()
 	s.issues.Reload(s.ctx(), cur)
-	return n, nil
+	return nil
 }
 
 // NoteToSession starts a session titled by the note, with the project's note command typed in.
@@ -179,15 +174,5 @@ func (s *Service) NoteToSession(id string) (sessions.Session, error) {
 }
 
 // issueBody is the issue template filled with the note's text. gh cannot upload
-// pictures, so a note with pictures says they stay in agentos.
-func issueBody(n Note) string {
-	body := "## Description\n\n" + n.Text
-	switch len(n.Images) {
-	case 0:
-	case 1:
-		body += "\n\n(1 screenshot is attached to the note in agentos.)"
-	default:
-		body += fmt.Sprintf("\n\n(%d screenshots are attached to the note in agentos.)", len(n.Images))
-	}
-	return body
-}
+// pictures, and the note is deleted after filing, so they are not mentioned.
+func issueBody(n Note) string { return "## Description\n\n" + n.Text }

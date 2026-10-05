@@ -97,11 +97,11 @@ func TestNoteToIssue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n, err = h.NoteToIssue(n.ID); err != nil {
+	if err := h.NoteToIssue(n.ID); err != nil {
 		t.Fatal(err)
 	}
-	if n.Issue != 55 || n.IssueURL != "https://github.com/acme/widgets/issues/55" {
-		t.Errorf("note = %+v", n)
+	if _, err := h.Notes().Get("main", n.ID); err == nil {
+		t.Error("the note is still there after filing")
 	}
 	var create string
 	for _, c := range h.GH.CallLog() {
@@ -118,20 +118,17 @@ func TestNoteToIssue(t *testing.T) {
 	if h.Rec.Last("issues") == nil {
 		t.Error("no issues event")
 	}
-	if got := h.Rec.LastNotes(); len(got) != 1 || got[0].Issue != 55 {
+	if got := h.Rec.LastNotes(); len(got) != 0 {
 		t.Errorf("notes event = %+v", got)
-	}
-	if _, err := h.NoteToIssue(n.ID); err == nil {
-		t.Error("a note was filed twice")
 	}
 
 	h.GH.Create = "something odd\n"
 	odd, _ := h.AddNote("odd")
-	if _, err := h.NoteToIssue(odd.ID); err == nil {
+	if err := h.NoteToIssue(odd.ID); err == nil {
 		t.Error("output without an address was accepted")
 	}
-	if got, _ := h.Notes().Get("main", odd.ID); got.Issue != 0 {
-		t.Error("a failed filing marked the note")
+	if _, err := h.Notes().Get("main", odd.ID); err != nil {
+		t.Error("a failed filing deleted the note")
 	}
 }
 
@@ -139,7 +136,7 @@ func TestNoteToIssueWithoutRepo(t *testing.T) {
 	h := newHarness(t)
 	h.GH.Repo = errors.New("not a repo")
 	n, _ := h.AddNote("x")
-	if _, err := h.NoteToIssue(n.ID); err == nil {
+	if err := h.NoteToIssue(n.ID); err == nil {
 		t.Error("filed an issue without a repo")
 	}
 }
@@ -274,23 +271,6 @@ func TestNoteImages(t *testing.T) {
 		}
 	}
 
-	h.GH.Create = "https://github.com/acme/widgets/issues/9\n"
-	if _, err := h.Issues(false); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := h.NoteToIssue(n.ID); err != nil {
-		t.Fatal(err)
-	}
-	var create string
-	for _, c := range h.GH.CallLog() {
-		if strings.HasPrefix(c, "issue create") {
-			create = c
-		}
-	}
-	if !strings.Contains(create, "(1 screenshot is attached to the note in agentos.)") {
-		t.Errorf("gh call = %q", create)
-	}
-
 	if _, err := h.RemoveNoteImage(n.ID, "/media/main/notes-media/other.png"); err == nil {
 		t.Error("removed a picture the note does not have")
 	}
@@ -302,6 +282,26 @@ func TestNoteImages(t *testing.T) {
 	file := h.Notes().MediaFile(n.Images[0])
 	if err := h.DeleteNote(n.ID); err != nil || exists(file) {
 		t.Errorf("deleting the note left its picture: %v", err)
+	}
+
+	h.GH.Create = "https://github.com/acme/widgets/issues/9\n"
+	if _, err := h.Issues(false); err != nil {
+		t.Fatal(err)
+	}
+	n, _ = h.AddNote("filed with picture")
+	n, _ = h.AddNoteImage(n.ID, b64, "image/png")
+	file = h.Notes().MediaFile(n.Images[0])
+	if err := h.NoteToIssue(n.ID); err != nil || exists(file) {
+		t.Errorf("filing the note left its picture: %v", err)
+	}
+	var create string
+	for _, c := range h.GH.CallLog() {
+		if strings.HasPrefix(c, "issue create") {
+			create = c
+		}
+	}
+	if strings.Contains(create, "screenshot") {
+		t.Errorf("the issue mentions a picture that no longer exists: %q", create)
 	}
 }
 
@@ -377,7 +377,7 @@ func TestNoteToIssueFilesOneIssueUnderConcurrentCalls(t *testing.T) {
 	errs := make([]error, 3)
 	var wg sync.WaitGroup
 	for i := range errs {
-		wg.Go(func() { _, errs[i] = h.NoteToIssue(n.ID) })
+		wg.Go(func() { errs[i] = h.NoteToIssue(n.ID) })
 	}
 	wg.Wait()
 
@@ -395,8 +395,8 @@ func TestNoteToIssueFilesOneIssueUnderConcurrentCalls(t *testing.T) {
 	if created != 1 || failed != 2 {
 		t.Errorf("%d issues created, %d calls failed; want 1 and 2 (%v)", created, failed, errs)
 	}
-	if got, _ := h.Notes().Get("main", n.ID); got.Issue != 61 {
-		t.Errorf("note = %+v", got)
+	if _, err := h.Notes().Get("main", n.ID); err == nil {
+		t.Error("the note is still there after filing")
 	}
 }
 
@@ -406,7 +406,7 @@ func TestNoteWithoutTextCannotBecomeAnIssue(t *testing.T) {
 		t.Fatal(err)
 	}
 	n, _ := h.AddNote("")
-	if _, err := h.NoteToIssue(n.ID); err == nil {
+	if err := h.NoteToIssue(n.ID); err == nil {
 		t.Error("a note with no text was filed")
 	}
 	for _, c := range h.GH.CallLog() {
