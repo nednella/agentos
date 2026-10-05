@@ -116,3 +116,27 @@ func TestParseFlags(t *testing.T) {
 		t.Error("a flag without its value was accepted")
 	}
 }
+
+func TestShowSendsTheAbsolutePathAndCaption(t *testing.T) {
+	var got control.Request
+	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
+		got = req
+		return control.Response{OK: true, Out: "filed as evidence"}
+	})
+	dir := t.TempDir()
+	t.Chdir(dir)
+	if out, err := run(t, "show", "shot.png", "--caption", "the page"); err != nil || out != "filed as evidence" {
+		t.Fatalf("show = %q, %v", out, err)
+	}
+	if got.Cmd != "show" || len(got.Args) != 1 || !strings.HasSuffix(got.Args[0], "/shot.png") || !strings.HasPrefix(got.Args[0], "/") || got.Opts["caption"] != "the page" {
+		t.Errorf("request = %+v", got)
+	}
+	if _, err := run(t, "show", "--text", "ran 40 tests"); err != nil || got.Opts["text"] != "ran 40 tests" || len(got.Args) != 0 {
+		t.Errorf("text card request = %+v, %v", got, err)
+	}
+	for _, bad := range [][]string{{"show"}, {"show", "a.png", "--text", "x"}} {
+		if _, err := run(t, bad...); err == nil {
+			t.Errorf("agentos %v succeeded", bad)
+		}
+	}
+}

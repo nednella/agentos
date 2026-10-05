@@ -1,8 +1,10 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -49,5 +51,32 @@ func newStatsCmd() *cobra.Command {
 	}
 	cmd.Flags().IntVar(&days, "days", 7, "how many days to look back")
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print JSON")
+	return cmd
+}
+
+func newShowCmd() *cobra.Command {
+	var caption, text string
+	cmd := &cobra.Command{
+		Use:   "show [file]",
+		Short: "Show the owner evidence: an image, a text file, or --text \"words\"",
+		Args:  cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			req := control.Request{Cmd: "show", Opts: map[string]string{"caption": caption, "text": text}}
+			switch {
+			case len(args) == 1 && text == "":
+				path, err := filepath.Abs(args[0])
+				if err != nil {
+					return fmt.Errorf("finding %s: %w", args[0], err)
+				}
+				req.Args = []string{path}
+			case len(args) == 0 && text != "":
+			default:
+				return errors.New("give a file or --text, not both")
+			}
+			return askApp(cmd, req)
+		},
+	}
+	cmd.Flags().StringVar(&caption, "caption", "", "what the evidence shows")
+	cmd.Flags().StringVar(&text, "text", "", "a text card instead of a file")
 	return cmd
 }
