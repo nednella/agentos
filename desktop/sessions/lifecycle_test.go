@@ -1,0 +1,398 @@
+package sessions_test
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/nednella/agentos/desktop/internal/apptest"
+	"github.com/nednella/agentos/desktop/sessions"
+)
+
+func issueSession(h *apptest.Harness, t *testing.T, issue int) sessions.Session {
+	t.Helper()
+	s, err := h.Sessions().Create(fmt.Sprintf("#%d work", issue), "", issue)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return s
+}
+
+func TestPRTracking(t *testing.T) {
+	h := newHarness(t)
+	s := issueSession(h, t, 12)
+	if s.Branch != "issue-12" || s.PR != nil || s.PRAttention != "" || s.Cleanup != "" {
+		t.Errorf("fresh session = %+v", s)
+	}
+	prAlerts := func() int { return h.Rec.CountAttentionFor(s.ID, "pr") }
+
+	h.GH.SetPR(prJSON("OPEN", true, `[{"status":"IN_PROGRESS"}]`, 1, 0))
+	h.RefreshPRs()
+	got, _ := h.Session(s.ID)
+	if got.PR == nil || got.PR.State != "draft" || got.PR.Checks != "pending" || got.PR.Comments != 1 || got.PRAttention != "" {
+		t.Fatalf("first sight = %+v", got)
+	}
+
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 1))
+	h.RefreshPRs()
+	h.RefreshPRs()
+	if got, _ = h.Session(s.ID); got.PRAttention != "comments" || got.PR.State != "open" {
+		t.Fatalf("new comments = %+v", got)
+	}
+	if prAlerts() != 1 {
+		t.Errorf("pr attention events = %d, want 1", prAlerts())
+	}
+	if last := h.Rec.LastSessions(); len(last) == 0 || last[0].PRAttention != "comments" {
+		t.Error("the sessions event did not carry the attention")
+	}
+
+	if err := h.AckPR(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ = h.Session(s.ID); got.PRAttention != "" {
+		t.Errorf("after ack = %+v", got)
+	}
+
+	h.GH.SetPR(prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"FAILURE"}]`, 3, 0))
+	h.RefreshPRs()
+	if got, _ = h.Session(s.ID); got.PRAttention != "checks" || prAlerts() != 2 {
+		t.Errorf("failing checks: attention %q, events %d", got.PRAttention, prAlerts())
+	}
+	if err := h.AckPR(s.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Run("a restart does not alert again", func(t *testing.T) {
+		fresh := h.Restart(t)
+		fresh.RefreshPRs()
+		var again sessions.Session
+		for _, v := range fresh.Sessions().List() {
+			if v.ID == s.ID {
+				again = v
+			}
+		}
+		if again.PR == nil || again.PRAttention != "" || fresh.Rec.CountAttentionFor(s.ID, "pr") != 0 {
+			t.Errorf("after restart = %+v, events %d", again, fresh.Rec.CountAttentionFor(s.ID, "pr"))
+		}
+		h.GH.SetPR(prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"FAILURE"}]`, 4, 0))
+		fresh.RefreshPRs()
+		for _, v := range fresh.Sessions().List() {
+			if v.ID == s.ID {
+				again = v
+			}
+		}
+		if again.PRAttention != "comments" {
+			t.Errorf("a new comment after restart: %q", again.PRAttention)
+		}
+	})
+}
+
+func gitIn(t *testing.T, dir string, args ...string) string {
+	t.Helper()
+	cmd := exec.Command("git", append([]string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false", "-c", "init.defaultBranch=main"}, args...)...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s: %v: %s", args, dir, err, out)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// repoFixture makes h.Dir a git repo with a bare origin, and returns the origin's path.
+func repoFixture(t *testing.T, h *apptest.Harness) string {
+	t.Helper()
+	origin := filepath.Join(t.TempDir(), "origin.git")
+	gitIn(t, filepath.Dir(origin), "init", "--bare", origin)
+	gitIn(t, h.Dir, "init")
+	if err := os.WriteFile(filepath.Join(h.Dir, "README"), []byte("hi\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, h.Dir, "add", "README")
+	gitIn(t, h.Dir, "commit", "-m", "first")
+	gitIn(t, h.Dir, "remote", "add", "origin", origin)
+	gitIn(t, h.Dir, "push", "-u", "origin", "main")
+	return origin
+}
+
+// issueWorktree adds a worktree on issue-7 with one pushed commit.
+func issueWorktree(t *testing.T, h *apptest.Harness) string {
+	t.Helper()
+	wt := filepath.Join(h.Dir, "trees", "issue-7")
+	gitIn(t, h.Dir, "worktree", "add", "-b", "issue-7", wt)
+	if err := os.WriteFile(filepath.Join(wt, "work.txt"), []byte("work\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, wt, "add", "work.txt")
+	gitIn(t, wt, "commit", "-m", "work")
+	gitIn(t, wt, "push", "-u", "origin", "issue-7")
+	return wt
+}
+
+func branches(t *testing.T, dir string) string {
+	return gitIn(t, dir, "branch", "--list", "issue-7")
+}
+
+func TestCleanupMerged(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+
+	openThenMerge(h)
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Errorf("worktree exists: %v, branches: %q", exists(wt), branches(t, h.Dir))
+	}
+	log := h.Cleanups()
+	if len(log) != 1 || log[0].Status != "done" || log[0].Issue != 7 || log[0].PR != 12 || log[0].SessionTitle != "#7 work" {
+		t.Fatalf("log = %+v", log)
+	}
+	if want := []string{"worktree trees/issue-7", "branch issue-7", "temp files", "session"}; !slices.Equal(log[0].Removed, want) {
+		t.Errorf("removed = %q, want %q", log[0].Removed, want)
+	}
+	if rec := h.Rec.Last("cleanups"); rec == nil {
+		t.Error("no cleanups event")
+	}
+	if out, _ := exec.Command("tmux", "-L", h.Socket, "list-sessions").CombinedOutput(); strings.Contains(string(out), s.ID) {
+		t.Errorf("tmux session still there: %s", out)
+	}
+	if exists(filepath.Join(h.Dir, "README")) == false {
+		t.Error("the project folder itself was touched")
+	}
+}
+
+func TestCleanupBlocked(t *testing.T) {
+	tests := []struct {
+		name   string
+		spoil  func(t *testing.T, wt string)
+		reason string
+	}{
+		{"uncommitted change", func(t *testing.T, wt string) {
+			if err := os.WriteFile(filepath.Join(wt, "work.txt"), []byte("changed\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}, "the worktree has uncommitted changes"},
+		{"untracked file", func(t *testing.T, wt string) {
+			if err := os.WriteFile(filepath.Join(wt, "new.txt"), []byte("x\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}, "the worktree has uncommitted changes"},
+		{"unpushed commit", func(t *testing.T, wt string) {
+			if err := os.WriteFile(filepath.Join(wt, "more.txt"), []byte("x\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			gitIn(t, wt, "add", "more.txt")
+			gitIn(t, wt, "commit", "-m", "unpushed")
+		}, "the branch has a commit that is not on origin"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			repoFixture(t, h)
+			wt := issueWorktree(t, h)
+			tt.spoil(t, wt)
+			s := issueSession(h, t, 7)
+
+			openThenMerge(h)
+			eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+
+			got, _ := h.Session(s.ID)
+			if got.CleanupReason != tt.reason {
+				t.Errorf("reason = %q, want %q", got.CleanupReason, tt.reason)
+			}
+			if !exists(wt) || branches(t, h.Dir) == "" {
+				t.Error("something was removed although the clean-up was blocked")
+			}
+			log := h.Cleanups()
+			if len(log) != 1 || log[0].Status != "blocked" || log[0].Reason != tt.reason || len(log[0].Removed) != 0 {
+				t.Errorf("log = %+v", log)
+			}
+			h.RefreshPRs()
+			h.RefreshPRs()
+			if len(h.Cleanups()) != 1 {
+				t.Error("a blocked clean-up was tried again by itself")
+			}
+
+			if err := h.Cleanup(s.ID, true); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok := h.Session(s.ID); ok || exists(wt) || branches(t, h.Dir) != "" {
+				t.Errorf("forced clean-up left things: wt %v branches %q", exists(wt), branches(t, h.Dir))
+			}
+			if log := h.Cleanups(); len(log) != 2 || log[0].Status != "done" {
+				t.Errorf("log after force = %+v", log)
+			}
+		})
+	}
+}
+
+func TestCleanupClosedAsksFirst(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	h.GH.SetPR(prJSON("CLOSED", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.RefreshPRs()
+	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(wt) || len(h.Cleanups()) != 0 {
+		t.Fatalf("closed PR: cleanup %q, worktree %v", got.Cleanup, exists(wt))
+	}
+	if err := h.Cleanup(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := h.Session(s.ID); ok || exists(wt) || branches(t, h.Dir) != "" {
+		t.Error("the confirmed clean-up left things behind")
+	}
+}
+
+func TestCleanupMergedWithRemoteBranchGone(t *testing.T) {
+	h := newHarness(t)
+	origin := repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	gitIn(t, origin, "branch", "-D", "issue-7")
+	gitIn(t, h.Dir, "fetch", "--prune")
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "clean-up of a merged branch GitHub deleted", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Error("left things behind")
+	}
+}
+
+func TestCleanupCustomCommand(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "clean-up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) || !exists(filepath.Join(h.Dir, "cleaned-issue-7")) {
+		t.Errorf("custom command: worktree exists %v, marker exists %v", exists(wt), exists(filepath.Join(h.Dir, "cleaned-issue-7")))
+	}
+	if branches(t, h.Dir) != "" {
+		t.Error("the branch was kept")
+	}
+}
+
+func TestCleanupLeavesBranchOfMainTree(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	gitIn(t, h.Dir, "checkout", "-b", "issue-7")
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "clean-up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if branches(t, h.Dir) == "" || !exists(filepath.Join(h.Dir, "README")) {
+		t.Error("the main working tree's branch was removed")
+	}
+	log := h.Cleanups()
+	if len(log) != 1 || log[0].Status != "done" || !strings.Contains(strings.Join(log[0].Removed, "|"), "kept") {
+		t.Errorf("log = %+v", log)
+	}
+}
+
+func TestSessionWithoutIssueIsNeverCleanedUp(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	s, err := h.NewSession("plain", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	openThenMerge(h)
+	time.Sleep(400 * time.Millisecond)
+	if _, ok := h.Session(s.ID); !ok {
+		t.Error("a session without an issue was cleaned up")
+	}
+	if err := h.Cleanup(s.ID, true); err == nil {
+		t.Error("Cleanup accepted a session without an issue")
+	}
+	if got, _ := h.Session(s.ID); got.Branch != "" || got.PR != nil {
+		t.Errorf("session = %+v", got)
+	}
+}
+
+func openThenMerge(h *apptest.Harness) {
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	h.RefreshPRs()
+}
+
+func TestMergedBeforeTheSessionAsksFirst(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(wt) || branches(t, h.Dir) == "" || len(h.Cleanups()) != 0 {
+		t.Fatalf("an old merged PR: cleanup %q, worktree %v", got.Cleanup, exists(wt))
+	}
+	if err := h.Cleanup(s.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := h.Session(s.ID); ok || exists(wt) || branches(t, h.Dir) != "" {
+		t.Error("the confirmed clean-up left things behind")
+	}
+}
+
+func TestCleanupAfterRestartBetweenOpenAndMerged(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+
+	fresh := h.Restart(t)
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	fresh.RefreshPRs()
+	eventually(t, "the restarted app to clean up", func() bool {
+		for _, v := range fresh.Sessions().List() {
+			if v.ID == s.ID {
+				return false
+			}
+		}
+		return true
+	})
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Error("the clean-up left things behind")
+	}
+}
+
+func TestLiveFlagGoesWithTheSession(t *testing.T) {
+	h := newHarness(t)
+	s := issueSession(h, t, 7)
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+	h.RefreshPRs()
+	live := func() bool {
+		data, _ := os.ReadFile(filepath.Join(h.State, "data", "main", "prs.json"))
+		var f struct{ Live map[string]bool }
+		_ = json.Unmarshal(data, &f)
+		return f.Live[s.ID]
+	}
+	if !live() {
+		t.Fatal("a draft PR was not counted as live")
+	}
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if live() {
+		t.Error("the live flag outlived its session")
+	}
+}

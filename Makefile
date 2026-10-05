@@ -25,8 +25,8 @@ desktop-app: desktop
 	rm -rf $(APP) bin/icon.iconset
 	mkdir -p $(APP)/Contents/MacOS $(APP)/Contents/Resources bin/icon.iconset
 	cp bin/agentos-desktop $(APP)/Contents/MacOS/agentos
-	cp desktop/Info.plist $(APP)/Contents/Info.plist
-	go run desktop/icon/gen.go bin/icon.png
+	cp desktop/build/Info.plist $(APP)/Contents/Info.plist
+	go run desktop/build/icon.go bin/icon.png
 	for s in 16 32 128 256 512; do \
 		sips -z $$s $$s bin/icon.png --out bin/icon.iconset/icon_$${s}x$${s}.png >/dev/null; \
 		sips -z $$((s*2)) $$((s*2)) bin/icon.png --out bin/icon.iconset/icon_$${s}x$${s}@2x.png >/dev/null; \
