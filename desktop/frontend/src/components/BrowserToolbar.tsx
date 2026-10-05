@@ -8,7 +8,7 @@ import { InlineInput } from './InlineInput'
 type BrowserToolbarProps = { id: string; state: BrowserState }
 
 export function BrowserToolbar({ id, state }: BrowserToolbarProps) {
-  const { report } = useAgentos()
+  const { report, pushToast } = useAgentos()
   const [draft, setDraft] = useState<string | null>(null)
   const [capturing, setCapturing] = useState(false)
   const nav = (action: 'back' | 'forward' | 'reload' | 'stop') => report(() => api.browserNav(id, action))
@@ -64,7 +64,10 @@ export function BrowserToolbar({ id, state }: BrowserToolbarProps) {
           className="w-64 max-w-full"
           onSubmit={(caption) => {
             setCapturing(false)
-            report(() => api.browserScreenshot(id, caption.trim()))
+            report(async () => {
+              await api.browserScreenshot(id, caption.trim())
+              pushToast({ tone: 'info', text: 'Captured to Evidence' })
+            })
           }}
           onCancel={() => setCapturing(false)}
         />

@@ -23,6 +23,8 @@ export type Action = {
   shortcut?: Shortcut
   keysLabel?: string
   hidden?: boolean
+  palette?: false | { prompt?: string; initial?: string }
+  confirm?: boolean
   run(args: string[]): string | void | Promise<string | void>
 }
 
@@ -39,6 +41,15 @@ export function matchShortcut(e: KeyboardEvent, shortcut: Shortcut): boolean {
   if (shortcut.code) return e.code === shortcut.code
   return [shortcut.key, ...(shortcut.aliases ?? [])].includes(e.key.toLowerCase())
 }
+
+export const LIST_KEYS: { keys: string; summary: string }[] = [
+  { keys: 'W / S or ↑ / ↓', summary: 'Move the row cursor in a focused list' },
+  { keys: 'Enter', summary: 'Act on the row: queue starts or jumps, sessions opens, notes edits' },
+  { keys: 'A / D or ← / →', summary: 'Switch Queue and Notes, or fold a lane' },
+  { keys: 'Space', summary: 'Fold or unfold the lane under the cursor' },
+  { keys: 'P / E in notes', summary: 'Pin or archive the note under the cursor' },
+  { keys: 'Esc', summary: 'Close a panel or overlay. Inside the terminal it goes to the agent' },
+]
 
 const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
 
@@ -81,6 +92,7 @@ export function useActions(): Action[] {
       id: 'open-session',
       label: 'Open session',
       group: 'Sessions',
+      palette: false,
       run(args) {
         const session = findSession(a.sessions, args.join(' '))
         a.select(session.id)
@@ -100,6 +112,7 @@ export function useActions(): Action[] {
       id: 'kill-session',
       label: current ? `Kill session ${describe(current)}` : 'Kill session',
       group: 'Sessions',
+      confirm: true,
       async run(args) {
         const target = args.length ? findSession(a.sessions, args.join(' ')) : current
         if (!target) throw 'No session to kill'
@@ -111,6 +124,7 @@ export function useActions(): Action[] {
       id: 'rename-session',
       label: current ? `Rename session ${describe(current)}` : 'Rename session',
       group: 'Sessions',
+      palette: { prompt: 'New title', initial: current?.title },
       async run(args) {
         if (!current) throw 'No session to rename'
         if (args.length === 0) throw 'Give the new title: rename <title>'
@@ -122,6 +136,7 @@ export function useActions(): Action[] {
       id: 'start-issue',
       label: 'Start issue',
       group: 'Queue',
+      palette: false,
       async run(args) {
         const numbers = args.map((x) => Number(x.replace(/^#/, '')))
         if (numbers.length === 0 || numbers.some((n) => !Number.isInteger(n))) throw 'Give issue numbers: issue 394 393'
@@ -154,6 +169,7 @@ export function useActions(): Action[] {
       id: 'note',
       label: 'New note',
       group: 'Notes',
+      palette: { prompt: 'Note text' },
       async run(args) {
         if (args.length === 0) {
           layout.showSidebarTab('notes')
@@ -186,6 +202,7 @@ export function useActions(): Action[] {
       id: 'filter-queue',
       label: 'Filter the queue…',
       group: 'Queue',
+      palette: { prompt: 'Filter, e.g. @mariam-k label:idea -type:bug', initial: a.issueFilter },
       run(args) {
         layout.showSidebarTab('queue')
         a.setIssueFilter(args.join(' '))
@@ -307,6 +324,7 @@ export function useActions(): Action[] {
       label: 'Previous view (terminal, browser, evidence)',
       group: 'Navigate',
       shortcut: { key: '[', code: 'BracketLeft', shift: true, label: '[' },
+      palette: false,
       run: () => a.cycleSessionView(-1),
     },
     {
@@ -314,6 +332,7 @@ export function useActions(): Action[] {
       label: 'Next view (terminal, browser, evidence)',
       group: 'Navigate',
       shortcut: { key: ']', code: 'BracketRight', shift: true, label: ']' },
+      palette: false,
       run: () => a.cycleSessionView(1),
     },
     {
@@ -346,6 +365,7 @@ export function useActions(): Action[] {
       id: 'cleanup',
       label: current ? `Clean up session ${describe(current)}` : 'Clean up session',
       group: 'Sessions',
+      confirm: true,
       async run(args) {
         const target = args.length ? findSession(a.sessions, args.join(' ')) : current
         if (!target) throw 'No session to clean up'
@@ -367,6 +387,21 @@ export function useActions(): Action[] {
       shortcut: { key: ']' },
       run: () => a.stepSession(1),
     },
+    {
+      id: 'palette',
+      label: 'Command palette',
+      group: 'Navigate',
+      shortcut: { key: 'k' },
+      palette: false,
+      run: () => a.setOverlay(a.overlay === 'palette' ? null : 'palette'),
+    },
+    {
+      id: 'shortcuts',
+      label: 'Keyboard shortcuts',
+      group: 'App',
+      shortcut: { key: '/' },
+      run: openOverlay('shortcuts'),
+    },
   ]
 
   for (let n = 1; n <= 9; n++) {
@@ -377,6 +412,7 @@ export function useActions(): Action[] {
       shortcut: { key: String(n) },
       keysLabel: n === 1 ? '⌘1–9' : undefined,
       hidden: n > 1,
+      palette: false,
       run() {
         const target = a.sessions.find((s) => s.n === n)
         if (!target) throw `No session ${n}`

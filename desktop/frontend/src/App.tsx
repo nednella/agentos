@@ -1,10 +1,13 @@
 import { DigestView } from './components/DigestView'
 import { Divider } from './components/Divider'
 import { MobileTabs } from './components/MobileTabs'
+import { Palette } from './components/Palette'
 import { ProjectPanel } from './components/ProjectPanel'
 import { SessionsPanel } from './components/SessionsPanel'
+import { ShortcutsSheet } from './components/ShortcutsSheet'
 import { Sidebar } from './components/Sidebar'
 import { Stats } from './components/Stats'
+import { Toasts } from './components/Toasts'
 import { TopBar } from './components/TopBar'
 import { Viewport } from './components/Viewport'
 import { useLayout } from './LayoutContext'
@@ -35,7 +38,10 @@ export function App() {
         <SessionsPanel />
       </main>
       {narrow && <MobileTabs />}
+      <Palette />
       <ProjectPanel />
+      <ShortcutsSheet />
+      <Toasts />
     </div>
   )
 }

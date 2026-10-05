@@ -4,6 +4,14 @@ import { api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
 import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session } from './types'
 
+export type Toast = {
+  key: number
+  tone: 'waiting' | 'replied' | 'pr' | 'evidence' | 'error' | 'info'
+  text: string
+  sessionId?: string
+  view?: SessionView
+}
+
 export type SessionView = 'terminal' | 'browser' | 'evidence'
 export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
@@ -27,6 +35,7 @@ type Agentos = {
   browserStates: Record<string, BrowserState>
   digest: Digest | null
   digestUnseen: boolean
+  toasts: Toast[]
   overlay: Overlay
   sidebarTab: SidebarTab
   composing: boolean
@@ -72,6 +81,8 @@ type Agentos = {
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
   report(run: () => unknown): void
+  pushToast(toast: Omit<Toast, 'key'>): void
+  dismissToast(key: number): void
 }
 
 const AgentosContext = createContext<Agentos | null>(null)
@@ -81,6 +92,9 @@ export function useAgentos(): Agentos {
   if (!value) throw new Error('useAgentos must be used inside AgentosProvider')
   return value
 }
+
+const cleanupToast = (entry: Cleanup, merged: boolean) =>
+  `${entry.issue > 0 ? `#${entry.issue}` : entry.sessionTitle} ${merged ? 'merged, ' : ''}cleaned up`
 
 const digestKey = (project: string) => `agentos.digestSeen.${project}`
 
@@ -104,6 +118,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [views, setViews] = useState<Record<string, SessionView>>({})
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
+  const [toasts, setToasts] = useState<Toast[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
   const [composing, setComposing] = useState(false)
@@ -113,6 +128,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const selectedRef = useRef(selectedId)
   const projectRef = useRef(project)
   const lastSelected = useRef(new Map<string, string>())
+  const toastKey = useRef(0)
   sessionsRef.current = sessions
   projectRef.current = project
 
@@ -124,9 +140,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
 
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
 
+  const pushToast = useCallback((toast: Omit<Toast, 'key'>) => {
+    const key = ++toastKey.current
+    setToasts((list) => [...list.slice(-2), { ...toast, key }])
+    const ms = toast.tone === 'error' ? 6000 : 7000
+    setTimeout(() => setToasts((list) => list.filter((t) => t.key !== key)), ms)
+  }, [])
+
   const report = useCallback(
     (run: () => unknown) => {
-      const fail = (err: unknown) => console.error(errorMessage(err))
+      const fail = (err: unknown) => pushToast({ tone: 'error', text: errorMessage(err) })
       try {
         const result = run()
         if (result instanceof Promise) result.catch(fail)
@@ -134,7 +157,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         fail(err)
       }
     },
-    [],
+    [pushToast],
   )
 
   const applySessions = useCallback(
@@ -188,7 +211,17 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('evidence', ({ id, items }) => setEvidence((map) => ({ ...map, [id]: items }))), [])
   useEffect(() => on('browser:state', (state) => setBrowserStates((map) => ({ ...map, [state.id]: state }))), [])
   useEffect(() => on('digest', setDigest), [])
-  useEffect(() => on('cleanups', setCleanups), [])
+  useEffect(
+    () =>
+      on('cleanups', (list) => {
+        setCleanups(list)
+        const entry = list[0]
+        if (!entry || entry.status !== 'done') return
+        const merged = sessionsRef.current.find((s) => s.title === entry.sessionTitle)?.pr?.state === 'merged'
+        pushToast({ tone: 'info', text: cleanupToast(entry, merged) })
+      }),
+    [pushToast],
+  )
   useEffect(
     () =>
       on('projects', (list) => {
@@ -196,6 +229,27 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         setProject((p) => list.find((x) => x.name === p?.name) ?? p)
       }),
     [],
+  )
+
+  useEffect(
+    () =>
+      on('attention', ({ id, state }) => {
+        if (id === selectedRef.current) return
+        const session = sessionsRef.current.find((s) => s.id === id)
+        if (!session) return
+        const describe = (current: Session) => {
+          if (state === 'waiting') return 'needs you'
+          if (state === 'replied') return 'replied'
+          if (state === 'evidence') return 'has something to show'
+          return current.prAttention === 'checks' ? 'has failing checks' : 'has new review comments'
+        }
+        // The sessions event that carries prAttention lands in the same tick as this one.
+        setTimeout(() => {
+          const current = sessionsRef.current.find((s) => s.id === id) ?? session
+          pushToast({ tone: state, text: `${current.title} ${describe(current)}`, sessionId: id, view: state === 'evidence' ? 'evidence' : undefined })
+        }, 50)
+      }),
+    [pushToast],
   )
 
   useEffect(() => {
@@ -247,6 +301,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       browserStates,
       digest,
       digestUnseen,
+      toasts,
       overlay,
       sidebarTab,
       composing,
@@ -411,8 +466,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       focus,
       report,
+      pushToast,
+      dismissToast: (key) => setToasts((list) => list.filter((t) => t.key !== key)),
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report, pushToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

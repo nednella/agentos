@@ -13,6 +13,7 @@ const noDrag = { '--wails-draggable': 'no-drag' } as CSSProperties
 const FULL_MIN = 1100
 const DOTS_MIN = 640
 const NEXT_FULL_MIN = 780
+const HELP_MIN = 560
 const MORE_MIN = 480
 
 type CountProps = { state: State; count: number; label: string; condensed: boolean }
@@ -113,6 +114,14 @@ export function TopBar() {
               {digestUnseen && <span className="dot absolute top-1.5 right-1.5" style={{ ['--c' as string]: 'var(--accent)' }} />}
             </button>
           </>
+        )}
+        <button className={iconButton} onClick={() => setOverlay('palette')} title={`Command palette (${keys('palette')})`} aria-label="Command palette">
+          <Icon name="search" />
+        </button>
+        {width >= HELP_MIN && (
+          <button className={iconButton} onClick={() => setOverlay('shortcuts')} title={`Keyboard shortcuts (${keys('shortcuts')})`} aria-label="Keyboard shortcuts">
+            <Icon name="help" />
+          </button>
         )}
       </div>
     </header>
