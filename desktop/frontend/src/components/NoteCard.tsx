@@ -75,7 +75,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
           autoFocus
           defaultValue={note.text}
           aria-label="Edit note"
-          className="note-jot text-body"
+          className="note-jot rounded-md border px-2.5 text-body"
           style={{ background: 'var(--bg-note)', borderColor: 'var(--border-note)' }}
           onFocus={(e) => e.currentTarget.setSelectionRange(note.text.length, note.text.length)}
           onPaste={(e) => attach(imageFiles(e.clipboardData)) && e.preventDefault()}

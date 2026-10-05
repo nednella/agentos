@@ -16,7 +16,7 @@ export function AutoTextarea({ taRef, onInput, className = '', ...props }: AutoT
 
   useEffect(() => {
     if (inner.current) grow(inner.current)
-  }, [])
+  }, [props.value])
 
   return (
     <textarea
@@ -27,7 +27,7 @@ export function AutoTextarea({ taRef, onInput, className = '', ...props }: AutoT
         else if (taRef) (taRef as { current: HTMLTextAreaElement | null }).current = el
       }}
       rows={1}
-      className={`w-full resize-none overflow-y-auto rounded-md border bg-transparent px-2.5 outline-none ${className}`}
+      className={`w-full resize-none overflow-y-auto bg-transparent outline-none ${className}`}
       onInput={(e) => {
         grow(e.currentTarget)
         onInput?.(e)

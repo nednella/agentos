@@ -198,6 +198,34 @@
     border-color: var(--accent);
   }
 
+  .composer {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-app);
+    transition: border-color 0.12s, box-shadow 0.12s;
+  }
+
+  .composer:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+  }
+
+  .composer :is(input, textarea) {
+    min-width: 0;
+    background: transparent;
+    outline: none;
+  }
+
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.375rem 0.375rem 0.75rem;
+  }
+
   .panel {
     background: var(--bg-surface);
     border: 1px solid var(--border);
@@ -304,6 +332,15 @@
     touch-action: none;
   }
 
+  /* The shell's divider sits in main's bottom padding, so the strip itself adds no height. */
+  .divider[aria-orientation='horizontal'] {
+    position: absolute;
+    inset: -0.75rem 0 auto;
+    width: auto;
+    height: 0.75rem;
+    cursor: row-resize;
+  }
+
   .divider::after {
     content: '';
     position: absolute;
@@ -311,6 +348,10 @@
     border-radius: 2px;
     background: transparent;
     transition: background 0.12s;
+  }
+
+  .divider[aria-orientation='horizontal']::after {
+    inset: 0.3125rem 0.25rem;
   }
 
   .divider:hover::after,
@@ -381,11 +422,16 @@
     border-color: color-mix(in srgb, var(--accent) 70%, var(--border-note));
   }
 
+  [data-panel='sidebar'][data-tab='notes'] .composer,
   [data-panel='sidebar'][data-tab='notes'] .note-jot,
   [data-panel='sidebar'][data-tab='notes'] .note-search {
     background: var(--bg-note-card);
     border-color: var(--border-note);
     color: var(--text-note);
+  }
+
+  [data-panel='sidebar'][data-tab='notes'] .composer:focus-within {
+    border-color: color-mix(in srgb, var(--accent) 70%, var(--border-note));
   }
 
   [data-panel='sidebar'][data-tab='notes'] .panel-head,

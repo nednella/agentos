@@ -10,11 +10,12 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
 
   if (composing) {
     return (
-      <div className="flex flex-none items-center gap-2 border-t border-line p-3">
+      <div className="flex-none border-t border-line p-3">
         <InlineInput
-          placeholder="Title (optional), Enter to start"
+          placeholder="Title (optional)"
           blur="cancel"
-          className="flex-1"
+          action="Start"
+          icon={<Icon name="plus" />}
           onSubmit={(title) => {
             setComposing(false)
             report(() => newSession(title.trim()))
