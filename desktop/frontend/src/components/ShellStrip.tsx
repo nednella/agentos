@@ -17,8 +17,8 @@ export function ShellStrip() {
   const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize)
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button')) return
     e.currentTarget.setPointerCapture(e.pointerId)
+    e.currentTarget.dataset.dragging = 'true'
     drag.current = { y: e.clientY, rem: shellRem, root: root() }
   }
   const heightAt = (e: PointerEvent<HTMLDivElement>) => {
@@ -32,10 +32,11 @@ export function ShellStrip() {
     if (!drag.current) return
     setShellHeight(heightAt(e), true)
     drag.current = null
+    delete e.currentTarget.dataset.dragging
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.target !== e.currentTarget || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
     e.preventDefault()
     const step = e.key === 'ArrowUp' ? KEY_STEP_REM : -KEY_STEP_REM
     setShellHeight(Math.min(shellRem + step, (0.6 * window.innerHeight) / root()), true)
@@ -63,13 +64,12 @@ export function ShellStrip() {
   }
 
   return (
-    <div data-panel="shell" tabIndex={-1} className="flex-none border-t border-line bg-term">
+    <div data-panel="shell" tabIndex={-1} className="relative flex-none border-t border-line bg-term">
       <div
-        className="panel-head flex cursor-row-resize items-center gap-2 border-b border-line px-4 select-none"
-        style={{ height: `${HEADER_REM}rem` }}
+        className="divider"
         role="separator"
         aria-orientation="horizontal"
-        aria-label="Shell height. Arrow up or down to resize"
+        aria-label="Resize shell"
         tabIndex={0}
         title="Drag to resize, double-click to reset"
         onKeyDown={onKeyDown}
@@ -77,7 +77,8 @@ export function ShellStrip() {
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onDoubleClick={resetShellHeight}
-      >
+      />
+      <div className="panel-head flex items-center gap-2 border-b border-line px-4 select-none" style={{ height: `${HEADER_REM}rem` }}>
         <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
         <span className="text-small text-dim">Shell</span>
         <span className="ml-auto flex items-center gap-1">
