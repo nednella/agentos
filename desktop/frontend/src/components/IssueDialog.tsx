@@ -1,24 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
-import type { KeyboardEvent } from 'react'
 import { api, errorMessage } from '../api'
 import { useAgentos } from '../AgentosContext'
-import { useLayout } from '../LayoutContext'
 import { ago, useNow } from '../time'
 import type { IssueDetail } from '../types'
 import { Icon } from './Icon'
 import { IssueBody } from './IssueBody'
+import { Overlay } from './Overlay'
 import { StateDot } from './StateDot'
 import { TypeMark } from './TypeMark'
 
-type IssueViewProps = { number: number }
-
 const dateOf = (at: number) => new Date(at).toLocaleString()
 
-export function IssueView({ number }: IssueViewProps) {
-  const { issues, sessions, startIssue, select, focus, report, focusRequest } = useAgentos()
-  const { closeCentre } = useLayout()
+export function IssueDialog() {
+  const { overlay } = useAgentos()
+  if (typeof overlay !== 'object' || !overlay) return null
+  return <IssueDialogContent key={overlay.issue} number={overlay.issue} />
+}
+
+type IssueDialogContentProps = { number: number }
+
+function IssueDialogContent({ number }: IssueDialogContentProps) {
+  const { issues, sessions, startIssue, select, setOverlay, report } = useAgentos()
   const now = useNow()
-  const panel = useRef<HTMLElement>(null)
+  const body = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<IssueDetail | null>(null)
   const [error, setError] = useState('')
   const issue = issues.find((i) => i.number === number)
@@ -28,35 +32,13 @@ export function IssueView({ number }: IssueViewProps) {
     api.issueDetail(number).then(setDetail, (err) => setError(errorMessage(err)))
   }, [number])
 
-  useEffect(() => panel.current?.focus(), [])
-  useEffect(() => {
-    if (focusRequest.target === 'terminal') panel.current?.focus()
-  }, [focusRequest])
+  useEffect(() => body.current?.focus(), [])
 
-  const close = () => {
-    closeCentre()
-    focus('terminal')
-  }
-
-  const start = () => {
-    closeCentre()
-    report(() => startIssue(number))
-  }
-
-  const onKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape' || (e.key === 'Enter' && e.target === e.currentTarget)) close()
-  }
+  const close = () => setOverlay(null)
 
   return (
-    <section
-      ref={panel}
-      data-panel="terminal"
-      tabIndex={-1}
-      aria-label={`Issue #${number}`}
-      className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
-      onKeyDown={onKeyDown}
-    >
-      <header className="panel-head flex flex-none flex-col gap-1.5 border-b border-line px-4 py-2.5">
+    <Overlay align="center" size="reading" label={`Issue #${number}`} onClose={close}>
+      <header className="flex flex-none flex-col gap-1.5 border-b border-line px-4 py-2.5">
         <div className="flex items-start gap-3">
           <span className="mono flex-none pt-px text-title font-semibold text-soft">#{number}</span>
           <h2 className="min-w-0 flex-1 text-title font-semibold break-words">{issue?.title ?? 'No longer in the queue'}</h2>
@@ -66,7 +48,7 @@ export function IssueView({ number }: IssueViewProps) {
                 className="btn"
                 title={`Open session ${session.n}`}
                 onClick={() => {
-                  closeCentre()
+                  close()
                   select(session.id)
                 }}
               >
@@ -75,7 +57,14 @@ export function IssueView({ number }: IssueViewProps) {
               </button>
             )}
             {issue && !session && (
-              <button className="btn btn-accent" title="Start a session for this issue" onClick={start}>
+              <button
+                className="btn btn-accent"
+                title="Start a session for this issue"
+                onClick={() => {
+                  close()
+                  report(() => startIssue(number))
+                }}
+              >
                 Start
               </button>
             )}
@@ -84,7 +73,7 @@ export function IssueView({ number }: IssueViewProps) {
                 <Icon name="external" />
               </button>
             )}
-            <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={close}>
+            <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Close (Esc)" aria-label="Close" onClick={close}>
               <Icon name="close" />
             </button>
           </span>
@@ -103,8 +92,8 @@ export function IssueView({ number }: IssueViewProps) {
           </div>
         )}
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="mx-auto flex max-w-3xl flex-col gap-6">
+      <div ref={body} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-4 outline-none">
+        <div className="flex flex-col gap-6">
           {error && <p className="text-small text-danger">{error}</p>}
           {!detail && !error && <p className="text-small text-dim">Loading…</p>}
           {detail && (detail.bodyHTML ? <IssueBody html={detail.bodyHTML} /> : <p className="text-small text-dim">No description.</p>)}
@@ -126,6 +115,6 @@ export function IssueView({ number }: IssueViewProps) {
           )}
         </div>
       </div>
-    </section>
+    </Overlay>
   )
 }

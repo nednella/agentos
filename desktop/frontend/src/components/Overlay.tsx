@@ -2,15 +2,23 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { useAgentos } from '../AgentosContext'
 
+type Size = 'default' | 'reading' | 'wide'
+
+const CENTRED: Record<Size, { top: string; width: string; maxHeight: string }> = {
+  default: { top: '12vh', width: 'min(40rem, 92vw)', maxHeight: '70vh' },
+  reading: { top: '7vh', width: 'min(56rem, 92vw)', maxHeight: '84vh' },
+  wide: { top: '2.5vh', width: 'min(72rem, 94vw)', maxHeight: '95vh' },
+}
+
 type OverlayProps = {
   label: string
   align: 'left' | 'center'
-  wide?: boolean
+  size?: Size
   onClose(): void
   children: ReactNode
 }
 
-export function Overlay({ label, align, wide = false, onClose, children }: OverlayProps) {
+export function Overlay({ label, align, size = 'default', onClose, children }: OverlayProps) {
   const { focus } = useAgentos()
   const previous = useRef(document.activeElement)
   const dialog = useRef<HTMLDivElement>(null)
@@ -37,11 +45,11 @@ export function Overlay({ label, align, wide = false, onClose, children }: Overl
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        className={`absolute flex flex-col overflow-hidden rounded-md border border-line-strong bg-surface shadow-2xl ${wide ? 'max-h-[95vh]' : 'max-h-[70vh]'}`}
+        className="absolute flex flex-col overflow-hidden rounded-md border border-line-strong bg-surface shadow-2xl"
         style={
           align === 'left'
-            ? { top: 'calc(var(--topbar-h) + 4px)', left: '50%', width: 'min(34rem, calc(100vw - 1.5rem))', transform: 'translateX(-50%)' }
-            : { top: wide ? '2.5vh' : '12vh', left: '50%', width: wide ? 'min(72rem, 94vw)' : 'min(40rem, 92vw)', transform: 'translateX(-50%)' }
+            ? { top: 'calc(var(--topbar-h) + 4px)', left: '50%', width: 'min(34rem, calc(100vw - 1.5rem))', maxHeight: '70vh', transform: 'translateX(-50%)' }
+            : { ...CENTRED[size], left: '50%', transform: 'translateX(-50%)' }
         }
       >
         {children}

@@ -89,7 +89,7 @@ export function ShortcutsSheet() {
     ))
 
   return (
-    <Overlay align="center" wide label="Keyboard shortcuts" onClose={() => setOverlay(null)}>
+    <Overlay align="center" size="wide" label="Keyboard shortcuts" onClose={() => setOverlay(null)}>
       <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2.5">
         <h2 className="flex-none text-title font-semibold">Shortcuts</h2>
         <div className="relative min-w-0 flex-1">
