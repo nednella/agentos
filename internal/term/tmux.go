@@ -217,5 +217,13 @@ func (t *Tmux) Type(ctx context.Context, name session.Name, text string) error {
 	return nil
 }
 
+// Submit presses Enter in the session's prompt.
+func (t *Tmux) Submit(ctx context.Context, name session.Name) error {
+	if _, err := t.run(ctx, "send-keys", "-t", target(name), "Enter"); err != nil {
+		return fmt.Errorf("submitting in session %s: %w", name, err)
+	}
+	return nil
+}
+
 // oneLine keeps a title from breaking the tab-separated list: tabs and line breaks become spaces.
 func oneLine(title string) string { return strings.Join(strings.Fields(title), " ") }
