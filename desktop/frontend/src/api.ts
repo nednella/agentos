@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, Note, Session, Snapshot, Stats, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, IssueDetail, Note, Session, Snapshot, Stats, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -22,6 +22,7 @@ type Backend = {
   NoteToSession(id: string): Promise<Session>
   Issues(refresh: boolean): Promise<Issue[]>
   StartIssue(number: number): Promise<Session>
+  IssueDetail(number: number): Promise<IssueDetail>
   ShellOpen(): Promise<{ id: string }>
   TermOpen(id: string, cols: number, rows: number): Promise<void>
   TermWrite(id: string, data: string): Promise<void>
@@ -71,7 +72,7 @@ const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'RemoveProject'],
   sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'HarnessCheck', 'ShellOpen'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
-  issues: ['Issues', 'StartIssue'],
+  issues: ['Issues', 'StartIssue', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
   stats: ['Stats'],
   evidence: ['Evidence', 'DeleteEvidence'],
@@ -121,6 +122,7 @@ export const api = {
   noteToSession: (id: string) => backend.NoteToSession(id),
   issues: (refresh: boolean) => backend.Issues(refresh),
   startIssue: (number: number) => backend.StartIssue(number),
+  issueDetail: (number: number) => backend.IssueDetail(number),
   shellOpen: () => backend.ShellOpen(),
   termOpen: (id: string, cols: number, rows: number) => backend.TermOpen(id, cols, rows),
   // A terminal can close (project switch, session end) while keys or a resize

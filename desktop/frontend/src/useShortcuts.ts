@@ -27,7 +27,7 @@ export function useShortcuts() {
         agentos.setOverlay(null)
         return
       }
-      if (lay.statsOpen || lay.digestOpen) {
+      if (lay.statsOpen || lay.digestOpen || lay.issueOpen !== null) {
         lay.closeCentre()
         agentos.focus('terminal')
         return

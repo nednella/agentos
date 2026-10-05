@@ -71,6 +71,18 @@ export type Issue = {
   updatedAt: number
 }
 
+export type IssueComment = {
+  author: string
+  createdAt: number
+  bodyHTML: string
+}
+
+export type IssueDetail = {
+  number: number
+  bodyHTML: string
+  comments: IssueComment[]
+}
+
 export type Snapshot = {
   project: Project
   projects: Project[]

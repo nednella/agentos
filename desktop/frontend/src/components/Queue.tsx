@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
+import { useLayout } from '../LayoutContext'
 import { filterIssues, isFiltering } from '../issueFilter'
 import { LANES } from '../lanes'
 import { readStored, writeStored } from '../storage'
@@ -55,7 +56,8 @@ export function Queue({ nav }: QueueProps) {
 type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 
 function QueueList({ nav, shown, filtering }: QueueListProps) {
-  const { issues, issuesLoading, select, startIssue, focus, report } = useAgentos()
+  const { issues, issuesLoading } = useAgentos()
+  const { toggleIssue } = useLayout()
   const [closed, setClosed] = useState<Set<Lane>>(() => new Set(readStored<Lane[]>(CLOSED_KEY, ['idea'])))
   const list = useRef<HTMLDivElement>(null)
 
@@ -95,13 +97,7 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
         toggle(item.lane, closed.has(item.lane))
         return
       }
-      const { issue } = item
-      if (issue.sessionId) {
-        select(issue.sessionId)
-        focus('terminal')
-        return
-      }
-      report(() => startIssue(issue.number))
+      toggleIssue(item.issue.number)
     },
     onSpace(index) {
       const item = items[index]

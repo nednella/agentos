@@ -309,6 +309,122 @@
     text-underline-offset: 2px;
   }
 
+  .markdown {
+    line-height: 1.55;
+    overflow-wrap: anywhere;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .markdown > :first-child { margin-top: 0; }
+  .markdown > :last-child { margin-bottom: 0; }
+
+  .markdown p,
+  .markdown ul,
+  .markdown ol,
+  .markdown pre,
+  .markdown table,
+  .markdown blockquote,
+  .markdown .highlight {
+    margin: 0 0 0.75rem;
+  }
+
+  .markdown h1,
+  .markdown h2,
+  .markdown h3,
+  .markdown h4,
+  .markdown h5,
+  .markdown h6 {
+    margin: 1.25rem 0 0.5rem;
+    font-weight: 600;
+    line-height: 1.3;
+  }
+
+  .markdown h1 { font-size: var(--fs-title); }
+  .markdown h2 { font-size: var(--fs-body); }
+  .markdown h3,
+  .markdown h4,
+  .markdown h5,
+  .markdown h6 { font-size: var(--fs-small); }
+
+  .markdown ul,
+  .markdown ol {
+    padding-left: 1.5rem;
+  }
+
+  .markdown li + li {
+    margin-top: 0.25rem;
+  }
+
+  .markdown li.task-list-item {
+    list-style: none;
+    margin-left: -1.25rem;
+  }
+
+  .markdown input[type='checkbox'] {
+    margin: 0 0.4rem 0 0;
+    vertical-align: middle;
+    accent-color: var(--accent);
+  }
+
+  .markdown code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    padding: 0.1em 0.3em;
+    border-radius: var(--radius-sm);
+    background: var(--bg-code);
+  }
+
+  .markdown pre {
+    padding: 0.75rem;
+    overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: var(--bg-code);
+    font-family: var(--font-mono);
+    font-size: var(--fs-small);
+  }
+
+  .markdown pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+  }
+
+  .markdown blockquote {
+    padding-left: 0.75rem;
+    border-left: 2px solid var(--border-strong);
+    color: var(--text-soft);
+  }
+
+  .markdown a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .markdown img {
+    max-width: 100%;
+    border-radius: var(--radius-sm);
+  }
+
+  .markdown table {
+    border-collapse: collapse;
+    font-size: var(--fs-small);
+  }
+
+  .markdown th,
+  .markdown td {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+
+  .markdown hr {
+    margin: 1rem 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+  }
+
   .note-card {
     background: var(--bg-note-card);
     border: 1px solid var(--border-note);

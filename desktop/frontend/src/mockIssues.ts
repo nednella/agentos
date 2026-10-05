@@ -1,4 +1,4 @@
-import type { Issue } from './types'
+import type { Issue, IssueDetail } from './types'
 
 type Seed = [number, Issue['lane'], Issue['type'], string, string, string[]]
 
@@ -66,4 +66,27 @@ export function buildIssues(repo: string): Issue[] {
       updatedAt: now - (i % 5) * day,
     }
   })
+}
+
+const html = (parts: string[]) => parts.join('\n')
+
+const bodies: Record<number, string> = {
+  454: html([
+    '<h2 dir="auto">Description</h2>',
+    '<p dir="auto">The document entry mixes the edit and view paths. Split it so each path loads only what it needs.</p>',
+    '<ul dir="auto"><li>Move the viewer into <code>document/view.tsx</code></li><li class="task-list-item"><input type="checkbox" disabled> Keep the URL the same</li><li class="task-list-item"><input type="checkbox" checked disabled> Measure the bundle before and after</li></ul>',
+    '<p dir="auto">See <a href="https://github.com/upscopeio/livedocument/issues/444">#444</a> for the embed side of this.</p>',
+    '<div class="highlight highlight-source-ts"><pre>export const entry = lazy(() =&gt; import(\'./view\'))</pre></div>',
+  ]),
+  12: html([
+    '<h2 dir="auto">Description</h2>',
+    '<p dir="auto">Coming back to a project should land on the session I left, not the first one in the list.</p>',
+    '<blockquote><p dir="auto">The app already remembers the last project; do the same per project for the session.</p></blockquote>',
+  ]),
+}
+
+export function buildIssueDetail(number: number): IssueDetail {
+  const now = Date.now()
+  const comments = number === 454 ? [{ author: 'mariam-k', createdAt: now - 2 * day, bodyHTML: '<p dir="auto">The embed route depends on this, so land it first.</p>' }] : []
+  return { number, bodyHTML: bodies[number] ?? '', comments }
 }
