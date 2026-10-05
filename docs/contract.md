@@ -315,7 +315,7 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 | `issues` | `ProjectList<Issue>` | the cached issue list changed (a session started or ended for an issue, a note was filed) |
 | `term:data` | `{ id, data }` | `data` is base64 of raw terminal output |
 | `term:exit` | `{ id }` | the session ended on its own |
-| `attention` | `{ id, state }` | `state` is `'waiting'`, `'replied'` (a turn ended with a reply: working to idle through Stop, not through a reminder), `'pr'` (PR checks or comments) or `'evidence'` (an agent filed evidence); once per change, current project only for waiting and replied |
+| `attention` | `{ id, state }` | `state` is `'waiting'`, `'replied'` (a turn ended with a reply: working to idle through Stop, not through a reminder), `'opened'` (the session is idle and its PR is new to the app: it opened the PR and stopped; sent instead of `replied` when both hold, once per PR), `'pr'` (PR checks or comments) or `'evidence'` (an agent filed evidence); once per change, current project only for waiting and replied |
 | `stats` | none | a wait opened or closed; refetch `Stats` if the view is open |
 | `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
