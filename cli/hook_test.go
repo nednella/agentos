@@ -119,3 +119,34 @@ func TestHookCommandIsQuiet(t *testing.T) {
 		t.Errorf("hook printed %q, %v", out.String(), err)
 	}
 }
+
+func TestLateHookDoesNotUndoALaterEvent(t *testing.T) {
+	dir, _ := hookSetup(t)
+	t0 := time.Now()
+	reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
+	reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0)
+	if rec, _ := bus.ReadState(dir, "demo/1"); rec.State != session.Idle || rec.Event != "Stop" {
+		t.Errorf("a late PostToolUse overwrote Stop: %+v", rec)
+	}
+}
+
+func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
+	dir, _ := hookSetup(t)
+	for i := range 40 {
+		t0 := time.Now().Add(time.Duration(i) * time.Minute)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0)
+		}()
+		go func() {
+			defer wg.Done()
+			reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
+		}()
+		wg.Wait()
+		if rec, _ := bus.ReadState(dir, "demo/1"); rec.State != session.Idle || rec.Event != "Stop" {
+			t.Fatalf("round %d: state = %+v, want the Stop", i, rec)
+		}
+	}
+}

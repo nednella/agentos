@@ -75,7 +75,7 @@ func runKill(t *testing.T, args ...string) string {
 
 func names(t *testing.T, tmux *term.Tmux) string {
 	t.Helper()
-	infos, err := tmux.List(context.Background())
+	infos, _, err := tmux.ListAll(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

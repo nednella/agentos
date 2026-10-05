@@ -19,11 +19,15 @@ func Execute(ctx context.Context) error {
 	return newRootCmd().ExecuteContext(ctx)
 }
 
-func newRootCmd() *cobra.Command {
+func newRootCmd() *cobra.Command { return newRootCmdWith(openWithMac, appPlaces) }
+
+func newRootCmdWith(open opener, places func() []string) *cobra.Command {
 	root := &cobra.Command{
 		Use:           "agentos",
 		Short:         "One screen for all your coding agents",
+		Long:          "One screen for all your coding agents.\n\nWith no command, agentos opens the app.",
 		Args:          cobra.NoArgs,
+		RunE:          openApp(open, places),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

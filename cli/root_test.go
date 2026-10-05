@@ -19,15 +19,15 @@ func TestVersion(t *testing.T) {
 	}
 }
 
-func TestRootShowsHelp(t *testing.T) {
+func TestRootHelpListsTheCommands(t *testing.T) {
 	var out bytes.Buffer
 	root := newRootCmd()
 	root.SetOut(&out)
-	root.SetArgs(nil)
+	root.SetArgs([]string{"--help"})
 	if err := root.Execute(); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out.String(), "version") {
-		t.Errorf("help does not list the version command:\n%s", out.String())
+	if !strings.Contains(out.String(), "version") || !strings.Contains(out.String(), "opens the app") {
+		t.Errorf("help does not list the version command or say what no command does:\n%s", out.String())
 	}
 }

@@ -30,22 +30,41 @@ func newHookCmd() *cobra.Command {
 
 // reportHook saves the session's new state and tells the app, within a short
 // budget: the file is already saved, so a miss costs only a delay.
-func reportHook(event string, stdin io.Reader) {
+func reportHook(event string, stdin io.Reader) { reportHookAt(event, stdin, time.Now()) }
+
+// reportHookAt records the event as of at, the moment the hook started: a hook that waited
+// for the lock must not undo a later event that got in first.
+func reportHookAt(event string, stdin io.Reader, at time.Time) {
 	name := os.Getenv("AGENTOS_SESSION")
 	socket := os.Getenv("AGENTOS_SOCKET")
 	if _, err := session.ParseName(name); err != nil || socket == "" {
 		return
 	}
 	dir := bus.DirOf(socket)
-	prev, _ := bus.ReadState(dir, name)
-	rec := session.Apply(name, prev, session.ParseEvent(event, stdin), time.Now())
-	if rec == prev {
-		return
-	}
-	if err := bus.WriteState(dir, rec); err != nil {
+	ev := session.ParseEvent(event, stdin)
+	rec, ok := saveHook(dir, name, ev, at)
+	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), hookBudget)
 	defer cancel()
 	_ = bus.Send(ctx, socket, rec)
+}
+
+// saveHook folds the event into the saved state under the file's lock. It reports whether the state changed.
+func saveHook(dir, name string, ev session.Event, at time.Time) (session.Record, bool) {
+	unlock, err := bus.LockState(dir, name)
+	if err != nil {
+		return session.Record{}, false
+	}
+	defer unlock()
+	prev, _ := bus.ReadState(dir, name)
+	if prev.At.After(at) {
+		return session.Record{}, false
+	}
+	rec := session.Apply(name, prev, ev, at)
+	if rec == prev || bus.WriteState(dir, rec) != nil {
+		return session.Record{}, false
+	}
+	return rec, true
 }
