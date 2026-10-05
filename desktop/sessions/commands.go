@@ -42,7 +42,7 @@ func started(s Session) string { return fmt.Sprintf("started session %d: %s", s.
 
 // New starts a session titled with the words given.
 func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
-	s, err := c.s.Create(strings.Join(req.Args, " "), "", 0)
+	s, err := c.s.Create(strings.Join(req.Args, " "), "", false, 0)
 	if err != nil {
 		return "", err
 	}

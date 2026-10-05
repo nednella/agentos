@@ -180,7 +180,7 @@ func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func()) {
 
 // HarnessCheck starts the session titled "Harness check" with the review prompt typed in, not sent.
 func (s *Sessions) HarnessCheck() (Session, error) {
-	return s.Create("Harness check", prompts.HarnessCheck(), 0)
+	return s.Create("Harness check", prompts.HarnessCheck(), false, 0)
 }
 
 // Touch tells the front end that something shown in the session list changed.
@@ -710,13 +710,13 @@ func (s *Sessions) IssueSessions() map[int]string {
 	return out
 }
 
-// Create starts the agent in the current project. A non-empty prefill is typed
-// into its prompt, without Enter, once the agent is ready.
-func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
+// Create starts the agent in the current project. A non-empty text is typed
+// into its prompt once the agent is ready, and sent when send is set.
+func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
-	name, proj, ctx, ready := s.reserve(prefill)
+	name, proj, ctx, ready := s.reserve(text)
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
@@ -728,7 +728,7 @@ func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 	}
 	view := s.register(name, title, proj, issue)
 	if ready != nil {
-		go s.typeWhenReady(name, ready, prefill)
+		go s.typeWhenReady(name, ready, text, send)
 	}
 	return view, nil
 }
@@ -808,7 +808,7 @@ func (s *Sessions) start(ctx context.Context, name session.Name, title, dir stri
 	return nil
 }
 
-func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text string) {
+func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text string, send bool) {
 	s.mu.Lock()
 	ctx := s.ctx
 	wait := s.prefillFor
@@ -831,7 +831,16 @@ func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text 
 	s.mu.Unlock()
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	_ = s.tmux.Type(tctx, name, text)
+	if err := s.tmux.Type(tctx, name, text); err != nil || !send {
+		return
+	}
+	// Enter right behind the text can reach the agent before the text has landed.
+	select {
+	case <-time.After(promptSettles):
+	case <-ctx.Done():
+		return
+	}
+	_ = s.tmux.Submit(tctx, name)
 }
 
 func (s *Sessions) Kill(id string) error {
