@@ -115,7 +115,7 @@ func TestBrowserModeServesTheAppAndTheShim(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}}, apptest.NoGH, apptest.NoClaude)
+	a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}}, apptest.NoGH, apptest.NoStream, apptest.NoClaude)
 	assets := fstest.MapFS{"index.html": {Data: []byte("<!doctype html><html><head></head><body>stub</body></html>")}}
 	addr := "127.0.0.1:" + freePort(t)
 	go func() {

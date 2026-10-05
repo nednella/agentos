@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"bufio"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -21,14 +22,15 @@ import (
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/util"
 )
 
 const (
-	prPollEvery  = 3 * time.Minute
-	cleanupsKept = 100
-	gitTimeout   = 30 * time.Second
+	reconcileEvery = 5 * time.Minute // a full look at every pull request, in case a watcher missed something
+	cleanupsKept   = 100
+	gitTimeout     = 30 * time.Second
 
 	closedReason = "app closed during clean-up"
 )
@@ -61,6 +63,7 @@ type target struct {
 	id, title string
 	issue     int
 	proj      project.Project
+	ended     bool
 }
 
 // track is what is known about the pull request and clean-up of one session.
@@ -80,22 +83,43 @@ type ack struct {
 	Checks   bool `json:"checks"` // failing checks were seen
 }
 
-// Lifecycle follows each issue session's branch, worktree and pull request, and
-// cleans up after the session when the PR is merged or closed.
+// nudge is how much of a PR its session has been woken for.
+type nudge struct {
+	Comments int    `json:"comments"`
+	Head     string `json:"head"` // the commit whose failing checks the session was told about
+}
+
+// Repos is what the lifecycle needs of the issues: a project's repo, and a fresh queue when a PR merges or closes.
+type Repos interface {
+	Repo(ctx context.Context, dir string) string
+	Reload(ctx context.Context, proj project.Project)
+}
+
+type noRepos struct{}
+
+func (noRepos) Repo(context.Context, string) string     { return "" }
+func (noRepos) Reload(context.Context, project.Project) {}
+
+// Lifecycle follows each issue session's branch, worktree and pull request, wakes the
+// session when its PR needs work, and cleans up after it when the PR is merged or closed.
 type Lifecycle struct {
 	run      run.Runner
+	stream   run.Streamer
 	dataDir  string
 	stateDir string
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
 	sessions *Sessions
+	repos    Repos
 
-	pollMu sync.Mutex // one poll at a time
+	pollMu sync.Mutex // one reconcile at a time
 	logMu  sync.Mutex // the clean-up log files
 
-	mu     sync.Mutex
-	tracks map[string]*track
-	files  map[string]*prsFile // by project key
+	mu       sync.Mutex
+	tracks   map[string]*track
+	files    map[string]*prsFile // by project key
+	etags    map[string]string   // by project key: the ETag of the last pull request list
+	watchers map[string]*watcher // by project key
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -104,11 +128,12 @@ type Lifecycle struct {
 	stopClean context.CancelFunc
 }
 
-func newLifecycle(runner run.Runner, dataDir, stateDir string, s *Sessions, emit func(string, any)) *Lifecycle {
+func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir string, s *Sessions, emit func(string, any)) *Lifecycle {
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
-		run: runner, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit),
-		tracks: map[string]*track{}, files: map[string]*prsFile{}, stopped: stopped, stopClean: stop,
+		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit), repos: noRepos{},
+		tracks: map[string]*track{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
+		stopped: stopped, stopClean: stop,
 	}
 }
 
@@ -177,9 +202,9 @@ func (l *Lifecycle) forget(id string) {
 	}
 }
 
-// Run polls until ctx ends.
+// Run reconciles every pull request now and then, and keeps a watcher per project in between.
 func (l *Lifecycle) Run(ctx context.Context) {
-	tick := time.NewTicker(prPollEvery)
+	tick := time.NewTicker(reconcileEvery)
 	defer tick.Stop()
 	for {
 		l.Poll(ctx)
@@ -191,41 +216,95 @@ func (l *Lifecycle) Run(ctx context.Context) {
 	}
 }
 
-// Poll looks up the worktree and pull request of every issue session.
+// group is the issue sessions of one project.
+type group struct {
+	proj    project.Project
+	targets []target
+}
+
+// groups splits the issue sessions by project.
+func groups(targets []target) []group {
+	var out []group
+	for _, t := range targets {
+		i := slices.IndexFunc(out, func(g group) bool { return g.proj.Key() == t.proj.Key() })
+		if i < 0 {
+			out = append(out, group{proj: t.proj})
+			i = len(out) - 1
+		}
+		out[i].targets = append(out[i].targets, t)
+	}
+	return out
+}
+
+// Poll looks up the worktree and pull request of every issue session, live or ended.
 func (l *Lifecycle) Poll(ctx context.Context) {
 	l.pollMu.Lock()
 	defer l.pollMu.Unlock()
-	targets := l.sessions.issueTargets()
-	trees := map[string]worktrees{}
-	var auto []string
 	var treeFailure, prFailure string
-	for _, t := range targets {
-		if _, ok := trees[t.proj.Dir]; !ok {
-			var err error
-			if trees[t.proj.Dir], err = l.worktrees(ctx, t.proj.Dir); err != nil && treeFailure == "" {
-				treeFailure = util.FirstLine(err.Error())
-			}
+	for _, g := range groups(l.sessions.issueTargets()) {
+		treeErr, prErr := l.refresh(ctx, g.proj, g.targets, nil)
+		if treeErr != nil && treeFailure == "" {
+			treeFailure = util.FirstLine(treeErr.Error())
 		}
-		branch := t.proj.BranchFor(t.issue)
-		pr, err := l.findPR(ctx, t.proj.Dir, branch)
-		if err != nil {
-			if prFailure == "" {
-				prFailure = util.FirstLine(err.Error())
-			}
-			continue
-		}
-		if l.update(t, trees[t.proj.Dir].byBranch[branch], pr) {
-			auto = append(auto, t.id)
+		if prErr != nil && prFailure == "" {
+			prFailure = util.FirstLine(prErr.Error())
 		}
 	}
 	if ctx.Err() == nil {
 		l.report("worktrees", treeFailure)
 		l.report("pull requests", prFailure)
 	}
+	l.ensureWatchers(ctx)
+}
+
+// refresh fetches the pull requests of the project's issue sessions, all of them or only those on
+// the branches named, and acts on what changed: clean-ups, a fresh queue, and wakes.
+func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets []target, only []string) (treeErr, prErr error) {
+	trees, treeErr := l.worktrees(ctx, proj.Dir)
+	prs := map[string]*PR{} // by branch: two sessions of one issue share its PR
+	var auto []string
+	var wakes []wake
+	reload := false
+	for _, t := range targets {
+		branch := proj.BranchFor(t.issue)
+		if only != nil && !slices.Contains(only, branch) {
+			continue
+		}
+		pr, ok := prs[branch]
+		if !ok {
+			var err error
+			if pr, err = l.findPR(ctx, proj.Dir, branch); err != nil {
+				prErr = cmp.Or(prErr, err)
+				continue
+			}
+			prs[branch] = pr
+		}
+		o := l.update(t, trees.byBranch[branch], pr)
+		if o.auto {
+			auto = append(auto, t.id)
+		}
+		if o.wake != "" {
+			wakes = append(wakes, wake{t, o.wake})
+		}
+		reload = reload || o.queue
+	}
 	for _, id := range auto {
 		l.autoCleanup(ctx, id)
 	}
+	for _, w := range wakes {
+		go l.sessions.wake(ctx, w.target, w.prompt)
+	}
 	l.sessions.changed()
+	if reload && ctx.Err() == nil {
+		l.repos.Reload(ctx, proj)
+	}
+	return treeErr, prErr
+}
+
+// wake is a prompt to send a session.
+type wake struct {
+	target target
+	prompt string
 }
 
 // report warns about a failure of the source, or says it works again when failure is "".
@@ -237,8 +316,15 @@ func (l *Lifecycle) report(source, failure string) {
 	l.warn.Report(source, failure)
 }
 
-// update stores what a poll found. It reports whether the session should be cleaned up now.
-func (l *Lifecycle) update(t target, worktree string, pr *PR) bool {
+// outcome is what a fetched pull request calls for.
+type outcome struct {
+	auto  bool   // clean up now
+	queue bool   // the PR merged or closed, so the issue leaves the queue
+	wake  string // a prompt to send the session, or ""
+}
+
+// update stores what a fetch found and says what it calls for.
+func (l *Lifecycle) update(t target, worktree string, pr *PR) outcome {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	key := t.proj.Key()
@@ -247,22 +333,32 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) bool {
 		tr = &track{sawLive: l.prs(key).Live[t.id]}
 		l.tracks[t.id] = tr
 	}
+	prev := tr.pr
 	tr.worktree, tr.pr = worktree, pr
-	if pr != nil && (pr.State == "draft" || pr.State == "open") && !tr.sawLive {
+	var o outcome
+	if pr == nil {
+		if tr.cleanup == "ask" {
+			tr.cleanup = ""
+		}
+		return o
+	}
+	live := pr.State == "draft" || pr.State == "open"
+	if live && !tr.sawLive {
 		tr.sawLive = true
 		l.prs(key).Live[t.id] = true
 		l.savePRs(key)
 	}
-	attention := ""
-	if pr != nil {
-		attention = l.attentionFor(key, pr)
-	}
+	attention := l.attentionFor(key, pr)
 	if attention != "" && attention != tr.attention {
 		l.emit("attention", map[string]string{"id": t.id, "state": "pr"})
 	}
 	tr.attention = attention
+	if live {
+		o.wake = l.nudgeFor(key, pr)
+	}
+	o.queue = !live && (prev == nil || prev.State != pr.State)
 	switch {
-	case pr == nil || (pr.State != "closed" && pr.State != "merged"):
+	case live:
 		if tr.cleanup == "ask" {
 			tr.cleanup = ""
 		}
@@ -273,18 +369,19 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) bool {
 		tr.cleanup = "ask"
 	case pr.State == "merged" && tr.cleanup == "" && !tr.autoTried:
 		tr.autoTried = true
-		return true
+		o.auto = true
 	}
-	return false
+	return o
 }
 
 func (l *Lifecycle) prsPath(key string) string { return filepath.Join(l.dataDir, key, "prs.json") }
 
 // prsFile is what is remembered of a project's PRs: what the user has seen of each,
-// and which sessions saw their PR open.
+// which sessions saw their PR open, and what each PR's session was woken for.
 type prsFile struct {
-	Acks map[string]ack  `json:"acks"` // PR number -> ack
-	Live map[string]bool `json:"live"` // session id -> its PR was seen draft or open
+	Acks   map[string]ack   `json:"acks"`   // PR number -> ack
+	Live   map[string]bool  `json:"live"`   // session id -> its PR was seen draft or open
+	Nudged map[string]nudge `json:"nudged"` // PR number -> nudge
 }
 
 // prs needs mu.
@@ -301,6 +398,9 @@ func (l *Lifecycle) prs(key string) *prsFile {
 	}
 	if f.Live == nil {
 		f.Live = map[string]bool{}
+	}
+	if f.Nudged == nil {
+		f.Nudged = map[string]nudge{}
 	}
 	l.files[key] = f
 	return f
@@ -340,6 +440,32 @@ func (l *Lifecycle) attentionFor(key string, pr *PR) string {
 		return "comments"
 	}
 	return ""
+}
+
+// nudgeFor is the prompt the PR's session should get: once per new comment or review, and once
+// per commit whose checks fail. Comments a PR had when first seen are not news. It needs mu.
+func (l *Lifecycle) nudgeFor(key string, pr *PR) string {
+	nudged := l.prs(key).Nudged
+	n := strconv.Itoa(pr.Number)
+	seen, known := nudged[n]
+	if !known {
+		seen = nudge{Comments: pr.Comments}
+	}
+	head := cmp.Or(pr.HeadOid, "unknown")
+	prompt := ""
+	switch {
+	case pr.Comments > seen.Comments:
+		seen.Comments = pr.Comments
+		prompt = prompts.PRReview(pr.Number)
+	case pr.Checks == "failing" && seen.Head != head:
+		seen.Head = head
+		prompt = prompts.PRChecks(pr.Number)
+	}
+	if !known || prompt != "" {
+		nudged[n] = seen
+		l.savePRs(key)
+	}
+	return prompt
 }
 
 // Ack marks the session's PR comments and failing checks as seen.
@@ -601,8 +727,10 @@ func (l *Lifecycle) removeSession(ctx context.Context, t target, _ *cleanupPlan)
 	if l.sessions.evidence.Purge(t.id) > 0 {
 		removed = append(removed, "evidence")
 	}
-	if err := l.sessions.Kill(t.id); err != nil {
-		return removed, fmt.Sprintf("ending the session failed: %v", err)
+	if !t.ended {
+		if err := l.sessions.Kill(t.id); err != nil {
+			return removed, fmt.Sprintf("ending the session failed: %v", err)
+		}
 	}
 	if err := l.sessions.Dismiss(t.id); err != nil {
 		return removed, fmt.Sprintf("removing the session failed: %v", err)

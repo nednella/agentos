@@ -448,7 +448,13 @@ func TestLiveFlagGoesWithTheSession(t *testing.T) {
 	if err := h.KillSession(s.ID); err != nil {
 		t.Fatal(err)
 	}
+	if !live() {
+		t.Error("the live flag went with the session's end, although its row still tracks the PR")
+	}
+	if err := h.DismissSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
 	if live() {
-		t.Error("the live flag outlived its session")
+		t.Error("the live flag outlived its row")
 	}
 }
