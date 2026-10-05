@@ -79,7 +79,7 @@ type Issue = {
   updatedAt: number
 }
 
-// The issue view: what a row does not carry. The HTML is GitHub's own rendering of the Markdown, the same
+// The issue dialog: what a row does not carry. The HTML is GitHub's own rendering of the Markdown, the same
 // github.com shows and sanitizes; the front end places it as it is and routes its links through openURL.
 type IssueDetail = {
   number: number
