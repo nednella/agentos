@@ -46,7 +46,7 @@ func (p Project) command(key string) string {
 	return defaultCommands[key]
 }
 
-// IssueCommand is what a session for an issue in the lane types into the agent, or "".
+// IssueCommand is what a session for an issue in the lane sends to the agent, or "".
 func (p Project) IssueCommand(lane string, number int) string {
 	if lane != "ready" && lane != "plan" && lane != "inbox" && lane != "idea" {
 		return ""

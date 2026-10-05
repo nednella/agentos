@@ -22,7 +22,7 @@ func (s *Service) Issues(refresh bool) ([]Issue, error) {
 	return s.issues.WithSessions(list), nil
 }
 
-// StartIssue opens a session for the issue, typing in the lane's command; an issue that has a live session gets it back.
+// StartIssue opens a session for the issue and sends the lane's command; an issue that has a live session gets it back.
 func (s *Service) StartIssue(number int) (sessions.Session, error) {
 	return s.issues.Start(s.ctx(), number)
 }

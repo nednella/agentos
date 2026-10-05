@@ -56,7 +56,8 @@ func TestIssues(t *testing.T) {
 	if s.Issue != 7 || s.Title != "#7 Fix the thing" {
 		t.Errorf("session = %+v", s)
 	}
-	eventually(t, "/ship typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "/ship 7") })
+	// The agent is bash: a sent command fails, a typed one just sits on the prompt.
+	eventually(t, "/ship sent", func() bool { return strings.Contains(h.Pane(t, s.ID), "/ship: No such file or directory") })
 	again, err := h.StartIssue(7)
 	if err != nil || again.ID != s.ID {
 		t.Errorf("second start = %+v, %v", again, err)
