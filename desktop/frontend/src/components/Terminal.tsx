@@ -76,7 +76,8 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     term.loadAddon(fitAddon)
     term.loadAddon(new Unicode11Addon())
     term.unicode.activeVersion = '11'
-    term.open(host.current!)
+    const hostEl = host.current!
+    term.open(hostEl)
     let webgl: WebglAddon | null = null
     renderer.current = {
       attach() {
@@ -125,6 +126,27 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       return true
     })
 
+    // xterm forwards at most one wheel report per DOM event to tmux, and damps small deltas, so a
+    // trackpad or mouse scrolls far slower than in a native terminal. Turn the travel into whole
+    // lines here; xterm forwards each line-mode event as one report, as Ghostty does per cell.
+    let partialLines = 0
+    const wheel = (event: WheelEvent) => {
+      if (event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL) return
+      event.preventDefault()
+      event.stopPropagation()
+      const screen = term.element?.querySelector('.xterm-screen')
+      if (!screen) return
+      partialLines += event.deltaY / (screen.clientHeight / term.rows)
+      const lines = Math.trunc(partialLines)
+      partialLines -= lines
+      for (let i = 0; i < Math.abs(lines); i++) {
+        screen.dispatchEvent(
+          new WheelEvent('wheel', { deltaY: Math.sign(lines), deltaMode: WheelEvent.DOM_DELTA_LINE, clientX: event.clientX, clientY: event.clientY, bubbles: true, cancelable: true }),
+        )
+      }
+    }
+    hostEl.addEventListener('wheel', wheel, { capture: true, passive: false })
+
     term.onData((data) => {
       // xterm answers tmux's "what terminal are you" queries (device attributes,
       // version, colours). tmux has stopped waiting by the time the answer
@@ -145,10 +167,11 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     fit.current = fitAddon
 
     const observer = new ResizeObserver(() => sync.current())
-    observer.observe(host.current!)
+    observer.observe(hostEl)
 
     return () => {
       observer.disconnect()
+      hostEl.removeEventListener('wheel', wheel, { capture: true })
       offData()
       offExit()
       if (opened.current) {
