@@ -95,8 +95,6 @@ type Note = {
   pinned: boolean
   archived: boolean
   images: string[]      // "/media/<project key>/notes-media/<file>"
-  issue: number         // GitHub issue filed from the note, 0 if none
-  issueUrl: string
 }
 
 type Snapshot = {
@@ -262,7 +260,7 @@ closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the 
 | `DeleteNote(id)` | | also deletes its pictures |
 | `AddNoteImage(id, base64, mime)` | `Note` | png, jpeg, gif or webp, at most 10 MB; the type is checked against the bytes |
 | `RemoveNoteImage(id, url)` | `Note` | |
-| `NoteToIssue(id)` | `Note` | files a GitHub issue; title is the first line, body is `## Description`, a blank line, and the note text (plus a line if the note has pictures); sets `issue` and `issueUrl`; rejects without a repo |
+| `NoteToIssue(id)` | | files a GitHub issue, then deletes the note and its pictures; title is the first line, body is `## Description`, a blank line, and the note text; rejects without a repo |
 | `NoteToSession(id)` | `Session` | starts a session titled with the first line and the project's `note` command typed in |
 
 ### Browser (`browser`)
