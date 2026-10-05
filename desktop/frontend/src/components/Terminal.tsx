@@ -37,20 +37,26 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
   const xterm = useRef<Xterm | null>(null)
   const fit = useRef<FitAddon | null>(null)
   const opened = useRef(false)
+  const sent = useRef({ cols: 0, rows: 0 })
   const renderer = useRef({ attach() {}, detach() {} })
 
   // A terminal mounted hidden has no size, so the core opens it at the first fit while visible.
+  // The grid refits on every size change; the core hears only when the cell count moves.
   const sync = useRef(() => {})
   sync.current = () => {
     const term = xterm.current
     if (!term || !fit.current || !active) return
     fit.current.fit()
+    const { cols, rows } = term
     if (opened.current) {
-      void api.termResize(id, term.cols, term.rows)
+      if (cols === sent.current.cols && rows === sent.current.rows) return
+      sent.current = { cols, rows }
+      void api.termResize(id, cols, rows)
       return
     }
     opened.current = true
-    void api.termOpen(id, term.cols, term.rows)
+    sent.current = { cols, rows }
+    void api.termOpen(id, cols, rows)
   }
 
   useEffect(() => {
@@ -138,15 +144,10 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     xterm.current = term
     fit.current = fitAddon
 
-    let timer = 0
-    const observer = new ResizeObserver(() => {
-      clearTimeout(timer)
-      timer = window.setTimeout(() => sync.current(), 80)
-    })
+    const observer = new ResizeObserver(() => sync.current())
     observer.observe(host.current!)
 
     return () => {
-      clearTimeout(timer)
       observer.disconnect()
       offData()
       offExit()
