@@ -79,6 +79,14 @@ type Issue = {
   updatedAt: number
 }
 
+// The issue view: what a row does not carry. The HTML is GitHub's own rendering of the Markdown, the same
+// github.com shows and sanitizes; the front end places it as it is and routes its links through openURL.
+type IssueDetail = {
+  number: number
+  bodyHTML: string      // "" for an empty body
+  comments: { author: string; createdAt: number; bodyHTML: string }[]   // oldest first, at most 100
+}
+
 type Note = {
   id: string
   text: string          // the whole note; its first line is the title when one is needed
@@ -228,6 +236,7 @@ type Digest = {
 |---|---|---|
 | `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh` |
 | `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
+| `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 
 ### Pull requests and clean-up (`sessions`)
 
