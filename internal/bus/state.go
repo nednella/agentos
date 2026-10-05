@@ -35,12 +35,9 @@ func stateFile(dir, name string) string {
 	return filepath.Join(dir, "sessions", name+".json")
 }
 
-// WriteState saves rec atomically, or removes the file when the session is gone.
+// WriteState saves rec atomically.
 func WriteState(dir string, rec session.Record) error {
 	path := stateFile(dir, rec.Session)
-	if rec.State == session.Gone {
-		return RemoveState(dir, rec.Session)
-	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return fmt.Errorf("creating state dir: %w", err)
 	}
@@ -79,7 +76,30 @@ func ReadState(dir, name string) (session.Record, error) {
 	if err := json.Unmarshal(data, &rec); err != nil {
 		return session.Record{}, fmt.Errorf("decoding state of %s: %w", name, err)
 	}
+	rec, _ = modernize(rec)
 	return rec, nil
+}
+
+// modernize maps the states of older files to today's: finished became idle, gone became ended.
+func modernize(rec session.Record) (session.Record, bool) {
+	switch rec.State {
+	case "finished":
+		rec.State = session.Idle
+	case "gone":
+		rec.State = session.Ended
+	default:
+		return rec, false
+	}
+	return rec, true
+}
+
+// MigrateStates rewrites state files that hold a state of an older version.
+func MigrateStates(dir string) {
+	for _, rec := range ReadAllRaw(dir) {
+		if fixed, changed := modernize(rec); changed {
+			_ = WriteState(dir, fixed)
+		}
+	}
 }
 
 func RemoveState(dir, name string) error {
@@ -91,6 +111,15 @@ func RemoveState(dir, name string) error {
 
 // ReadAll returns every saved record by session name. Unreadable files are skipped.
 func ReadAll(dir string) map[string]session.Record {
+	out := ReadAllRaw(dir)
+	for name, rec := range out {
+		out[name], _ = modernize(rec)
+	}
+	return out
+}
+
+// ReadAllRaw is ReadAll without mapping old states.
+func ReadAllRaw(dir string) map[string]session.Record {
 	out := map[string]session.Record{}
 	root := filepath.Join(dir, "sessions")
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {

@@ -21,7 +21,7 @@ import (
 type Wait struct {
 	SessionTitle string `json:"sessionTitle"`
 	Issue        int    `json:"issue"`
-	Kind         string `json:"kind"`
+	Kind         string `json:"kind"` // permission, question or idle
 	Label        string `json:"label"`
 	StartedAt    int64  `json:"startedAt"`
 	WaitedMs     int64  `json:"waitedMs"`
@@ -54,8 +54,8 @@ const recentWaits = 50
 // causeOf says why the record's session waits on the user, in the words the Stats view groups by.
 func causeOf(rec session.Record) (kind, label string) {
 	switch {
-	case rec.State == session.Finished:
-		return "finished", "Turn finished"
+	case rec.State == session.Idle:
+		return "idle", "Reply landed"
 	case rec.Notify == "permission_prompt" || (rec.Notify == "" && strings.Contains(strings.ToLower(rec.Detail), "permission")):
 		return "permission", permissionLabel(rec.Tool, rec.Command)
 	}
@@ -149,6 +149,12 @@ func (w *Waits) read(key string) ([]Wait, error) {
 	for sc.Scan() {
 		var wait Wait
 		if json.Unmarshal(sc.Bytes(), &wait) == nil {
+			if wait.Kind == "finished" { // what older versions called a reply that landed
+				wait.Kind = "idle"
+				if wait.Label == "Turn finished" {
+					wait.Label = "Reply landed"
+				}
+			}
 			out = append(out, wait)
 		}
 	}

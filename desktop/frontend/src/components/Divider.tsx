@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import { DEFAULT_WIDTH, useLayout } from '../LayoutContext'
+import { useLayout } from '../LayoutContext'
 import type { SidePanel } from '../LayoutContext'
 
 type DividerProps = { panel: SidePanel }
@@ -8,7 +8,7 @@ type DividerProps = { panel: SidePanel }
 const KEY_STEP_REM = 1
 
 export function Divider({ panel }: DividerProps) {
-  const { widths, setWidth } = useLayout()
+  const { widths, setWidth, resetWidth } = useLayout()
   const drag = useRef<{ x: number; width: number; rem: number } | null>(null)
   const direction = panel === 'sidebar' ? 1 : -1
 
@@ -50,7 +50,7 @@ export function Divider({ panel }: DividerProps) {
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
-      onDoubleClick={() => setWidth(panel, DEFAULT_WIDTH[panel], true)}
+      onDoubleClick={() => resetWidth(panel)}
       onKeyDown={onKeyDown}
     />
   )

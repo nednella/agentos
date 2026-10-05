@@ -1,4 +1,5 @@
 import { useAgentos } from '../AgentosContext'
+import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
 import { Icon } from './Icon'
@@ -10,11 +11,14 @@ type IssueRowProps = { issue: Issue; cursor: boolean }
 
 export function IssueRow({ issue, cursor }: IssueRowProps) {
   const { sessions, select, startIssue, report } = useAgentos()
+  const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
+  const dense = mode === 'compact'
+  const openable = session !== undefined && session.state !== 'ended'
 
   const content = (
     <>
-      <span className="mono w-10 flex-none text-small text-dim">{issue.number}</span>
+      <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
       <TypeMark type={issue.type} />
       <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
     </>
@@ -22,7 +26,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
 
   return (
     <div className="row row-inset group h-9 items-center gap-1 pr-1.5 pl-3" data-cursor={cursor}>
-      {session ? (
+      {openable && session ? (
         <button
           className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
           title={`Open session ${session.n}`}
@@ -54,7 +58,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
       </span>
       {session && (
         <span className="flex flex-none items-center justify-end gap-2 pl-1" title={`Session ${session.n} is running`}>
-          {session.pr && <PRMark pr={session.pr} />}
+          {session.pr && !dense && <PRMark pr={session.pr} />}
           <StateDot state={session.state} />
         </span>
       )}

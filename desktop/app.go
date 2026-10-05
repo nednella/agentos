@@ -177,6 +177,7 @@ func newApp(c config, h host, run runner) *App {
 	a.media = map[string]string{mediaFolder: c.dataDir, evidenceFolder: c.localDir}
 	a.sessions.browsers, a.sessions.ev = a.browsers, a.evidence
 	a.sessions.onGone = a.sessionGone
+	a.sessions.onDismiss = func(id string) { a.evidence.Purge(id) }
 	a.browsers.urlFor = a.projectURL
 	a.browsers.onTabs = a.sessions.changed
 	a.life.release = a.release
@@ -209,12 +210,11 @@ func (a *App) stop() {
 	}
 }
 
-// sessionGone drops what a session that ended left behind in the browser and evidence.
+// sessionGone closes the browser tab of a session that ended. Its evidence stays until it is dismissed.
 func (a *App) sessionGone(id string) {
 	ctx, cancel := context.WithTimeout(context.Background(), callLimit)
 	defer cancel()
 	a.browsers.Close(ctx, id)
-	a.evidence.Purge(id)
 }
 
 // release is the clean-up step for the session's browser tab and evidence; it names what it removed.
@@ -267,6 +267,9 @@ func (a *App) KillSession(id string) error {
 	a.terms.Close(id)
 	return a.sessions.Kill(id)
 }
+
+// DismissSession removes the row of an ended session.
+func (a *App) DismissSession(id string) error { return a.sessions.Dismiss(id) }
 
 func (a *App) RenameSession(id, title string) error { return a.sessions.Rename(id, title) }
 

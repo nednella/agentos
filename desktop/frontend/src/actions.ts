@@ -12,6 +12,7 @@ export type Shortcut = {
   code?: string
   aliases?: string[]
   anyShift?: boolean
+  unlessTyping?: boolean
   label?: string
 }
 export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Notes' | 'Queue' | 'App'
@@ -54,8 +55,9 @@ export const LIST_KEYS: { keys: string; summary: string }[] = [
   { keys: 'W / S or ↑ / ↓', summary: 'Move the row cursor in a focused list' },
   { keys: 'Enter', summary: 'Act on the row: queue starts or jumps, sessions opens, notes edits' },
   { keys: 'A / D or ← / →', summary: 'Switch Queue and Notes, or fold a lane' },
+  { keys: 'Space', summary: 'Fold or unfold the lane under the cursor' },
   { keys: 'P / E in notes', summary: 'Pin or archive the note under the cursor' },
-  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘⇧2 or a click brings you back' },
+  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘A or ⌘↑ brings you back' },
 ]
 
 const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
@@ -91,6 +93,10 @@ export function useActions(): Action[] {
   const layout = useLayout()
   const current = a.sessions.find((s) => s.id === a.selectedId)
   const openOverlay = (overlay: Overlay) => () => a.setOverlay(overlay)
+  const toTerminal = () => {
+    layout.closeCentre()
+    layout.focusPanel('terminal')
+  }
 
   const sessionCandidates = (args: string[]): Candidate[] =>
     a.sessions
@@ -109,7 +115,7 @@ export function useActions(): Action[] {
       id: 'new-session',
       label: 'New session',
       group: 'Sessions',
-      shortcut: { key: 'n' },
+      shortcut: { key: 'n', shift: true },
       command: { name: 'new', syntax: 'new [title]', summary: 'Start a session' },
       run(args, via) {
         if (via === 'ui') {
@@ -247,7 +253,6 @@ export function useActions(): Action[] {
       id: 'note',
       label: 'New note',
       group: 'Notes',
-      shortcut: { key: 'n', shift: true },
       palette: { prompt: 'Note text' },
       command: { name: 'note', syntax: 'note <text>', summary: 'Capture a note' },
       async run(args) {
@@ -264,16 +269,18 @@ export function useActions(): Action[] {
       id: 'show-notes',
       label: 'Show notes',
       group: 'Notes',
-      command: { name: 'notes', syntax: 'notes', summary: 'Show the notes tab' },
+      shortcut: { key: 'n' },
+      command: { name: 'notes', syntax: 'notes', summary: 'Show the notes tab and focus the jot box' },
       run() {
         layout.showSidebarTab('notes')
+        a.focus('note-input')
       },
     },
     {
       id: 'show-queue',
       label: 'Search the queue',
       group: 'Queue',
-      shortcut: { key: 'q', shift: true },
+      shortcut: { key: 'q' },
       command: { name: 'queue', syntax: 'queue', summary: 'Show the queue tab and focus its search' },
       run() {
         layout.showSidebarTab('queue')
@@ -326,48 +333,49 @@ export function useActions(): Action[] {
     },
     {
       id: 'panel-left',
-      label: 'Focus the panel on the left',
+      label: 'Move to the panel on the left',
       group: 'Navigate',
-      shortcut: { key: 'arrowleft', alt: true },
+      shortcut: { key: 'arrowleft', unlessTyping: true },
       palette: false,
       run: () => layout.movePanel(-1),
     },
     {
       id: 'panel-right',
-      label: 'Focus the panel on the right',
+      label: 'Move to the panel on the right',
       group: 'Navigate',
-      shortcut: { key: 'arrowright', alt: true },
+      shortcut: { key: 'arrowright', unlessTyping: true },
       palette: false,
       run: () => layout.movePanel(1),
     },
     {
-      id: 'panel-sidebar',
-      label: 'Focus queue and notes',
+      id: 'panel-down',
+      label: 'Move to the command line',
       group: 'Navigate',
-      shortcut: { key: '1', code: 'Digit1', shift: true, label: '1' },
-      run: () => layout.focusPanel('sidebar'),
+      shortcut: { key: 'arrowdown' },
+      palette: false,
+      run: () => layout.focusPanel('command'),
+    },
+    {
+      id: 'panel-up',
+      label: 'Back to the terminal',
+      group: 'Navigate',
+      shortcut: { key: 'arrowup' },
+      palette: false,
+      run: toTerminal,
     },
     {
       id: 'panel-terminal',
-      label: 'Focus terminal',
+      label: 'Active session terminal',
       group: 'Navigate',
-      shortcut: { key: '2', code: 'Digit2', shift: true, label: '2' },
-      run: () => layout.focusPanel('terminal'),
+      shortcut: { key: 'a', unlessTyping: true },
+      run: toTerminal,
     },
     {
       id: 'panel-sessions',
       label: 'Focus sessions',
       group: 'Navigate',
-      shortcut: { key: '3', code: 'Digit3', shift: true, label: '3' },
+      shortcut: { key: 's' },
       run: () => layout.focusPanel('sessions'),
-    },
-    {
-      id: 'panel-command',
-      label: 'Focus command line (panel 4)',
-      group: 'Navigate',
-      shortcut: { key: '4', code: 'Digit4', shift: true, label: '4' },
-      palette: false,
-      run: () => layout.focusPanel('command'),
     },
     {
       id: 'zoom-in',

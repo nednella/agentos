@@ -72,25 +72,27 @@ func oneLine(s string, max int) string {
 // Next is the state reducer: the state after ev, given the state before it.
 func Next(cur State, ev Event) State {
 	switch ev.Name {
-	case "SessionStart":
+	case "SessionStart", "Stop":
 		return Idle
 	case "UserPromptSubmit", "PreToolUse", "PostToolUse":
 		return Working
 	case "Notification":
 		if isIdleReminder(ev) {
+			// A turn that ended in an error fires no Stop, so the reminder is what stops it showing as working.
+			if cur == Working {
+				return Idle
+			}
 			return cur
 		}
 		return Waiting
-	case "Stop":
-		return Finished
 	case "SessionEnd":
-		return Gone
+		return Ended
 	}
 	return cur
 }
 
 // isIdleReminder spots the "waiting for your input" nudge Claude sends a while
-// after a turn ends. It asks nothing of the user that Stop did not already say.
+// after a turn ends.
 func isIdleReminder(ev Event) bool {
 	if ev.NotificationType != "" {
 		return ev.NotificationType == "idle_prompt"
@@ -99,14 +101,15 @@ func isIdleReminder(ev Event) bool {
 }
 
 // Apply builds the record a hook leaves for ev on top of the previous record.
-// An idle reminder leaves the previous record alone, so it does not reorder the rail.
+// An idle reminder leaves the previous record alone unless the session was
+// working: then it is the sign that the turn is over.
 func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	if prev.State == "" {
 		prev = Record{Session: name, State: Idle, Event: ev.Name, At: now}
 		if isIdleReminder(ev) {
 			return prev
 		}
-	} else if isIdleReminder(ev) {
+	} else if isIdleReminder(ev) && prev.State != Working {
 		return prev
 	}
 	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType}

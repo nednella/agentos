@@ -41,6 +41,7 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
             title={`${s.n} ${s.title}`}
             aria-label={`Open session ${s.n}, ${s.title}`}
             style={{ boxShadow: s.id === selectedId ? 'inset 2px 0 var(--accent)' : undefined }}
+            disabled={s.state === 'ended'}
             onClick={() => select(s.id)}
           >
             <StateDot state={s.state} />

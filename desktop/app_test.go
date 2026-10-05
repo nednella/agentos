@@ -16,7 +16,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/session"
 )
 
 type recorder struct {
@@ -313,13 +315,22 @@ func TestSessionLifecycle(t *testing.T) {
 			t.Errorf("last event = %s %s", last.name, got)
 		}
 
-		h.hook(t, first.ID, "Stop", `{}`)
-		eventually(t, "finished", func() bool {
+		h.hook(t, first.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+		eventually(t, "working", func() bool {
 			s := h.rec.lastSessions()
-			return len(s) == 2 && s[1].ID == first.ID && s[1].State == "finished"
+			return len(s) == 2 && s[1].ID == first.ID && s[1].State == "working"
 		})
+		repliedBefore := h.rec.countAttention("replied")
+		h.hook(t, first.ID, "Stop", `{}`)
+		eventually(t, "idle after the reply", func() bool {
+			s := h.rec.lastSessions()
+			return len(s) == 2 && s[1].ID == first.ID && s[1].State == "idle"
+		})
+		if h.rec.countAttention("replied") != repliedBefore+1 {
+			t.Error("no replied attention for a turn that ended")
+		}
 		h.hook(t, second.ID, "PreToolUse", `{"tool_name":"Edit","tool_input":{"file_path":"a.tsx"}}`)
-		eventually(t, "waiting then working order", func() bool {
+		eventually(t, "idle then working order", func() bool {
 			s := h.rec.lastSessions()
 			return len(s) == 2 && s[0].ID == first.ID && s[1].State == "working" && s[1].Detail == "Edit a.tsx"
 		})
@@ -337,12 +348,32 @@ func TestSessionLifecycle(t *testing.T) {
 		if err := h.app.KillSession(first.ID); err != nil {
 			t.Fatal(err)
 		}
-		eventually(t, "kill", func() bool { return len(h.rec.lastSessions()) == 1 })
-		if got := h.app.Snapshot().Sessions; len(got) != 1 || got[0].ID != second.ID {
+		eventually(t, "the killed session to show as ended", func() bool {
+			s := h.rec.lastSessions()
+			return len(s) == 2 && s[1].ID == first.ID && s[1].State == "ended" && s[1].EndedAt > 0
+		})
+		if got := h.app.Snapshot().Sessions; len(got) != 2 || got[0].ID != second.ID || got[1].State != "ended" || got[1].Title != "first" {
 			t.Errorf("sessions after kill = %+v", got)
 		}
 		if h.rec.count("term:exit") != exits {
 			t.Error("a terminal we closed ourselves reported an exit")
+		}
+		if out, err := exec.Command("tmux", "-L", h.socket, "has-session", "-t", first.ID).CombinedOutput(); err == nil {
+			t.Errorf("the killed tmux session is still there: %s", out)
+		}
+		if err := h.app.KillSession(first.ID); err == nil {
+			t.Error("killing an ended session succeeded")
+		}
+		if err := h.app.DismissSession(second.ID); err == nil {
+			t.Error("dismissed a session that is running")
+		}
+		if err := h.app.DismissSession(first.ID); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "the dismissed row to go", func() bool { return len(h.rec.lastSessions()) == 1 })
+		time.Sleep(2500 * time.Millisecond) // a poll must not bring it back
+		if got := h.app.Snapshot().Sessions; len(got) != 1 || got[0].ID != second.ID {
+			t.Errorf("sessions after dismiss and a poll = %+v", got)
 		}
 	})
 
@@ -355,7 +386,22 @@ func TestSessionLifecycle(t *testing.T) {
 			t.Fatal(err)
 		}
 		eventually(t, "term:exit", func() bool { return h.rec.count("term:exit") > exits })
-		eventually(t, "sessions empty", func() bool { return len(h.rec.lastSessions()) == 0 })
+		eventually(t, "the row to turn ended", func() bool {
+			s := h.rec.lastSessions()
+			return len(s) == 1 && s[0].State == "ended" && s[0].EndedAt > 0 && s[0].Title == "renamed"
+		})
+		if h.app.Snapshot().Projects[0].Sessions != 0 {
+			t.Error("an ended session counts as a running one")
+		}
+
+		// A new session does not take the ended one's number.
+		third, err := h.app.NewSession("third", "")
+		if err != nil || third.ID == second.ID {
+			t.Errorf("new session = %+v, %v", third, err)
+		}
+		if err := h.app.DismissSession(second.ID); err != nil {
+			t.Fatal(err)
+		}
 	})
 }
 
@@ -919,5 +965,123 @@ func TestInboxAndIdeaCommands(t *testing.T) {
 	time.Sleep(600 * time.Millisecond)
 	if pane := h.pane(t, idea.ID); strings.Contains(pane, "/") && strings.Contains(pane, "investigate") {
 		t.Errorf("an idea got a command:\n%s", pane)
+	}
+}
+
+func (r *recorder) countAttention(state string) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := 0
+	for _, e := range r.events {
+		if m, ok := e.payload.(map[string]string); ok && e.name == "attention" && m["state"] == state {
+			n++
+		}
+	}
+	return n
+}
+
+func TestIdleReminders(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.app.NewSession("r", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := func() string { got, _ := h.session(s.ID); return string(got.State) }
+	waits := func() int { st, _ := h.app.Stats(7); return st.Total }
+
+	h.hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+	eventually(t, "working", func() bool { return state() == "working" })
+	replied := h.rec.countAttention("replied")
+	h.hook(t, s.ID, "Notification", `{"message":"Claude is waiting for your input","notification_type":"idle_prompt"}`)
+	eventually(t, "a turn killed by an error to stop showing as working", func() bool { return state() == "idle" })
+	if h.rec.countAttention("replied") != replied || waits() != 0 {
+		t.Errorf("an idle reminder raised attention (%d) or opened a wait (%d)", h.rec.countAttention("replied")-replied, waits())
+	}
+
+	h.hook(t, s.ID, "Notification", `{"message":"needs permission","notification_type":"permission_prompt"}`)
+	eventually(t, "waiting", func() bool { return state() == "waiting" })
+	h.hook(t, s.ID, "Notification", `{"message":"Claude is waiting for your input","notification_type":"idle_prompt"}`)
+	time.Sleep(300 * time.Millisecond)
+	if state() != "waiting" {
+		t.Errorf("an idle reminder changed a waiting session to %s", state())
+	}
+
+	h.hook(t, s.ID, "PostToolUse", `{"tool_name":"Edit"}`)
+	eventually(t, "working again", func() bool { return state() == "working" })
+	h.hook(t, s.ID, "Stop", `{}`)
+	eventually(t, "a wait for the reply", func() bool { return waits() == 2 })
+	st, _ := h.app.Stats(7)
+	var kinds []string
+	for _, c := range st.ByCause {
+		kinds = append(kinds, c.Kind+"/"+c.Label)
+	}
+	slices.Sort(kinds)
+	if !slices.Equal(kinds, []string{"idle/Reply landed", "permission/Permission"}) {
+		t.Errorf("causes = %q", kinds)
+	}
+}
+
+func TestEndedSessionsSurviveARestart(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.app.NewSession("keep me", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.hook(t, s.ID, "SessionEnd", `{}`)
+	eventually(t, "ended by its hook", func() bool { got, _ := h.session(s.ID); return got.State == "ended" })
+	if err := h.app.KillSession(s.ID); err != nil && !strings.Contains(err.Error(), "ended") {
+		t.Fatal(err)
+	}
+	eventually(t, "ended after the process is gone", func() bool { got, ok := h.session(s.ID); return ok && got.State == "ended" && got.EndedAt > 0 })
+
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	fresh := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}, openURL: func(string) {}, pickDir: h.rec.picker}, h.gh.run)
+	fresh.digestFirst = time.Hour
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := fresh.start(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var got Session
+	for _, v := range fresh.sessions.List() {
+		if v.ID == s.ID {
+			got = v
+		}
+	}
+	if got.State != "ended" || got.Title != "keep me" || got.EndedAt == 0 {
+		t.Errorf("after a restart = %+v", got)
+	}
+	if err := fresh.DismissSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if exists(filepath.Join(h.state, "sessions", s.ID+".json")) {
+		t.Error("the state file of a dismissed session is still there")
+	}
+}
+
+func TestOldFinishedStateIsMigrated(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.app.NewSession("old", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := `{"session":"` + s.ID + `","state":"finished","event":"Stop","at":"2026-10-01T12:00:00Z"}`
+	file := filepath.Join(h.state, "sessions", s.ID+".json")
+	if err := os.MkdirAll(filepath.Dir(file), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(file, []byte(old), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	bus.MigrateStates(h.state)
+	rec, err := bus.ReadState(h.state, s.ID)
+	if err != nil || rec.State != session.Idle {
+		t.Errorf("state = %q, %v", rec.State, err)
+	}
+	if data, _ := os.ReadFile(file); !strings.Contains(string(data), `"state":"idle"`) {
+		t.Error("the file was not rewritten")
 	}
 }

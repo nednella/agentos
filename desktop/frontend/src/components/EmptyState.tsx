@@ -14,7 +14,7 @@ export function EmptyState() {
           Start a session
         </button>
         <span className="flex items-center gap-1.5 text-small text-dim">
-          or press <Keycap>⌘N</Keycap>
+          or press <Keycap>⌘⇧N</Keycap>
           {issues.length > 0 && (
             <>
               , or start one from the{' '}

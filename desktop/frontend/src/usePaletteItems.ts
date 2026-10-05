@@ -25,7 +25,9 @@ export function usePaletteItems(query: string): PaletteItem[] {
   const layout = useLayout()
   const parsed = parseQuery(query)
 
-  const sessions: PaletteItem[] = a.sessions.map((s) => ({
+  const sessions: PaletteItem[] = a.sessions
+    .filter((s) => s.state !== 'ended')
+    .map((s) => ({
     key: `s-${s.id}`,
     group: 'Sessions',
     label: `${s.n}  ${s.title}`,

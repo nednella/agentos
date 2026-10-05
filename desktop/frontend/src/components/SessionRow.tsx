@@ -1,27 +1,34 @@
 import { useAgentos } from '../AgentosContext'
+import { api } from '../api'
 import { STATE_LABEL } from '../stateMeta'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
-import { Icon } from './Icon'
 import { CleanupControls } from './CleanupControls'
+import { Icon } from './Icon'
 import { PRBadge } from './PRBadge'
 import { StateDot } from './StateDot'
 import { Timeline } from './Timeline'
 
-type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean }
+type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
 
-export function SessionRow({ session, selected, cursor, compact }: SessionRowProps) {
-  const { select, focus, setSessionView } = useAgentos()
+export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
+  const { select, focus, setSessionView, dismissSession, report, issues } = useAgentos()
   const now = useNow()
   const waiting = session.state === 'waiting'
-  const hasFooter = session.pr !== null || session.cleanup !== '' || session.evidence > 0
+  const ended = session.state === 'ended'
+  const issue = issues.find((i) => i.number === session.issue)
+  const showPR = session.pr !== null && !dense
+  const showEvidence = session.evidence > 0 && !dense
+  const hasFooter = ended || showPR || showEvidence || session.cleanup !== ''
 
   return (
-    <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor}>
+    <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
       <button
-        className="flex w-full flex-col gap-1 px-4 pt-2.5 pb-2.5 text-left"
+        className={`flex w-full flex-col gap-1 px-4 text-left ${dense ? 'py-2' : 'pt-2.5 pb-2.5'}`}
         aria-current={selected}
-        title={session.title}
+        disabled={ended}
+        title={ended ? `${session.title} (ended)` : session.title}
+        style={ended ? { cursor: 'default', opacity: 1 } : undefined}
         onClick={() => {
           select(session.id)
           focus('terminal')
@@ -33,7 +40,7 @@ export function SessionRow({ session, selected, cursor, compact }: SessionRowPro
           <span className="min-w-0 flex-1 truncate text-body font-medium">{session.title}</span>
           <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
         </span>
-        {!compact && (
+        {!compact && !dense && (
           <span
             className="mono w-full truncate pl-[1.625rem] text-small"
             style={{ color: waiting ? 'var(--waiting)' : 'var(--text-dim)' }}
@@ -41,14 +48,20 @@ export function SessionRow({ session, selected, cursor, compact }: SessionRowPro
             {session.detail || STATE_LABEL[session.state]}
           </span>
         )}
-        <span className="w-full pl-[1.625rem]">
-          <Timeline session={session} size="mini" />
-        </span>
+        {!dense && (
+          <span className="w-full pl-[1.625rem]">
+            <Timeline session={session} size="mini" />
+          </span>
+        )}
       </button>
       {hasFooter && (
-        <div className="flex w-full flex-wrap items-center gap-2 pr-4 pb-2.5 pl-[2.625rem]">
-          <PRBadge session={session} compact={compact} />
-          {session.evidence > 0 && (
+        <div className="flex w-full flex-wrap items-center gap-2 pr-3 pb-2.5 pl-[2.625rem]">
+          {ended && (
+            <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
+          )}
+          {showPR && <PRBadge session={session} compact={compact} />}
+          {ended && session.pr && dense && <PRBadge session={session} compact />}
+          {showEvidence && (
             <button
               className="inline-flex h-6 flex-none items-center gap-1 rounded-sm border border-line-strong px-2 text-small text-soft"
               title={`${session.evidence} evidence items`}
@@ -62,6 +75,20 @@ export function SessionRow({ session, selected, cursor, compact }: SessionRowPro
             </button>
           )}
           {session.cleanup !== '' && <CleanupControls session={session} />}
+          {ended && issue && (
+            <button
+              className="btn btn-ghost h-6 px-2"
+              title={`Open #${issue.number} on GitHub`}
+              onClick={() => report(() => api.openURL(issue.url))}
+            >
+              <Icon name="external" size={12} /> #{issue.number}
+            </button>
+          )}
+          {ended && (
+            <button className="btn ml-auto h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
+              Dismiss
+            </button>
+          )}
         </div>
       )}
     </div>

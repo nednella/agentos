@@ -8,7 +8,7 @@ export function PRBadge({ session, compact = false }: PRBadgeProps) {
   const { openPR, report } = useAgentos()
   const { pr, prAttention } = session
   if (!pr) return null
-  const color = { checks: 'var(--danger)', comments: 'var(--waiting)', '': 'var(--text-soft)' }[prAttention]
+  const color = { checks: 'var(--danger)', comments: 'var(--idle)', '': 'var(--text-soft)' }[prAttention]
   const note = { checks: 'failing checks', comments: 'new review comments', '': '' }[prAttention]
 
   return (

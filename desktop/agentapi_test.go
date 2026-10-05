@@ -320,7 +320,14 @@ func TestCLIsAgainstTheApp(t *testing.T) {
 		if err := h.app.KillSession(s.ID); err != nil {
 			t.Fatal(err)
 		}
-		eventually(t, "evidence removed with the session", func() bool { return len(h.app.Evidence(s.ID)) == 0 })
+		if len(h.app.Evidence(s.ID)) != 3 {
+			t.Error("evidence went with the ended session; it should stay until dismissed")
+		}
+		eventually(t, "the session to show as ended", func() bool { got, _ := h.session(s.ID); return got.State == "ended" })
+		if err := h.app.DismissSession(s.ID); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "evidence removed with the dismissed session", func() bool { return len(h.app.Evidence(s.ID)) == 0 })
 	})
 
 	t.Run("app not running", func(t *testing.T) {

@@ -6,7 +6,7 @@ import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Ses
 
 export type Toast = {
   key: number
-  tone: 'waiting' | 'finished' | 'pr' | 'evidence' | 'error' | 'info'
+  tone: 'waiting' | 'replied' | 'pr' | 'evidence' | 'error' | 'info'
   text: string
   sessionId?: string
   view?: SessionView
@@ -44,6 +44,7 @@ type Agentos = {
   stepSession(delta: number): void
   newSession(title?: string): Promise<Session>
   killSession(id: string): Promise<void>
+  dismissSession(id: string): Promise<void>
   renameSession(id: string, title: string): Promise<void>
   startIssue(number: number, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
@@ -238,7 +239,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         if (!session) return
         const describe = (current: Session) => {
           if (state === 'waiting') return 'needs you'
-          if (state === 'finished') return 'finished'
+          if (state === 'replied') return 'replied'
           if (state === 'evidence') return 'has something to show'
           return current.prAttention === 'checks' ? 'has failing checks' : 'has new review comments'
         }
@@ -317,6 +318,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async killSession(id) {
         await api.killSession(id)
+        applySessions(sessionsRef.current.filter((s) => s.id !== id))
+      },
+      async dismissSession(id) {
+        await api.dismissSession(id)
         applySessions(sessionsRef.current.filter((s) => s.id !== id))
       },
       async renameSession(id, title) {
@@ -447,7 +452,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       nextAttention() {
         const list = sessionsRef.current
-        const urgent = [...list.filter((s) => s.state === 'waiting'), ...list.filter((s) => s.state === 'finished')]
+        const urgent = [...list.filter((s) => s.state === 'waiting'), ...list.filter((s) => s.state === 'idle')]
         if (urgent.length === 0) throw 'Nothing needs you right now'
         const at = urgent.findIndex((s) => s.id === selectedRef.current)
         selectId(urgent[(at + 1) % urgent.length].id)

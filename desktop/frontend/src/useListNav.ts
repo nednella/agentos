@@ -7,6 +7,7 @@ type ListNavHandlers = {
   onEnter(index: number): void
   onLeft?(index: number): boolean
   onRight?(index: number): boolean
+  onSpace?(index: number): boolean
 }
 
 const UP = new Set(['ArrowUp', 'w'])
@@ -16,6 +17,10 @@ const RIGHT = new Set(['ArrowRight', 'd'])
 
 export function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)
+}
+
+export function isEditingText(target: EventTarget | null): boolean {
+  return isTyping(target) && (target as HTMLInputElement | HTMLTextAreaElement).value !== ''
 }
 
 export function useListNav(count: number, handlers: ListNavHandlers): ListNav {
@@ -34,6 +39,7 @@ export function useListNav(count: number, handlers: ListNavHandlers): ListNav {
         if (e.target !== e.currentTarget) return false
         handlers.onEnter(cursor)
       }
+      else if (e.key === ' ') return handlers.onSpace?.(cursor) ?? false
       else if (LEFT.has(e.key)) return handlers.onLeft?.(cursor) ?? false
       else if (RIGHT.has(e.key)) return handlers.onRight?.(cursor) ?? false
       else return false

@@ -8,11 +8,10 @@ import (
 type State string
 
 const (
-	Idle     State = "idle"
-	Working  State = "working"
-	Waiting  State = "waiting"
-	Finished State = "finished"
-	Gone     State = "gone"
+	Idle    State = "idle"    // started, or a turn ended: the user's move
+	Working State = "working" // the agent is running
+	Waiting State = "waiting" // blocked on the user
+	Ended   State = "ended"   // the agent's session is gone
 )
 
 // Record is what a hook leaves behind: in a state file and on the bus.
@@ -25,6 +24,13 @@ type Record struct {
 	Tool    string    `json:"tool,omitempty"`    // the latest tool call, kept through the prompt it leads to
 	Command string    `json:"command,omitempty"` // that call's shell command
 	Notify  string    `json:"notify,omitempty"`  // notification_type of a Notification
+
+	// What the desktop app records when a session ends, so the row can outlive it.
+	Title   string `json:"title,omitempty"`
+	Issue   int    `json:"issue,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Created int64  `json:"created,omitempty"` // unix ms
+	EndedAt int64  `json:"endedAt,omitempty"` // unix ms
 }
 
 // Session is one agent as the screen sees it.
@@ -36,14 +42,11 @@ type Session struct {
 	Detail string
 }
 
-// NeedsUser reports whether the ball is in the user's court.
-func (s State) NeedsUser() bool { return s == Waiting || s == Finished }
-
 func (s State) rank() int {
 	switch s {
 	case Waiting:
 		return 0
-	case Finished:
+	case Idle:
 		return 1
 	case Working:
 		return 2
@@ -51,7 +54,7 @@ func (s State) rank() int {
 	return 3
 }
 
-// Sort orders sessions by who needs the user most, then most recent event first.
+// Sort orders sessions by who needs the user most: waiting, idle, working, ended, then most recent event first.
 func Sort(ss []Session) {
 	sort.SliceStable(ss, func(i, j int) bool {
 		a, b := ss[i], ss[j]

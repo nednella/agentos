@@ -27,7 +27,7 @@ function Tab({ panel, label, badge, urgent }: TabProps) {
 export function MobileTabs() {
   const { sessions, selectedId, issues, notes } = useAgentos()
   const selected = sessions.find((s) => s.id === selectedId)
-  const needsYou = sessions.some((s) => s.state === 'waiting' || s.state === 'finished')
+  const needsYou = sessions.some((s) => s.state === 'waiting')
   return (
     <nav role="tablist" aria-label="Panels" className="flex flex-none border-t border-line bg-surface">
       <Tab panel="queue" label="Queue" badge={String(issues.length)} />

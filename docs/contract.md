@@ -17,8 +17,10 @@ arguments) and the event stream `/__events`.
 ## Types
 
 ```ts
-type State = 'waiting' | 'finished' | 'working' | 'idle'
-// waiting: blocked on the user. finished: the turn ended. working: running. idle: started, nothing yet.
+type State = 'waiting' | 'working' | 'idle' | 'ended'
+// waiting: blocked on the user (a permission prompt or a question). working: running.
+// idle: started, or a turn ended and a reply landed: the user's move.
+// ended: the session's process is gone; the row stays until dismissed, for at most 7 days.
 
 type Session = {
   id: string            // tmux session name "<project key>/<n>"; stable; key for every call
@@ -38,6 +40,7 @@ type Session = {
   cleanupReason: string // why blocked, in a sentence
   browser: boolean      // the session has a browser tab
   evidence: number      // number of evidence items
+  endedAt: number       // unix ms when the session ended; 0 while it runs
 }
 
 type PR = {
@@ -53,9 +56,9 @@ type Project = {
   name: string
   dir: string
   repo: string          // "owner/name", or ""; filled for the current project, and for others once known
-  needsYou: number      // sessions waiting or finished
+  needsYou: number      // sessions waiting, or idle after a reply landed (not just started)
   working: number
-  sessions: number      // all live sessions
+  sessions: number      // all running sessions; ended ones do not count
 }
 
 type Issue = {
@@ -87,7 +90,7 @@ type Note = {
 type Snapshot = {
   project: Project
   projects: Project[]   // every known project: configured, current, and any with live sessions
-  sessions: Session[]   // current project, sorted: waiting, finished, working, idle; newest event first in a group
+  sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
   version: string
 }
@@ -102,11 +105,13 @@ type Evidence = {
   at: number
 }
 
+// A wait of kind idle opens when a Stop ends a working turn. An idle reminder that stops a working
+// session (a turn lost to an error fires no Stop) opens none.
 type Wait = {           // one time a session waited on the user
   sessionTitle: string
   issue: number
-  kind: 'permission' | 'question' | 'finished'
-  label: string         // "Bash: yarn test", "Edit", "Question", "Turn finished"
+  kind: 'permission' | 'question' | 'idle'
+  label: string         // "Bash: yarn test", "Edit", "Question", "Reply landed"
   startedAt: number
   waitedMs: number      // 0 while still waiting
 }
@@ -180,7 +185,8 @@ type Digest = {
 | `AddProjectDir(dir)` | `Snapshot` | the same without the picker; `~` is expanded; rejects a folder that does not exist |
 | `RemoveProject(name)` | `Snapshot` | forgets a configured project, keeps its sessions; switches away if it was current |
 | `NewSession(title, prefill)` | `Session` | starts the agent in the project folder; a non-empty `prefill` is typed in, not sent, once the agent is ready |
-| `KillSession(id)` | | stops the agent |
+| `KillSession(id)` | | stops the agent; the row stays as `ended` |
+| `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | |
 | `TypeInto(id, text)` | | types text into the prompt, not sent; line breaks cannot submit it |
 | `HarnessCheck()` | `Session` | starts a session titled "Harness check" with the review prompt typed in |
@@ -270,7 +276,7 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 | `issues` | `Issue[]` | the cached issue list changed (a session started or ended for an issue, a note was filed) |
 | `term:data` | `{ id, data }` | `data` is base64 of raw terminal output |
 | `term:exit` | `{ id }` | the session ended on its own |
-| `attention` | `{ id, state }` | `state` is `'waiting'`, `'finished'`, `'pr'` (PR checks or comments) or `'evidence'` (an agent filed evidence); once per change, current project only for waiting and finished |
+| `attention` | `{ id, state }` | `state` is `'waiting'`, `'replied'` (a turn ended with a reply: working to idle through Stop, not through a reminder), `'pr'` (PR checks or comments) or `'evidence'` (an agent filed evidence); once per change, current project only for waiting and replied |
 | `stats` | none | a wait opened or closed; refetch `Stats` if the view is open |
 | `cleanups` | `Cleanup[]` | a clean-up finished or was blocked |
 | `evidence` | `{ id, items }` | a session's evidence changed |

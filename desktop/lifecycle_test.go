@@ -467,7 +467,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	for _, c := range st.ByCause {
 		causes = append(causes, fmt.Sprintf("%s/%s/%d", c.Kind, c.Label, c.Count))
 	}
-	want := []string{"finished/Turn finished/1", "permission/Bash: upscope test api/1", "permission/Edit/1", "question/Question/1"}
+	want := []string{"idle/Reply landed/1", "permission/Bash: upscope test api/1", "permission/Edit/1", "question/Question/1"}
 	slices.Sort(causes)
 	if !slices.Equal(causes, want) {
 		t.Errorf("causes = %q, want %q", causes, want)
@@ -548,7 +548,7 @@ func TestCauseOf(t *testing.T) {
 		{"unknown tool", session.Record{State: session.Waiting, Notify: "permission_prompt"}, "permission", "Permission"},
 		{"untyped permission", session.Record{State: session.Waiting, Detail: "Claude needs your permission to use Edit", Tool: "Edit"}, "permission", "Edit"},
 		{"elicitation", session.Record{State: session.Waiting, Notify: "elicitation_dialog", Tool: "Edit"}, "question", "Question"},
-		{"finished", session.Record{State: session.Finished, Tool: "Edit"}, "finished", "Turn finished"},
+		{"reply landed", session.Record{State: session.Idle, Event: "Stop", Tool: "Edit"}, "idle", "Reply landed"},
 	}
 	for _, tt := range tests {
 		if kind, label := causeOf(tt.rec); kind != tt.kind || label != tt.label {

@@ -5,6 +5,7 @@ type Backend = {
   Snapshot(): Promise<Snapshot>
   NewSession(title: string, prefill: string): Promise<Session>
   KillSession(id: string): Promise<void>
+  DismissSession(id: string): Promise<void>
   RenameSession(id: string, title: string): Promise<void>
   SwitchProject(name: string): Promise<Snapshot>
   AddProject(): Promise<Snapshot>
@@ -74,6 +75,7 @@ export const api = {
   snapshot: () => backend.Snapshot(),
   newSession: (title: string, prefill = '') => backend.NewSession(title, prefill),
   killSession: (id: string) => backend.KillSession(id),
+  dismissSession: (id: string) => backend.DismissSession(id),
   renameSession: (id: string, title: string) => backend.RenameSession(id, title),
   switchProject: (name: string) => backend.SwitchProject(name),
   addProject: () => backend.AddProject(),

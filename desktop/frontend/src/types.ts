@@ -1,4 +1,4 @@
-export type State = 'waiting' | 'finished' | 'working' | 'idle'
+export type State = 'waiting' | 'working' | 'idle' | 'ended'
 
 export type HistoryEntry = { state: State; at: number }
 
@@ -167,5 +167,5 @@ export type EventMap = {
   'browser:state': BrowserState
   'term:data': { id: string; data: string }
   'term:exit': { id: string }
-  attention: { id: string; state: 'waiting' | 'finished' | 'pr' | 'evidence' }
+  attention: { id: string; state: 'waiting' | 'replied' | 'pr' | 'evidence' }
 }

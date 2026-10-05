@@ -96,6 +96,12 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
       }
       report(() => startIssue(issue.number))
     },
+    onSpace(index) {
+      const item = items[index]
+      if (item?.kind !== 'lane' || filtering) return false
+      toggle(item.lane, closed.has(item.lane))
+      return true
+    },
     onLeft(index) {
       const item = items[index]
       if (item?.kind !== 'lane' || filtering || closed.has(item.lane)) return false

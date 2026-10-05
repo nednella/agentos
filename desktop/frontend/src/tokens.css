@@ -14,10 +14,11 @@
   --text-soft: #a3abbb;
   --text-dim: #7c8597;
 
-  --waiting: #f5a524;
+  --waiting: #ff5a4a;
   --finished: #3ecf8e;
   --working: #4cb4ff;
-  --idle: #6b7385;
+  --idle: #f2a33a;
+  --ended: #5f677b;
   --accent: #a78bfa;
   --danger: #f5586a;
 
@@ -39,6 +40,8 @@
 
   --topbar-h: 2.5rem;
   --edge-strip-w: 2.75rem;
+  --traffic-light-zone: 96px;
+  --topbar-corner-pad: 1.375rem;
 
   --bg-note: #181613;
   --bg-note-card: #211e19;

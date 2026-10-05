@@ -103,11 +103,11 @@ const details: Record<State, string[]> = {
     'Write DocumentReader.tsx',
   ],
   waiting: ['Claude needs your permission', 'Claude has a question for you'],
-  finished: ['Done: 4 files changed', 'Done: tests pass'],
-  idle: [''],
+  idle: ['Done: 4 files changed', 'Done: tests pass'],
+  ended: ['Session ended'],
 }
 
-const order: Record<State, number> = { waiting: 0, finished: 1, working: 2, idle: 3 }
+const order: Record<State, number> = { waiting: 0, idle: 1, working: 2, ended: 3 }
 
 const pick = <T,>(items: T[]): T => items[Math.floor(Math.random() * items.length)]
 
@@ -186,7 +186,7 @@ export function createMock(params: URLSearchParams) {
       name: p.name,
       dir: p.dir,
       repo: p.repo,
-      needsYou: own.filter((s) => s.state === 'waiting' || s.state === 'finished').length,
+      needsYou: own.filter((s) => s.state === 'waiting').length,
       working: own.filter((s) => s.state === 'working').length,
       sessions: own.length,
     }
@@ -266,8 +266,9 @@ export function createMock(params: URLSearchParams) {
       tools: 0,
     }
     if (initial === 'waiting') s.buffer += term.permissionPrompt('npx tsc --noEmit')
-    if (initial === 'finished') s.buffer += term.finishedNote(134)
-    if (initial === 'idle') s.buffer = term.banner(owner.dir) + term.promptLine('')
+    if (initial === 'idle' && history.length > 0) s.buffer += term.finishedNote(134)
+    if (initial === 'idle' && history.length === 0) s.buffer = term.banner(owner.dir) + term.promptLine('')
+    if (initial === 'ended') s.buffer += '\r\n\x1b[2m[session ended]\x1b[0m\r\n'
     sessions.push(s)
     return s
   }
@@ -280,14 +281,15 @@ export function createMock(params: URLSearchParams) {
   }
 
   if (!flags.empty) {
-    seed('#454 entry split', 454, 'working', [['working', 74], ['waiting', 52], ['working', 47], ['finished', 31], ['working', 12]])
-    seed('#444 embed route', 444, 'waiting', [['working', 96], ['finished', 70], ['working', 38], ['waiting', 4]])
-    seed('#326 sendBeacon', 326, 'finished', [['working', 41], ['waiting', 33], ['working', 30], ['finished', 6]])
+    seed('#454 entry split', 454, 'working', [['working', 74], ['waiting', 52], ['working', 47], ['idle', 31], ['working', 12]])
+    seed('#444 embed route', 444, 'waiting', [['working', 96], ['idle', 70], ['working', 38], ['waiting', 4]])
+    seed('#326 sendBeacon', 326, 'idle', [['working', 41], ['waiting', 33], ['working', 30], ['idle', 6]])
     seed('billing tests scratch', 0, 'working', [['working', 22], ['waiting', 15], ['working', 13]])
-    seed('#412 locale sweep', 412, 'finished', [['working', 50], ['finished', 20]])
-    seed('#437 cobrowse strip', 437, 'finished', [['working', 80], ['finished', 25]])
-    seed('#430 thumbnail ratio', 430, 'finished', [['working', 60], ['finished', 18]])
-    seed('#389 stripe retries', 389, 'working', [['working', 58], ['finished', 40], ['working', 9]])
+    seed('#412 locale sweep', 412, 'idle', [['working', 50], ['idle', 20]])
+    seed('#437 cobrowse strip', 437, 'idle', [['working', 80], ['idle', 25]])
+    seed('#430 thumbnail ratio', 430, 'ended', [['working', 60], ['ended', 18]])
+    seed('spike: websocket retry', 0, 'ended', [['working', 140], ['idle', 110], ['ended', 95]])
+    seed('#389 stripe retries', 389, 'working', [['working', 58], ['idle', 40], ['working', 9]])
     const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'livedocument')!
     byIssue(454).pr = pr(457, 'draft', 'pending')
     Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
@@ -302,7 +304,7 @@ export function createMock(params: URLSearchParams) {
   if (flags.toast) {
     setTimeout(() => {
       const target = sessions[2]
-      if (target) emit('attention', { id: target.id, state: 'finished' })
+      if (target) emit('attention', { id: target.id, state: 'replied' })
     }, 1500)
   }
 
@@ -317,7 +319,7 @@ export function createMock(params: URLSearchParams) {
 
   function openWait(s: MockSession, at: number) {
     const permission = s.detail.includes('permission')
-    const kind: WaitKind = s.state === 'finished' ? 'finished' : permission ? 'permission' : 'question'
+    const kind: WaitKind = s.state === 'idle' ? 'finished' : permission ? 'permission' : 'question'
     const label = { permission: 'Bash: npx tsc --noEmit', question: 'Question', finished: 'Turn finished' }[kind]
     owner(s).waits.unshift({ sessionTitle: s.title, issue: s.issue, kind, label, startedAt: at, waitedMs: 0 })
   }
@@ -330,25 +332,25 @@ export function createMock(params: URLSearchParams) {
     s.lastEventAt = at
     s.history = [...s.history, { state, at }].slice(-200)
     if (state === 'waiting') write(s, term.permissionPrompt('npx tsc --noEmit'))
-    if (state === 'finished') write(s, term.finishedNote(Math.round((at - s.createdAt) / 1000) % 600))
+    if (state === 'idle') write(s, term.finishedNote(Math.round((at - s.createdAt) / 1000) % 600))
     if (state === 'working') write(s, term.toolCall(s.tools++))
     publish()
-    if (state === 'waiting' || state === 'finished') {
+    if (state === 'waiting' || state === 'idle') {
       openWait(s, at)
       emit('stats', undefined)
-      if (s.project === current.name) emit('attention', { id: s.id, state })
+      if (s.project === current.name) emit('attention', { id: s.id, state: state === 'idle' ? 'replied' : 'waiting' })
     }
   }
 
   function nextState(state: State): State {
-    if (state === 'working') return Math.random() < 0.6 ? 'waiting' : 'finished'
+    if (state === 'working') return Math.random() < 0.6 ? 'waiting' : 'idle'
     return 'working'
   }
 
   setInterval(() => {
     const now = Date.now()
     sessions.forEach((s) => {
-      if (s.pr && (s.pr.state === 'merged' || s.pr.state === 'closed')) return
+      if (s.state === 'ended' || (s.pr && (s.pr.state === 'merged' || s.pr.state === 'closed'))) return
       if (now >= s.nextChangeAt) {
         s.nextChangeAt = now + 12_000 + Math.random() * 28_000
         setState(s, nextState(s.state))
@@ -594,6 +596,13 @@ export function createMock(params: URLSearchParams) {
   const backend = {
     Snapshot: async () => snapshot(),
     NewSession: async (title: string, prefill: string) => startSessionFor(title || `session ${nextN}`, 0, prefill),
+    DismissSession: async (id: string) => {
+      const s = find(id)
+      if (s.state !== 'ended') throw 'Only an ended session can be dismissed'
+      sessions.splice(sessions.indexOf(s), 1)
+      publish()
+      emit('issues', currentIssues())
+    },
     KillSession: async (id: string) => {
       find(id)
       sessions.splice(sessions.findIndex((s) => s.id === id), 1)

@@ -519,6 +519,9 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool)
 	if err := l.sessions.Kill(t.id); err != nil {
 		return removed, fmt.Sprintf("ending the session failed: %v", err)
 	}
+	if err := l.sessions.Dismiss(t.id); err != nil {
+		return removed, fmt.Sprintf("removing the session failed: %v", err)
+	}
 	return append(removed, "session"), ""
 }
 

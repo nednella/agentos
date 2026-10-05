@@ -14,17 +14,20 @@ func TestNext(t *testing.T) {
 		want State
 	}{
 		{"start", Idle, Event{Name: "SessionStart"}, Idle},
-		{"start after finish", Finished, Event{Name: "SessionStart"}, Idle},
-		{"prompt", Finished, Event{Name: "UserPromptSubmit"}, Working},
+		{"start after a reply", Idle, Event{Name: "SessionStart"}, Idle},
+		{"prompt", Idle, Event{Name: "UserPromptSubmit"}, Working},
 		{"pre tool", Idle, Event{Name: "PreToolUse"}, Working},
 		{"post tool answers a prompt", Waiting, Event{Name: "PostToolUse"}, Working},
 		{"permission prompt", Working, Event{Name: "Notification", NotificationType: "permission_prompt"}, Waiting},
 		{"notification without type", Working, Event{Name: "Notification", Message: "Claude needs your permission to use Bash"}, Waiting},
-		{"idle reminder after stop", Finished, Event{Name: "Notification", NotificationType: "idle_prompt"}, Finished},
-		{"idle reminder by message", Finished, Event{Name: "Notification", Message: "Claude is waiting for your input"}, Finished},
-		{"idle reminder never raises", Idle, Event{Name: "Notification", NotificationType: "idle_prompt"}, Idle},
-		{"stop", Working, Event{Name: "Stop"}, Finished},
-		{"end", Working, Event{Name: "SessionEnd"}, Gone},
+		{"idle reminder stops a working session", Working, Event{Name: "Notification", NotificationType: "idle_prompt"}, Idle},
+		{"idle reminder by message stops a working session", Working, Event{Name: "Notification", Message: "Claude is waiting for your input"}, Idle},
+		{"idle reminder leaves waiting alone", Waiting, Event{Name: "Notification", NotificationType: "idle_prompt"}, Waiting},
+		{"idle reminder leaves idle alone", Idle, Event{Name: "Notification", NotificationType: "idle_prompt"}, Idle},
+		{"idle reminder leaves ended alone", Ended, Event{Name: "Notification", NotificationType: "idle_prompt"}, Ended},
+		{"stop", Working, Event{Name: "Stop"}, Idle},
+		{"stop while waiting", Waiting, Event{Name: "Stop"}, Idle},
+		{"end", Working, Event{Name: "SessionEnd"}, Ended},
 		{"unknown event", Working, Event{Name: "PreCompact"}, Working},
 	}
 	for _, tt := range tests {
@@ -39,7 +42,7 @@ func TestNext(t *testing.T) {
 func TestApply(t *testing.T) {
 	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	t1 := t0.Add(time.Minute)
-	stop := Record{Session: "p/1", State: Finished, Event: "Stop", At: t0, Detail: "done"}
+	stop := Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Detail: "done"}
 	tests := []struct {
 		name string
 		prev Record
@@ -47,6 +50,8 @@ func TestApply(t *testing.T) {
 		want Record
 	}{
 		{"first event", Record{}, Event{Name: "PreToolUse", Detail: "Bash ls"}, Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t1, Detail: "Bash ls"}},
+		{"idle reminder ends a working turn", Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t0, Tool: "Bash"}, Event{Name: "Notification", NotificationType: "idle_prompt"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1, Notify: "idle_prompt", Tool: "Bash"}},
+		{"idle reminder leaves a waiting record alone", Record{Session: "p/1", State: Waiting, Event: "Notification", At: t0}, Event{Name: "Notification", NotificationType: "idle_prompt"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t0}},
 		{"idle reminder keeps the record", stop, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "waiting"}, stop},
 		{"permission prompt", stop, Event{Name: "Notification", NotificationType: "permission_prompt", Detail: "needs Bash"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Detail: "needs Bash", Notify: "permission_prompt"}},
 		{"prompt keeps the last tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", Tool: "Bash", Command: "yarn test"}, Event{Name: "Notification", NotificationType: "permission_prompt"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Notify: "permission_prompt", Tool: "Bash", Command: "yarn test"}},
@@ -97,18 +102,19 @@ func TestSort(t *testing.T) {
 	ss := []Session{
 		mk(1, Idle, 0),
 		mk(2, Working, time.Minute),
-		mk(3, Finished, time.Hour),
+		mk(3, Idle, time.Hour),
 		mk(4, Waiting, time.Hour),
 		mk(5, Working, time.Second),
-		mk(6, Finished, time.Minute),
+		mk(6, Idle, time.Minute),
 		mk(7, Idle, 0),
+		mk(8, Ended, 0),
 	}
 	Sort(ss)
 	var got []int
 	for _, s := range ss {
 		got = append(got, s.Name.N)
 	}
-	want := []int{4, 6, 3, 5, 2, 1, 7}
+	want := []int{4, 1, 7, 6, 3, 5, 2, 8}
 	for i := range want {
 		if got[i] != want[i] {
 			t.Fatalf("order = %v, want %v", got, want)

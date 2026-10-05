@@ -25,8 +25,8 @@ export function App() {
       <TopBar />
       <main className={`relative flex min-h-0 min-w-0 flex-1 ${narrow ? 'p-2' : 'p-3'}`}>
         <Sidebar />
-        {mode === 'wide' && sidebarOpen && <Divider panel="sidebar" />}
-        {!narrow && !(mode === 'wide' && sidebarOpen) && <span className="w-3 flex-none" />}
+        {!narrow && sidebarOpen && <Divider panel="sidebar" />}
+        {!narrow && !sidebarOpen && <span className="w-3 flex-none" />}
         <div className={`min-h-0 min-w-0 flex-1 ${showCentre ? '' : 'hidden'}`}>
           <div className={statsOpen || digestOpen ? 'hidden' : 'h-full'}>
             <Viewport />

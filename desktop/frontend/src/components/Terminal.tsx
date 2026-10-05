@@ -12,7 +12,7 @@ type TerminalProps = { id: string; active: boolean }
 
 const BASE_FONT_PX = 14
 const SHIFT_ENTER = '\x1b[13;2u'
-const SYSTEM_KEYS = new Set(['c', 'v', 'a', 'x', 'm', 'h', 'q', 'w'])
+const SYSTEM_KEYS = new Set(['c', 'v', 'x', 'm', 'h', 'w'])
 
 function decode(base64: string): Uint8Array {
   const binary = atob(base64)

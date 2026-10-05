@@ -87,13 +87,14 @@ func run() error {
 		AssetServer:      &assetserver.Options{Assets: assets, Handler: app.mediaHandler()},
 		OnStartup: func(c context.Context) {
 			window.Store(&c)
+			stripMenuShortcuts()
 			if err := app.start(c); err != nil {
 				log.Printf("agentos: %v", err)
 			}
 		},
 		OnShutdown: func(context.Context) { app.stop() },
 		Bind:       []any{app},
-		// The Edit menu is what makes ⌘C, ⌘V and ⌘A reach the web view on macOS.
+		// The Edit menu is what makes ⌘C, ⌘V and ⌘X reach the web view on macOS. Quit and Select All lose their keys in stripMenuShortcuts.
 		Menu: menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
 		Mac: &mac.Options{
 			TitleBar:   mac.TitleBarHiddenInset(),

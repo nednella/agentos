@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useAgentos } from './AgentosContext'
 import { matchShortcut, useActions } from './actions'
 import { useLayout } from './LayoutContext'
+import { isEditingText } from './useListNav'
 
 export function useShortcuts() {
   const a = useAgentos()
@@ -13,7 +14,7 @@ export function useShortcuts() {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       const { a: agentos, actions: registry } = latest.current
-      const action = registry.find((x) => x.shortcut && matchShortcut(e, x.shortcut))
+      const action = registry.find((x) => x.shortcut && matchShortcut(e, x.shortcut) && !(x.shortcut.unlessTyping && isEditingText(e.target)))
       if (action) {
         e.preventDefault()
         agentos.report(() => action.run([], 'ui'))
@@ -32,9 +33,8 @@ export function useShortcuts() {
         agentos.focus('terminal')
         return
       }
-      if (lay.mode === 'medium' && lay.sidebarOpen) {
-        lay.setSidebarOpen(false)
-        agentos.focus('terminal')
+      if (lay.sidebarPeek || lay.sessionsPeek) {
+        lay.returnToTerminal()
         return
       }
       const el = document.activeElement
