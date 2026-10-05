@@ -5,7 +5,8 @@ export type Completion = { start: number; typed: string; items: Candidate[] }
 const split = (value: string) => value.trimStart().split(/\s+/)
 
 export function commandNamed(actions: Action[], name: string): Action | undefined {
-  return actions.find((a) => a.command?.name === name.toLowerCase())
+  const lower = name.toLowerCase()
+  return actions.find((a) => a.command?.name === lower || a.command?.aliases?.includes(lower))
 }
 
 export function parseInput(value: string): { name: string; args: string[] } {

@@ -57,7 +57,7 @@ const causes: { kind: WaitKind; label: string; weight: number; waitMin: number }
   { kind: 'permission', label: 'Bash: gh pr create', weight: 6, waitMin: 3 },
   { kind: 'permission', label: 'Read outside project', weight: 5, waitMin: 2 },
   { kind: 'question', label: 'Question', weight: 10, waitMin: 7 },
-  { kind: 'finished', label: 'Turn finished', weight: 16, waitMin: 11 },
+  { kind: 'idle', label: 'Reply landed', weight: 16, waitMin: 11 },
 ]
 
 function seedWaits(titles: [string, number][]): Wait[] {
@@ -319,8 +319,8 @@ export function createMock(params: URLSearchParams) {
 
   function openWait(s: MockSession, at: number) {
     const permission = s.detail.includes('permission')
-    const kind: WaitKind = s.state === 'idle' ? 'finished' : permission ? 'permission' : 'question'
-    const label = { permission: 'Bash: npx tsc --noEmit', question: 'Question', finished: 'Turn finished' }[kind]
+    const kind: WaitKind = s.state === 'idle' ? 'idle' : permission ? 'permission' : 'question'
+    const label = { permission: 'Bash: npx tsc --noEmit', question: 'Question', idle: 'Reply landed' }[kind]
     owner(s).waits.unshift({ sessionTitle: s.title, issue: s.issue, kind, label, startedAt: at, waitedMs: 0 })
   }
 

@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, Note, Session, Snapshot, Stats } from './types'
+import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, Note, Session, Snapshot, Stats, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -99,7 +99,7 @@ export const api = {
   termResize: (id: string, cols: number, rows: number) => backend.TermResize(id, cols, rows).catch(() => {}),
   termClose: (id: string) => backend.TermClose(id),
   openURL: (url: string) => backend.OpenURL(url),
-  stats: (days: number) => backend.Stats(days),
+  stats: (days: number) => backend.Stats(days).then(readIdleKinds),
   refreshPRs: () => backend.RefreshPRs(),
   ackPR: (id: string) => backend.AckPR(id),
   typeInto: (id: string, text: string) => backend.TypeInto(id, text),
@@ -122,6 +122,18 @@ export const api = {
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),
   dismissDigestItem: (itemId: string) => backend.DismissDigestItem(itemId),
+}
+
+// The Go side used to call an idle wait "finished"; accept both.
+type LegacyWaitKind = WaitKind | 'finished'
+
+function readIdleKinds(stats: Stats): Stats {
+  const idle = (kind: LegacyWaitKind): WaitKind => (kind === 'finished' ? 'idle' : kind)
+  return {
+    ...stats,
+    byCause: stats.byCause.map((c) => ({ ...c, kind: idle(c.kind) })),
+    recent: stats.recent.map((w) => ({ ...w, kind: idle(w.kind) })),
+  }
 }
 
 export function on<K extends keyof EventMap>(

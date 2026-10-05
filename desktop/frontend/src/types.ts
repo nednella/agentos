@@ -78,7 +78,7 @@ export type Snapshot = {
   version: string
 }
 
-export type WaitKind = 'permission' | 'question' | 'finished'
+export type WaitKind = 'permission' | 'question' | 'idle'
 
 export type Wait = {
   sessionTitle: string
