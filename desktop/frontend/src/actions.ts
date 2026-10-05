@@ -63,6 +63,7 @@ export function useActions(): Action[] {
   const current = a.sessions.find((s) => s.id === a.selectedId)
   const openOverlay = (overlay: Overlay) => () => a.setOverlay(overlay)
   const toTerminal = () => {
+    layout.closeCentre()
     layout.focusPanel('terminal')
   }
 
@@ -192,6 +193,16 @@ export function useActions(): Action[] {
       },
     },
     {
+      id: 'refresh-issues',
+      label: 'Refresh issues and PRs',
+      group: 'Queue',
+      shortcut: { key: 'r' },
+      async run() {
+        await Promise.all([a.refreshIssues(), a.refreshPRs()])
+        return 'Issues and pull requests refreshed'
+      },
+    },
+    {
       id: 'toggle-sidebar',
       label: 'Toggle queue and notes panel',
       group: 'Navigate',
@@ -248,6 +259,43 @@ export function useActions(): Action[] {
       group: 'App',
       shortcut: { key: '0' },
       run: () => layout.zoom(0),
+    },
+    {
+      id: 'stats',
+      label: 'Stats: what interrupts you',
+      group: 'App',
+      shortcut: { key: 's', shift: true },
+      run: layout.toggleStats,
+    },
+    {
+      id: 'harness',
+      label: "Check this project's harness",
+      group: 'Projects',
+      async run() {
+        await a.harnessCheck()
+        return 'Started the harness check'
+      },
+    },
+    {
+      id: 'open-pr',
+      label: current?.pr ? `Open PR #${current.pr.number}` : 'Open the pull request',
+      group: 'Sessions',
+      async run() {
+        if (!current) throw 'No session selected'
+        await a.openPR(current)
+        return `Opened PR #${current.pr?.number}`
+      },
+    },
+    {
+      id: 'cleanup',
+      label: current ? `Clean up session ${describe(current)}` : 'Clean up session',
+      group: 'Sessions',
+      async run(args) {
+        const target = args.length ? findSession(a.sessions, args.join(' ')) : current
+        if (!target) throw 'No session to clean up'
+        await a.cleanupSession(target.id, false)
+        return `Cleaned up ${describe(target)}`
+      },
     },
     {
       id: 'previous-session',

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { ReactNode } from 'react'
 import { useAgentos } from './AgentosContext'
 import type { SidebarTab } from './AgentosContext'
+import { devFlags } from './api'
 import { readStored, writeStored } from './storage'
 
 export type Band = 'compact' | 'medium' | 'wide'
@@ -41,6 +42,7 @@ type Layout = {
   mobilePanel: MobilePanel
   widths: Record<SidePanel, number>
   peekWidths: Record<SidePanel, number>
+  statsOpen: boolean
   zoom(step: -1 | 0 | 1): void
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
@@ -50,6 +52,8 @@ type Layout = {
   setSidebarOpen(open: boolean): void
   setSessionsOpen(open: boolean): void
   showSidebarTab(tab: SidebarTab): void
+  toggleStats(): void
+  closeCentre(): void
   closePeek(): void
   returnToTerminal(): void
   focusPanel(panel: Panel): void
@@ -108,6 +112,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   const [stored, setStored] = useState(() => readStored<Partial<AllPrefs>>(LAYOUT_KEY, {}))
   const [peek, setPeek] = useState<SidePanel | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
+  const [statsOpen, setStatsOpen] = useState(devFlags.view === 'stats')
 
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(scale))
@@ -136,6 +141,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     const first = previousSelected.current === null
     previousSelected.current = selectedId
     if (first) return
+    setStatsOpen(false)
     setPeek(null)
     if (narrow) setMobilePanel('session')
   }, [selectedId, narrow])
@@ -198,6 +204,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         sidebar: Math.min(Math.max(fitted.full.sidebar, 20), (0.8 * width) / (16 * scale)),
         sessions: Math.min(Math.max(fitted.full.sessions, 18), (0.8 * width) / (16 * scale)),
       },
+      statsOpen,
       zoom(step) {
         const at = SCALES.indexOf(scale)
         const next = step === 0 ? DEFAULT_SCALE : SCALES[Math.min(Math.max((at < 0 ? 2 : at) + step, 0), SCALES.length - 1)]
@@ -216,6 +223,14 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       setSidebarOpen,
       setSessionsOpen,
       showSidebarTab,
+      toggleStats() {
+        setStatsOpen(!statsOpen)
+        setPeek(null)
+        if (!statsOpen && narrow) setMobilePanel('session')
+      },
+      closeCentre() {
+        setStatsOpen(false)
+      },
       closePeek: () => setPeek(null),
       returnToTerminal() {
         setPeek(null)
@@ -223,7 +238,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, peek, mobilePanel, fitted.widths, fitted.full, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, peek, mobilePanel, fitted.widths, fitted.full, statsOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

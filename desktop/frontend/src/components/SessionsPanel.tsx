@@ -5,6 +5,7 @@ import { useFocusRequest } from '../useFocusRequest'
 import { useLayout } from '../LayoutContext'
 import { useListNav } from '../useListNav'
 import { useToggleAnimation } from '../useToggleAnimation'
+import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
 import { NewSessionRow } from './NewSessionRow'
@@ -65,6 +66,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         <span className="label">Sessions</span>
         <span className="mono text-small text-dim">{sessions.length}</span>
         <span className="ml-auto" />
+        <CleanupsMenu />
         {!full && (
           <button
             className="btn btn-ghost h-8 w-8 flex-none justify-center px-0"

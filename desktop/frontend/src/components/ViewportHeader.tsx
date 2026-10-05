@@ -4,17 +4,24 @@ import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
 import { ConfirmRow } from './ConfirmRow'
+import { PRBadge } from './PRBadge'
 import { StateBadge } from './StateBadge'
 
 type ViewportHeaderProps = { session: Session }
 
+const PR_ACTION = {
+  comments: { label: 'Address review comments', sentence: (n: number) => `Address the review comments on PR #${n}.` },
+  checks: { label: 'Fix failing checks', sentence: (n: number) => `Fix the failing checks on PR #${n}.` },
+}
+
 export function ViewportHeader({ session }: ViewportHeaderProps) {
-  const { renameSession, report, focus, killSession } = useAgentos()
+  const { renameSession, report, focus, typeInto, ackPR, killSession } = useAgentos()
   const now = useNow()
   const [renaming, setRenaming] = useState(false)
   const [killing, setKilling] = useState(false)
 
   useEffect(() => setKilling(false), [session.id])
+  const action = session.pr && session.prAttention ? PR_ACTION[session.prAttention] : null
 
   const finishRename = () => {
     setRenaming(false)
@@ -48,6 +55,22 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           )}
           <span className="contents short:hidden">
             <StateBadge state={session.state} />
+            <PRBadge session={session} />
+            {action && session.pr && (
+              <button
+                className="btn btn-accent"
+                onClick={() => {
+                  const number = session.pr?.number ?? 0
+                  report(async () => {
+                    await typeInto(session.id, action.sentence(number))
+                    await ackPR(session.id)
+                  })
+                  focus('terminal')
+                }}
+              >
+                {action.label}
+              </button>
+            )}
           </span>
         </div>
         <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>

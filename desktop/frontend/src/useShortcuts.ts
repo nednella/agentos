@@ -28,6 +28,11 @@ export function useShortcuts() {
         lay.returnToTerminal()
         return
       }
+      if (lay.statsOpen) {
+        lay.closeCentre()
+        agentos.focus('terminal')
+        return
+      }
       if (lay.sidebarPeek || lay.sessionsPeek) {
         lay.returnToTerminal()
         return

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { Issue, Note, Project, Session } from './types'
+import type { Cleanup, Issue, Note, Project, Session } from './types'
 
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
 export type SidebarTab = 'queue' | 'notes'
@@ -19,6 +19,7 @@ type Agentos = {
   issuesLoading: boolean
   issueFilter: string
   notes: Note[]
+  cleanups: Cleanup[]
   overlay: Overlay
   sidebarTab: SidebarTab
   composing: boolean
@@ -41,6 +42,12 @@ type Agentos = {
   addNoteImage(id: string, image: PendingImage): Promise<void>
   removeNoteImage(id: string, url: string): Promise<void>
   deleteNote(id: string): Promise<void>
+  refreshPRs(): Promise<void>
+  harnessCheck(): Promise<void>
+  ackPR(id: string): Promise<void>
+  openPR(session: Session): Promise<void>
+  typeInto(id: string, text: string): Promise<void>
+  cleanupSession(id: string, force: boolean): Promise<void>
   noteToIssue(id: string): Promise<void>
   noteToSession(id: string): Promise<void>
   nextAttention(): void
@@ -74,6 +81,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [issuesLoading, setIssuesLoading] = useState(true)
   const [issueFilter, setIssueFilterState] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
+  const [cleanups, setCleanups] = useState<Cleanup[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
   const [composing, setComposing] = useState(false)
@@ -139,6 +147,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setNotes(snap.notes)
       setRawIssues([])
       setIssueFilterState(readStored(filterKey(snap.project.name), ''))
+      report(async () => setCleanups(await api.cleanups()))
       applySessions(snap.sessions)
       report(() => loadIssues(false))
     },
@@ -152,6 +161,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('sessions', applySessions), [applySessions])
   useEffect(() => on('notes', setNotes), [])
   useEffect(() => on('issues', setRawIssues), [])
+  useEffect(() => on('cleanups', setCleanups), [])
   useEffect(
     () =>
       on('projects', (list) => {
@@ -186,6 +196,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       issuesLoading,
       issueFilter,
       notes,
+      cleanups,
       overlay,
       sidebarTab,
       composing,
@@ -230,6 +241,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         else enterProject(snap)
       },
       refreshIssues: () => loadIssues(true),
+      async harnessCheck() {
+        addSession(await api.harnessCheck())
+      },
       async addNote(text, images = []) {
         const trimmed = text.trim()
         if (!trimmed && images.length === 0) throw 'A note cannot be empty'
@@ -266,6 +280,23 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         const note = await api.removeNoteImage(id, url)
         setNotes((list) => list.map((n) => (n.id === id ? note : n)))
       },
+      async refreshPRs() {
+        await api.refreshPRs()
+      },
+      async ackPR(id) {
+        await api.ackPR(id)
+      },
+      async openPR(session) {
+        if (!session.pr) throw 'This session has no pull request yet'
+        await api.openURL(session.pr.url)
+        if (session.prAttention) await api.ackPR(session.id)
+      },
+      async typeInto(id, text) {
+        await api.typeInto(id, text)
+      },
+      async cleanupSession(id, force) {
+        await api.cleanup(id, force)
+      },
       async deleteNote(id) {
         await api.deleteNote(id)
         setNotes((list) => list.filter((n) => n.id !== id))
@@ -294,7 +325,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       focus,
       report,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

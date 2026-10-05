@@ -3,7 +3,9 @@ import { api } from '../api'
 import { STATE_LABEL } from '../stateMeta'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
+import { CleanupControls } from './CleanupControls'
 import { Icon } from './Icon'
+import { PRBadge } from './PRBadge'
 import { StateDot } from './StateDot'
 import { Timeline } from './Timeline'
 
@@ -15,7 +17,8 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
   const waiting = session.state === 'waiting'
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
-  const hasFooter = ended
+  const showPR = session.pr !== null && !dense
+  const hasFooter = ended || showPR || session.cleanup !== ''
 
   return (
     <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
@@ -55,6 +58,9 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           {ended && (
             <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
           )}
+          {showPR && <PRBadge session={session} compact={compact} />}
+          {ended && session.pr && dense && <PRBadge session={session} compact />}
+          {session.cleanup !== '' && <CleanupControls session={session} />}
           {ended && issue && (
             <button
               className="btn btn-ghost h-6 px-2"

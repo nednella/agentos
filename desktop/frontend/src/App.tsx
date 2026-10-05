@@ -3,6 +3,7 @@ import { MobileTabs } from './components/MobileTabs'
 import { ProjectPanel } from './components/ProjectPanel'
 import { SessionsPanel } from './components/SessionsPanel'
 import { Sidebar } from './components/Sidebar'
+import { Stats } from './components/Stats'
 import { TopBar } from './components/TopBar'
 import { Viewport } from './components/Viewport'
 import { useLayout } from './LayoutContext'
@@ -10,7 +11,7 @@ import { useShortcuts } from './useShortcuts'
 
 export function App() {
   useShortcuts()
-  const { mode, sidebarOpen, sessionsOpen, mobilePanel } = useLayout()
+  const { mode, sidebarOpen, sessionsOpen, mobilePanel, statsOpen } = useLayout()
   const narrow = mode === 'narrow'
   const showCentre = !narrow || mobilePanel === 'session'
 
@@ -22,7 +23,10 @@ export function App() {
         {!narrow && sidebarOpen && <Divider panel="sidebar" />}
         {!narrow && !sidebarOpen && <span className="w-3 flex-none" />}
         <div className={`min-h-0 min-w-0 flex-1 ${showCentre ? '' : 'hidden'}`}>
-          <Viewport />
+          <div className={statsOpen ? 'hidden' : 'h-full'}>
+            <Viewport />
+          </div>
+          {statsOpen && <Stats />}
         </div>
         {!narrow && sessionsOpen && <Divider panel="sessions" />}
         {!narrow && !sessionsOpen && <span className="w-3 flex-none" />}

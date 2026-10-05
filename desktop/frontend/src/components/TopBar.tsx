@@ -13,6 +13,7 @@ const noDrag = { '--wails-draggable': 'no-drag' } as CSSProperties
 const FULL_MIN = 1100
 const DOTS_MIN = 640
 const NEXT_FULL_MIN = 780
+const MORE_MIN = 480
 
 type CountProps = { state: State; count: number; label: string; condensed: boolean }
 
@@ -30,7 +31,7 @@ function Count({ state, count, label, condensed }: CountProps) {
 
 export function TopBar() {
   const { project, projects, sessions, setOverlay } = useAgentos()
-  const { width } = useLayout()
+  const { width, statsOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
@@ -86,6 +87,18 @@ export function TopBar() {
         ) : (
           <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
             <Icon name="next" />
+          </button>
+        )}
+        {width >= MORE_MIN && (
+          <button
+            className={iconButton}
+            style={{ color: statsOpen ? 'var(--accent)' : undefined }}
+            title={`Stats (${keys('stats')})`}
+            aria-label="Stats"
+            aria-pressed={statsOpen}
+            onClick={() => find('stats').run([])}
+          >
+            <Icon name="chart" />
           </button>
         )}
       </div>

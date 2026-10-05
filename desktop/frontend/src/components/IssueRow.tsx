@@ -3,6 +3,7 @@ import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
 import { Icon } from './Icon'
+import { PRMark } from './PRMark'
 import { StateDot } from './StateDot'
 import { TypeMark } from './TypeMark'
 
@@ -57,6 +58,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
       </span>
       {session && (
         <span className="flex flex-none items-center justify-end gap-2 pl-1" title={`Session ${session.n} is running`}>
+          {session.pr && !dense && <PRMark pr={session.pr} />}
           <StateDot state={session.state} />
         </span>
       )}
