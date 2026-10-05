@@ -315,7 +315,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(
     () =>
       on('attention', ({ id, state }) => {
-        if (id === selectedRef.current) return
+        if (id === selectedRef.current && state !== 'opened') return
         const session = sessionsRef.current.find((s) => s.id === id)
         if (!session) return
         const describe = (current: Session) => {
