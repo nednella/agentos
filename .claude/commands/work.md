@@ -18,10 +18,12 @@ Ned unless a decision is genuinely his. Read `CLAUDE.md` first; its hard rules a
 ## 2. Branch
 
 ```
-git worktree add trees/issue-$ARGUMENTS -b issue-$ARGUMENTS main
+git fetch origin
+git worktree add trees/issue-$ARGUMENTS -b issue-$ARGUMENTS origin/main
 cd trees/issue-$ARGUMENTS
 ```
 
+Branch from `origin/main`, never from local `main`, so the PR holds only your change.
 Work only inside that worktree. Never touch the tree Ned is sitting in.
 
 ## 3. Build
