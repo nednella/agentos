@@ -201,3 +201,6 @@ dist
 ### agentos ###
 bin/
 desktop/frontend/dist/
+
+# worktrees made by /work
+trees/
