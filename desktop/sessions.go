@@ -75,7 +75,7 @@ type Sessions struct {
 	mu         sync.Mutex
 	ctx        context.Context
 	project    project.Project
-	configured []project.Project
+	registry   *Registry
 	info       []term.Info
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
@@ -93,10 +93,10 @@ type Sessions struct {
 	prefillFor time.Duration
 }
 
-func newSessions(tmux *term.Tmux, ag agent.Agent, stateDir string, configured []project.Project, current project.Project, emit func(string, any)) *Sessions {
+func newSessions(tmux *term.Tmux, ag agent.Agent, stateDir string, registry *Registry, current project.Project, emit func(string, any)) *Sessions {
 	return &Sessions{
 		tmux: tmux, agent: ag, stateDir: stateDir, emit: emit,
-		project: current, configured: configured,
+		project: current, registry: registry,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
@@ -488,7 +488,7 @@ func (s *Sessions) Projects() []Project {
 }
 
 func (s *Sessions) projects() []project.Project {
-	out := slices.Clone(s.configured)
+	out := s.registry.List()
 	if !slices.ContainsFunc(out, func(p project.Project) bool { return p.Key() == s.project.Key() }) {
 		out = append(out, s.project)
 	}
@@ -512,6 +512,29 @@ func (s *Sessions) SwitchProject(name string) (project.Project, error) {
 		}
 	}
 	return project.Project{}, fmt.Errorf("no project %q", name)
+}
+
+// Forget removes a configured project, moving to another one if it was current.
+func (s *Sessions) Forget(name string) (project.Project, error) {
+	removed, err := s.registry.Remove(name)
+	if err != nil {
+		return project.Project{}, err
+	}
+	if !removed {
+		return project.Project{}, fmt.Errorf("%q is not in the config", name)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.project.Name == name {
+		for _, p := range s.projects() {
+			if p.Key() != s.project.Key() {
+				s.project = p
+				break
+			}
+		}
+	}
+	s.sync()
+	return s.project, nil
 }
 
 // IssueSessions maps issue numbers to the live session started for each, in the current project.

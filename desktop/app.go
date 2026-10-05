@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
@@ -28,10 +29,11 @@ type Snapshot struct {
 type host struct {
 	emit      func(event string, payload any)
 	clipboard func(text string)
+	pickDir   func() (string, error) // "" when the user cancels
 }
 
 type config struct {
-	projects []project.Project
+	registry *Registry
 	project  project.Project
 	stateDir string
 	tmux     *term.Tmux
@@ -54,22 +56,29 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, fmt.Errorf("loading config: %w", err)
 	}
+	stateDir, err := bus.DefaultDir()
+	if err != nil {
+		return config{}, err
+	}
 	dir := os.Getenv("AGENTOS_DIR")
 	if dir == "" {
 		if dir, err = os.Getwd(); err != nil {
 			return config{}, fmt.Errorf("finding the current folder: %w", err)
 		}
 	}
-	current := cfg.Resolve(dir)
+	current := project.Project{}
 	if dir == "/" {
-		current = cfg.Resolve(home)
-		if len(cfg.Projects) > 0 {
+		last := readLastProject(stateDir)
+		switch i := slices.IndexFunc(cfg.Projects, func(p project.Project) bool { return p.Name == last }); {
+		case i >= 0:
+			current = cfg.Projects[i]
+		case len(cfg.Projects) > 0:
 			current = cfg.Projects[0]
+		default:
+			current = cfg.Resolve(home)
 		}
-	}
-	stateDir, err := bus.DefaultDir()
-	if err != nil {
-		return config{}, err
+	} else {
+		current = cfg.Resolve(dir)
 	}
 	socket := os.Getenv("AGENTOS_TMUX_SOCKET")
 	if socket == "" {
@@ -79,7 +88,7 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
-	return config{projects: cfg.Projects, project: current, stateDir: stateDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
+	return config{registry: &Registry{path: path, cfg: cfg}, project: current, stateDir: stateDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
@@ -100,6 +109,7 @@ func pickAgent(name string) agent.Agent {
 type App struct {
 	ctx      context.Context
 	host     host
+	stateDir string
 	sessions *Sessions
 	terms    *Terms
 	issues   *Issues
@@ -109,7 +119,8 @@ func newApp(c config, h host, run runner) *App {
 	a := &App{
 		ctx:      context.Background(),
 		host:     h,
-		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.projects, c.project, h.emit),
+		stateDir: c.stateDir,
+		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.registry, c.project, h.emit),
 		terms:    newTerms(c.tmux, h.emit, h.clipboard),
 		issues:   newIssues(run),
 	}
@@ -156,9 +167,46 @@ func (a *App) DismissSession(id string) error { return a.sessions.Dismiss(id) }
 func (a *App) RenameSession(id, title string) error { return a.sessions.Rename(id, title) }
 
 func (a *App) SwitchProject(name string) (Snapshot, error) {
-	if _, err := a.sessions.SwitchProject(name); err != nil {
+	p, err := a.sessions.SwitchProject(name)
+	if err != nil {
 		return Snapshot{}, err
 	}
+	a.remember(p)
+	return a.Snapshot(), nil
+}
+
+func (a *App) remember(p project.Project) {
+	if err := writeLastProject(a.stateDir, p.Name); err != nil {
+		log.Printf("agentos: remembering the project: %v", err)
+	}
+}
+
+// AddProject asks for a folder and makes it the current project.
+func (a *App) AddProject() (Snapshot, error) {
+	dir, err := a.host.pickDir()
+	if err != nil {
+		return Snapshot{}, fmt.Errorf("choosing a folder: %w", err)
+	}
+	if dir == "" {
+		return a.Snapshot(), nil
+	}
+	return a.AddProjectDir(dir)
+}
+
+func (a *App) AddProjectDir(dir string) (Snapshot, error) {
+	p, err := a.sessions.registry.Add(dir)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	return a.SwitchProject(p.Name)
+}
+
+func (a *App) RemoveProject(name string) (Snapshot, error) {
+	p, err := a.sessions.Forget(name)
+	if err != nil {
+		return Snapshot{}, err
+	}
+	a.remember(p)
 	return a.Snapshot(), nil
 }
 

@@ -21,6 +21,7 @@ type recorder struct {
 	mu     sync.Mutex
 	events []recorded
 	clips  []string
+	pick   string // what the folder picker returns
 }
 
 type recorded struct {
@@ -32,6 +33,12 @@ func (r *recorder) emit(name string, payload any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, recorded{name, payload})
+}
+
+func (r *recorder) picker() (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.pick, nil
 }
 
 func (r *recorder) clip(text string) {
@@ -168,6 +175,7 @@ type harness struct {
 	socket string
 	dir    string
 	state  string
+	conf   string
 }
 
 // noGH is a runner for tests that must not reach GitHub.
@@ -204,7 +212,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 		t.Fatal(err)
 	}
 	rec, gh := &recorder{}, &fakeGH{}
-	app := newApp(cfg, host{emit: rec.emit, clipboard: rec.clip}, gh.run)
+	app := newApp(cfg, host{emit: rec.emit, clipboard: rec.clip, pickDir: rec.picker}, gh.run)
 	app.sessions.prefillFor = 300 * time.Millisecond
 	if tweak != nil {
 		tweak(app)
@@ -219,7 +227,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 		_ = exec.Command("tmux", "-L", socket, "kill-server").Run()
 		os.RemoveAll(state)
 	})
-	return &harness{app: app, rec: rec, gh: gh, socket: socket, dir: dir, state: state}
+	return &harness{app: app, rec: rec, gh: gh, socket: socket, dir: dir, state: state, conf: confPath}
 }
 
 // hook runs the built agentos command as Claude Code would.
@@ -293,7 +301,7 @@ func (h *harness) restart(t *testing.T) *App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}}, h.gh.run)
+	app := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}, pickDir: h.rec.picker}, h.gh.run)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	t.Cleanup(app.stop)

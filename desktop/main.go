@@ -39,7 +39,7 @@ func run() error {
 	}
 	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
 		hub := &eventHub{subs: map[chan []byte]struct{}{}}
-		app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}}, execRunner)
+		app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}, pickDir: func() (string, error) { return "", nil }}, execRunner)
 		quitOnSignal(app)
 		return serveHTTP(app, hub, assets, addr)
 	}
@@ -55,6 +55,9 @@ func run() error {
 			if c := window.Load(); c != nil {
 				_ = runtime.ClipboardSetText(*c, text)
 			}
+		},
+		pickDir: func() (string, error) {
+			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Add a project folder", CanCreateDirectories: true})
 		},
 	}, execRunner)
 	quitOnSignal(app)
