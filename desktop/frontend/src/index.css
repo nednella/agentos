@@ -304,6 +304,15 @@
     touch-action: none;
   }
 
+  /* The shell's divider sits in main's bottom padding, so the strip itself adds no height. */
+  .divider[aria-orientation='horizontal'] {
+    position: absolute;
+    inset: -0.75rem 0 auto;
+    width: auto;
+    height: 0.75rem;
+    cursor: row-resize;
+  }
+
   .divider::after {
     content: '';
     position: absolute;
@@ -311,6 +320,10 @@
     border-radius: 2px;
     background: transparent;
     transition: background 0.12s;
+  }
+
+  .divider[aria-orientation='horizontal']::after {
+    inset: 0.3125rem 0.25rem;
   }
 
   .divider:hover::after,
