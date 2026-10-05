@@ -542,8 +542,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         setNotes((list) => list.filter((n) => n.id !== id))
       },
       async noteToIssue(id) {
-        const note = await api.noteToIssue(id)
-        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+        await api.noteToIssue(id)
+        setNotes((list) => list.filter((n) => n.id !== id))
       },
       async noteToSession(id) {
         addSession(await api.noteToSession(id))

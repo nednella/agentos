@@ -1,6 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
-import { api } from '../api'
 import { imageFiles, readImage } from '../images'
 import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
@@ -112,17 +111,12 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
         <span className="mono text-label" style={{ color: 'var(--text-note-dim)' }}>
           {ago(note.createdAt, now)}
         </span>
-        {note.issue > 0 && (
-          <button className="link mono text-label" title={note.issueUrl} onClick={() => a.report(() => api.openURL(note.issueUrl))}>
-            #{note.issue}
-          </button>
-        )}
         <span className="ml-auto flex items-center">
           <span className="reveal">
             <button className={iconButton} title="Start a session from this note" aria-label="Start session" onClick={() => a.report(() => a.noteToSession(note.id))}>
               <Icon name="play" size={12} />
             </button>
-            {note.issue === 0 && canFile && (
+            {canFile && (
               <button className={iconButton} title="File as an issue" aria-label="File as issue" onClick={() => confirm.arm('file')}>
                 <Icon name="issue" size={13} />
               </button>
@@ -191,7 +185,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
       {confirm.armed === 'file' && (
         <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: 'var(--border-note)' }}>
           <ConfirmRow
-            message={`File as issue “${title}”?`}
+            message={`File as issue “${title}”? The note${note.images.length > 0 ? ' and its pictures are' : ' is'} deleted afterwards.`}
             confirmLabel="File"
             onCancel={confirm.disarm}
             onConfirm={() => {

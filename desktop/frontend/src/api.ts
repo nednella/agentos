@@ -18,7 +18,7 @@ type Backend = {
   AddNoteImage(id: string, base64: string, mime: string): Promise<Note>
   RemoveNoteImage(id: string, url: string): Promise<Note>
   DeleteNote(id: string): Promise<void>
-  NoteToIssue(id: string): Promise<Note>
+  NoteToIssue(id: string): Promise<void>
   NoteToSession(id: string): Promise<Session>
   Issues(refresh: boolean): Promise<Issue[]>
   StartIssue(number: number): Promise<Session>

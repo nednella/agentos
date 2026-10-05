@@ -49,8 +49,6 @@ export type Note = {
   pinned: boolean
   archived: boolean
   images: string[]
-  issue: number
-  issueUrl: string
 }
 
 export type IssueType = 'bug' | 'feature' | 'refactor' | 'chore' | ''
