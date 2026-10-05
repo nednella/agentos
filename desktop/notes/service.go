@@ -116,9 +116,9 @@ func (s *Service) DeleteNote(id string) error {
 	return err
 }
 
-// NoteToIssue files the note on GitHub, its first line as the title and the rest as the body,
-// then deletes the note. A second call for a note that is being filed fails, so one note never
-// becomes two issues.
+// NoteToIssue files the note on GitHub, its first line as the title, the rest as the body and
+// its pictures attached, then deletes the note. A second call for a note that is being filed
+// fails, so one note never becomes two issues.
 func (s *Service) NoteToIssue(id string) error {
 	cur := s.project.Current()
 	filing := cur.Key() + "/" + id
@@ -147,13 +147,22 @@ func (s *Service) NoteToIssue(id string) error {
 	}
 	ctx, cancel := context.WithTimeout(s.ctx(), run.GHTimeout)
 	defer cancel()
-	out, err := s.run(ctx, cur.Dir, "gh", "issue", "create", "--title", n.title(), "--body", issueBody(n), "--assignee", "@me")
-	if err != nil {
+	args := []string{"issue", "create", "--title", n.title(), "--body", issueBody(n), "--assignee", "@me"}
+	for i, image := range n.Images {
+		args = append(args, "--attach", fmt.Sprintf("%s#Picture %d", s.notes.MediaFile(image), i+1))
+	}
+	out, err := s.run(ctx, cur.Dir, "gh", args...)
+	url := issueURL.FindString(string(out))
+	if err != nil && url == "" {
 		return fmt.Errorf("filing the issue: %w", err)
 	}
-	url := issueURL.FindString(string(out))
 	if url == "" {
 		return fmt.Errorf("gh did not print an issue address: %q", strings.TrimSpace(string(out)))
+	}
+	if err != nil {
+		// gh filed the issue but some pictures did not upload; the note stays so they are not lost.
+		s.issues.Reload(s.ctx(), cur)
+		return fmt.Errorf("filed %s but some pictures did not upload: %w", url, err)
 	}
 	if err := s.notes.Delete(cur.Key(), id); err != nil {
 		return fmt.Errorf("filed %s but could not delete the note: %w", url, err)
@@ -173,6 +182,5 @@ func (s *Service) NoteToSession(id string) (sessions.Session, error) {
 	return s.sessions.Create(n.title(), cur.NoteCommand(n.Text), false, 0)
 }
 
-// issueBody is the issue template filled with the note's text. gh cannot upload
-// pictures, and the note is deleted after filing, so they are not mentioned.
+// issueBody is the issue template filled with the note's text; gh appends the pictures.
 func issueBody(n Note) string { return "## Description\n\n" + n.Text }

@@ -272,7 +272,7 @@ once, remembered in `prs.json`.
 | `DeleteNote(id)` | | also deletes its pictures |
 | `AddNoteImage(id, base64, mime)` | `Note` | png, jpeg, gif or webp, at most 10 MB; the type is checked against the bytes |
 | `RemoveNoteImage(id, url)` | `Note` | |
-| `NoteToIssue(id)` | | files a GitHub issue, then deletes the note and its pictures; title is the first line, body is `## Description`, a blank line, and the note text; rejects without a repo |
+| `NoteToIssue(id)` | | files a GitHub issue, then deletes the note and its pictures; title is the first line, body is `## Description`, a blank line, and the note text; each picture is uploaded with `gh issue create --attach` (gh 2.99 or later) and appended to the body. When gh files the issue but a picture fails to upload, the note is kept and the error names the issue; rejects without a repo |
 | `NoteToSession(id)` | `Session` | starts a session titled with the first line and the project's `note` command typed in |
 
 ### Browser (`browser`)
