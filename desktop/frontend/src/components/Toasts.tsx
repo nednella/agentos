@@ -18,7 +18,7 @@ export function Toasts() {
   const { toasts, select, dismissToast, setSessionView } = useAgentos()
   return (
     <div
-      className="pointer-events-none fixed right-4 bottom-20 flex flex-col items-end gap-2"
+      className="pointer-events-none fixed inset-x-0 bottom-12 flex flex-col items-center gap-2"
       style={{ zIndex: 'var(--z-toast)' }}
       aria-live="polite"
     >
