@@ -83,7 +83,7 @@ export function PaletteDialog() {
           }}
           onKeyDown={onKeyDown}
         />
-        <Keycap>esc</Keycap>
+        <Keycap>Esc</Keycap>
       </div>
       {!prompting && (
         <div ref={list} id="palette-list" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto py-1">
