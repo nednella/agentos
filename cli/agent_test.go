@@ -186,3 +186,36 @@ func TestBrowserCommandSendsItsWords(t *testing.T) {
 		t.Error("an unknown flag was accepted")
 	}
 }
+
+func TestDigestAddSendsItsFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want map[string]string
+	}{
+		{"all flags", []string{"digest", "add", "--title", "T", "--why", "W", "--url", "https://x", "--source", "S"},
+			map[string]string{"title": "T", "why": "W", "url": "https://x", "source": "S"}},
+		{"only required", []string{"digest", "add", "--title", "T", "--url", "https://x"},
+			map[string]string{"title": "T", "why": "", "url": "https://x", "source": ""}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var got control.Request
+			fakeApp(t, func(_ context.Context, req control.Request) control.Response {
+				got = req
+				return control.Response{OK: true, Out: "added"}
+			})
+			if out, err := run(t, tt.args...); err != nil || out != "added" {
+				t.Fatalf("digest add = %q, %v", out, err)
+			}
+			if got.Cmd != "digest-add" {
+				t.Errorf("cmd = %q", got.Cmd)
+			}
+			for k, v := range tt.want {
+				if got.Opts[k] != v {
+					t.Errorf("opt %s = %q, want %q", k, got.Opts[k], v)
+				}
+			}
+		})
+	}
+}

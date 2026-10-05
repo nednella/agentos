@@ -115,3 +115,24 @@ func browserTimeout(sub string, pos []string, opts map[string]string) int {
 	}
 	return 75_000
 }
+
+func newDigestCmd() *cobra.Command {
+	digest := &cobra.Command{Use: "digest", Short: "Work with the weekly digest"}
+	var title, why, url, source string
+	add := &cobra.Command{
+		Use:    "add --title <t> --why <w> --url <u> --source <s>",
+		Short:  "File one item in the digest (used by the digest run)",
+		Hidden: true,
+		Args:   cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			opts := map[string]string{"title": title, "why": why, "url": url, "source": source}
+			return askApp(cmd, control.Request{Cmd: "digest-add", Opts: opts})
+		},
+	}
+	add.Flags().StringVar(&title, "title", "", "headline")
+	add.Flags().StringVar(&why, "why", "", "why it matters to this project")
+	add.Flags().StringVar(&url, "url", "", "link")
+	add.Flags().StringVar(&source, "source", "", "where it came from")
+	digest.AddCommand(add)
+	return digest
+}
