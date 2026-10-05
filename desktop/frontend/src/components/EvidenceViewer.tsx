@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import { ago, useNow } from '../time'
+import { useArmedConfirm } from '../useArmedConfirm'
 import type { Evidence } from '../types'
+import { ConfirmRow } from './ConfirmRow'
 import { Icon } from './Icon'
 
 type EvidenceViewerProps = {
@@ -17,7 +19,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
   const now = useNow()
   const root = useRef<HTMLDivElement>(null)
   const [id, setId] = useState(startId)
-  const [confirming, setConfirming] = useState(false)
+  const confirm = useArmedConfirm()
   const [copied, setCopied] = useState(false)
   const at = items.findIndex((i) => i.id === id)
   const item = items[at]
@@ -31,13 +33,13 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
   if (!item) return null
 
   const step = (delta: number) => {
-    setConfirming(false)
+    confirm.disarm()
     setId(items[(at + delta + items.length) % items.length].id)
   }
 
   const remove = () => {
     const next = items[at + 1] ?? items[at - 1]
-    setConfirming(false)
+    confirm.disarm()
     if (next) setId(next.id)
     report(() => api.deleteEvidence(sessionId, item.id))
   }
@@ -80,18 +82,10 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
           >
             {copied ? 'Copied' : 'Copy path/URL'}
           </button>
-          {confirming ? (
-            <>
-              <span className="text-small text-danger">Delete this item?</span>
-              <button className="btn btn-danger" autoFocus onClick={remove}>
-                Delete
-              </button>
-              <button className="btn" onClick={() => setConfirming(false)}>
-                No
-              </button>
-            </>
+          {confirm.armed ? (
+            <ConfirmRow inline danger message="Delete this item?" confirmLabel="Delete" cancelLabel="No" onCancel={confirm.disarm} onConfirm={remove} />
           ) : (
-            <button className="btn btn-ghost" onClick={() => setConfirming(true)}>
+            <button className="btn btn-ghost" onClick={() => confirm.arm()}>
               <Icon name="trash" /> Delete
             </button>
           )}

@@ -4,6 +4,7 @@ import { filterIssues, isFiltering } from '../issueFilter'
 import { LANES } from '../lanes'
 import type { Issue, Lane } from '../types'
 import { useListNav } from '../useListNav'
+import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
 import { Icon } from './Icon'
 import { IssueRow } from './IssueRow'
@@ -13,6 +14,8 @@ import { QueueSearch } from './QueueSearch'
 import type { NavRef } from './Sidebar'
 
 type Item = { kind: 'lane'; lane: Lane; count: number } | { kind: 'issue'; issue: Issue }
+
+const itemKey = (item: Item) => (item.kind === 'lane' ? `lane:${item.lane}` : `issue:${item.issue.number}`)
 
 type QueueProps = { nav: NavRef }
 
@@ -80,7 +83,7 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
       return next
     })
 
-  const listNav = useListNav(items.length, {
+  const listNav = useListNav(items.map(itemKey), {
     onEnter(index) {
       const item = items[index]
       if (!item) return
@@ -123,39 +126,31 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
     }
   }, [nav, listNav.handle])
 
-  useEffect(() => {
-    list.current?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [listNav.cursor])
+  useScrollCursorIntoView(list, listNav.cursorKey)
 
   if (issuesLoading && issues.length === 0) return <Notice title="Loading issues" hint="Asking GitHub." />
   if (issues.length === 0) return <Notice title="No open issues" hint="This repo has nothing in the queue." />
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." />
 
-  let index = 0
   return (
     <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-2">
-      {sections.map((section) => {
-        const headerAt = index++
-        const first = index
-        if (section.open) index += section.issues.length
-        return (
-          <section key={section.lane}>
-            <QueueLaneHeader
-              lane={section.lane}
-              count={section.issues.length}
-              open={section.open}
-              cursor={listNav.cursor === headerAt}
-              locked={filtering}
-              onToggle={() => toggle(section.lane, closed.has(section.lane))}
-            />
-            <Collapse open={section.open}>
-              {section.issues.map((issue, i) => (
-                <IssueRow key={issue.number} issue={issue} cursor={section.open && listNav.cursor === first + i} />
-              ))}
-            </Collapse>
-          </section>
-        )
-      })}
+      {sections.map((section) => (
+        <section key={section.lane}>
+          <QueueLaneHeader
+            lane={section.lane}
+            count={section.issues.length}
+            open={section.open}
+            cursor={listNav.cursorKey === `lane:${section.lane}`}
+            locked={filtering}
+            onToggle={() => toggle(section.lane, closed.has(section.lane))}
+          />
+          <Collapse open={section.open}>
+            {section.issues.map((issue) => (
+              <IssueRow key={issue.number} issue={issue} cursor={section.open && listNav.cursorKey === `issue:${issue.number}`} />
+            ))}
+          </Collapse>
+        </section>
+      ))}
     </div>
   )
 }

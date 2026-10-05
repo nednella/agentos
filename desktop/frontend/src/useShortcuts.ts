@@ -25,7 +25,6 @@ export function useShortcuts() {
       const { a: agentos, layout: lay } = latest.current
       if (agentos.overlay) {
         agentos.setOverlay(null)
-        lay.returnToTerminal()
         return
       }
       if (lay.statsOpen || lay.digestOpen) {

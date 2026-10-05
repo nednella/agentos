@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { readStored, writeStored } from '../storage'
+import { useArmedConfirm } from '../useArmedConfirm'
 import { ConfirmRow } from './ConfirmRow'
 import type { Session } from '../types'
 
@@ -14,23 +15,23 @@ function tail(path: string): string {
 
 export function CleanupControls({ session }: CleanupControlsProps) {
   const { cleanupSession, report } = useAgentos()
-  const [confirming, setConfirming] = useState(false)
+  const remove = useArmedConfirm()
   const [kept, setKept] = useState(() => readStored<string[]>(KEPT_KEY, []).includes(session.id))
   const { cleanup, cleanupReason, worktree, branch } = session
 
   if (cleanup === 'pending') return <span className="text-small text-dim">cleaning up…</span>
   if (cleanup === 'ask' && kept) return null
 
-  if (confirming) {
+  if (remove.armed) {
     const what = `${worktree ? `the worktree ${tail(worktree)}, ` : ''}${branch ? `the branch ${branch}, ` : ''}temp files and the session`
     return (
       <ConfirmRow
         danger
         message={`Remove ${what}?${cleanup === 'blocked' ? ' Uncommitted work is lost.' : ''}`}
         confirmLabel="Remove"
-        onCancel={() => setConfirming(false)}
+        onCancel={remove.disarm}
         onConfirm={() => {
-          setConfirming(false)
+          remove.disarm()
           report(() => cleanupSession(session.id, true))
         }}
       />
@@ -41,7 +42,7 @@ export function CleanupControls({ session }: CleanupControlsProps) {
     return (
       <div className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
         <span className="min-w-0 text-small text-danger">Not cleaned up: {cleanupReason}</span>
-        <button className="btn h-6" onClick={() => setConfirming(true)}>
+        <button className="btn h-6" onClick={() => remove.arm()}>
           Clean up anyway
         </button>
       </div>
@@ -53,7 +54,7 @@ export function CleanupControls({ session }: CleanupControlsProps) {
       <span className="text-small text-waiting">
         {session.pr?.state === 'merged' ? 'PR was already merged' : 'PR closed without merging'}
       </span>
-      <button className="btn h-6" onClick={() => setConfirming(true)}>
+      <button className="btn h-6" onClick={() => remove.arm()}>
         Clean up
       </button>
       <button

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useListNav, isTyping } from '../useListNav'
+import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
 import { Icon } from './Icon'
 import { ImageViewer } from './ImageViewer'
@@ -18,7 +19,6 @@ export function Notes({ nav }: NotesProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null)
   const list = useRef<HTMLDivElement>(null)
-  const follow = useRef<string | null>(null)
 
   const { active, archived } = useMemo(() => {
     const matches = a.notes.filter((n) => n.text.toLowerCase().includes(query.trim().toLowerCase()))
@@ -31,7 +31,7 @@ export function Notes({ nav }: NotesProps) {
   const visible = archivedOpen || query ? [...active, ...archived] : active
   const showArchived = archivedOpen || Boolean(query)
 
-  const listNav = useListNav(visible.length, {
+  const listNav = useListNav(visible.map((n) => n.id), {
     onEnter(index) {
       if (visible[index]) setEditingId(visible[index].id)
     },
@@ -45,7 +45,6 @@ export function Notes({ nav }: NotesProps) {
       if (e.key === 'p' && !note.archived) a.report(() => a.setNotePinned(note.id, !note.pinned))
       else if (e.key === 'e') a.report(() => a.setNoteArchived(note.id, !note.archived))
       else return false
-      follow.current = note.id
       return true
     }
     return () => {
@@ -53,25 +52,16 @@ export function Notes({ nav }: NotesProps) {
     }
   })
 
-  useEffect(() => {
-    const at = visible.findIndex((n) => n.id === follow.current)
-    if (at < 0) return
-    follow.current = null
-    listNav.setCursor(at)
-  }, [a.notes])
+  useScrollCursorIntoView(list, listNav.cursorKey)
 
-  useEffect(() => {
-    list.current?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [listNav.cursor])
-
-  const card = (note: (typeof visible)[number], index: number) => (
+  const card = (note: (typeof visible)[number]) => (
     <NoteCard
       key={note.id}
       note={note}
-      cursor={listNav.cursor === index}
+      cursor={listNav.cursorKey === note.id}
       editing={editingId === note.id}
       onEdit={() => {
-        listNav.setCursor(index)
+        listNav.setCursorKey(note.id)
         setEditingId(note.id)
       }}
       onStopEditing={(refocus) => {
@@ -111,7 +101,7 @@ export function Notes({ nav }: NotesProps) {
           <Notice title="Nothing jotted yet" hint="Ramble here: half ideas, things to ask, bugs you noticed. Start a session or file an issue from any note later." />
         )}
         {a.notes.length > 0 && visible.length === 0 && <Notice title="No notes match" hint="Clear the search to see them all." />}
-        {active.map((note, i) => card(note, i))}
+        {active.map(card)}
         {archived.length > 0 && (
           <>
             <button className="flex items-center gap-1.5 py-1 text-small" style={{ color: 'var(--text-note-dim)' }} aria-expanded={showArchived} onClick={() => setArchivedOpen(!archivedOpen)}>
@@ -121,7 +111,7 @@ export function Notes({ nav }: NotesProps) {
               Archived ({archived.length})
             </button>
             <Collapse open={showArchived}>
-              <div className="flex flex-col gap-2.5">{archived.map((note, i) => card(note, active.length + i))}</div>
+              <div className="flex flex-col gap-2.5">{archived.map(card)}</div>
             </Collapse>
           </>
         )}

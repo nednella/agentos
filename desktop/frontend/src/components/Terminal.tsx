@@ -5,6 +5,7 @@ import { Terminal as Xterm } from '@xterm/xterm'
 import { useEffect, useRef } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api, on } from '../api'
+import { decodeBase64 } from '../base64'
 import { useLayout } from '../LayoutContext'
 import { terminalFont, terminalTheme } from '../terminalTheme'
 
@@ -16,12 +17,12 @@ const BASE_FONT_PX = 14
 const SHIFT_ENTER = '\x1b[13;2u'
 const SYSTEM_KEYS = new Set(['c', 'v', 'x', 'm', 'h', 'w', 'q'])
 
-function decode(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
+// A remount of one id must not let the old mount's close land after the new mount's open.
+const generations = new Map<string, number>()
+
+// The last focus request a terminal acted on, so a terminal that becomes active later
+// (auto-selection after a session ends) does not replay an old request.
+let focusedRequest = -1
 
 const DEVICE_REPORT = /^(\x1b\[[?>]?[\d;]*c|\x1bP[^\x1b]*\x1b\\|\x1b\]\d+;[^\x07\x1b]*(\x07|\x1b\\))+$/
 
@@ -35,16 +36,27 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
   const host = useRef<HTMLDivElement>(null)
   const xterm = useRef<Xterm | null>(null)
   const fit = useRef<FitAddon | null>(null)
+  const opened = useRef(false)
+  const renderer = useRef({ attach() {}, detach() {} })
 
+  // A terminal mounted hidden has no size, so the core opens it at the first fit while visible.
   const sync = useRef(() => {})
   sync.current = () => {
     const term = xterm.current
     if (!term || !fit.current || !active) return
     fit.current.fit()
-    void api.termResize(id, term.cols, term.rows)
+    if (opened.current) {
+      void api.termResize(id, term.cols, term.rows)
+      return
+    }
+    opened.current = true
+    void api.termOpen(id, term.cols, term.rows)
   }
 
   useEffect(() => {
+    const generation = (generations.get(id) ?? 0) + 1
+    generations.set(id, generation)
+    opened.current = false
     const term = new Xterm({
       fontFamily: terminalFont,
       fontSize: Math.round(BASE_FONT_PX * scale * 2) / 2,
@@ -59,12 +71,26 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     term.loadAddon(new Unicode11Addon())
     term.unicode.activeVersion = '11'
     term.open(host.current!)
-    try {
-      const webgl = new WebglAddon()
-      webgl.onContextLoss(() => webgl.dispose())
-      term.loadAddon(webgl)
-    } catch {
-      // the default renderer keeps working without WebGL
+    let webgl: WebglAddon | null = null
+    renderer.current = {
+      attach() {
+        if (webgl) return
+        try {
+          const addon = new WebglAddon()
+          addon.onContextLoss(() => {
+            addon.dispose()
+            if (webgl === addon) webgl = null
+          })
+          term.loadAddon(addon)
+          webgl = addon
+        } catch {
+          // the default renderer keeps working without WebGL
+        }
+      },
+      detach() {
+        webgl?.dispose()
+        webgl = null
+      },
     }
 
     term.attachCustomKeyEventHandler((event) => {
@@ -103,7 +129,7 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     term.onBinary((data) => void api.termWrite(id, data))
 
     const offData = on('term:data', (payload) => {
-      if (payload.id === id) term.write(decode(payload.data))
+      if (payload.id === id) term.write(decodeBase64(payload.data))
     })
     const offExit = on('term:exit', (payload) => {
       if (payload.id === id) term.write('\r\n\x1b[2m[session ended]\x1b[0m\r\n')
@@ -111,8 +137,6 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
 
     xterm.current = term
     fit.current = fitAddon
-    fitAddon.fit()
-    void api.termOpen(id, term.cols, term.rows)
 
     let timer = 0
     const observer = new ResizeObserver(() => {
@@ -126,7 +150,16 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       observer.disconnect()
       offData()
       offExit()
-      void api.termClose(id)
+      if (opened.current) {
+        // Deferred a tick: an immediate remount of this id bumps the generation and keeps the session open.
+        setTimeout(() => {
+          if (generations.get(id) !== generation) return
+          generations.delete(id)
+          void api.termClose(id)
+        })
+      }
+      renderer.current.detach()
+      renderer.current = { attach() {}, detach() {} }
       term.dispose()
       xterm.current = null
       fit.current = null
@@ -143,15 +176,20 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
 
   useEffect(() => {
     if (!active) return
-    const frame = requestAnimationFrame(() => {
-      sync.current()
-      if (kind !== 'shell') xterm.current?.focus()
-    })
+    const frame = requestAnimationFrame(() => sync.current())
     return () => cancelAnimationFrame(frame)
-  }, [active, kind])
+  }, [active])
 
   useEffect(() => {
-    if (active && focusRequest.target === focusTarget) xterm.current?.focus()
+    if (!active) return
+    renderer.current.attach()
+    return () => renderer.current.detach()
+  }, [active, id])
+
+  useEffect(() => {
+    if (!active || focusRequest.target !== focusTarget || focusRequest.n <= focusedRequest) return
+    focusedRequest = focusRequest.n
+    xterm.current?.focus()
   }, [active, focusRequest, focusTarget])
 
   return <div ref={host} className={`absolute inset-0 px-3 py-2 ${active ? '' : 'hidden'}`} aria-hidden={!active} />

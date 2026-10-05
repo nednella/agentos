@@ -1,4 +1,6 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
+import { useAgentos } from '../AgentosContext'
 
 type OverlayProps = {
   label: string
@@ -9,15 +11,31 @@ type OverlayProps = {
 }
 
 export function Overlay({ label, align, wide = false, onClose, children }: OverlayProps) {
+  const { focus } = useAgentos()
+  const previous = useRef(document.activeElement)
+  const dialog = useRef<HTMLDivElement>(null)
+
+  useEffect(
+    () => () => {
+      // Strict Mode's rehearsal unmount leaves the dialog in the page.
+      if (dialog.current?.isConnected) return
+      const el = previous.current
+      if (el instanceof HTMLElement && el.isConnected && el !== document.body) el.focus()
+      else focus('terminal')
+    },
+    [focus],
+  )
+
   return (
     <div
       className="fade-in fixed inset-0"
       style={{ zIndex: 'var(--z-overlay)', background: 'var(--bg-overlay)' }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-      onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div
+        ref={dialog}
         role="dialog"
+        aria-modal="true"
         aria-label={label}
         className={`absolute flex flex-col overflow-hidden rounded-md border border-line-strong bg-surface shadow-2xl ${wide ? 'max-h-[95vh]' : 'max-h-[70vh]'}`}
         style={

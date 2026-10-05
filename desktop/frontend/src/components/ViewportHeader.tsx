@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { ago, useNow } from '../time'
+import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
 import { ConfirmRow } from './ConfirmRow'
@@ -18,9 +19,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
   const { renameSession, report, focus, typeInto, ackPR, killSession } = useAgentos()
   const now = useNow()
   const [renaming, setRenaming] = useState(false)
-  const [killing, setKilling] = useState(false)
-
-  useEffect(() => setKilling(false), [session.id])
+  const kill = useArmedConfirm()
   const action = session.pr && session.prAttention ? PR_ACTION[session.prAttention] : null
 
   const finishRename = () => {
@@ -74,11 +73,11 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </span>
         </div>
         <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
-        <button className="btn btn-ghost" onClick={() => setKilling(true)} title="Kill this session" disabled={killing}>
+        <button className="btn btn-ghost" onClick={() => kill.arm()} title="Kill this session" disabled={Boolean(kill.armed)}>
           Kill
         </button>
       </div>
-      {killing && (
+      {kill.armed && (
         <div className="pt-1.5">
           <ConfirmRow
             danger
@@ -90,9 +89,9 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
               </>
             }
             confirmLabel="Kill"
-            onCancel={() => setKilling(false)}
+            onCancel={kill.disarm}
             onConfirm={() => {
-              setKilling(false)
+              kill.disarm()
               report(() => killSession(session.id))
             }}
           />

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, MouseEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api, on } from '../api'
+import { decodeBase64 } from '../base64'
 import type { BrowserInput, BrowserState, Session } from '../types'
 import { BrowserToolbar } from './BrowserToolbar'
 
@@ -34,34 +35,58 @@ export function BrowserPage({ session, state }: BrowserPageProps) {
   const [focused, setFocused] = useState(false)
 
   useEffect(() => {
-    const paint = (frame: Frame) => {
-      painting.current = true
-      const image = new Image()
-      image.onload = () => {
-        const el = canvas.current
-        if (el) {
-          if (el.width !== frame.width || el.height !== frame.height) {
-            el.width = frame.width
-            el.height = frame.height
-          }
-          el.getContext('2d')?.drawImage(image, 0, 0)
-          frameSize.current = { width: frame.width, height: frame.height }
+    let alive = true
+    painting.current = false
+    queued.current = null
+
+    const settle = () => {
+      if (!alive) return
+      painting.current = false
+      const next = queued.current
+      queued.current = null
+      if (next) paint(next)
+    }
+    const draw = (source: CanvasImageSource, frame: Frame) => {
+      const el = canvas.current
+      if (alive && el) {
+        if (el.width !== frame.width || el.height !== frame.height) {
+          el.width = frame.width
+          el.height = frame.height
         }
-        painting.current = false
-        const next = queued.current
-        queued.current = null
-        if (next) paint(next)
+        el.getContext('2d')?.drawImage(source, 0, 0)
+        frameSize.current = { width: frame.width, height: frame.height }
       }
-      image.onerror = () => {
-        painting.current = false
-      }
+      settle()
+    }
+    const paintWithImage = (frame: Frame) => {
+      const image = new Image()
+      image.onload = () => draw(image, frame)
+      image.onerror = settle
       image.src = `data:image/jpeg;base64,${frame.data}`
     }
-    return on('browser:frame', (frame) => {
+    const paint = (frame: Frame) => {
+      painting.current = true
+      if (typeof createImageBitmap !== 'function') {
+        paintWithImage(frame)
+        return
+      }
+      createImageBitmap(new Blob([decodeBase64(frame.data)], { type: 'image/jpeg' })).then(
+        (bitmap) => {
+          draw(bitmap, frame)
+          bitmap.close()
+        },
+        () => paintWithImage(frame),
+      )
+    }
+    const off = on('browser:frame', (frame) => {
       if (frame.id !== id) return
       if (painting.current) queued.current = frame
       else paint(frame)
     })
+    return () => {
+      alive = false
+      off()
+    }
   }, [id])
 
   useEffect(() => {
@@ -112,7 +137,7 @@ export function BrowserPage({ session, state }: BrowserPageProps) {
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  })
+  }, [id])
 
   const mouse = (action: 'move' | 'down' | 'up') => (e: MouseEvent) => {
     if (action === 'down') area.current?.focus()
@@ -127,7 +152,7 @@ export function BrowserPage({ session, state }: BrowserPageProps) {
 
   const key = (action: 'down' | 'up') => (e: KeyboardEvent) => {
     if (e.metaKey) return
-    if (e.key === 'Escape' && action === 'down') {
+    if (e.key === 'Escape' && action === 'down' && !e.repeat) {
       const now = performance.now()
       if (now - lastEsc.current < DOUBLE_ESC_MS) {
         lastEsc.current = 0

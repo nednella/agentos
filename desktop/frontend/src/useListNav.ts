@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 
-export type ListNav = { cursor: number; setCursor(index: number): void; handle(e: KeyboardEvent): boolean }
+export type ListNav = { cursor: number; cursorKey: string | null; setCursorKey(key: string): void; handle(e: KeyboardEvent): boolean }
 
 type ListNavHandlers = {
   onEnter(index: number): void
@@ -19,22 +19,24 @@ export function isTyping(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.matches('input, textarea, select') || target.isContentEditable)
 }
 
+// Inside xterm the app's own shortcuts must still work; every other text field keeps its keys.
 export function isEditingText(target: EventTarget | null): boolean {
-  return isTyping(target) && (target as HTMLInputElement | HTMLTextAreaElement).value !== ''
+  return isTyping(target) && !(target as HTMLElement).closest('.xterm')
 }
 
-export function useListNav(count: number, handlers: ListNavHandlers): ListNav {
-  const [cursor, setCursor] = useState(0)
-
-  useEffect(() => {
-    setCursor((c) => Math.min(c, Math.max(count - 1, 0)))
-  }, [count])
+// The cursor follows the row it is on by key, so re-sorting the list does not move it.
+export function useListNav(keys: string[], handlers: ListNavHandlers): ListNav {
+  const [cursorKey, setCursorKey] = useState<string | null>(null)
+  const lastIndex = useRef(0)
+  const at = cursorKey === null ? -1 : keys.indexOf(cursorKey)
+  const cursor = at >= 0 ? at : Math.max(0, Math.min(lastIndex.current, keys.length - 1))
+  lastIndex.current = cursor
 
   const handle = useCallback(
     (e: KeyboardEvent): boolean => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return false
-      if (UP.has(e.key)) setCursor((c) => Math.max(c - 1, 0))
-      else if (DOWN.has(e.key)) setCursor((c) => Math.min(c + 1, count - 1))
+      if (UP.has(e.key)) setCursorKey(keys[Math.max(cursor - 1, 0)] ?? null)
+      else if (DOWN.has(e.key)) setCursorKey(keys[Math.max(0, Math.min(cursor + 1, keys.length - 1))] ?? null)
       else if (e.key === 'Enter') {
         if (e.target !== e.currentTarget) return false
         handlers.onEnter(cursor)
@@ -45,8 +47,8 @@ export function useListNav(count: number, handlers: ListNavHandlers): ListNav {
       else return false
       return true
     },
-    [count, cursor, handlers],
+    [keys, cursor, handlers],
   )
 
-  return { cursor, setCursor, handle }
+  return { cursor, cursorKey: keys[cursor] ?? null, setCursorKey, handle }
 }

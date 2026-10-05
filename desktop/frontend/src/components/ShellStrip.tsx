@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import type { PointerEvent } from 'react'
+import type { KeyboardEvent, PointerEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { Icon } from './Icon'
@@ -7,6 +7,7 @@ import { Keycap } from './Keycap'
 import { ShellTerminal } from './ShellTerminal'
 
 const HEADER_REM = 1.75
+const KEY_STEP_REM = 1
 
 export function ShellStrip() {
   const { project, focus } = useAgentos()
@@ -31,6 +32,13 @@ export function ShellStrip() {
     if (!drag.current) return
     setShellHeight(heightAt(e), true)
     drag.current = null
+  }
+
+  const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.target !== e.currentTarget || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return
+    e.preventDefault()
+    const step = e.key === 'ArrowUp' ? KEY_STEP_REM : -KEY_STEP_REM
+    setShellHeight(Math.min(shellRem + step, (0.6 * window.innerHeight) / root()), true)
   }
 
   if (!shellOpen) {
@@ -59,7 +67,12 @@ export function ShellStrip() {
       <div
         className="panel-head flex cursor-row-resize items-center gap-2 border-b border-line px-4 select-none"
         style={{ height: `${HEADER_REM}rem` }}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Shell height. Arrow up or down to resize"
+        tabIndex={0}
         title="Drag to resize, double-click to reset"
+        onKeyDown={onKeyDown}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

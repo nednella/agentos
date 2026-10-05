@@ -1,20 +1,15 @@
-import { useEffect, useRef } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
+import { useFocusRequest } from '../useFocusRequest'
 import { Terminal } from './Terminal'
 
 type ShellTerminalProps = { visible: boolean }
 
 export function ShellTerminal({ visible }: ShellTerminalProps) {
-  const { shellId, openShell, focusRequest, report, focus, project } = useAgentos()
+  const { shellId, openShell, report, focus, project } = useAgentos()
   const { returnToTerminal } = useLayout()
-  const handled = useRef(-1)
 
-  useEffect(() => {
-    if (!visible || focusRequest.n === handled.current) return
-    handled.current = focusRequest.n
-    if (focusRequest.target === 'shell' && !shellId) report(openShell)
-  }, [visible, focusRequest, shellId, openShell, report])
+  useFocusRequest('shell', () => !shellId && report(openShell), visible)
 
   if (!shellId) {
     return (

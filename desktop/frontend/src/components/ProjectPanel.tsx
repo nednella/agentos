@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
+import { useArmedConfirm } from '../useArmedConfirm'
 import { ProjectRow } from './ProjectRow'
 import { Icon } from './Icon'
 import { Keycap } from './Keycap'
@@ -15,20 +16,19 @@ function ProjectPanelContent() {
   const { project, projects, switchProject, addProject, removeProject, setOverlay, report } = useAgentos()
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(Math.max(0, projects.findIndex((p) => p.name === project?.name)))
-  const [removing, setRemoving] = useState<string | null>(null)
+  const removal = useArmedConfirm<string>()
 
   const shown = useMemo(() => projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase())), [projects, query])
   const close = () => setOverlay(null)
 
-  const latest = useRef({ switchProject, removeProject, report, setOverlay })
-  latest.current = { switchProject, removeProject, report, setOverlay }
+  const latest = useRef({ switchProject, removeProject, report, setOverlay, disarm: removal.disarm })
+  latest.current = { switchProject, removeProject, report, setOverlay, disarm: removal.disarm }
   const choose = useCallback((name: string) => {
     latest.current.setOverlay(null)
     latest.current.report(() => latest.current.switchProject(name))
   }, [])
-  const cancelRemove = useCallback(() => setRemoving(null), [])
   const remove = useCallback((name: string) => {
-    setRemoving(null)
+    latest.current.disarm()
     latest.current.report(() => latest.current.removeProject(name))
   }, [])
 
@@ -68,11 +68,11 @@ function ProjectPanelContent() {
             index={i}
             current={p.name === project?.name}
             active={i === cursor}
-            removing={removing === p.name}
+            removing={removal.armed === p.name}
             onHover={setCursor}
             onChoose={choose}
-            onAskRemove={setRemoving}
-            onCancelRemove={cancelRemove}
+            onAskRemove={removal.arm}
+            onCancelRemove={removal.disarm}
             onRemove={remove}
           />
         ))}

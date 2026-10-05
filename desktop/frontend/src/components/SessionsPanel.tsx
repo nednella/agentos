@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import type { KeyboardEvent, RefObject } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useFocusRequest } from '../useFocusRequest'
 import { useLayout } from '../LayoutContext'
 import { useListNav } from '../useListNav'
+import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { useToggleAnimation } from '../useToggleAnimation'
 import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
@@ -12,6 +13,7 @@ import { NewSessionRow } from './NewSessionRow'
 import { SessionRow } from './SessionRow'
 
 const COMPACT_BELOW_REM = 17
+const NEW_SESSION_KEY = 'new-session'
 
 type SessionsListProps = { panel: RefObject<HTMLElement>; full: boolean; overlay: boolean; widthRem: number }
 
@@ -20,7 +22,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
   const { mode, setSessionsOpen, returnToTerminal } = useLayout()
   const list = useRef<HTMLDivElement>(null)
 
-  const nav = useListNav(sessions.length + 1, {
+  const nav = useListNav([...sessions.map((s) => s.id), NEW_SESSION_KEY], {
     onEnter(index) {
       const session = sessions[index]
       if (!session) {
@@ -32,9 +34,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
     },
   })
 
-  useEffect(() => {
-    list.current?.querySelector('[data-cursor="true"]')?.scrollIntoView({ block: 'nearest' })
-  }, [nav.cursor])
+  useScrollCursorIntoView(list, nav.cursorKey)
 
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -58,8 +58,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
       onKeyDown={onKeyDown}
       onFocus={(e) => {
         if (e.target !== e.currentTarget) return
-        const at = sessions.findIndex((s) => s.id === selectedId)
-        nav.setCursor(Math.max(at, 0))
+        if (selectedId) nav.setCursorKey(selectedId)
       }}
     >
       <div className="panel-head flex h-10 flex-none items-center gap-2 border-b border-line pr-[0.3125rem] pl-4">
@@ -79,12 +78,12 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         )}
       </div>
       <div ref={list} className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
-        {sessions.map((s, i) => (
-          <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursor === i} compact={compact} dense={dense} />
+        {sessions.map((s) => (
+          <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
         {sessions.length === 0 && <p className="px-4 py-6 text-small text-dim">No sessions yet.</p>}
       </div>
-      <NewSessionRow cursor={nav.cursor === sessions.length} compact={compact} />
+      <NewSessionRow cursor={nav.cursorKey === NEW_SESSION_KEY} compact={compact} />
     </aside>
   )
 }

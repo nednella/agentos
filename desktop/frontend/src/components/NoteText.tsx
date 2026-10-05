@@ -15,7 +15,7 @@ export function NoteText({ text }: NoteTextProps) {
     const [token, code] = match
     if (code) {
       parts.push(
-        <code key={at} className="mono rounded-sm px-1 text-[0.92em]" style={{ background: 'rgba(0,0,0,0.3)' }}>
+        <code key={at} className="mono rounded-sm px-1 text-[0.92em]" style={{ background: 'var(--bg-code)' }}>
           {token.slice(1, -1)}
         </code>,
       )

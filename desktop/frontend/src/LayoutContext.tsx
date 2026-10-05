@@ -36,7 +36,7 @@ type AllPrefs = Record<Band, BandPrefs>
 
 const fresh = (band: Band): BandPrefs => ({ sidebarOpen: true, sessionsOpen: band !== 'compact', shellOpen: true, sidebar: null, sessions: null, shell: null })
 
-type Layout = {
+export type Layout = {
   mode: LayoutMode
   width: number
   scale: number
@@ -85,14 +85,14 @@ function modeFor(width: number): LayoutMode {
   return width < MEDIUM_BELOW ? 'medium' : 'wide'
 }
 
-function useWindowWidth(): number {
-  const [width, setWidth] = useState(window.innerWidth)
+function useWindowSize(): { w: number; h: number } {
+  const [size, setSize] = useState({ w: window.innerWidth, h: window.innerHeight })
   useEffect(() => {
-    const update = () => setWidth(window.innerWidth)
+    const update = () => setSize({ w: window.innerWidth, h: window.innerHeight })
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
   }, [])
-  return width
+  return size
 }
 
 const clamp = (value: number, [min, max]: [number, number]) => Math.min(Math.max(value, min), max)
@@ -117,7 +117,7 @@ type LayoutProviderProps = { children: ReactNode }
 
 export function LayoutProvider({ children }: LayoutProviderProps) {
   const { selectedId, sidebarTab, setSidebarTab, focus } = useAgentos()
-  const width = useWindowWidth()
+  const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
   const [scale, setScale] = useState(() => readStored('agentos.scale', DEFAULT_SCALE))
@@ -132,11 +132,11 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   }, [scale])
 
   const prefs: BandPrefs = { ...fresh(band), ...stored[band] }
-  const fitted = fit(width, prefs, 16 * scale)
+  const { widths: fittedWidths, full: fullWidths, sessionsForcedClosed } = fit(width, prefs, 16 * scale)
   const narrow = mode === 'narrow'
   const sidebarMobile = mobilePanel === 'queue' || mobilePanel === 'notes'
   const sidebarOpen = narrow ? sidebarMobile : prefs.sidebarOpen
-  const sessionsOpen = narrow ? mobilePanel === 'sessions' : prefs.sessionsOpen && !fitted.sessionsForcedClosed
+  const sessionsOpen = narrow ? mobilePanel === 'sessions' : prefs.sessionsOpen && !sessionsForcedClosed
 
   const updatePrefs = useCallback(
     (patch: Partial<BandPrefs>) =>
@@ -213,14 +213,14 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       sidebarOpen,
       sessionsOpen,
       shellOpen: narrow ? mobilePanel === 'shell' : prefs.shellOpen,
-      shellRem: Math.min(Math.max(prefs.shell ?? SHELL_DEFAULT_REM, SHELL_MIN_REM), (0.6 * window.innerHeight) / (16 * scale)),
+      shellRem: Math.min(Math.max(prefs.shell ?? SHELL_DEFAULT_REM, SHELL_MIN_REM), (0.6 * height) / (16 * scale)),
       sidebarPeek: !narrow && !prefs.sidebarOpen && peek === 'sidebar',
       sessionsPeek: !narrow && !sessionsOpen && peek === 'sessions',
       mobilePanel,
-      widths: fitted.widths,
+      widths: { sidebar: fittedWidths.sidebar, sessions: fittedWidths.sessions },
       peekWidths: {
-        sidebar: Math.min(Math.max(fitted.full.sidebar, 20), (0.8 * width) / (16 * scale)),
-        sessions: Math.min(Math.max(fitted.full.sessions, 18), (0.8 * width) / (16 * scale)),
+        sidebar: Math.min(Math.max(fullWidths.sidebar, 20), (0.8 * width) / (16 * scale)),
+        sessions: Math.min(Math.max(fullWidths.sessions, 18), (0.8 * width) / (16 * scale)),
       },
       statsOpen,
       digestOpen,
@@ -275,7 +275,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fitted.widths, fitted.full, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

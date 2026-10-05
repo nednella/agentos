@@ -128,6 +128,7 @@ export function createMock(params: URLSearchParams) {
     cmd: params.get('cmd') ?? undefined,
     view: params.get('view') ?? undefined,
     toast: params.has('toast'),
+    warn: params.has('warn'),
   }
   const handlers = new Map<string, Set<Handler>>()
   const sessions: MockSession[] = []
@@ -183,6 +184,7 @@ export function createMock(params: URLSearchParams) {
   function projectView(p: ProjectData): Project {
     const own = sessions.filter((s) => s.project === p.name)
     return {
+      key: p.name,
       name: p.name,
       dir: p.dir,
       repo: p.repo,
@@ -246,7 +248,7 @@ export function createMock(params: URLSearchParams) {
   }
 
   function publish() {
-    emit('sessions', currentSessions())
+    emit('sessions', { project: current.name, items: currentSessions() })
     emit('projects', data.map(projectView))
   }
 
@@ -329,6 +331,11 @@ export function createMock(params: URLSearchParams) {
     Object.assign(byIssue(430), { pr: pr(447, 'closed', 'failing'), cleanup: 'ask' })
     seed('#12 session memory', 12, 'waiting', [['working', 30], ['waiting', 7]], data[1])
     seed('notes sync spike', 0, 'working', [['working', 11]], data[1])
+  }
+
+  if (flags.warn) {
+    setTimeout(() => emit('warnings', { source: 'github', message: 'gh could not name the repo' }), 1500)
+    setTimeout(() => emit('warnings', { source: 'github', message: '' }), 9000)
   }
 
   if (flags.toast) {
@@ -416,7 +423,7 @@ export function createMock(params: URLSearchParams) {
   }
 
   function touchNotes() {
-    emit('notes', currentNotes())
+    emit('notes', { project: current.name, items: currentNotes() })
   }
 
   function startSessionFor(title: string, issue: number, prefill: string): Session {
@@ -471,8 +478,8 @@ export function createMock(params: URLSearchParams) {
     sessions.splice(sessions.indexOf(s), 1)
     emit('term:exit', { id: s.id })
     publish()
-    emit('issues', currentIssues())
-    if (target === current) emit('cleanups', [...target.cleanups])
+    emit('issues', { project: current.name, items: currentIssues() })
+    if (target === current) emit('cleanups', { project: target.name, items: [...target.cleanups] })
   }
 
   const merging = sessions.find((s) => s.cleanup === 'pending')
@@ -618,7 +625,7 @@ export function createMock(params: URLSearchParams) {
       item(7, now - 9 * 86_400_000, 'bullmq', 'Flow producers get a retry option', 'The PDF pipeline retries by hand today.'),
     ]
   }
-  let digest: Digest = { running: false, lastRunAt: Date.now() - 2 * 86_400_000, nextRunAt: Date.now() + 5 * 86_400_000, error: '', items: seedDigest() }
+  let digest: Digest = { running: false, lastRunAt: Date.now() - 2 * 86_400_000, nextRunAt: Date.now() + 5 * 86_400_000, error: '', project: data[0].name, items: seedDigest() }
   const pushDigest = () => emit('digest', { ...digest, items: digest.items.map((i) => ({ ...i })) })
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
@@ -631,14 +638,14 @@ export function createMock(params: URLSearchParams) {
       if (s.state !== 'ended') throw 'Only an ended session can be dismissed'
       sessions.splice(sessions.indexOf(s), 1)
       publish()
-      emit('issues', currentIssues())
+      emit('issues', { project: current.name, items: currentIssues() })
     },
     KillSession: async (id: string) => {
       find(id)
       sessions.splice(sessions.findIndex((s) => s.id === id), 1)
       emit('term:exit', { id })
       publish()
-      emit('issues', currentIssues())
+      emit('issues', { project: current.name, items: currentIssues() })
     },
     RenameSession: async (id: string, title: string) => {
       find(id).title = title
@@ -739,7 +746,7 @@ export function createMock(params: URLSearchParams) {
       note.issue = number
       note.issueUrl = `https://github.com/${current.repo}/issues/${number}`
       touchNotes()
-      emit('issues', currentIssues())
+      emit('issues', { project: current.name, items: currentIssues() })
       return { ...note }
     },
     NoteToSession: async (id: string) => {
@@ -755,7 +762,7 @@ export function createMock(params: URLSearchParams) {
       const command = { ready: `/work ${number}`, plan: `/investigate ${number}` }[issue.lane as 'ready' | 'plan'] ?? ''
       const short = issue.title.split(' ').slice(0, 3).join(' ')
       const session = startSessionFor(`#${number} ${short}`, number, command)
-      emit('issues', currentIssues())
+      emit('issues', { project: current.name, items: currentIssues() })
       return session
     },
     ShellOpen: async () => {
@@ -891,7 +898,7 @@ export function createMock(params: URLSearchParams) {
           ['vite', 'v8 build is faster', 'No change needed, nice to have for the embed.'],
           ['gh', 'pr checks --watch exits on first failure', 'The PR poller could use it.'],
         ].map(([source, title, why], i) => ({ id: `dg-new-${now}-${i}`, title, why, url: 'https://example.com/changelog/new', source, at: now, noteId: '' }))
-        digest = { running: false, lastRunAt: now, nextRunAt: now + 7 * 86_400_000, error: '', items: [...fresh, ...digest.items].slice(0, 30) }
+        digest = { running: false, lastRunAt: now, nextRunAt: now + 7 * 86_400_000, error: '', project: digest.project, items: [...fresh, ...digest.items].slice(0, 30) }
         pushDigest()
       }, 4000)
     },

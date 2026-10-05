@@ -3,6 +3,7 @@ import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import { imageFiles, readImage } from '../images'
 import { ago, useNow } from '../time'
+import { useArmedConfirm } from '../useArmedConfirm'
 import type { Note } from '../types'
 import { AutoTextarea } from './AutoTextarea'
 import { ConfirmRow } from './ConfirmRow'
@@ -19,7 +20,7 @@ type NoteCardProps = {
   onOpenImage(url: string): void
 }
 
-type Confirm = 'file' | 'delete' | null
+type Confirm = 'file' | 'delete'
 
 const FOLD_LINES = 10
 const AUTOSAVE_MS = 700
@@ -27,7 +28,7 @@ const AUTOSAVE_MS = 700
 export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenImage }: NoteCardProps) {
   const a = useAgentos()
   const now = useNow()
-  const [confirm, setConfirm] = useState<Confirm>(null)
+  const confirm = useArmedConfirm<Confirm>()
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
   const body = useRef<HTMLDivElement>(null)
@@ -122,7 +123,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
               <Icon name="play" size={12} />
             </button>
             {note.issue === 0 && canFile && (
-              <button className={iconButton} title="File as an issue" aria-label="File as issue" onClick={() => setConfirm('file')}>
+              <button className={iconButton} title="File as an issue" aria-label="File as issue" onClick={() => confirm.arm('file')}>
                 <Icon name="issue" size={13} />
               </button>
             )}
@@ -134,7 +135,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
             >
               <Icon name="archive" size={13} />
             </button>
-            <button className={iconButton} title="Delete" aria-label="Delete note" onClick={() => setConfirm('delete')}>
+            <button className={iconButton} title="Delete" aria-label="Delete note" onClick={() => confirm.arm('delete')}>
               <Icon name="trash" size={13} />
             </button>
           </span>
@@ -187,28 +188,28 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
           <NoteImages urls={note.images} onOpen={onOpenImage} />
         </div>
       )}
-      {confirm === 'file' && (
+      {confirm.armed === 'file' && (
         <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: 'var(--border-note)' }}>
           <ConfirmRow
             message={`File as issue “${title}”?`}
             confirmLabel="File"
-            onCancel={() => setConfirm(null)}
+            onCancel={confirm.disarm}
             onConfirm={() => {
-              setConfirm(null)
+              confirm.disarm()
               a.report(() => a.noteToIssue(note.id))
             }}
           />
         </div>
       )}
-      {confirm === 'delete' && (
+      {confirm.armed === 'delete' && (
         <div className="mt-2.5 border-t pt-2.5" style={{ borderColor: 'var(--border-note)' }}>
           <ConfirmRow
             danger
             message="Delete this note?"
             confirmLabel="Delete"
-            onCancel={() => setConfirm(null)}
+            onCancel={confirm.disarm}
             onConfirm={() => {
-              setConfirm(null)
+              confirm.disarm()
               a.report(() => a.deleteNote(note.id))
             }}
           />

@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { useAgentos } from '../AgentosContext'
+import { useFocusRequest } from '../useFocusRequest'
 import { BrowserTab } from './BrowserTab'
 import { EmptyState } from './EmptyState'
 import { EvidenceTab } from './EvidenceTab'
@@ -9,17 +10,12 @@ import { ViewTabs } from './ViewTabs'
 import { ViewportHeader } from './ViewportHeader'
 
 export function Viewport() {
-  const { sessions, selectedId, openedIds, focusRequest, viewOf } = useAgentos()
+  const { sessions, selectedId, openedIds, viewOf } = useAgentos()
   const panel = useRef<HTMLElement>(null)
   const selected = sessions.find((s) => s.id === selectedId)
   const view = viewOf(selectedId)
 
-  const handled = useRef(focusRequest.n)
-  useEffect(() => {
-    if (focusRequest.n === handled.current) return
-    handled.current = focusRequest.n
-    if ((!selected || view !== 'terminal') && focusRequest.target === 'terminal') panel.current?.focus()
-  }, [selected, view, focusRequest])
+  useFocusRequest('terminal', panel, !selected || view !== 'terminal')
 
   if (!selected) {
     return (
@@ -37,7 +33,7 @@ export function Viewport() {
       tabIndex={-1}
       className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
     >
-      <ViewportHeader session={selected} />
+      <ViewportHeader key={selected.id} session={selected} />
       <Timeline session={selected} size="full" />
       <ViewTabs session={selected} view={view} />
       <div className="relative min-h-0 flex-1 border-t border-line bg-term">

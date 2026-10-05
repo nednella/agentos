@@ -32,6 +32,7 @@ export type Session = {
 }
 
 export type Project = {
+  key: string
   name: string
   dir: string
   repo: string
@@ -152,15 +153,24 @@ export type Digest = {
   lastRunAt: number
   nextRunAt: number
   error: string
+  project: string
   items: DigestItem[]
 }
 
+export type ProjectList<T> = { project: string; items: T[] }
+
+export type Warning = {
+  source: 'tmux' | 'github' | 'pull requests' | 'worktrees'
+  message: string
+}
+
 export type EventMap = {
-  sessions: Session[]
+  sessions: ProjectList<Session>
   projects: Project[]
-  notes: Note[]
-  issues: Issue[]
-  cleanups: Cleanup[]
+  notes: ProjectList<Note>
+  issues: ProjectList<Issue>
+  cleanups: ProjectList<Cleanup>
+  warnings: Warning
   stats: undefined
   'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }

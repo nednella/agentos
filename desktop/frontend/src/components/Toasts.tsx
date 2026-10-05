@@ -1,6 +1,16 @@
 import { useAgentos } from '../AgentosContext'
+import type { Toast } from '../AgentosContext'
 import { Icon } from './Icon'
 import { StateDot } from './StateDot'
+
+const EDGE: Record<Toast['tone'], string> = {
+  error: 'border-l-danger',
+  pr: 'border-l-danger',
+  waiting: 'border-l-waiting',
+  replied: 'border-l-idle',
+  info: 'border-l-accent',
+  evidence: 'border-l-accent',
+}
 
 const ACTION_LABEL: Partial<Record<string, string>> = { replied: 'Open', evidence: 'View' }
 
@@ -15,12 +25,10 @@ export function Toasts() {
       {toasts.map((toast) => {
         const { sessionId } = toast
         const { tone } = toast
-        const edge = { error: 'var(--danger)', info: 'var(--accent)', waiting: 'var(--waiting)', replied: 'var(--idle)', pr: 'var(--danger)', evidence: 'var(--accent)' }[tone]
         return (
           <div
             key={toast.key}
-            className="toast-in pointer-events-auto flex items-center gap-3 rounded-md border border-line-strong bg-raised py-2 pr-2 pl-3"
-            style={{ borderLeft: `3px solid ${edge}` }}
+            className={`toast-in pointer-events-auto flex items-center gap-3 rounded-md border border-l-3 border-line-strong bg-raised py-2 pr-2 pl-3 ${EDGE[tone]}`}
           >
             {tone === 'waiting' && <StateDot state="waiting" />}
             {tone === 'replied' && <StateDot state="idle" />}
