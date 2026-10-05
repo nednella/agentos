@@ -45,8 +45,6 @@ function seedNotes(texts: string[]): Note[] {
     pinned: i === 2,
     archived: i >= texts.length - 2,
     images: i === 0 ? [shot(210, 'before: banner overlaps'), shot(150, 'after: thin bar')] : i === 3 ? [shot(30, 'referrer header')] : [],
-    issue: 0,
-    issueUrl: '',
   }))
 }
 
@@ -683,7 +681,7 @@ export function createMock(params: URLSearchParams) {
     },
     AddNote: async (text: string) => {
       const now = Date.now()
-      const note: Note = { id: `note-${Math.random().toString(36).slice(2, 8)}`, text, createdAt: now, updatedAt: now, pinned: false, archived: false, images: [], issue: 0, issueUrl: '' }
+      const note: Note = { id: `note-${Math.random().toString(36).slice(2, 8)}`, text, createdAt: now, updatedAt: now, pinned: false, archived: false, images: [] }
       current.notes.push(note)
       touchNotes()
       return { ...note }
@@ -743,11 +741,9 @@ export function createMock(params: URLSearchParams) {
         createdAt: now,
         updatedAt: now,
       })
-      note.issue = number
-      note.issueUrl = `https://github.com/${current.repo}/issues/${number}`
+      current.notes = current.notes.filter((n) => n.id !== id)
       touchNotes()
       emit('issues', { project: current.name, items: currentIssues() })
-      return { ...note }
     },
     NoteToSession: async (id: string) => {
       const note = noteById(id)
@@ -910,7 +906,7 @@ export function createMock(params: URLSearchParams) {
       const item = digest.items.find((i) => i.id === itemId)
       if (!item) throw 'No such digest item'
       const now = Date.now()
-      const note: Note = { id: `note-${Math.random().toString(36).slice(2, 8)}`, text: `${item.title}\n${item.why}\n${item.url}`, createdAt: now, updatedAt: now, pinned: false, archived: false, images: [], issue: 0, issueUrl: '' }
+      const note: Note = { id: `note-${Math.random().toString(36).slice(2, 8)}`, text: `${item.title}\n${item.why}\n${item.url}`, createdAt: now, updatedAt: now, pinned: false, archived: false, images: [] }
       current.notes.push(note)
       item.noteId = note.id
       touchNotes()
