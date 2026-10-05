@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nednella/agentos/internal/control"
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 //go:embed snapshot.js
@@ -92,7 +92,7 @@ func (b *Browsers) agent(ctx context.Context, id, cmd string, args []string, opt
 		return nil
 	}
 	if cmd == "help" {
-		return control.BrowserHelp, nil
+		return prompts.BrowserHelp(), nil
 	}
 	if cmd == "open" {
 		if err := need(1, "open <url>"); err != nil {

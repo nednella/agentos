@@ -6,6 +6,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/internal/control"
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 // Asker checks which session a command comes from.
@@ -38,7 +39,7 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 	}
 	sub, args := req.Args[0], req.Args[1:]
 	if sub == "help" {
-		return control.BrowserHelp, nil
+		return prompts.BrowserHelp(), nil
 	}
 	id, err := c.asker.AskerSession(req)
 	if err != nil {

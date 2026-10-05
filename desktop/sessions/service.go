@@ -1,6 +1,10 @@
 package sessions
 
-import "context"
+import (
+	"context"
+
+	"github.com/nednella/agentos/internal/prompts"
+)
 
 // Service is bound to the front end.
 type Service struct {
@@ -53,5 +57,5 @@ func (v *Service) Cleanups() []Cleanup { return v.s.life.Cleanups(v.s.Current().
 
 // HarnessCheck starts a session titled "Harness check" with the review prompt typed in, not sent.
 func (v *Service) HarnessCheck() (Session, error) {
-	return v.s.Create("Harness check", harnessPrompt, 0)
+	return v.s.Create("Harness check", prompts.HarnessCheck(), 0)
 }

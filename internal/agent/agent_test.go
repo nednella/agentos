@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 func TestClaudeCommand(t *testing.T) {
@@ -42,7 +44,7 @@ func TestNew(t *testing.T) {
 
 func TestBrowserPromptNamesTheCommands(t *testing.T) {
 	for _, want := range []string{"agentos browser help", "agentos browser screenshot", "agentos show"} {
-		if !strings.Contains(BrowserPrompt, want) {
+		if !strings.Contains(prompts.BrowserSession(), want) {
 			t.Errorf("the prompt lacks %q", want)
 		}
 	}

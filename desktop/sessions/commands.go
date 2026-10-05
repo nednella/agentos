@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	ctl "github.com/nednella/agentos/internal/control"
+	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 )
 
@@ -51,7 +52,7 @@ func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
 
 // Harness starts the harness check.
 func (c *Commands) Harness(context.Context, ctl.Request) (string, error) {
-	s, err := c.s.Create("Harness check", harnessPrompt, 0)
+	s, err := c.s.Create("Harness check", prompts.HarnessCheck(), 0)
 	if err != nil {
 		return "", err
 	}

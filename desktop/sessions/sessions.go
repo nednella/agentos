@@ -18,6 +18,7 @@ import (
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
 )
@@ -960,7 +961,7 @@ func (s *Sessions) OpenShell() (string, error) {
 func (s *Sessions) commandFor(name session.Name, proj project.Project) []string {
 	argv := s.agent.Command(name.String())
 	if _, ok := s.agent.(agent.Claude); ok && proj.BrowserOn() && s.browsers.Available() {
-		argv = append(argv, "--append-system-prompt", agent.BrowserPrompt)
+		argv = append(argv, "--append-system-prompt", prompts.BrowserSession())
 	}
 	return argv
 }

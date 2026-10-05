@@ -13,6 +13,7 @@ import (
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 // Projects knows the current project.
@@ -77,7 +78,7 @@ func (m *Manager) start(proj project.Project) error {
 		env := append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
 			return strings.HasPrefix(kv, "AGENTOS_SESSION=") || strings.HasPrefix(kv, digestProjects+"=")
 		}), digestProjects+"="+key, "AGENTOS_SOCKET="+bus.SocketPath(m.stateDir))
-		_, err := m.run(ctx, proj.Dir, env, "claude", "-p", digestPrompt, "--allowedTools", digestTools)
+		_, err := m.run(ctx, proj.Dir, env, "claude", "-p", prompts.Digest(), "--allowedTools", digestTools)
 		failure := ""
 		switch {
 		case ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):

@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nednella/agentos/internal/control"
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 // The commands in this file are for agents running in a session. Each one asks
@@ -96,7 +97,7 @@ func newBrowserCmd() *cobra.Command {
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 && (args[0] == "help" || args[0] == "-h" || args[0] == "--help") {
-				fmt.Fprintln(cmd.OutOrStdout(), control.BrowserHelp)
+				fmt.Fprintln(cmd.OutOrStdout(), prompts.BrowserHelp())
 				return nil
 			}
 			if len(args) == 0 {
