@@ -1,5 +1,11 @@
+VERSION ?= dev
+LDFLAGS := -X github.com/nednella/agentos/internal/version.Version=$(VERSION)
+
 build:
-	go build -o bin/agentos .
+	go build -ldflags '$(LDFLAGS)' -o bin/agentos .
+
+install:
+	go install -ldflags '$(LDFLAGS)' .
 
 test:
 	go test ./...
@@ -10,4 +16,4 @@ fmt:
 clean:
 	rm -rf bin
 
-.PHONY: build test fmt clean
+.PHONY: build install test fmt clean
