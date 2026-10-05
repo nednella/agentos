@@ -65,17 +65,22 @@ func New(runner run.Runner, sessions Sessions, emit func(string, any)) *Issues {
 
 // Repo is "owner/name" of the folder's GitHub repository, or "" when it has none or gh cannot say.
 // A folder with no GitHub repo is remembered; a failure that may pass is warned about and tried again later.
-func (i *Issues) Repo(ctx context.Context, dir string) string {
+func (i *Issues) Repo(ctx context.Context, dir string) string { return i.repo(ctx, dir, false) }
+
+// repo answers from what gh said before unless fresh asks again. A known repo stays known
+// while gh is asked and when it fails, so no screen sees the folder lose its repo for a moment.
+func (i *Issues) repo(ctx context.Context, dir string, fresh bool) string {
 	i.mu.Lock()
-	repo, ok := i.repos[dir]
+	known, ok := i.repos[dir]
 	failedAt, failed := i.repoFailed[dir]
 	i.mu.Unlock()
-	if ok || (failed && time.Since(failedAt) < repoRetry) {
-		return repo
+	if !fresh && (ok || (failed && time.Since(failedAt) < repoRetry)) {
+		return known
 	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := i.run(ctx, dir, "gh", "repo", "view", "--json", "nameWithOwner")
+	var repo string
 	if err == nil {
 		var v struct {
 			NameWithOwner string `json:"nameWithOwner"`
@@ -92,7 +97,7 @@ func (i *Issues) Repo(ctx context.Context, dir string) string {
 		if ctx.Err() == nil {
 			i.warn.Report("github", util.FirstLine(err.Error()))
 		}
-		return ""
+		return known
 	}
 	i.mu.Lock()
 	i.repos[dir] = repo
@@ -121,20 +126,17 @@ func (i *Issues) Cached(dir string) ([]Issue, bool) {
 	return slices.Clone(list), ok
 }
 
-// List returns the project's open issues; without a repo that is none. Refreshing drops the cache first.
+// List returns the project's open issues; without a repo that is none. Refreshing asks gh again for the repo and the issues.
 func (i *Issues) List(ctx context.Context, proj project.Project, refresh bool) ([]Issue, error) {
 	dir := proj.Dir
 	if refresh {
 		i.mu.Lock()
-		delete(i.repos, dir)
-		delete(i.repoFailed, dir)
 		delete(i.lists, dir)
 		i.mu.Unlock()
-	}
-	if cached, ok := i.Cached(dir); ok {
+	} else if cached, ok := i.Cached(dir); ok {
 		return cached, nil
 	}
-	if i.Repo(ctx, dir) == "" {
+	if i.repo(ctx, dir, refresh) == "" {
 		return []Issue{}, nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
