@@ -4,7 +4,6 @@ import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
-import { ConfirmRow } from './ConfirmRow'
 import { PRBadge } from './PRBadge'
 import { StateBadge } from './StateBadge'
 
@@ -73,29 +72,42 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </span>
         </div>
         <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
-        <button className="btn btn-ghost" onClick={() => kill.arm()} title="Kill this session" disabled={Boolean(kill.armed)}>
-          Kill
-        </button>
+        {kill.armed ? (
+          <span
+            className="contents"
+            role="alertdialog"
+            aria-label="Kill this session"
+            onKeyDown={(e) => {
+              if (e.key !== 'Escape') return
+              e.stopPropagation()
+              kill.disarm()
+            }}
+          >
+            <button className="btn" onClick={kill.disarm}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-danger"
+              autoFocus
+              onClick={() => {
+                kill.disarm()
+                report(() => killSession(session.id))
+              }}
+            >
+              Kill
+            </button>
+          </span>
+        ) : (
+          <button className="btn btn-ghost" onClick={() => kill.arm()} title="Kill this session">
+            Kill
+          </button>
+        )}
       </div>
       {kill.armed && (
-        <div className="pt-1.5">
-          <ConfirmRow
-            danger
-            label="Kill this session"
-            message={
-              <>
-                Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
-                <code className="mono">claude --resume</code>.
-              </>
-            }
-            confirmLabel="Kill"
-            onCancel={kill.disarm}
-            onConfirm={() => {
-              kill.disarm()
-              report(() => killSession(session.id))
-            }}
-          />
-        </div>
+        <p className="pt-1.5 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
+          Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
+          <code className="mono">claude --resume</code>.
+        </p>
       )}
       {session.detail && (
         <span
