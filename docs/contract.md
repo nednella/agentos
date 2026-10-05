@@ -13,7 +13,9 @@ to `undefined`. Empty lists are `[]`, never `null`.
 When `window.go` is undefined (plain `vite dev`) the front end uses its mock. When the binary runs
 with `AGENTOS_HTTP=127.0.0.1:PORT` it serves the real front end in a browser with a shim that
 provides `window.go` and `window.runtime` over `POST /__call/<pkg>.Service/<Method>` (a JSON array
-of arguments) and the event stream `/__events`. Every method below is in the service named by its section heading.
+of arguments, with the header `X-Agentos: 1`) and the event stream `/__events`. The server answers only requests whose
+`Host` is the listen address and whose `Origin`, if any, is `http://<listen address>`; anything else gets 403. `/__call/` also
+gets 403 without the `X-Agentos` header, which the shim sends. Every method below is in the service named by its section heading.
 
 ## Types
 
@@ -54,6 +56,7 @@ type PR = {
 }
 
 type Project = {
+  key: string           // the project key: the "project" of events and the first part of a session id
   name: string
   dir: string
   repo: string          // "owner/name", or ""; filled for the current project, and for others once known
@@ -89,12 +92,22 @@ type Note = {
 }
 
 type Snapshot = {
-  project: Project
+  project: Project      // project.key says which project the rest is about; drop events of another key
   projects: Project[]   // every known project: configured, current, and any with live sessions
   sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
   shell: string         // the current project's shell session id ("<key>/shell"), "" until ShellOpen
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
   version: string
+}
+
+// The sessions, notes, issues and cleanups events carry a list of one project. Drop an event whose project is not
+// the current one: it can arrive after a switch.
+type ProjectList<T> = { project: string; items: T[] }   // project: the project key
+
+// The warnings event: a failure that would otherwise be silent. Show it once; an empty message says the source works again.
+type Warning = {
+  source: 'tmux' | 'github' | 'pull requests' | 'worktrees'
+  message: string       // first line of the failure, "" when the source recovered
 }
 
 type Evidence = {
@@ -167,6 +180,7 @@ type DigestItem = {
 }
 
 type Digest = {
+  project: string       // project key
   running: boolean
   lastRunAt: number     // 0 if never
   nextRunAt: number     // 0 if the project's digest is off
@@ -185,7 +199,7 @@ type Digest = {
 | `SwitchProject(name)` | `Snapshot` | makes the project current; remembered for the next start |
 | `AddProject()` | `Snapshot` | opens the folder picker, adds the folder (named after it, `-2` on a clash), saves the config, switches to it; unchanged snapshot on cancel |
 | `AddProjectDir(dir)` | `Snapshot` | the same without the picker; `~` is expanded; rejects a folder that does not exist |
-| `RemoveProject(name)` | `Snapshot` | forgets a configured project, keeps its sessions; switches away if it was current |
+| `RemoveProject(name)` | `Snapshot` | forgets a configured project, keeps its sessions; switches away if it was current. Rejects while the project has live issue sessions (the message names them): their branch pattern and clean-up command come from the project. Editing the config file keeps its comments and `~` paths |
 
 ### Sessions (`sessions`)
 
@@ -203,7 +217,7 @@ type Digest = {
 
 | Method | What it does |
 |---|---|
-| `TermOpen(id, cols, rows)` | attaches a terminal stream; opening an open one attaches afresh, which redraws everything |
+| `TermOpen(id, cols, rows)` | attaches a terminal stream. Opening an open one keeps its stream, sets the new size and redraws everything, so an open that follows a late close never kills the new stream |
 | `TermWrite(id, data)` | raw input bytes as a string (xterm.js `onData`) |
 | `TermResize(id, cols, rows)` | |
 | `TermClose(id)` | detaches the stream; the agent keeps running |
@@ -225,14 +239,14 @@ type Digest = {
 | `Cleanups()` | `Cleanup[]` | the current project's log, newest first, at most 100 |
 
 A session is cleaned up on its own when its PR is merged after the session saw it draft or open. A PR first seen already merged, or a
-closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the worktree has changes or the branch has commits that are not on origin;
-`Cleanup(id, true)` overrides.
+closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
+`Cleanup(id, true)` overrides. Clean-up applies to live sessions; a session that has already ended is not cleaned up.
 
 ### Notes (`notes`)
 
 | Method | Returns | What it does |
 |---|---|---|
-| `AddNote(text)` | `Note` | |
+| `AddNote(text)` | `Note` | `text` may be empty: a note made to hold pictures is created first, and the pictures are attached right after. (`UpdateNote` and `agentos note` still reject empty text; `NoteToIssue` rejects a note with no text) |
 | `UpdateNote(id, text)` | `Note` | |
 | `SetNotePinned(id, pinned)` | `Note` | |
 | `SetNoteArchived(id, archived)` | `Note` | |
@@ -248,7 +262,7 @@ One hidden browser per project (separate profile, so logins persist), one tab pe
 
 | Method | Returns | What it does |
 |---|---|---|
-| `BrowserOpen(id, url)` | `BrowserState` | opens the session's tab, starting the browser if needed; `url` "" means the project's `url`, else a blank page |
+| `BrowserOpen(id, url)` | `BrowserState` | opens the session's tab, starting the browser if needed; `url` "" means the project's `url`, else a blank page. Rejects when that first page cannot be opened; the tab then stays open and `browser:state` has it. Two calls for one session share one tab |
 | `BrowserGoto(id, url)` | | a bare host gets `https://`; localhost, IPs and `.local` get `http://` |
 | `BrowserNav(id, action)` | | `'back' \| 'forward' \| 'reload' \| 'stop'` |
 | `BrowserInput(id, input)` | | |
@@ -276,20 +290,21 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 
 | Name | Payload | When |
 |---|---|---|
-| `sessions` | `Session[]` | a session of the current project was added, removed, renamed, or changed (state, detail, PR, clean-up, browser, evidence) |
+| `sessions` | `ProjectList<Session>` | a session of the current project was added, removed, renamed, or changed (state, detail, PR, clean-up, browser, evidence) |
 | `projects` | `Project[]` | a project was added or removed, or its counts changed |
-| `notes` | `Note[]` | the current project's notes changed |
-| `issues` | `Issue[]` | the cached issue list changed (a session started or ended for an issue, a note was filed) |
+| `notes` | `ProjectList<Note>` | the current project's notes changed |
+| `issues` | `ProjectList<Issue>` | the cached issue list changed (a session started or ended for an issue, a note was filed) |
 | `term:data` | `{ id, data }` | `data` is base64 of raw terminal output |
 | `term:exit` | `{ id }` | the session ended on its own |
 | `attention` | `{ id, state }` | `state` is `'waiting'`, `'replied'` (a turn ended with a reply: working to idle through Stop, not through a reminder), `'pr'` (PR checks or comments) or `'evidence'` (an agent filed evidence); once per change, current project only for waiting and replied |
 | `stats` | none | a wait opened or closed; refetch `Stats` if the view is open |
-| `cleanups` | `Cleanup[]` | a clean-up finished or was blocked |
+| `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
 | `browser:frame` | `{ id, data, width, height }` | `data` is base64 JPEG; width and height are the viewport's CSS pixels |
 | `browser:state` | `BrowserState` | URL, title, loading or open changed |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
-| `digest` | `Digest` | the current project's digest changed |
+| `digest` | `Digest` | the current project's digest changed; `project` is its key |
+| `warnings` | `Warning` | a service met a failure it cannot show otherwise: tmux could not be listed (`tmux`; the sessions stay as they were), `gh` could not name the repo (`github`; retried after 30 s), pull requests or worktrees could not be read (`pull requests`, `worktrees`). Sent once per distinct message of a source, and again with `message: ""` when the source works |
 
 Opening a web address is the front end's job: the window runtime's `BrowserOpenURL`, else `window.open`. No Go method does it.
 
@@ -301,7 +316,7 @@ folders are served. Use the URL in `<img src>`.
 
 ## Config file
 
-`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, and keeps every key below.
+`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, and keeps every key below, its comments and its `~` paths.
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
@@ -339,7 +354,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 |---|---|
 | notes, note images, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
 | evidence, PR tracking, clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
-| state files, sockets, tmux config, last project | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`) |
+| state files, sockets, tmux config, last project, app location | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.
 
@@ -348,14 +363,14 @@ All files are written by writing a temp file and renaming it into place; folders
 `AGENTOS_CONFIG`, `AGENTOS_STATE_DIR` (state dir), `AGENTOS_DATA_DIR` (replaces both data locations), `AGENTOS_TMUX_SOCKET` (default `agentos`),
 `AGENTOS_DIR` (the project folder to start in instead of the current folder), `AGENTOS_HTTP` (browser mode), `AGENTOS_BROWSER` (path of the
 browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
-`AGENTOS_DIGEST_PROJECT`.
+`AGENTOS_DIGEST_PROJECT`. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
 The texts given to agents (the harness check, the digest run, the browser lines in a session's system prompt, `agentos browser help`) are Markdown
 files in `internal/prompts`.
 
 ## Command line
 
-`agentos` with no command lists the commands by group. Every command below except `kill` without a number talks to the running app over its control
+`agentos` with no command opens the app (`open -a` on `agentos.app`, looked for next to the command, in `~/Applications`, in `/Applications`, then at the path in `app-path`; it prints where it looked when there is none); `agentos --help` lists the commands by group. Every command below except `kill` without a number talks to the running app over its control
 socket, and exits 1 with "agentos is not running: open the app and try again" when there is none. The project is `AGENTOS_PROJECT` (set in the shell
 session) or the asking session's, else the current one; the app switches to it. Commands that start or change sessions do the work and say what
 happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:command` event and answer "ok".

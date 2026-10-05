@@ -43,13 +43,14 @@ on a temp control socket.
 ## The real front end, in a browser
 
 `AGENTOS_HTTP` serves the embedded front end over HTTP with a shim for `window.go` and
-`window.runtime`: `POST /__call/<pkg>.Service/<Method>` with a JSON array of arguments, and server-sent
-events at `/__events`.
+`window.runtime`: `POST /__call/<pkg>.Service/<Method>` with a JSON array of arguments and the header
+`X-Agentos: 1`, and server-sent events at `/__events`. The server answers only requests addressed to its
+own listen address (`127.0.0.1:PORT`, not `localhost`) and refuses a foreign `Origin` with 403.
 
 ```sh
 make -o desktop-frontend desktop-app          # or: make desktop-app (rebuilds the front end)
 (cd / && AGENTOS_HTTP=127.0.0.1:18772 bin/agentos.app/Contents/MacOS/agentos) &
-curl -s -XPOST localhost:18772/__call/projects.Service/Snapshot -d '[]'
+curl -s -XPOST -H 'X-Agentos: 1' 127.0.0.1:18772/__call/projects.Service/Snapshot -d '[]'
 ```
 
 Agents' commands reach the same app: `AGENTOS_SESSION=<id> AGENTOS_SOCKET=$S/agentos.sock agentos note "x"`.
