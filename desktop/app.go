@@ -14,6 +14,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
@@ -140,7 +141,7 @@ func newApp(c config, h host, run runner) *App {
 		ctx:      context.Background(),
 		host:     h,
 		stateDir: c.stateDir,
-		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.registry, c.project, h.emit),
+		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.dataDir, c.registry, c.project, h.emit),
 		terms:    newTerms(c.tmux, h.emit, h.clipboard),
 		issues:   newIssues(run),
 		notes:    &Notes{dir: c.dataDir},
@@ -412,6 +413,10 @@ func issueBody(n Note) string {
 		body += fmt.Sprintf("\n\n(%d screenshots are attached to the note in agentos.)", len(n.Images))
 	}
 	return body
+}
+
+func (a *App) Stats(days int) (Stats, error) {
+	return a.sessions.waits.Stats(a.sessions.Current().Key(), days, time.Now())
 }
 
 func (a *App) RefreshPRs() { a.life.Poll(a.ctx) }

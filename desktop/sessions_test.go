@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -167,14 +168,15 @@ func TestIdleReminders(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := func() string { got, _ := h.session(s.ID); return string(got.State) }
+	waits := func() int { st, _ := h.app.Stats(7); return st.Total }
 
 	h.hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
 	eventually(t, "working", func() bool { return state() == "working" })
 	replied := h.rec.countAttention("replied")
 	h.hook(t, s.ID, "Notification", `{"message":"Claude is waiting for your input","notification_type":"idle_prompt"}`)
 	eventually(t, "a turn killed by an error to stop showing as working", func() bool { return state() == "idle" })
-	if h.rec.countAttention("replied") != replied {
-		t.Error("an idle reminder raised replied attention")
+	if h.rec.countAttention("replied") != replied || waits() != 0 {
+		t.Errorf("an idle reminder raised attention (%d) or opened a wait (%d)", h.rec.countAttention("replied")-replied, waits())
 	}
 
 	h.hook(t, s.ID, "Notification", `{"message":"needs permission","notification_type":"permission_prompt"}`)
@@ -183,6 +185,20 @@ func TestIdleReminders(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if state() != "waiting" {
 		t.Errorf("an idle reminder changed a waiting session to %s", state())
+	}
+
+	h.hook(t, s.ID, "PostToolUse", `{"tool_name":"Edit"}`)
+	eventually(t, "working again", func() bool { return state() == "working" })
+	h.hook(t, s.ID, "Stop", `{}`)
+	eventually(t, "a wait for the reply", func() bool { return waits() == 2 })
+	st, _ := h.app.Stats(7)
+	var kinds []string
+	for _, c := range st.ByCause {
+		kinds = append(kinds, c.Kind+"/"+c.Label)
+	}
+	slices.Sort(kinds)
+	if !slices.Equal(kinds, []string{"idle/Reply landed", "permission/Permission"}) {
+		t.Errorf("causes = %q", kinds)
 	}
 }
 

@@ -50,10 +50,12 @@ func TestApply(t *testing.T) {
 		want Record
 	}{
 		{"first event", Record{}, Event{Name: "PreToolUse", Detail: "Bash ls"}, Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t1, Detail: "Bash ls"}},
-		{"idle reminder ends a working turn", Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t0}, Event{Name: "Notification", NotificationType: "idle_prompt"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1}},
+		{"idle reminder ends a working turn", Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t0, Tool: "Bash"}, Event{Name: "Notification", NotificationType: "idle_prompt"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1, Notify: "idle_prompt", Tool: "Bash"}},
 		{"idle reminder leaves a waiting record alone", Record{Session: "p/1", State: Waiting, Event: "Notification", At: t0}, Event{Name: "Notification", NotificationType: "idle_prompt"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t0}},
 		{"idle reminder keeps the record", stop, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "waiting"}, stop},
-		{"permission prompt", stop, Event{Name: "Notification", NotificationType: "permission_prompt", Detail: "needs Bash"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Detail: "needs Bash"}},
+		{"permission prompt", stop, Event{Name: "Notification", NotificationType: "permission_prompt", Detail: "needs Bash"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Detail: "needs Bash", Notify: "permission_prompt"}},
+		{"prompt keeps the last tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", Tool: "Bash", Command: "yarn test"}, Event{Name: "Notification", NotificationType: "permission_prompt"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Notify: "permission_prompt", Tool: "Bash", Command: "yarn test"}},
+		{"new prompt forgets the tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", Tool: "Bash", Command: "yarn test"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1}},
 		{"reminder with no record", Record{}, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "x"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1}},
 	}
 	for _, tt := range tests {
@@ -75,9 +77,9 @@ func TestParseEvent(t *testing.T) {
 		{"permission notification", "Notification", `{"message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}`,
 			Event{Name: "Notification", NotificationType: "permission_prompt", Message: "Claude needs your permission to use Bash", Detail: "Claude needs your permission to use Bash"}},
 		{"tool with command", "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"echo hi","description":"Print hi"}}`,
-			Event{Name: "PreToolUse", Detail: "Bash echo hi"}},
+			Event{Name: "PreToolUse", Detail: "Bash echo hi", Tool: "Bash", Command: "echo hi"}},
 		{"tool without known input", "PostToolUse", `{"tool_name":"Task","tool_input":{"x":1}}`,
-			Event{Name: "PostToolUse", Detail: "Task"}},
+			Event{Name: "PostToolUse", Detail: "Task", Tool: "Task"}},
 		{"prompt on many lines", "UserPromptSubmit", `{"prompt":"fix\n  the   bug"}`,
 			Event{Name: "UserPromptSubmit", Detail: "fix the bug"}},
 		{"not json", "Stop", `garbage`, Event{Name: "Stop"}},

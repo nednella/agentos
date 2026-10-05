@@ -84,6 +84,7 @@ type Sessions struct {
 	ctx        context.Context
 	project    project.Project
 	registry   *Registry
+	waits      *Waits
 	info       []term.Info
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
@@ -102,10 +103,10 @@ type Sessions struct {
 	prefillFor time.Duration
 }
 
-func newSessions(tmux *term.Tmux, ag agent.Agent, stateDir string, registry *Registry, current project.Project, emit func(string, any)) *Sessions {
+func newSessions(tmux *term.Tmux, ag agent.Agent, stateDir, dataDir string, registry *Registry, current project.Project, emit func(string, any)) *Sessions {
 	return &Sessions{
 		tmux: tmux, agent: ag, stateDir: stateDir, emit: emit,
-		project: current, registry: registry,
+		project: current, registry: registry, waits: newWaits(dataDir),
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
@@ -320,6 +321,7 @@ func (s *Sessions) take(rec session.Record) {
 func (s *Sessions) sync() {
 	key := s.project.Key()
 	var attention [][2]string // session id and the attention state
+	waitsChanged := false
 	live := map[string]bool{}
 	for _, in := range s.info {
 		id := in.Name.String()
@@ -348,15 +350,34 @@ func (s *Sessions) sync() {
 				attention = append(attention, [2]string{id, "replied"})
 			}
 		}
+		if s.loaded {
+			ended := s.waits.End(id, at)
+			opens := state == session.Waiting || replied
+			if opens {
+				kind, label := causeOf(rec)
+				issue, _ := strconv.Atoi(in.Issue)
+				s.waits.Begin(id, Wait{SessionTitle: cmp.Or(in.Title, defaultTitle), Issue: issue, Kind: kind, Label: label, StartedAt: at.UnixMilli()})
+			}
+			if ended || opens {
+				waitsChanged = true
+			}
+		}
 	}
 	for id := range s.seen {
 		if !live[id] {
+			if s.waits.End(id, time.Now()) {
+				waitsChanged = true
+			}
 			s.life.forget(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
 			delete(s.records, id)
 		}
 	}
+	if waitsChanged {
+		s.emit("stats", nil)
+	}
+
 	s.announceProjects()
 	s.announceIssues()
 	list := s.list()

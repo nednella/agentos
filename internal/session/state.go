@@ -21,6 +21,9 @@ type Record struct {
 	Event   string    `json:"event"`
 	At      time.Time `json:"at"`
 	Detail  string    `json:"detail,omitempty"`
+	Tool    string    `json:"tool,omitempty"`    // the latest tool call, kept through the prompt it leads to
+	Command string    `json:"command,omitempty"` // that call's shell command
+	Notify  string    `json:"notify,omitempty"`  // notification_type of a Notification
 
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`

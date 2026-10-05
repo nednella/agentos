@@ -13,6 +13,8 @@ type Event struct {
 	NotificationType string
 	Message          string
 	Detail           string
+	Tool             string // the tool of a PreToolUse or PostToolUse
+	Command          string // that tool's shell command, when it has one
 }
 
 type payload struct {
@@ -41,6 +43,12 @@ func ParseEvent(name string, r io.Reader) Event {
 		ev.Detail = p.LastAssistantMessage
 	}
 	ev.Detail = oneLine(ev.Detail, 120)
+	if name == "PreToolUse" || name == "PostToolUse" {
+		ev.Tool = p.ToolName
+		if cmd, ok := p.ToolInput["command"].(string); ok {
+			ev.Command = oneLine(cmd, 200)
+		}
+	}
 	return ev
 }
 
@@ -104,5 +112,13 @@ func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	} else if isIdleReminder(ev) && prev.State != Working {
 		return prev
 	}
-	return Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail}
+	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType}
+	switch ev.Name {
+	case "PreToolUse", "PostToolUse":
+		rec.Tool, rec.Command = ev.Tool, ev.Command
+	case "Notification", "Stop":
+		// The prompt that follows a tool call is about that tool.
+		rec.Tool, rec.Command = prev.Tool, prev.Command
+	}
+	return rec
 }
