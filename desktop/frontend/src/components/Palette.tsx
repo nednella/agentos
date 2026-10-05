@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { usePaletteItems } from '../usePaletteItems'
 import type { PaletteItem } from '../usePaletteItems'
@@ -44,6 +44,14 @@ function PaletteDialog() {
     }
     run(item)
   }
+
+  const latest = useRef({ results, activate })
+  latest.current = { results, activate }
+  const hover = useCallback((index: number) => setCursor(index), [])
+  const pick = useCallback((index: number) => {
+    const item = latest.current.results[index]
+    if (item) latest.current.activate(item)
+  }, [])
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape' && prompting) {
@@ -96,8 +104,9 @@ function PaletteDialog() {
               active={i === cursor}
               confirming={confirming === item.key}
               showGroup={results[i - 1]?.group !== item.group}
-              onHover={() => setCursor(i)}
-              onPick={() => activate(item)}
+              index={i}
+              onHover={hover}
+              onPick={pick}
             />
           ))}
         </div>
@@ -111,15 +120,16 @@ type PaletteRowProps = {
   active: boolean
   confirming: boolean
   showGroup: boolean
-  onHover(): void
-  onPick(): void
+  index: number
+  onHover(index: number): void
+  onPick(index: number): void
 }
 
-function PaletteRow({ item, active, confirming, showGroup, onHover, onPick }: PaletteRowProps) {
+function PaletteRowView({ item, active, confirming, showGroup, index, onHover, onPick }: PaletteRowProps) {
   return (
     <>
       {showGroup && <div className="label px-4 pt-3 pb-1">{item.group}</div>}
-      <button className="row h-9 items-center gap-3 px-4" data-selected={active} data-active={active} onMouseEnter={onHover} onClick={onPick}>
+      <button className="row row-pick h-9 items-center gap-3 px-4" data-selected={active} data-active={active} onMouseEnter={() => onHover(index)} onClick={() => onPick(index)}>
         <span className="flex w-3 flex-none justify-center">{item.state && <StateDot state={item.state} />}</span>
         <span className="truncate">{item.label}</span>
         <span className="mono ml-auto truncate text-small text-dim">{confirming ? 'Enter again to confirm' : item.hint}</span>
@@ -128,3 +138,5 @@ function PaletteRow({ item, active, confirming, showGroup, onHover, onPick }: Pa
     </>
   )
 }
+
+const PaletteRow = memo(PaletteRowView, (a, b) => a.item.key === b.item.key && a.item.label === b.item.label && a.item.hint === b.item.hint && a.active === b.active && a.confirming === b.confirming && a.showGroup === b.showGroup)

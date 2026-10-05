@@ -8,7 +8,7 @@ type Group = { title: string; ids: string[] }
 
 const GROUPS: Group[] = [
   { title: 'Sessions', ids: ['new-session', 'open-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'open-pr', 'cleanup', 'harness'] },
-  { title: 'Navigation', ids: ['panel-left', 'panel-right', 'panel-down', 'panel-up', 'panel-terminal', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'project', 'palette', 'shortcuts'] },
+  { title: 'Navigation', ids: ['panel-left', 'panel-right', 'panel-down', 'panel-up', 'panel-sidebar', 'panel-terminal', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'project', 'palette', 'shortcuts'] },
   { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues', 'start-issue'] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
   { title: 'Views', ids: ['stats', 'digest', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },

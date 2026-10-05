@@ -58,7 +58,7 @@ export const LIST_KEYS: { keys: string; summary: string }[] = [
   { keys: 'A / D or ← / →', summary: 'Switch Queue and Notes, or fold a lane' },
   { keys: 'Space', summary: 'Fold or unfold the lane under the cursor' },
   { keys: 'P / E in notes', summary: 'Pin or archive the note under the cursor' },
-  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘A or ⌘↑ brings you back' },
+  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘S or ⌘↑ brings you back' },
 ]
 
 const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
@@ -116,7 +116,7 @@ export function useActions(): Action[] {
       id: 'new-session',
       label: 'New session',
       group: 'Sessions',
-      shortcut: { key: 'n', shift: true },
+      shortcut: { key: 'n' },
       command: { name: 'new', syntax: 'new [title]', summary: 'Start a session' },
       run(args, via) {
         if (via === 'ui') {
@@ -270,7 +270,6 @@ export function useActions(): Action[] {
       id: 'show-notes',
       label: 'Show notes',
       group: 'Notes',
-      shortcut: { key: 'n' },
       command: { name: 'notes', syntax: 'notes', summary: 'Show the notes tab and focus the jot box' },
       run() {
         layout.showSidebarTab('notes')
@@ -281,7 +280,6 @@ export function useActions(): Action[] {
       id: 'show-queue',
       label: 'Search the queue',
       group: 'Queue',
-      shortcut: { key: 'q' },
       command: { name: 'queue', syntax: 'queue', summary: 'Show the queue tab and focus its search' },
       run() {
         layout.showSidebarTab('queue')
@@ -365,17 +363,27 @@ export function useActions(): Action[] {
       run: toTerminal,
     },
     {
-      id: 'panel-terminal',
-      label: 'Active session terminal',
+      id: 'panel-sidebar',
+      label: 'Left panel: queue and notes',
       group: 'Navigate',
       shortcut: { key: 'a', unlessTyping: true },
+      run() {
+        layout.showSidebarTab(a.sidebarTab)
+        a.focus(a.sidebarTab === 'queue' ? 'queue-filter' : 'sidebar')
+      },
+    },
+    {
+      id: 'panel-terminal',
+      label: 'Middle panel: the active session',
+      group: 'Navigate',
+      shortcut: { key: 's' },
       run: toTerminal,
     },
     {
       id: 'panel-sessions',
-      label: 'Focus sessions',
+      label: 'Right panel: sessions',
       group: 'Navigate',
-      shortcut: { key: 's' },
+      shortcut: { key: 'd' },
       run: () => layout.focusPanel('sessions'),
     },
     {

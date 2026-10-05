@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
-import { ConfirmRow } from './ConfirmRow'
+import { ProjectRow } from './ProjectRow'
 import { Icon } from './Icon'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
@@ -20,10 +20,17 @@ function ProjectPanelContent() {
   const shown = useMemo(() => projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase())), [projects, query])
   const close = () => setOverlay(null)
 
-  const choose = (name: string) => {
-    close()
-    report(() => switchProject(name))
-  }
+  const latest = useRef({ switchProject, removeProject, report, setOverlay })
+  latest.current = { switchProject, removeProject, report, setOverlay }
+  const choose = useCallback((name: string) => {
+    latest.current.setOverlay(null)
+    latest.current.report(() => latest.current.switchProject(name))
+  }, [])
+  const cancelRemove = useCallback(() => setRemoving(null), [])
+  const remove = useCallback((name: string) => {
+    setRemoving(null)
+    latest.current.report(() => latest.current.removeProject(name))
+  }, [])
 
   return (
     <Overlay align="left" label="Projects" onClose={close}>
@@ -55,53 +62,19 @@ function ProjectPanelContent() {
       <div className="max-h-80 overflow-y-auto py-1">
         {shown.length === 0 && <p className="px-4 py-4 text-small text-dim">No project matches.</p>}
         {shown.map((p, i) => (
-          <div key={p.name} className="row group h-11 items-center pr-2 pl-4" data-selected={i === cursor} onMouseEnter={() => setCursor(i)}>
-            {removing === p.name ? (
-              <>
-                <ConfirmRow
-                  danger
-                  message={`Forget ${p.name}? Its sessions keep running.`}
-                  confirmLabel="Remove"
-                  onCancel={() => setRemoving(null)}
-                  onConfirm={() => {
-                    setRemoving(null)
-                    report(() => removeProject(p.name))
-                  }}
-                />
-              </>
-            ) : (
-              <>
-                <button className="flex h-full min-w-0 flex-1 items-center gap-3 text-left" onClick={() => choose(p.name)}>
-                  <span className="w-3 flex-none text-accent">{p.name === project?.name && <Icon name="check" size={12} />}</span>
-                  <span className="min-w-0">
-                    <span className="block truncate text-body font-medium">{p.name}</span>
-                    <span className="mono block truncate text-label text-dim">{p.dir}</span>
-                  </span>
-                  <span className="mono ml-auto flex flex-none gap-3 text-small">
-                    <span style={{ color: p.needsYou > 0 ? 'var(--waiting)' : 'var(--text-dim)' }} title="need you">
-                      {p.needsYou} need
-                    </span>
-                    <span style={{ color: p.working > 0 ? 'var(--working)' : 'var(--text-dim)' }} title="working">
-                      {p.working} work
-                    </span>
-                    <span className="text-dim" title="sessions">
-                      {p.sessions} total
-                    </span>
-                  </span>
-                </button>
-                <span className="reveal">
-                  <button
-                    className="btn btn-ghost ml-1 h-6 w-6 justify-center px-0"
-                    aria-label={`Remove ${p.name}`}
-                    title="Remove project"
-                    onClick={() => setRemoving(p.name)}
-                  >
-                    <Icon name="trash" size={13} />
-                  </button>
-                </span>
-              </>
-            )}
-          </div>
+          <ProjectRow
+            key={p.name}
+            project={p}
+            index={i}
+            current={p.name === project?.name}
+            active={i === cursor}
+            removing={removing === p.name}
+            onHover={setCursor}
+            onChoose={choose}
+            onAskRemove={setRemoving}
+            onCancelRemove={cancelRemove}
+            onRemove={remove}
+          />
         ))}
       </div>
       <button

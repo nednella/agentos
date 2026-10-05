@@ -34,7 +34,7 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
       <span className="text-body">New session</span>
       {!compact && (
         <span className="ml-auto">
-          <Keycap>⌘⇧N</Keycap>
+          <Keycap>⌘N</Keycap>
         </span>
       )}
     </button>
