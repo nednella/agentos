@@ -14,7 +14,7 @@ export function ShellTerminal({ visible }: ShellTerminalProps) {
   if (!shellId) {
     return (
       <button
-        className="absolute inset-0 flex items-center gap-2 px-4 text-left text-small text-dim"
+        className="absolute inset-0 flex items-center gap-2 px-3 text-left text-small text-dim"
         onClick={() => {
           report(openShell)
           focus('shell')

@@ -47,7 +47,7 @@ export function TopBar() {
   return (
     <header
       className="relative flex flex-none items-center border-b border-line"
-      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: 'var(--traffic-light-zone)', paddingRight: 'var(--topbar-corner-pad)' }}
+      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: 'var(--traffic-light-zone)', paddingRight: 'var(--corner-pad)' }}
     >
       <div className="flex min-w-0 items-center gap-3" style={noDrag}>
         {badge ? (
