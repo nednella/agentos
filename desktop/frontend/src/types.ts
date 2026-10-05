@@ -189,5 +189,5 @@ export type EventMap = {
   'browser:state': BrowserState
   'term:data': { id: string; data: string }
   'term:exit': { id: string }
-  attention: { id: string; state: 'waiting' | 'replied' | 'pr' | 'evidence' }
+  attention: { id: string; state: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' }
 }

@@ -458,3 +458,50 @@ func TestLiveFlagGoesWithTheSession(t *testing.T) {
 		t.Error("the live flag outlived its row")
 	}
 }
+
+func TestPROpenedAttention(t *testing.T) {
+	t.Run("a PR seen while the session is idle", func(t *testing.T) {
+		h := newHarness(t)
+		s := issueSession(h, t, 12)
+		h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+		h.RefreshPRs()
+		h.RefreshPRs()
+		if got := h.Rec.CountAttentionFor(s.ID, "opened"); got != 1 {
+			t.Errorf("opened attention events = %d, want 1", got)
+		}
+		fresh := h.Restart(t)
+		fresh.RefreshPRs()
+		if got := fresh.Rec.CountAttentionFor(s.ID, "opened"); got != 0 {
+			t.Errorf("opened attention events after restart = %d, want 0", got)
+		}
+	})
+
+	t.Run("a PR seen while the session works waits for its reply", func(t *testing.T) {
+		h := newHarness(t)
+		s := issueSession(h, t, 12)
+		h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+		eventually(t, "working", func() bool {
+			got, _ := h.Session(s.ID)
+			return got.State == "working"
+		})
+		h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+		h.RefreshPRs()
+		if got := h.Rec.CountAttentionFor(s.ID, "opened"); got != 0 {
+			t.Errorf("opened attention events while working = %d, want 0", got)
+		}
+		h.Hook(t, s.ID, "Stop", `{}`)
+		eventually(t, "idle", func() bool {
+			got, _ := h.Session(s.ID)
+			return got.State == "idle"
+		})
+		if opened, replied := h.Rec.CountAttentionFor(s.ID, "opened"), h.Rec.CountAttentionFor(s.ID, "replied"); opened != 1 || replied != 0 {
+			t.Errorf("after the reply: opened %d, replied %d; want 1 and 0", opened, replied)
+		}
+		h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"more"}`)
+		h.Hook(t, s.ID, "Stop", `{}`)
+		eventually(t, "replied again", func() bool { return h.Rec.CountAttentionFor(s.ID, "replied") == 1 })
+		if got := h.Rec.CountAttentionFor(s.ID, "opened"); got != 1 {
+			t.Errorf("opened attention events after a second reply = %d, want 1", got)
+		}
+	})
+}

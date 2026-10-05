@@ -6,7 +6,7 @@ import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Ses
 
 export type Toast = {
   key: number
-  tone: 'waiting' | 'replied' | 'pr' | 'evidence' | 'error' | 'info'
+  tone: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' | 'error' | 'info'
   text: string
   sessionId?: string
   view?: SessionView
@@ -315,12 +315,13 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(
     () =>
       on('attention', ({ id, state }) => {
-        if (id === selectedRef.current) return
+        if (id === selectedRef.current && state !== 'opened') return
         const session = sessionsRef.current.find((s) => s.id === id)
         if (!session) return
         const describe = (current: Session) => {
           if (state === 'waiting') return 'needs you'
           if (state === 'replied') return 'replied'
+          if (state === 'opened') return current.pr ? `opened PR #${current.pr.number}` : 'opened a PR'
           if (state === 'evidence') return 'has something to show'
           return current.prAttention === 'checks' ? 'has failing checks' : 'has new review comments'
         }
