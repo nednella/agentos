@@ -869,3 +869,10 @@ func (s *Sessions) SetPrefillWait(d time.Duration) {
 	defer s.mu.Unlock()
 	s.prefillFor = d
 }
+
+// Has says whether a session of that id is running, in any project.
+func (s *Sessions) Has(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.ContainsFunc(s.info, func(in term.Info) bool { return in.Name.String() == id })
+}

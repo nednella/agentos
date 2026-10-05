@@ -26,6 +26,7 @@ import (
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
+	ctl "github.com/nednella/agentos/internal/control"
 )
 
 type Recorder struct {
@@ -500,4 +501,14 @@ func PRJSON(state string, draft bool, rollup string, comments, reviews int) stri
 	}
 	return fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"statusCheckRollup":%s,"comments":%s,"reviews":%s,"updatedAt":"2026-10-01T12:00:00Z"}]`,
 		state, draft, rollup, repeat(comments), repeat(reviews))
+}
+
+// Ask sends a command to the app's control socket, as the agentos command does.
+func (h *Harness) Ask(t *testing.T, req ctl.Request) ctl.Response {
+	t.Helper()
+	resp, err := ctl.Call(context.Background(), ctl.SocketPath(h.State), req)
+	if err != nil {
+		t.Fatalf("asking %s: %v", req.Cmd, err)
+	}
+	return resp
 }

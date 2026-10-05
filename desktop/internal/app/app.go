@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/nednella/agentos/desktop/control"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/desktop/notes"
@@ -27,6 +28,8 @@ type App struct {
 	sessions *sessions.Sessions
 	terms    *terminal.Terms
 	notes    *notes.Notes
+	router   *control.Router
+	stateDir string
 	services []any
 }
 
@@ -48,7 +51,10 @@ func New(c Config, h Host, runner run.Runner) *App {
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit)
 	store := notes.New(c.DataDir)
-	a.sessions, a.terms, a.notes = sess, terms, store
+	a.sessions, a.terms, a.notes, a.stateDir = sess, terms, store, c.StateDir
+	a.router = control.New(sess)
+	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
+	a.router.Handle("stats", stats.NewCommands(waits, a.router).Stats)
 	a.services = []any{
 		projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx),
 		sessions.NewService(sess, ctx),
@@ -66,11 +72,18 @@ func (a *App) Services() []any { return a.services }
 // Start begins following the sessions; it runs until ctx ends.
 func (a *App) Start(ctx context.Context) error {
 	a.ctx.Store(&ctx)
-	return a.sessions.Run(ctx)
+	if err := a.sessions.Run(ctx); err != nil {
+		return err
+	}
+	a.router.Listen(a.stateDir)
+	return nil
 }
 
-// Stop closes the terminal streams.
-func (a *App) Stop() { a.terms.CloseAll() }
+// Stop closes the terminal streams and stops answering the command line.
+func (a *App) Stop() {
+	a.terms.CloseAll()
+	a.router.Close()
+}
 
 // Media serves the pictures under /media/.
 func (a *App) Media() http.Handler { return a.notes.MediaHandler() }
