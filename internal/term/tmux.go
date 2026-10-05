@@ -143,5 +143,21 @@ func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) erro
 	return nil
 }
 
+// Type puts text into the session's prompt without pressing Enter. Text with
+// line breaks goes in as a paste, so the breaks cannot submit it.
+func (t *Tmux) Type(ctx context.Context, name session.Name, text string) error {
+	if strings.Contains(text, "\n") {
+		const buf = "agentos-prefill"
+		if _, err := t.run(ctx, "set-buffer", "-b", buf, "--", text, ";", "paste-buffer", "-p", "-r", "-d", "-b", buf, "-t", name.String()); err != nil {
+			return fmt.Errorf("pasting into session %s: %w", name, err)
+		}
+		return nil
+	}
+	if _, err := t.run(ctx, "send-keys", "-t", name.String(), "-l", "--", text); err != nil {
+		return fmt.Errorf("typing into session %s: %w", name, err)
+	}
+	return nil
+}
+
 // oneLine keeps a title from breaking the tab-separated list: tabs and line breaks become spaces.
 func oneLine(title string) string { return strings.Join(strings.Fields(title), " ") }

@@ -5,12 +5,14 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"sync/atomic"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func main() {
@@ -32,7 +34,14 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	app := newApp(cfg)
+	var window atomic.Pointer[context.Context]
+	app := newApp(cfg, host{
+		emit: func(event string, payload any) {
+			if c := window.Load(); c != nil {
+				runtime.EventsEmit(*c, event, payload)
+			}
+		},
+	})
 
 	return wails.Run(&options.App{
 		Title:            "agentos",
@@ -43,8 +52,11 @@ func run() error {
 		BackgroundColour: &options.RGBA{R: 7, G: 9, B: 13, A: 255},
 		AssetServer:      &assetserver.Options{Assets: assets},
 		OnStartup: func(c context.Context) {
+			window.Store(&c)
 			stripMenuShortcuts()
-			app.start(c)
+			if err := app.start(c); err != nil {
+				log.Printf("agentos: %v", err)
+			}
 		},
 		Bind: []any{app},
 		// The Edit menu is what makes ⌘C, ⌘V and ⌘X reach the web view on macOS. Select All loses its key in stripMenuShortcuts.

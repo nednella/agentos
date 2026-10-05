@@ -21,6 +21,12 @@ type Record struct {
 	Event   string    `json:"event"`
 	At      time.Time `json:"at"`
 	Detail  string    `json:"detail,omitempty"`
+
+	// What the desktop app records when a session ends, so the row can outlive it.
+	Title   string `json:"title,omitempty"`
+	Path    string `json:"path,omitempty"`
+	Created int64  `json:"created,omitempty"` // unix ms
+	EndedAt int64  `json:"endedAt,omitempty"` // unix ms
 }
 
 // Session is one agent as the screen sees it.
