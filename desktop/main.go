@@ -37,6 +37,13 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
+		hub := &eventHub{subs: map[chan []byte]struct{}{}}
+		app := newApp(cfg, host{emit: hub.emit, clipboard: func(string) {}})
+		quitOnSignal(app)
+		return serveHTTP(app, hub, assets, addr)
+	}
+
 	var window atomic.Pointer[context.Context]
 	app := newApp(cfg, host{
 		emit: func(event string, payload any) {
