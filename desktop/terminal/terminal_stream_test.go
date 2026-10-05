@@ -2,6 +2,7 @@ package terminal_test
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -123,4 +124,29 @@ func TestClipboardFromTheAgent(t *testing.T) {
 	if !strings.Contains(h.Rec.Output(s.ID), "\x1b]52;") {
 		t.Error("the OSC 52 bytes were not forwarded")
 	}
+}
+
+func TestTerminalAttachesToTheShell(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+	t.Setenv("HOME", t.TempDir())
+	h := newHarness(t)
+	shell, err := h.ShellOpen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.TermOpen(shell.ID, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "shell output", func() bool { return len(h.Rec.Output(shell.ID)) > 0 })
+	if err := h.TermWrite(shell.ID, "echo \"$AGENTOS_PROJECT|${AGENTOS_SESSION-unset}|${AGENTOS_SOCKET:+set}|$(pwd -P)\"\n"); err != nil {
+		t.Fatal(err)
+	}
+	want, err := filepath.EvalSymlinks(h.Dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the shell's environment", func() bool {
+		return strings.Contains(h.Rec.Output(shell.ID), "\r\nmain|unset|set|"+want+"\r\n")
+	})
+	h.TermClose(shell.ID)
 }

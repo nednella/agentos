@@ -136,6 +136,10 @@ func TestParseName(t *testing.T) {
 		{"api/", Name{}, true},
 		{"api/x", Name{}, true},
 		{"api/0", Name{}, true},
+		{"api/shell", Name{Project: "api"}, false},
+		{"a/b/shell", Name{Project: "a/b"}, false},
+		{"api/shells", Name{}, true},
+		{"/shell", Name{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
@@ -145,6 +149,9 @@ func TestParseName(t *testing.T) {
 			}
 			if err == nil && got.String() != tt.in {
 				t.Errorf("round trip = %q, want %q", got.String(), tt.in)
+			}
+			if err == nil && got.IsShell() != strings.HasSuffix(tt.in, "/shell") {
+				t.Errorf("IsShell = %v for %q", got.IsShell(), tt.in)
 			}
 		})
 	}

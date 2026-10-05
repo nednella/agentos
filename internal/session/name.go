@@ -8,19 +8,33 @@ import (
 
 // Name is the tmux session name: "<project key>/<n>". The title shown to the
 // user lives in a tmux option, so renaming never changes the name the agent's
-// hooks report under.
+// hooks report under. N 0 names the project's shell, "<project key>/shell",
+// which is not an agent and never reports.
 type Name struct {
 	Project string
 	N       int
 }
 
-func (n Name) String() string { return fmt.Sprintf("%s/%d", n.Project, n.N) }
+const shellSuffix = "shell"
+
+func (n Name) String() string {
+	if n.N == 0 {
+		return n.Project + "/" + shellSuffix
+	}
+	return fmt.Sprintf("%s/%d", n.Project, n.N)
+}
+
+// IsShell says whether the name is a project's shell rather than an agent.
+func (n Name) IsShell() bool { return n.N == 0 }
 
 // ParseName decodes a tmux session name. It fails for sessions agentos did not create.
 func ParseName(s string) (Name, error) {
 	i := strings.LastIndexByte(s, '/')
 	if i <= 0 {
 		return Name{}, fmt.Errorf("session name %q is not <project>/<n>", s)
+	}
+	if s[i+1:] == shellSuffix {
+		return Name{Project: s[:i]}, nil
 	}
 	n, err := strconv.Atoi(s[i+1:])
 	if err != nil || n < 1 {

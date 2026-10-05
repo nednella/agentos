@@ -101,3 +101,27 @@ func TestListSkipsSessionsAgentosDidNotMake(t *testing.T) {
 		t.Errorf("List = %v, %v", infos, err)
 	}
 }
+
+func TestShellSessionsAreListedApart(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	agent, shell := session.Name{Project: "demo", N: 1}, session.Name{Project: "demo"}
+	if tmux.Has(ctx, shell) {
+		t.Fatal("Has without a server is true")
+	}
+	for _, n := range []session.Name{agent, shell} {
+		if err := tmux.NewSession(ctx, n, "title", t.TempDir(), nil, []string{"sleep", "60"}, 100, 30); err != nil {
+			t.Fatal(err)
+		}
+	}
+	infos, shells, err := tmux.ListAll(ctx)
+	if err != nil || len(infos) != 1 || infos[0].Name != agent || len(shells) != 1 || shells[0] != "demo" {
+		t.Fatalf("ListAll = %v, %v, %v", infos, shells, err)
+	}
+	if infos, err = tmux.List(ctx); err != nil || len(infos) != 1 {
+		t.Errorf("List = %v, %v", infos, err)
+	}
+	if !tmux.Has(ctx, shell) || !tmux.Has(ctx, agent) || tmux.Has(ctx, session.Name{Project: "demo", N: 2}) || tmux.Has(ctx, session.Name{Project: "dem"}) {
+		t.Error("Has gave a wrong answer")
+	}
+}

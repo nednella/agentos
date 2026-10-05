@@ -95,15 +95,22 @@ func cleanEnv() []string {
 
 // List returns the agent sessions. No running server means no sessions.
 func (t *Tmux) List(ctx context.Context) ([]Info, error) {
+	infos, _, err := t.ListAll(ctx)
+	return infos, err
+}
+
+// ListAll returns the agent sessions and the projects that have a shell session.
+func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
 	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{session_created}")
 	if err != nil {
 		var exit *exec.ExitError
 		if msg := err.Error(); errors.As(err, &exit) && (strings.Contains(msg, "no server running") || strings.Contains(msg, "error connecting")) {
-			return nil, nil
+			return nil, nil, nil
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	var infos []Info
+	var shells []string
 	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.Split(line, "\t")
 		if len(f) != 5 {
@@ -113,13 +120,23 @@ func (t *Tmux) List(ctx context.Context) ([]Info, error) {
 		if err != nil {
 			continue
 		}
+		if name.IsShell() {
+			shells = append(shells, name.Project)
+			continue
+		}
 		info := Info{Name: name, Title: f[1], Path: f[2], Issue: f[3]}
 		if secs, err := strconv.ParseInt(f[4], 10, 64); err == nil {
 			info.Created = time.Unix(secs, 0)
 		}
 		infos = append(infos, info)
 	}
-	return infos, nil
+	return infos, shells, nil
+}
+
+// Has says whether a tmux session of that name exists.
+func (t *Tmux) Has(ctx context.Context, name session.Name) bool {
+	_, err := t.run(ctx, "has-session", "-t", "="+name.String())
+	return err == nil
 }
 
 // NewSession starts argv detached in dir at the given size.

@@ -16,6 +16,18 @@ func (v *Service) NewSession(title, prefill string) (Session, error) {
 	return v.s.Create(title, prefill, 0)
 }
 
+// ShellInfo names a shell session.
+type ShellInfo struct {
+	ID string `json:"id"`
+}
+
+// ShellOpen makes sure the current project has a shell session and returns its id.
+// Attach to it with TermOpen like any session; it is not a session row.
+func (v *Service) ShellOpen() (ShellInfo, error) {
+	id, err := v.s.OpenShell()
+	return ShellInfo{ID: id}, err
+}
+
 // KillSession stops the agent; its row stays as ended.
 func (v *Service) KillSession(id string) error { return v.s.Kill(id) }
 

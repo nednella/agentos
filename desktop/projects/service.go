@@ -16,6 +16,7 @@ type Sessions interface {
 	Current() project.Project
 	Projects() []sessions.Project
 	List() []sessions.Session
+	ShellID() string
 	SwitchProject(name string) (project.Project, error)
 	Forget(name string) (project.Project, error)
 }
@@ -37,6 +38,7 @@ type Snapshot struct {
 	Sessions []sessions.Session `json:"sessions"`
 	Notes    []notes.Note       `json:"notes"`
 	Version  string             `json:"version"`
+	Shell    string             `json:"shell"` // the current project's shell session, "" until it is opened
 }
 
 // Service is bound to the front end.
@@ -59,7 +61,7 @@ func (s *Service) Snapshot() Snapshot {
 	cur := s.sessions.Current()
 	repo := s.repos.Repo(s.ctx(), cur.Dir)
 	projects := s.sessions.Projects()
-	snap := Snapshot{Projects: projects, Sessions: s.sessions.List(), Version: version.Version}
+	snap := Snapshot{Projects: projects, Sessions: s.sessions.List(), Version: version.Version, Shell: s.sessions.ShellID()}
 	snap.Project = sessions.Project{Name: cur.Name, Dir: cur.Dir}
 	for i, p := range projects {
 		if p.Dir == cur.Dir {

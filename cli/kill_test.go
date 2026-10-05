@@ -113,3 +113,17 @@ func TestKillAllStopsEveryProject(t *testing.T) {
 		t.Errorf("state files left: %v", left)
 	}
 }
+
+func TestKillLeavesShellsUnlessAll(t *testing.T) {
+	tmux, _ := killSetup(t)
+	shell := session.Name{Project: "demo"}
+	if err := tmux.NewSession(context.Background(), shell, "shell", t.TempDir(), nil, []string{"sleep", "60"}, 80, 24); err != nil {
+		t.Fatal(err)
+	}
+	if out := runKill(t); strings.Contains(out, "shell") || !tmux.Has(context.Background(), shell) {
+		t.Errorf("kill touched the shell: %q", out)
+	}
+	if out := runKill(t, "--all"); !strings.Contains(out, "stopping demo/shell") || tmux.Has(context.Background(), shell) {
+		t.Errorf("kill --all left the shell: %q", out)
+	}
+}

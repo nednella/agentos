@@ -35,6 +35,8 @@ const (
 	promptSettles = 300 * time.Millisecond
 )
 
+var errNotSession = errors.New("the shell is not a session")
+
 // Change is one entry of a session's state timeline.
 type Change struct {
 	State session.State `json:"state"`
@@ -93,6 +95,7 @@ type Sessions struct {
 	evidence   Evidence
 	browsers   Browsers
 	info       []term.Info
+	shells     []string                 // projects that have a shell session
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
 	dismissed  map[string]bool          // ended sessions the user dismissed: the poll must not bring them back
@@ -221,7 +224,7 @@ func (s *Sessions) Refresh() {
 	s.mu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	infos, err := s.tmux.List(ctx)
+	infos, shells, err := s.tmux.ListAll(ctx)
 	if err != nil {
 		return
 	}
@@ -229,6 +232,7 @@ func (s *Sessions) Refresh() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.info = infos
+	s.shells = shells
 	for name, rec := range records {
 		if slices.ContainsFunc(infos, func(i term.Info) bool { return i.Name.String() == name }) {
 			s.take(rec)
@@ -762,6 +766,9 @@ func (s *Sessions) Kill(id string) error {
 	if err != nil {
 		return err
 	}
+	if name.IsShell() {
+		return errNotSession
+	}
 	s.mu.Lock()
 	_, ended := s.ended[id]
 	s.mu.Unlock()
@@ -786,6 +793,9 @@ func (s *Sessions) Rename(id, title string) error {
 	name, err := session.ParseName(id)
 	if err != nil {
 		return err
+	}
+	if name.IsShell() {
+		return errNotSession
 	}
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
@@ -905,6 +915,45 @@ func (s *Sessions) closeBrowser(id string) {
 	ctx, cancel := context.WithTimeout(context.Background(), tmuxTimeout)
 	defer cancel()
 	s.browsers.Close(ctx, id)
+}
+
+// ShellID is the current project's shell session, or "" until it is opened.
+func (s *Sessions) ShellID() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := s.project.Key()
+	if slices.Contains(s.shells, key) {
+		return session.Name{Project: key}.String()
+	}
+	return ""
+}
+
+// OpenShell makes sure the current project has a shell session, a login shell
+// in the project folder, and returns its id. The shell reports nothing: it is
+// not an agent, so it gets no hooks and no session number.
+func (s *Sessions) OpenShell() (string, error) {
+	s.mu.Lock()
+	ctx, proj := s.ctx, s.project
+	s.mu.Unlock()
+	name := session.Name{Project: proj.Key()}
+	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	defer cancel()
+	if !s.tmux.Has(tctx, name) {
+		login := cmp.Or(os.Getenv("SHELL"), "/bin/zsh")
+		env := []string{
+			"AGENTOS_PROJECT=" + proj.Key(),
+			"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
+		}
+		if err := s.tmux.NewSession(tctx, name, "shell", proj.Dir, env, []string{login, "-l"}, startCols, startRows); err != nil {
+			return "", err
+		}
+	}
+	s.mu.Lock()
+	if !slices.Contains(s.shells, proj.Key()) {
+		s.shells = append(s.shells, proj.Key())
+	}
+	s.mu.Unlock()
+	return name.String(), nil
 }
 
 // commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
