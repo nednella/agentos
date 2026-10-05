@@ -27,8 +27,6 @@ type Note struct {
 	Pinned    bool     `json:"pinned"`
 	Archived  bool     `json:"archived"`
 	Images    []string `json:"images"` // URLs under /media/
-	Issue     int      `json:"issue"`
-	IssueURL  string   `json:"issueUrl"`
 }
 
 // title is the first line of the note.
@@ -185,10 +183,6 @@ func (s *Notes) SetPinned(key, id string, pinned bool) (Note, error) {
 
 func (s *Notes) SetArchived(key, id string, archived bool) (Note, error) {
 	return s.edit(key, id, func(n *Note) error { n.Archived = archived; return nil })
-}
-
-func (s *Notes) SetIssue(key, id string, number int, url string) (Note, error) {
-	return s.edit(key, id, func(n *Note) error { n.Issue, n.IssueURL = number, url; return nil })
 }
 
 func (s *Notes) Delete(key, id string) error {

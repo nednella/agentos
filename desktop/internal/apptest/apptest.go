@@ -602,7 +602,7 @@ func (h *Harness) AddNoteImage(id, data, mime string) (notes.Note, error) {
 func (h *Harness) RemoveNoteImage(id, url string) (notes.Note, error) {
 	return h.notes.RemoveNoteImage(id, url)
 }
-func (h *Harness) NoteToIssue(id string) (notes.Note, error) { return h.notes.NoteToIssue(id) }
+func (h *Harness) NoteToIssue(id string) error { return h.notes.NoteToIssue(id) }
 func (h *Harness) NoteToSession(id string) (sessions.Session, error) {
 	return h.notes.NoteToSession(id)
 }
