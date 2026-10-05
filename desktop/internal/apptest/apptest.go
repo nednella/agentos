@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/browser"
+	"github.com/nednella/agentos/desktop/digest"
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/run"
@@ -246,9 +247,16 @@ func NoGH(context.Context, string, string, ...string) ([]byte, error) {
 	return nil, errors.New("gh is not available in this test")
 }
 
+// NoClaude is an env runner for tests that must not run claude.
+func NoClaude(context.Context, string, []string, string, ...string) ([]byte, error) {
+	return nil, errors.New("claude is not available in this test")
+}
+
 // Options changes the harness's config.
 type Options struct {
-	ProjectExtra string // yaml lines added under the project "main"
+	ProjectExtra string        // yaml lines added under the project "main"
+	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
+	DigestTick   time.Duration
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -256,6 +264,7 @@ type Harness struct {
 	App    *app.App
 	Rec    *Recorder
 	GH     *FakeGH
+	Claude *FakeClaude
 	Socket string
 	Dir    string
 	State  string
@@ -269,6 +278,7 @@ type Harness struct {
 	stats    *stats.Service
 	evidence *evidence.Service
 	browser  *browser.Service
+	digest   *digest.Service
 }
 
 // New starts an app for the test; the cleanup stops it and its tmux server.
@@ -296,9 +306,14 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_DIR", dir)
 	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
 
-	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
+	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
 	h.App = h.build(t)
 	h.App.Sessions().SetPrefillWait(300 * time.Millisecond)
+	first, tick := o.DigestFirst, o.DigestTick
+	if first == 0 {
+		first, tick = time.Hour, time.Hour
+	}
+	h.App.Digests().SetLoop(first, tick) // a test must never start the real claude
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := h.App.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -319,7 +334,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker}, h.GH.Run)
+	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker}, h.GH.Run, h.Claude.RunEnv)
 	for _, svc := range a.Services() {
 		switch s := svc.(type) {
 		case *projects.Service:
@@ -338,6 +353,8 @@ func (h *Harness) build(t *testing.T) *app.App {
 			h.evidence = s
 		case *browser.Service:
 			h.browser = s
+		case *digest.Service:
+			h.digest = s
 		}
 	}
 	return a
@@ -346,7 +363,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 // Restart starts a second app on the same dirs, as if the first was quit and opened again.
 func (h *Harness) Restart(t *testing.T) *Harness {
 	t.Helper()
-	second := &Harness{Rec: &Recorder{}, GH: h.GH, Socket: h.Socket, Dir: h.Dir, State: h.State, Conf: h.Conf}
+	second := &Harness{Rec: &Recorder{}, GH: h.GH, Claude: h.Claude, Socket: h.Socket, Dir: h.Dir, State: h.State, Conf: h.Conf}
 	second.App = second.build(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
@@ -583,3 +600,50 @@ func (h *Harness) BrowserScreenshot(id, caption string) (evidence.Evidence, erro
 func (h *Harness) BrowserClose(id string) { h.browser.BrowserClose(id) }
 
 func (h *Harness) HarnessCheck() (sessions.Session, error) { return h.sessions.HarnessCheck() }
+
+// DigestCall is one run of claude as the digest makes it.
+type DigestCall struct {
+	Dir  string
+	Env  []string
+	Args []string
+}
+
+// FakeClaude stands in for claude: it records each call and runs Do, if set, as claude would act.
+type FakeClaude struct {
+	mu    sync.Mutex
+	calls []DigestCall
+	Do    func(call DigestCall)
+	Err   error
+}
+
+// RunEnv is the run.EnvRunner of the digest.
+func (f *FakeClaude) RunEnv(_ context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
+	call := DigestCall{Dir: dir, Env: env, Args: append([]string{name}, args...)}
+	f.mu.Lock()
+	f.calls = append(f.calls, call)
+	do, err := f.Do, f.Err
+	f.mu.Unlock()
+	if do != nil {
+		do(call)
+	}
+	return nil, err
+}
+
+// Calls are the runs so far.
+func (f *FakeClaude) Calls() []DigestCall {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.calls)
+}
+
+// SetDo sets what claude does when called.
+func (f *FakeClaude) SetDo(do func(DigestCall)) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.Do = do
+}
+
+func (h *Harness) Digest() digest.Digest                      { return h.digest.Digest() }
+func (h *Harness) RunDigest() error                           { return h.digest.RunDigest() }
+func (h *Harness) DismissDigestItem(id string) error          { return h.digest.DismissDigestItem(id) }
+func (h *Harness) DigestToNote(id string) (notes.Note, error) { return h.digest.DigestToNote(id) }

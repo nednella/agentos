@@ -8,6 +8,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/browser"
 	"github.com/nednella/agentos/desktop/control"
+	"github.com/nednella/agentos/desktop/digest"
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/issues"
@@ -34,13 +35,14 @@ type App struct {
 	notes    *notes.Notes
 	evidence *evidence.Store
 	browsers *browser.Browsers
+	digests  *digest.Manager
 	router   *control.Router
 	stateDir string
 	services []any
 }
 
 // New wires the services: who needs whom is decided here, and nowhere else.
-func New(c Config, h Host, runner run.Runner) *App {
+func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
 	a := &App{}
 	ctx := func() context.Context {
 		if c := a.ctx.Load(); c != nil {
@@ -73,7 +75,10 @@ func New(c Config, h Host, runner run.Runner) *App {
 		}
 		return ""
 	}, sess.Touch)
+	mgr := digest.NewManager(digest.New(c.DataDir), sess, store, claude, h.Emit, c.StateDir, ctx)
+	a.digests = mgr
 	a.router = control.New(sess)
+	a.router.Handle("digest-add", digest.NewCommands(mgr).Add)
 	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
 	a.router.Handle("show", evidence.NewCommands(proofs, a.router, changes).Show)
@@ -87,6 +92,7 @@ func New(c Config, h Host, runner run.Runner) *App {
 		notes.NewService(store, sess, sess, iss, runner, h.Emit, ctx),
 		evidence.NewService(proofs, changes),
 		browser.NewService(browsers, proofs, changes, ctx),
+		digest.NewService(mgr),
 		stats.NewService(waits, sess),
 	}
 	return a
@@ -102,6 +108,7 @@ func (a *App) Start(ctx context.Context) error {
 		return err
 	}
 	a.router.Listen(a.stateDir)
+	go a.digests.Loop(ctx)
 	return nil
 }
 
@@ -131,3 +138,6 @@ func (a *App) Notes() *notes.Notes { return a.notes }
 
 // Browsers are the hidden browsers, for tests.
 func (a *App) Browsers() *browser.Browsers { return a.browsers }
+
+// Digests is the digest manager, for tests.
+func (a *App) Digests() *digest.Manager { return a.digests }

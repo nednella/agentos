@@ -70,3 +70,6 @@ func (p Project) BranchFor(number int) string {
 
 // BrowserOn says whether sessions get the browser and evidence commands.
 func (p Project) BrowserOn() bool { return p.Browser == nil || *p.Browser }
+
+// DigestOn says whether the weekly digest runs by itself.
+func (p Project) DigestOn() bool { return p.Digest != "off" }

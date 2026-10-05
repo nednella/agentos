@@ -42,7 +42,7 @@ func launch() error {
 	}
 	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
 		hub := devhttp.NewHub()
-		a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil }}, run.Exec)
+		a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil }}, run.Exec, run.ExecEnv)
 		quitOnSignal(a)
 		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: a.Stop, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
 	}
@@ -62,7 +62,7 @@ func launch() error {
 		PickDir: func() (string, error) {
 			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Add a project folder", CanCreateDirectories: true})
 		},
-	}, run.Exec)
+	}, run.Exec, run.ExecEnv)
 	quitOnSignal(a)
 
 	return wails.Run(&options.App{

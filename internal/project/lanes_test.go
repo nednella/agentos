@@ -72,3 +72,14 @@ func TestBrowserOn(t *testing.T) {
 		}
 	}
 }
+
+func TestDigestOn(t *testing.T) {
+	for _, tt := range []struct {
+		digest string
+		want   bool
+	}{{"", true}, {"weekly", true}, {"off", false}} {
+		if got := (Project{Digest: tt.digest}).DigestOn(); got != tt.want {
+			t.Errorf("DigestOn(%q) = %v, want %v", tt.digest, got, tt.want)
+		}
+	}
+}

@@ -21,6 +21,7 @@ type Project struct {
 	Cleanup  string            `yaml:"cleanup,omitempty"`  // shell command that removes a worktree; {branch} and {worktree}
 	URL      string            `yaml:"url,omitempty"`      // the page a session's browser opens first
 	Browser  *bool             `yaml:"browser,omitempty"`  // give sessions the browser and evidence commands; on unless false
+	Digest   string            `yaml:"digest,omitempty"`   // weekly (the default) or off
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.

@@ -20,7 +20,7 @@ func useConfig(t *testing.T, body string) {
 }
 
 func snapshot(cfg app.Config) projects.Snapshot {
-	a := app.New(cfg, app.Host{Emit: func(string, any) {}, Clipboard: func(string) {}}, apptest.NoGH)
+	a := app.New(cfg, app.Host{Emit: func(string, any) {}, Clipboard: func(string) {}}, apptest.NoGH, apptest.NoClaude)
 	for _, svc := range a.Services() {
 		if s, ok := svc.(*projects.Service); ok {
 			return s.Snapshot()

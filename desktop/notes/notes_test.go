@@ -328,7 +328,7 @@ func TestNotesLiveInTheDataDir(t *testing.T) {
 	if err != nil || cfg.DataDir != synced {
 		t.Fatalf("dataDir = %q, %v", cfg.DataDir, err)
 	}
-	a := app.New(cfg, app.Host{Emit: func(string, any) {}, Clipboard: func(string) {}}, apptest.NoGH)
+	a := app.New(cfg, app.Host{Emit: func(string, any) {}, Clipboard: func(string) {}}, apptest.NoGH, apptest.NoClaude)
 	if _, err := addNote(a, "kept in the synced folder"); err != nil {
 		t.Fatal(err)
 	}
