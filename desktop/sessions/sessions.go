@@ -446,6 +446,10 @@ func (s *Sessions) sync() {
 			state, at = rec.State, rec.At
 		}
 		prev, known := s.seen[id]
+		opened := s.loaded && state == session.Idle && s.life.opened(id)
+		if opened {
+			attention = append(attention, [2]string{id, "opened"})
+		}
 		if known && prev == state {
 			continue
 		}
@@ -460,7 +464,7 @@ func (s *Sessions) sync() {
 			switch {
 			case state == session.Waiting:
 				attention = append(attention, [2]string{id, "waiting"})
-			case replied:
+			case replied && !opened:
 				attention = append(attention, [2]string{id, "replied"})
 			}
 		}

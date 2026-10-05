@@ -75,6 +75,7 @@ type track struct {
 	reason    string
 	autoTried bool
 	sawLive   bool // the PR was seen draft or open while this session ran
+	opened    bool // the PR is new to the app; the user hears of it once the session is idle
 }
 
 // ack is how much of a PR the user has seen.
@@ -186,6 +187,21 @@ func (l *Lifecycle) fields(id string) sessionFields {
 		f.pr = &pr
 	}
 	return f
+}
+
+// opened says, once, that the session's PR has appeared since the user last heard of it.
+func (l *Lifecycle) opened(id string) bool {
+	if l == nil {
+		return false
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	t := l.tracks[id]
+	if t == nil || !t.opened {
+		return false
+	}
+	t.opened = false
+	return true
 }
 
 func (l *Lifecycle) forget(id string) {
@@ -343,6 +359,9 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) outcome {
 		return o
 	}
 	live := pr.State == "draft" || pr.State == "open"
+	if _, known := l.prs(key).Acks[strconv.Itoa(pr.Number)]; live && !known {
+		tr.opened = true
+	}
 	if live && !tr.sawLive {
 		tr.sawLive = true
 		l.prs(key).Live[t.id] = true
