@@ -28,7 +28,7 @@ export function useShortcuts() {
         lay.returnToTerminal()
         return
       }
-      if (lay.statsOpen) {
+      if (lay.statsOpen || lay.digestOpen) {
         lay.closeCentre()
         agentos.focus('terminal')
         return

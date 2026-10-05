@@ -1,3 +1,4 @@
+import { DigestView } from './components/DigestView'
 import { Divider } from './components/Divider'
 import { MobileTabs } from './components/MobileTabs'
 import { ProjectPanel } from './components/ProjectPanel'
@@ -11,7 +12,7 @@ import { useShortcuts } from './useShortcuts'
 
 export function App() {
   useShortcuts()
-  const { mode, sidebarOpen, sessionsOpen, mobilePanel, statsOpen } = useLayout()
+  const { mode, sidebarOpen, sessionsOpen, mobilePanel, statsOpen, digestOpen } = useLayout()
   const narrow = mode === 'narrow'
   const showCentre = !narrow || mobilePanel === 'session'
 
@@ -23,10 +24,11 @@ export function App() {
         {!narrow && sidebarOpen && <Divider panel="sidebar" />}
         {!narrow && !sidebarOpen && <span className="w-3 flex-none" />}
         <div className={`min-h-0 min-w-0 flex-1 ${showCentre ? '' : 'hidden'}`}>
-          <div className={statsOpen ? 'hidden' : 'h-full'}>
+          <div className={statsOpen || digestOpen ? 'hidden' : 'h-full'}>
             <Viewport />
           </div>
           {statsOpen && <Stats />}
+          {digestOpen && <DigestView />}
         </div>
         {!narrow && sessionsOpen && <Divider panel="sessions" />}
         {!narrow && !sessionsOpen && <span className="w-3 flex-none" />}

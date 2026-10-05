@@ -30,8 +30,8 @@ function Count({ state, count, label, condensed }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay } = useAgentos()
-  const { width, statsOpen } = useLayout()
+  const { project, projects, sessions, setOverlay, digestUnseen } = useAgentos()
+  const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
@@ -90,16 +90,29 @@ export function TopBar() {
           </button>
         )}
         {width >= MORE_MIN && (
-          <button
-            className={iconButton}
-            style={{ color: statsOpen ? 'var(--accent)' : undefined }}
-            title={`Stats (${keys('stats')})`}
-            aria-label="Stats"
-            aria-pressed={statsOpen}
-            onClick={() => find('stats').run([])}
-          >
-            <Icon name="chart" />
-          </button>
+          <>
+            <button
+              className={iconButton}
+              style={{ color: statsOpen ? 'var(--accent)' : undefined }}
+              title={`Stats (${keys('stats')})`}
+              aria-label="Stats"
+              aria-pressed={statsOpen}
+              onClick={() => find('stats').run([])}
+            >
+              <Icon name="chart" />
+            </button>
+            <button
+              className={`${iconButton} relative`}
+              style={{ color: digestOpen ? 'var(--accent)' : undefined }}
+              title={`Weekly digest (${keys('digest')})${digestUnseen ? ', new items' : ''}`}
+              aria-label={digestUnseen ? 'Weekly digest, new items' : 'Weekly digest'}
+              aria-pressed={digestOpen}
+              onClick={() => find('digest').run([])}
+            >
+              <Icon name="digest" />
+              {digestUnseen && <span className="dot absolute top-1.5 right-1.5" style={{ ['--c' as string]: 'var(--accent)' }} />}
+            </button>
+          </>
         )}
       </div>
     </header>

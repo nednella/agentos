@@ -12,13 +12,14 @@ import { Timeline } from './Timeline'
 type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
 
 export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
-  const { select, focus, dismissSession, report, issues } = useAgentos()
+  const { select, focus, setSessionView, dismissSession, report, issues } = useAgentos()
   const now = useNow()
   const waiting = session.state === 'waiting'
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
   const showPR = session.pr !== null && !dense
-  const hasFooter = ended || showPR || session.cleanup !== ''
+  const showEvidence = session.evidence > 0 && !dense
+  const hasFooter = ended || showPR || showEvidence || session.cleanup !== ''
 
   return (
     <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
@@ -60,6 +61,19 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           )}
           {showPR && <PRBadge session={session} compact={compact} />}
           {ended && session.pr && dense && <PRBadge session={session} compact />}
+          {showEvidence && (
+            <button
+              className="inline-flex h-6 flex-none items-center gap-1 rounded-sm border border-line-strong px-2 text-small text-soft"
+              title={`${session.evidence} evidence items`}
+              onClick={() => {
+                select(session.id)
+                setSessionView(session.id, 'evidence')
+              }}
+            >
+              <Icon name="image" size={12} />
+              <span className="mono">{session.evidence}</span>
+            </button>
+          )}
           {session.cleanup !== '' && <CleanupControls session={session} />}
           {ended && issue && (
             <button

@@ -268,6 +268,62 @@ export function useActions(): Action[] {
       run: layout.toggleStats,
     },
     {
+      id: 'show-terminal',
+      label: 'Show terminal',
+      group: 'Sessions',
+      run() {
+        if (!current) throw 'No session selected'
+        layout.closeCentre()
+        a.setSessionView(current.id, 'terminal')
+      },
+    },
+    {
+      id: 'show-browser',
+      label: 'Show browser',
+      group: 'Sessions',
+      async run(args) {
+        if (!current) throw 'No session selected'
+        layout.closeCentre()
+        if (args.length === 0) {
+          a.setSessionView(current.id, 'browser')
+          return
+        }
+        await a.openBrowser(current.id, args.join(' '))
+        return `Opened ${args.join(' ')}`
+      },
+    },
+    {
+      id: 'show-evidence',
+      label: 'Show evidence',
+      group: 'Sessions',
+      run() {
+        if (!current) throw 'No session selected'
+        layout.closeCentre()
+        a.setSessionView(current.id, 'evidence')
+      },
+    },
+    {
+      id: 'view-previous',
+      label: 'Previous view (terminal, browser, evidence)',
+      group: 'Navigate',
+      shortcut: { key: '[', code: 'BracketLeft', shift: true, label: '[' },
+      run: () => a.cycleSessionView(-1),
+    },
+    {
+      id: 'view-next',
+      label: 'Next view (terminal, browser, evidence)',
+      group: 'Navigate',
+      shortcut: { key: ']', code: 'BracketRight', shift: true, label: ']' },
+      run: () => a.cycleSessionView(1),
+    },
+    {
+      id: 'digest',
+      label: 'Weekly digest',
+      group: 'App',
+      shortcut: { key: 'd', shift: true },
+      run: layout.toggleDigest,
+    },
+    {
       id: 'harness',
       label: "Check this project's harness",
       group: 'Projects',

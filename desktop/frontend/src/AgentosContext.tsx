@@ -2,7 +2,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { Cleanup, Issue, Note, Project, Session } from './types'
+import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session } from './types'
+
+export type SessionView = 'terminal' | 'browser' | 'evidence'
+export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
 export type SidebarTab = 'queue' | 'notes'
@@ -20,6 +23,10 @@ type Agentos = {
   issueFilter: string
   notes: Note[]
   cleanups: Cleanup[]
+  evidence: Record<string, Evidence[]>
+  browserStates: Record<string, BrowserState>
+  digest: Digest | null
+  digestUnseen: boolean
   overlay: Overlay
   sidebarTab: SidebarTab
   composing: boolean
@@ -43,7 +50,15 @@ type Agentos = {
   removeNoteImage(id: string, url: string): Promise<void>
   deleteNote(id: string): Promise<void>
   refreshPRs(): Promise<void>
+  viewOf(id: string | null): SessionView
+  setSessionView(id: string, view: SessionView): void
+  cycleSessionView(delta: -1 | 1): void
+  openBrowser(id: string, url?: string): Promise<void>
   harnessCheck(): Promise<void>
+  runDigest(): Promise<void>
+  digestToNote(itemId: string): Promise<void>
+  dismissDigestItem(itemId: string): Promise<void>
+  markDigestSeen(): void
   ackPR(id: string): Promise<void>
   openPR(session: Session): Promise<void>
   typeInto(id: string, text: string): Promise<void>
@@ -67,6 +82,8 @@ export function useAgentos(): Agentos {
   return value
 }
 
+const digestKey = (project: string) => `agentos.digestSeen.${project}`
+
 const filterKey = (project: string) => `agentos.filter.${project}`
 
 type AgentosProviderProps = { children: ReactNode }
@@ -82,6 +99,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [issueFilter, setIssueFilterState] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
   const [cleanups, setCleanups] = useState<Cleanup[]>([])
+  const [evidence, setEvidence] = useState<Record<string, Evidence[]>>({})
+  const [browserStates, setBrowserStates] = useState<Record<string, BrowserState>>({})
+  const [views, setViews] = useState<Record<string, SessionView>>({})
+  const [digest, setDigest] = useState<Digest | null>(null)
+  const [digestSeen, setDigestSeen] = useState(0)
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
   const [composing, setComposing] = useState(false)
@@ -148,6 +170,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setRawIssues([])
       setIssueFilterState(readStored(filterKey(snap.project.name), ''))
       report(async () => setCleanups(await api.cleanups()))
+      report(async () => setDigest(await api.digest()))
+      setDigestSeen(readStored(digestKey(snap.project.name), 0))
       applySessions(snap.sessions)
       report(() => loadIssues(false))
     },
@@ -161,6 +185,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('sessions', applySessions), [applySessions])
   useEffect(() => on('notes', setNotes), [])
   useEffect(() => on('issues', setRawIssues), [])
+  useEffect(() => on('evidence', ({ id, items }) => setEvidence((map) => ({ ...map, [id]: items }))), [])
+  useEffect(() => on('browser:state', (state) => setBrowserStates((map) => ({ ...map, [state.id]: state }))), [])
+  useEffect(() => on('digest', setDigest), [])
   useEffect(() => on('cleanups', setCleanups), [])
   useEffect(
     () =>
@@ -170,6 +197,25 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       }),
     [],
   )
+
+  useEffect(() => {
+    if (!selectedId || evidence[selectedId]) return
+    report(async () => {
+      const items = await api.evidence(selectedId)
+      setEvidence((map) => (map[selectedId] ? map : { ...map, [selectedId]: items }))
+    })
+  }, [selectedId, evidence, report])
+
+  useEffect(() => {
+    const target = sessions.find((s) => s.id === selectedId)
+    if (!target?.browser || browserStates[target.id]) return
+    report(async () => {
+      const state = await api.browserState(target.id)
+      setBrowserStates((map) => (map[target.id] ? map : { ...map, [target.id]: state }))
+    })
+  }, [sessions, selectedId, browserStates, report])
+
+  const digestUnseen = digest?.items.some((i) => !i.noteId && i.at > digestSeen) ?? false
 
   const issues = useMemo(
     () => rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => s.issue === issue.number)?.id ?? '' })),
@@ -197,6 +243,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       issueFilter,
       notes,
       cleanups,
+      evidence,
+      browserStates,
+      digest,
+      digestUnseen,
       overlay,
       sidebarTab,
       composing,
@@ -241,8 +291,45 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         else enterProject(snap)
       },
       refreshIssues: () => loadIssues(true),
+      viewOf: (id) => (id && views[id]) || 'terminal',
+      setSessionView(id, view) {
+        setViews((map) => ({ ...map, [id]: view }))
+        if (view === 'terminal') focus('terminal')
+      },
+      cycleSessionView(delta) {
+        const id = selectedRef.current
+        if (!id) return
+        const at = SESSION_VIEWS.indexOf(views[id] ?? 'terminal')
+        const next = SESSION_VIEWS[(at + delta + SESSION_VIEWS.length) % SESSION_VIEWS.length]
+        setViews((map) => ({ ...map, [id]: next }))
+        if (next === 'terminal') focus('terminal')
+      },
+      async openBrowser(id, url) {
+        setViews((map) => ({ ...map, [id]: 'browser' }))
+        const state = browserStates[id] ?? (await api.browserState(id))
+        if (!state.open) {
+          const opened = await api.browserOpen(id, url ?? '')
+          setBrowserStates((map) => ({ ...map, [id]: opened }))
+        } else if (url) {
+          await api.browserGoto(id, url)
+        }
+      },
       async harnessCheck() {
         addSession(await api.harnessCheck())
+      },
+      async runDigest() {
+        await api.runDigest()
+      },
+      async digestToNote(itemId) {
+        await api.digestToNote(itemId)
+      },
+      async dismissDigestItem(itemId) {
+        await api.dismissDigestItem(itemId)
+      },
+      markDigestSeen() {
+        const now = Date.now()
+        setDigestSeen(now)
+        if (projectRef.current) writeStored(digestKey(projectRef.current.name), now)
       },
       async addNote(text, images = []) {
         const trimmed = text.trim()
@@ -325,7 +412,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       focus,
       report,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
