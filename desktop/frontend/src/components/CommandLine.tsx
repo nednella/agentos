@@ -161,7 +161,7 @@ export function CommandLine() {
             onKeyDown={onKeyDown}
           />
         </div>
-        {mode !== 'narrow' && <Keycap>⌘L</Keycap>}
+        {mode !== 'narrow' && <Keycap>⌘S</Keycap>}
         {popup && (
           <div
             className="fade-in absolute bottom-10 left-4 max-h-60 w-[min(36rem,calc(100%-2rem))] overflow-y-auto rounded-md border border-line-strong bg-raised py-1 shadow-2xl"

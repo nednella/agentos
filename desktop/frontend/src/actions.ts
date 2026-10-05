@@ -58,7 +58,7 @@ export const LIST_KEYS: { keys: string; summary: string }[] = [
   { keys: 'A / D or ← / →', summary: 'Switch Queue and Notes, or fold a lane' },
   { keys: 'Space', summary: 'Fold or unfold the lane under the cursor' },
   { keys: 'P / E in notes', summary: 'Pin or archive the note under the cursor' },
-  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘S or ⌘↑ brings you back' },
+  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘↑ brings you back' },
 ]
 
 const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
@@ -327,7 +327,7 @@ export function useActions(): Action[] {
       id: 'focus-command',
       label: 'Focus command line',
       group: 'Navigate',
-      shortcut: { key: 'l' },
+      shortcut: { key: 's' },
       run: () => layout.focusPanel('command'),
     },
     {
@@ -376,7 +376,6 @@ export function useActions(): Action[] {
       id: 'panel-terminal',
       label: 'Middle panel: the active session',
       group: 'Navigate',
-      shortcut: { key: 's' },
       run: toTerminal,
     },
     {
