@@ -69,7 +69,7 @@ func run() error {
 		MinWidth:         420,
 		MinHeight:        360,
 		BackgroundColour: &options.RGBA{R: 7, G: 9, B: 13, A: 255},
-		AssetServer:      &assetserver.Options{Assets: assets},
+		AssetServer:      &assetserver.Options{Assets: assets, Handler: app.mediaHandler()},
 		OnStartup: func(c context.Context) {
 			window.Store(&c)
 			stripMenuShortcuts()

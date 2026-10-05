@@ -15,7 +15,7 @@ import (
 type Project struct {
 	Name     string            `yaml:"name"`
 	Dir      string            `yaml:"dir"`
-	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea
+	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea, note
 	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
 }
 

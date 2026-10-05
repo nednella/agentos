@@ -134,6 +134,7 @@ func serveHTTP(app *App, hub *eventHub, assets fs.FS, addr string) error {
 		io.WriteString(w, devShim)
 	})
 	mux.HandleFunc("/__events", hub.serve)
+	mux.Handle(mediaPrefix, app.mediaHandler())
 	mux.HandleFunc("/__call/", func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {

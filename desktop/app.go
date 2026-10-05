@@ -1,13 +1,19 @@
 package main
 
 import (
+	"cmp"
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
@@ -18,10 +24,13 @@ import (
 
 const defaultTmuxSocket = "agentos"
 
+var issueURL = regexp.MustCompile(`https://[^\s/]+/[^\s/]+/[^\s/]+/issues/(\d+)`)
+
 type Snapshot struct {
 	Project  Project   `json:"project"`
 	Projects []Project `json:"projects"`
 	Sessions []Session `json:"sessions"`
+	Notes    []Note    `json:"notes"`
 	Version  string    `json:"version"`
 }
 
@@ -36,6 +45,7 @@ type config struct {
 	registry *Registry
 	project  project.Project
 	stateDir string
+	dataDir  string // notes: may be a synced folder
 	tmux     *term.Tmux
 	agent    agent.Agent
 }
@@ -59,6 +69,10 @@ func loadConfig() (config, error) {
 	stateDir, err := bus.DefaultDir()
 	if err != nil {
 		return config{}, err
+	}
+	dataDir := cmp.Or(cfg.DataDir, filepath.Join(home, ".local", "share", "agentos"))
+	if override := os.Getenv("AGENTOS_DATA_DIR"); override != "" {
+		dataDir = override
 	}
 	dir := os.Getenv("AGENTOS_DIR")
 	if dir == "" {
@@ -88,7 +102,7 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
-	return config{registry: &Registry{path: path, cfg: cfg}, project: current, stateDir: stateDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
+	return config{registry: &Registry{path: path, cfg: cfg}, project: current, stateDir: stateDir, dataDir: dataDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
@@ -113,6 +127,9 @@ type App struct {
 	sessions *Sessions
 	terms    *Terms
 	issues   *Issues
+	notes    *Notes
+	run      runner
+	media    map[string]string // folder of a /media/ URL -> the dir that holds it
 }
 
 func newApp(c config, h host, run runner) *App {
@@ -123,6 +140,9 @@ func newApp(c config, h host, run runner) *App {
 		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.registry, c.project, h.emit),
 		terms:    newTerms(c.tmux, h.emit, h.clipboard),
 		issues:   newIssues(run),
+		notes:    &Notes{dir: c.dataDir},
+		run:      run,
+		media:    map[string]string{mediaFolder: c.dataDir},
 	}
 	a.sessions.repoOf = a.issues.CachedRepo
 	a.sessions.onIssues = a.emitIssues
@@ -148,6 +168,11 @@ func (a *App) Snapshot() Snapshot {
 			projects[i].Repo = repo
 			snap.Project = projects[i]
 		}
+	}
+	var err error
+	if snap.Notes, err = a.notes.List(cur.Key()); err != nil {
+		log.Printf("agentos: %v", err)
+		snap.Notes = []Note{}
 	}
 	return snap
 }
@@ -256,9 +281,136 @@ func (a *App) StartIssue(number int) (Session, error) {
 	return Session{}, fmt.Errorf("issue #%d is not open in this project", number)
 }
 
+func (a *App) emitNotes() {
+	notes, err := a.notes.List(a.sessions.Current().Key())
+	if err != nil {
+		log.Printf("agentos: %v", err)
+		return
+	}
+	a.host.emit("notes", notes)
+}
+
+func (a *App) AddNote(text string) (Note, error) {
+	n, err := a.notes.Add(a.sessions.Current().Key(), text)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) UpdateNote(id, text string) (Note, error) {
+	n, err := a.notes.Update(a.sessions.Current().Key(), id, text)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) SetNotePinned(id string, pinned bool) (Note, error) {
+	n, err := a.notes.SetPinned(a.sessions.Current().Key(), id, pinned)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) SetNoteArchived(id string, archived bool) (Note, error) {
+	n, err := a.notes.SetArchived(a.sessions.Current().Key(), id, archived)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) AddNoteImage(id, data, mime string) (Note, error) {
+	n, err := a.notes.AddImage(a.sessions.Current().Key(), id, data, mime)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) RemoveNoteImage(id, url string) (Note, error) {
+	n, err := a.notes.RemoveImage(a.sessions.Current().Key(), id, url)
+	if err == nil {
+		a.emitNotes()
+	}
+	return n, err
+}
+
+func (a *App) DeleteNote(id string) error {
+	err := a.notes.Delete(a.sessions.Current().Key(), id)
+	if err == nil {
+		a.emitNotes()
+	}
+	return err
+}
+
+// NoteToIssue files the note on GitHub: its first line is the title, the rest the body.
+func (a *App) NoteToIssue(id string) (Note, error) {
+	cur := a.sessions.Current()
+	n, err := a.notes.Get(cur.Key(), id)
+	if err != nil {
+		return Note{}, err
+	}
+	if n.Issue > 0 {
+		return Note{}, fmt.Errorf("this note is already issue #%d", n.Issue)
+	}
+	if a.issues.Repo(a.ctx, cur.Dir) == "" {
+		return Note{}, errors.New("this project has no GitHub repo")
+	}
+	ctx, cancel := context.WithTimeout(a.ctx, ghTimeout)
+	defer cancel()
+	out, err := a.run(ctx, cur.Dir, "gh", "issue", "create", "--title", n.title(), "--body", issueBody(n), "--assignee", "@me")
+	if err != nil {
+		return Note{}, fmt.Errorf("filing the issue: %w", err)
+	}
+	m := issueURL.FindStringSubmatch(string(out))
+	if m == nil {
+		return Note{}, fmt.Errorf("gh did not print an issue address: %q", strings.TrimSpace(string(out)))
+	}
+	number, _ := strconv.Atoi(m[1])
+	n, err = a.notes.SetIssue(cur.Key(), id, number, m[0])
+	if err != nil {
+		return Note{}, err
+	}
+	a.emitNotes()
+	if _, err := a.issues.List(a.ctx, cur, true); err == nil {
+		a.emitIssues()
+	}
+	return n, nil
+}
+
+// NoteToSession starts a session titled by the note, with the project's note command typed in.
+func (a *App) NoteToSession(id string) (Session, error) {
+	cur := a.sessions.Current()
+	n, err := a.notes.Get(cur.Key(), id)
+	if err != nil {
+		return Session{}, err
+	}
+	return a.sessions.Create(n.title(), cur.NoteCommand(n.Text), 0)
+}
+
+// issueBody is the issue template filled with the note's text. gh cannot upload
+// pictures, so a note with pictures says they stay in agentos.
+func issueBody(n Note) string {
+	body := "## Description\n\n" + n.Text
+	switch len(n.Images) {
+	case 0:
+	case 1:
+		body += "\n\n(1 screenshot is attached to the note in agentos.)"
+	default:
+		body += fmt.Sprintf("\n\n(%d screenshots are attached to the note in agentos.)", len(n.Images))
+	}
+	return body
+}
+
 func (a *App) TermOpen(id string, cols, rows int) error { return a.terms.Open(id, cols, rows) }
 func (a *App) TermWrite(id, data string) error          { return a.terms.Write(id, data) }
 func (a *App) TermResize(id string, cols, rows int) error {
 	return a.terms.Resize(id, cols, rows)
 }
 func (a *App) TermClose(id string) { a.terms.Close(id) }
+
+// mediaHandler serves the note pictures under /media/.
+func (a *App) mediaHandler() http.Handler { return mediaHandler(a.media) }

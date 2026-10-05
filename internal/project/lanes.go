@@ -11,7 +11,7 @@ var defaultLanes = map[string]string{
 }
 
 var defaultCommands = map[string]string{
-	"ready": "/work {n}", "plan": "/investigate {n}", "inbox": "", "idea": "",
+	"ready": "/work {n}", "plan": "/investigate {n}", "inbox": "", "idea": "", "note": "{text}",
 }
 
 // laneOrder ranks lanes when an issue's labels map to several.
@@ -52,4 +52,9 @@ func (p Project) IssueCommand(lane string, number int) string {
 		return ""
 	}
 	return strings.ReplaceAll(p.command(lane), "{n}", strconv.Itoa(number))
+}
+
+// NoteCommand is what a session for a note types into the agent.
+func (p Project) NoteCommand(text string) string {
+	return strings.ReplaceAll(p.command("note"), "{text}", text)
 }

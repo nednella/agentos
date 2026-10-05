@@ -125,9 +125,10 @@ func eventually(t *testing.T, what string, cond func() bool) {
 // fakeGH answers the gh calls with canned output; any other command runs for real.
 
 type fakeGH struct {
-	mu    sync.Mutex
-	calls []string
-	repo  error
+	mu     sync.Mutex
+	calls  []string
+	repo   error
+	create string // what gh issue create prints
 }
 
 func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -143,6 +144,8 @@ func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]b
 			return nil, f.repo
 		}
 		return []byte(`{"nameWithOwner":"acme/widgets"}`), nil
+	case args[0] == "issue" && args[1] == "create":
+		return []byte(f.create), nil
 	case args[0] == "issue":
 		return []byte(`[
 			{"number":7,"title":"Fix the thing","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
@@ -206,6 +209,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 	t.Setenv("AGENTOS_STATE_DIR", state)
 	t.Setenv("AGENTOS_CONFIG", confPath)
 	t.Setenv("AGENTOS_DIR", dir)
+	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
 
 	cfg, err := loadConfig()
 	if err != nil {
@@ -314,4 +318,10 @@ func (h *harness) restart(t *testing.T) *App {
 func exists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func (f *fakeGH) callLog() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.calls)
 }
