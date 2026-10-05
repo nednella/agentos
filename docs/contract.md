@@ -227,7 +227,7 @@ type Digest = {
 | Method | Returns | What it does |
 |---|---|---|
 | `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh` |
-| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` with the lane's command typed in (see config); an issue that has a live session gets that session back |
+| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
 
 ### Pull requests and clean-up (`sessions`)
 
@@ -326,9 +326,9 @@ projects:
     dir: /Users/me/code/livedocument
     # everything below is optional; the values shown are the defaults
     commands:
-      ready: "/work {n}"       # typed into a session started from a ready issue; {n} is the issue number
+      ready: "/work {n}"       # sent to a session started from a ready issue; {n} is the issue number
       plan: "/investigate {n}"
-      inbox: ""                # "" types nothing
+      inbox: ""                # "" sends nothing
       idea: ""
       note: "{text}"           # a session started from a note; {text} is the note
     lanes:                     # GitHub label -> lane; when set it replaces the defaults
