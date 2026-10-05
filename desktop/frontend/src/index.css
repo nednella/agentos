@@ -281,6 +281,21 @@
     text-underline-offset: 2px;
   }
 
+  .note-card {
+    background: var(--bg-note-card);
+    border: 1px solid var(--border-note);
+    border-radius: var(--radius-md);
+    color: var(--text-note);
+  }
+
+  .note-card[data-cursor='true'] {
+    border-color: var(--border-strong);
+  }
+
+  [data-panel]:focus-within .note-card[data-cursor='true'] {
+    border-color: var(--accent);
+  }
+
   .divider {
     position: relative;
     flex: none;
@@ -344,6 +359,34 @@
       animation: none !important;
       transition: none !important;
     }
+  }
+
+  [data-panel='sidebar'][data-tab='notes'] {
+    background: var(--bg-note);
+    border-color: var(--border-note);
+  }
+
+  .note-jot {
+    min-height: 2rem;
+    padding-top: 0.3125rem;
+    padding-bottom: 0.3125rem;
+    border-color: var(--border-note);
+  }
+
+  .note-jot:focus {
+    border-color: color-mix(in srgb, var(--accent) 70%, var(--border-note));
+  }
+
+  [data-panel='sidebar'][data-tab='notes'] .note-jot,
+  [data-panel='sidebar'][data-tab='notes'] .note-search {
+    background: var(--bg-note-card);
+    border-color: var(--border-note);
+    color: var(--text-note);
+  }
+
+  [data-panel='sidebar'][data-tab='notes'] .panel-head,
+  [data-panel='sidebar'][data-tab='notes'] .border-line {
+    border-color: var(--border-note);
   }
 
   .reveal {

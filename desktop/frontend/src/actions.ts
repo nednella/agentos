@@ -14,7 +14,7 @@ export type Shortcut = {
   unlessTyping?: boolean
   label?: string
 }
-export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Queue' | 'App'
+export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Notes' | 'Queue' | 'App'
 
 export type Action = {
   id: string
@@ -147,6 +147,29 @@ export function useActions(): Action[] {
       group: 'Projects',
       async run() {
         await a.addProject()
+      },
+    },
+    {
+      id: 'note',
+      label: 'New note',
+      group: 'Notes',
+      async run(args) {
+        if (args.length === 0) {
+          layout.showSidebarTab('notes')
+          a.focus('note-input')
+          return
+        }
+        await a.addNote(args.join(' '))
+        return 'Note added'
+      },
+    },
+    {
+      id: 'show-notes',
+      label: 'Show notes',
+      group: 'Notes',
+      run() {
+        layout.showSidebarTab('notes')
+        a.focus('note-input')
       },
     },
     {

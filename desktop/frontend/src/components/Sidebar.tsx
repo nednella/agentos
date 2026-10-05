@@ -8,6 +8,7 @@ import { useFocusRequest } from '../useFocusRequest'
 import { useToggleAnimation } from '../useToggleAnimation'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
+import { Notes } from './Notes'
 import { Queue } from './Queue'
 
 export type NavHandler = (e: KeyboardEvent) => boolean
@@ -94,7 +95,7 @@ function SidebarPanel({ panel, nav, overlay, full, widthRem }: SidebarPanelProps
           </>
         )}
       </div>
-      {sidebarTab === 'queue' && <Queue nav={nav} />}
+      {sidebarTab === 'queue' ? <Queue nav={nav} /> : <Notes nav={nav} />}
     </aside>
   )
 }

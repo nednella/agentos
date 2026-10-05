@@ -7,6 +7,7 @@ import type { Issue, Note, Project, Session } from './types'
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | null
 export type SidebarTab = 'queue' | 'notes'
 export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
+export type PendingImage = { base64: string; mime: string }
 
 type Agentos = {
   project: Project | null
@@ -33,6 +34,15 @@ type Agentos = {
   addProject(dir?: string): Promise<void>
   removeProject(name: string): Promise<void>
   refreshIssues(): Promise<void>
+  addNote(text: string, images?: PendingImage[]): Promise<void>
+  updateNote(id: string, text: string): Promise<void>
+  setNotePinned(id: string, pinned: boolean): Promise<void>
+  setNoteArchived(id: string, archived: boolean): Promise<void>
+  addNoteImage(id: string, image: PendingImage): Promise<void>
+  removeNoteImage(id: string, url: string): Promise<void>
+  deleteNote(id: string): Promise<void>
+  noteToIssue(id: string): Promise<void>
+  noteToSession(id: string): Promise<void>
   nextAttention(): void
   setSidebarTab(tab: SidebarTab): void
   setOverlay(overlay: Overlay): void
@@ -220,6 +230,53 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         else enterProject(snap)
       },
       refreshIssues: () => loadIssues(true),
+      async addNote(text, images = []) {
+        const trimmed = text.trim()
+        if (!trimmed && images.length === 0) throw 'A note cannot be empty'
+        let note: Note
+        try {
+          note = await api.addNote(trimmed)
+        } catch (err) {
+          if (trimmed) throw err
+          note = await api.addNote('(screenshot)')
+        }
+        for (const image of images) note = await api.addNoteImage(note.id, image.base64, image.mime)
+        const saved = note
+        setNotes((list) => (list.some((n) => n.id === saved.id) ? list.map((n) => (n.id === saved.id ? saved : n)) : [saved, ...list]))
+      },
+      async updateNote(id, text) {
+        const trimmed = text.trim()
+        if (!trimmed && !notes.find((n) => n.id === id)?.images.length) throw 'A note cannot be empty'
+        const note = await api.updateNote(id, trimmed)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async setNotePinned(id, pinned) {
+        const note = await api.setNotePinned(id, pinned)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async setNoteArchived(id, archived) {
+        const note = await api.setNoteArchived(id, archived)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async addNoteImage(id, image) {
+        const note = await api.addNoteImage(id, image.base64, image.mime)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async removeNoteImage(id, url) {
+        const note = await api.removeNoteImage(id, url)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async deleteNote(id) {
+        await api.deleteNote(id)
+        setNotes((list) => list.filter((n) => n.id !== id))
+      },
+      async noteToIssue(id) {
+        const note = await api.noteToIssue(id)
+        setNotes((list) => list.map((n) => (n.id === id ? note : n)))
+      },
+      async noteToSession(id) {
+        addSession(await api.noteToSession(id))
+      },
       nextAttention() {
         const list = sessionsRef.current
         const urgent = [...list.filter((s) => s.state === 'waiting'), ...list.filter((s) => s.state === 'idle')]
