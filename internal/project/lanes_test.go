@@ -60,3 +60,15 @@ func TestBranchFor(t *testing.T) {
 		t.Errorf("custom branch = %q", got)
 	}
 }
+
+func TestBrowserOn(t *testing.T) {
+	off, on := false, true
+	for _, tt := range []struct {
+		p    Project
+		want bool
+	}{{Project{}, true}, {Project{Browser: &off}, false}, {Project{Browser: &on}, true}} {
+		if got := tt.p.BrowserOn(); got != tt.want {
+			t.Errorf("BrowserOn(%+v) = %v, want %v", tt.p, got, tt.want)
+		}
+	}
+}

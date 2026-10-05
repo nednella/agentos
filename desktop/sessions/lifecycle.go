@@ -505,6 +505,10 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool)
 		removed = append(removed, "temp files")
 	}
 
+	if l.sessions.browsers.Has(t.id) {
+		l.sessions.browsers.Close(ctx, t.id)
+		removed = append(removed, "browser tab")
+	}
 	if l.sessions.evidence.Purge(t.id) > 0 {
 		removed = append(removed, "evidence")
 	}

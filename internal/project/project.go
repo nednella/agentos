@@ -19,6 +19,8 @@ type Project struct {
 	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
 	Branch   string            `yaml:"branch,omitempty"`   // branch of an issue's work; {n} is the number
 	Cleanup  string            `yaml:"cleanup,omitempty"`  // shell command that removes a worktree; {branch} and {worktree}
+	URL      string            `yaml:"url,omitempty"`      // the page a session's browser opens first
+	Browser  *bool             `yaml:"browser,omitempty"`  // give sessions the browser and evidence commands; on unless false
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"sync/atomic"
 
+	"github.com/nednella/agentos/desktop/browser"
 	"github.com/nednella/agentos/desktop/control"
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/run"
@@ -15,6 +16,7 @@ import (
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
+	"github.com/nednella/agentos/internal/session"
 )
 
 // Host is what the window provides. The services never touch Wails directly.
@@ -31,6 +33,7 @@ type App struct {
 	terms    *terminal.Terms
 	notes    *notes.Notes
 	evidence *evidence.Store
+	browsers *browser.Browsers
 	router   *control.Router
 	stateDir string
 	services []any
@@ -47,15 +50,29 @@ func New(c Config, h Host, runner run.Runner) *App {
 	}
 	waits := stats.New(c.DataDir)
 	proofs := evidence.New(c.LocalDir)
+	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
-		Current: c.Project, Emit: h.Emit, Run: runner, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs,
+		Current: c.Project, Emit: h.Emit, Run: runner, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
 	})
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit)
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
+	a.browsers = browsers
+	browsers.Hook(func(id string) string {
+		name, err := session.ParseName(id)
+		if err != nil {
+			return ""
+		}
+		for _, p := range c.Registry.List() {
+			if p.Key() == name.Project {
+				return p.URL
+			}
+		}
+		return ""
+	}, sess.Touch)
 	a.router = control.New(sess)
 	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
@@ -68,6 +85,7 @@ func New(c Config, h Host, runner run.Runner) *App {
 		issues.NewService(iss, ctx),
 		notes.NewService(store, sess, sess, iss, runner, h.Emit, ctx),
 		evidence.NewService(proofs, changes),
+		browser.NewService(browsers, proofs, changes, ctx),
 		stats.NewService(waits, sess),
 	}
 	return a
@@ -89,6 +107,7 @@ func (a *App) Start(ctx context.Context) error {
 // Stop closes the terminal streams and stops answering the command line.
 func (a *App) Stop() {
 	a.terms.CloseAll()
+	a.browsers.CloseAll()
 	a.router.Close()
 }
 
@@ -108,3 +127,6 @@ func (a *App) Sessions() *sessions.Sessions { return a.sessions }
 
 // Notes is the notes store, for tests.
 func (a *App) Notes() *notes.Notes { return a.notes }
+
+// Browsers are the hidden browsers, for tests.
+func (a *App) Browsers() *browser.Browsers { return a.browsers }

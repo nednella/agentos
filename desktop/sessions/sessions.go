@@ -53,6 +53,7 @@ type Session struct {
 	Issue       int           `json:"issue"`
 	History     []Change      `json:"history"`
 	Evidence    int           `json:"evidence"`
+	Browser     bool          `json:"browser"`
 
 	Branch        string `json:"branch"`
 	Worktree      string `json:"worktree"`
@@ -90,6 +91,7 @@ type Sessions struct {
 	tally      Tally
 	closeTerm  func(id string)
 	evidence   Evidence
+	browsers   Browsers
 	info       []term.Info
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
@@ -126,6 +128,13 @@ type Evidence interface {
 	Purge(id string) int
 }
 
+// Browsers is what the sessions need of the browsers.
+type Browsers interface {
+	Available() bool
+	Has(id string) bool
+	Close(ctx context.Context, id string)
+}
+
 // Options is what a Sessions needs from outside.
 type Options struct {
 	Tmux          *term.Tmux
@@ -139,6 +148,7 @@ type Options struct {
 	Tally         Tally
 	CloseTerminal func(id string)
 	Evidence      Evidence
+	Browsers      Browsers
 }
 
 // New tracks the sessions of o.Tmux, and follows their pull requests.
@@ -162,7 +172,7 @@ func (s *Sessions) Touch() { s.changed() }
 func newSessions(o Options) *Sessions {
 	return &Sessions{
 		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit,
-		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence,
+		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
@@ -425,6 +435,7 @@ func (s *Sessions) sync() {
 				waitsChanged = true
 			}
 			s.life.forget(id)
+			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
 			delete(s.records, id)
@@ -538,7 +549,7 @@ func (s *Sessions) list() []Session {
 		view := Session{
 			ID: id, N: ss.Name.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(), Issue: issue, Evidence: s.evidence.Count(id),
+			CreatedAt: in.Created.UnixMilli(), Issue: issue, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {
@@ -675,7 +686,7 @@ func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 	}
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	err := s.start(tctx, name, title, proj.Dir, env, s.agent.Command(name.String()), issue)
+	err := s.start(tctx, name, title, proj.Dir, env, s.commandFor(name, proj), issue)
 	if err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
@@ -888,4 +899,19 @@ func (s *Sessions) Has(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return slices.ContainsFunc(s.info, func(in term.Info) bool { return in.Name.String() == id })
+}
+
+func (s *Sessions) closeBrowser(id string) {
+	ctx, cancel := context.WithTimeout(context.Background(), tmuxTimeout)
+	defer cancel()
+	s.browsers.Close(ctx, id)
+}
+
+// commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
+func (s *Sessions) commandFor(name session.Name, proj project.Project) []string {
+	argv := s.agent.Command(name.String())
+	if _, ok := s.agent.(agent.Claude); ok && proj.BrowserOn() && s.browsers.Available() {
+		argv = append(argv, "--append-system-prompt", agent.BrowserPrompt)
+	}
+	return argv
 }

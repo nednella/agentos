@@ -67,3 +67,6 @@ func (p Project) BranchFor(number int) string {
 	}
 	return strings.ReplaceAll(pattern, "{n}", strconv.Itoa(number))
 }
+
+// BrowserOn says whether sessions get the browser and evidence commands.
+func (p Project) BrowserOn() bool { return p.Browser == nil || *p.Browser }

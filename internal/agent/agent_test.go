@@ -39,3 +39,11 @@ func TestNew(t *testing.T) {
 		}
 	}
 }
+
+func TestBrowserPromptNamesTheCommands(t *testing.T) {
+	for _, want := range []string{"agentos browser help", "agentos browser screenshot", "agentos show"} {
+		if !strings.Contains(BrowserPrompt, want) {
+			t.Errorf("the prompt lacks %q", want)
+		}
+	}
+}
