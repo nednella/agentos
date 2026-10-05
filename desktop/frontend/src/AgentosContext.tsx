@@ -39,6 +39,7 @@ export type Agentos = {
   toasts: Toast[]
   overlay: Overlay
   sidebarTab: SidebarTab
+  noteDraft: string
   composing: boolean
   focusRequest: { target: FocusTarget; n: number }
   shellId: string
@@ -80,6 +81,7 @@ export type Agentos = {
   noteToSession(id: string): Promise<void>
   nextAttention(): void
   setSidebarTab(tab: SidebarTab): void
+  setNoteDraft(text: string): void
   setOverlay(overlay: Overlay): void
   setComposing(open: boolean): void
   setIssueFilter(query: string): void
@@ -128,6 +130,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
+  const [noteDraft, setNoteDraft] = useState('')
   const [composing, setComposing] = useState(false)
   const [focusRequest, setFocusRequest] = useState<Agentos['focusRequest']>({ target: 'terminal', n: 0 })
 
@@ -391,6 +394,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       toasts,
       overlay,
       sidebarTab,
+      noteDraft,
       composing,
       focusRequest,
       shellId,
@@ -553,6 +557,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         focus('terminal')
       },
       setSidebarTab,
+      setNoteDraft,
       setOverlay,
       setComposing,
       setIssueFilter(query) {
@@ -564,7 +569,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
