@@ -46,6 +46,7 @@ type config struct {
 	project  project.Project
 	stateDir string
 	dataDir  string // notes: may be a synced folder
+	localDir string // PR tracking and the clean-up log: never synced
 	tmux     *term.Tmux
 	agent    agent.Agent
 }
@@ -71,8 +72,9 @@ func loadConfig() (config, error) {
 		return config{}, err
 	}
 	dataDir := cmp.Or(cfg.DataDir, filepath.Join(home, ".local", "share", "agentos"))
+	localDir := filepath.Join(home, ".local", "share", "agentos")
 	if override := os.Getenv("AGENTOS_DATA_DIR"); override != "" {
-		dataDir = override
+		dataDir, localDir = override, override
 	}
 	dir := os.Getenv("AGENTOS_DIR")
 	if dir == "" {
@@ -102,7 +104,7 @@ func loadConfig() (config, error) {
 	if err != nil {
 		return config{}, err
 	}
-	return config{registry: &Registry{path: path, cfg: cfg}, project: current, stateDir: stateDir, dataDir: dataDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
+	return config{registry: &Registry{path: path, cfg: cfg}, project: current, stateDir: stateDir, dataDir: dataDir, localDir: localDir, tmux: tmux, agent: pickAgent(cfg.Agent)}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
@@ -128,6 +130,7 @@ type App struct {
 	terms    *Terms
 	issues   *Issues
 	notes    *Notes
+	life     *Lifecycle
 	run      runner
 	media    map[string]string // folder of a /media/ URL -> the dir that holds it
 }
@@ -144,6 +147,8 @@ func newApp(c config, h host, run runner) *App {
 		run:      run,
 		media:    map[string]string{mediaFolder: c.dataDir},
 	}
+	a.life = newLifecycle(run, c.localDir, c.stateDir, a.sessions, h.emit, a.terms.Close)
+	a.sessions.life = a.life
 	a.sessions.repoOf = a.issues.CachedRepo
 	a.sessions.onIssues = a.emitIssues
 	return a
@@ -152,7 +157,11 @@ func newApp(c config, h host, run runner) *App {
 // start begins listening for hooks; it runs until ctx ends.
 func (a *App) start(ctx context.Context) error {
 	a.ctx = ctx
-	return a.sessions.Start(ctx)
+	if err := a.sessions.Start(ctx); err != nil {
+		return err
+	}
+	go a.life.Run(ctx)
+	return nil
 }
 
 func (a *App) stop() { a.terms.CloseAll() }
@@ -404,6 +413,16 @@ func issueBody(n Note) string {
 	}
 	return body
 }
+
+func (a *App) RefreshPRs() { a.life.Poll(a.ctx) }
+
+func (a *App) AckPR(id string) error { return a.life.Ack(id) }
+
+func (a *App) TypeInto(id, text string) error { return a.sessions.TypeInto(id, text) }
+
+func (a *App) Cleanup(id string, force bool) error { return a.life.Cleanup(a.ctx, id, force) }
+
+func (a *App) Cleanups() []Cleanup { return a.life.Cleanups(a.sessions.Current().Key()) }
 
 func (a *App) TermOpen(id string, cols, rows int) error { return a.terms.Open(id, cols, rows) }
 func (a *App) TermWrite(id, data string) error          { return a.terms.Write(id, data) }

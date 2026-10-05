@@ -51,3 +51,12 @@ func TestCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestBranchFor(t *testing.T) {
+	if got := (Project{}).BranchFor(394); got != "issue-394" {
+		t.Errorf("default branch = %q", got)
+	}
+	if got := (Project{Branch: "ned/{n}-fix"}).BranchFor(7); got != "ned/7-fix" {
+		t.Errorf("custom branch = %q", got)
+	}
+}

@@ -17,6 +17,8 @@ type Project struct {
 	Dir      string            `yaml:"dir"`
 	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea, note
 	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
+	Branch   string            `yaml:"branch,omitempty"`   // branch of an issue's work; {n} is the number
+	Cleanup  string            `yaml:"cleanup,omitempty"`  // shell command that removes a worktree; {branch} and {worktree}
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.

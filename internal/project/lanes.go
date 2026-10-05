@@ -58,3 +58,12 @@ func (p Project) IssueCommand(lane string, number int) string {
 func (p Project) NoteCommand(text string) string {
 	return strings.ReplaceAll(p.command("note"), "{text}", text)
 }
+
+// BranchFor is the branch the work on an issue happens on.
+func (p Project) BranchFor(number int) string {
+	pattern := p.Branch
+	if pattern == "" {
+		pattern = "issue-{n}"
+	}
+	return strings.ReplaceAll(pattern, "{n}", strconv.Itoa(number))
+}

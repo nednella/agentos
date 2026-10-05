@@ -50,7 +50,15 @@ type Session struct {
 	CreatedAt   int64         `json:"createdAt"`
 	Issue       int           `json:"issue"`
 	History     []Change      `json:"history"`
-	EndedAt     int64         `json:"endedAt"` // unix ms; 0 while the session runs
+
+	Branch        string `json:"branch"`
+	Worktree      string `json:"worktree"`
+	PR            *PR    `json:"pr"`
+	PRAttention   string `json:"prAttention"`
+	Cleanup       string `json:"cleanup"`
+	CleanupReason string `json:"cleanupReason"`
+
+	EndedAt int64 `json:"endedAt"` // unix ms; 0 while the session runs
 }
 
 // Project is a project as the front end sees it, with how its sessions stand.
@@ -87,6 +95,7 @@ type Sessions struct {
 	lastSent   string
 	lastProjs  string
 	lastIssues string
+	life       *Lifecycle
 	repoOf     func(dir string) string
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
@@ -342,6 +351,7 @@ func (s *Sessions) sync() {
 	}
 	for id := range s.seen {
 		if !live[id] {
+			s.life.forget(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
 			delete(s.records, id)
@@ -459,6 +469,11 @@ func (s *Sessions) list() []Session {
 		}
 		if ss.State == session.Ended {
 			view.EndedAt = ss.At.UnixMilli()
+		}
+		if issue > 0 {
+			f := s.life.fields(id)
+			view.Branch, view.Worktree, view.PR = s.project.BranchFor(issue), f.worktree, f.pr
+			view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
 		}
 		if view.History == nil {
 			view.History = []Change{}
@@ -704,4 +719,72 @@ func (s *Sessions) context() context.Context {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.ctx
+}
+
+// changed re-checks what the front end shows after something outside the session list moved.
+func (s *Sessions) changed() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sync()
+}
+
+// issueTargets are the sessions that work on an issue, in any project we know.
+func (s *Sessions) issueTargets() []target {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []target
+	for _, in := range s.info {
+		if t, ok := s.targetOf(in); ok {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func (s *Sessions) target(id string) (target, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, in := range s.info {
+		if in.Name.String() == id {
+			if t, ok := s.targetOf(in); ok {
+				return t, nil
+			}
+			return target{}, fmt.Errorf("session %s has no issue to clean up after", id)
+		}
+	}
+	return target{}, fmt.Errorf("no session %s", id)
+}
+
+// targetOf needs mu.
+func (s *Sessions) targetOf(in term.Info) (target, bool) {
+	issue, _ := strconv.Atoi(in.Issue)
+	if issue == 0 {
+		return target{}, false
+	}
+	for _, p := range s.projects() {
+		if p.Key() == in.Name.Project {
+			return target{id: in.Name.String(), title: cmp.Or(in.Title, defaultTitle), issue: issue, proj: p}, true
+		}
+	}
+	return target{}, false
+}
+
+// TypeInto puts text into the session's prompt without pressing Enter.
+func (s *Sessions) TypeInto(id, text string) error {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
+	defer cancel()
+	return s.tmux.Type(ctx, name, text)
+}
+
+// projectKeyOf is the project key of a session id.
+func projectKeyOf(id string) string {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return "project"
+	}
+	return name.Project
 }

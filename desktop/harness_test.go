@@ -129,6 +129,7 @@ type fakeGH struct {
 	calls  []string
 	repo   error
 	create string // what gh issue create prints
+	pr     string // what gh pr list prints
 }
 
 func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -139,6 +140,11 @@ func (f *fakeGH) run(ctx context.Context, dir, name string, args ...string) ([]b
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, strings.Join(args, " "))
 	switch {
+	case args[0] == "pr":
+		if f.pr == "" {
+			return []byte("[]"), nil
+		}
+		return []byte(f.pr), nil
 	case args[0] == "repo":
 		if f.repo != nil {
 			return nil, f.repo
