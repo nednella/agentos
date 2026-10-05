@@ -240,14 +240,26 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `RefreshPRs()` | | polls the PRs of issue sessions now (they are also polled every 3 minutes); results arrive as `sessions` |
+| `RefreshPRs()` | | fetches the PRs of issue sessions now (the app also watches them, see below); results arrive as `sessions` |
 | `AckPR(id)` | | the user has seen the PR's comments and failing checks; clears `prAttention` until something new arrives |
 | `Cleanup(id, force)` | | cleans up after a session now: worktree, branch, temp files, evidence, browser tab, session. Without `force` the safety checks apply |
 | `Cleanups()` | `Cleanup[]` | the current project's log, newest first, at most 100 |
 
 A session is cleaned up on its own when its PR is merged after the session saw it draft or open. A PR first seen already merged, or a
 closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
-`Cleanup(id, true)` overrides. Clean-up applies to live sessions; a session that has already ended is not cleaned up.
+`Cleanup(id, true)` overrides. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
+agent finished still cleans up, and the row shows the PR merged.
+
+How the app watches: every 5 minutes it fetches every tracked PR. In between, each project with an issue session has a watcher. Unless
+the project's `pr_watch` says `poll`, the watcher streams the repo's `pull_request`, `pull_request_review`, `issue_comment` and `check_suite` events
+through `gh webhook forward` (needs the extension and admin on the repo; a stream that ends within 10 s never worked, and the project is polled
+instead; one that drops later is retried after 30 s, with a warning when `pr_watch: webhook` asked for it). Polling asks GitHub for the repo's
+PR list every `pr_poll` (30 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
+plus those whose checks are still running. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
+comment or review, the app types `address the review on PR #<n>` into its session and sends it; failing checks on a new commit send
+`fix the failing checks on PR #<n>` (the texts are in `internal/prompts`). A session waiting on the user gets the text once it is not;
+an ended session gets a new session for its issue with the text sent, and its row goes. Each comment count and each failing commit wakes
+once, remembered in `prs.json`.
 
 ### Notes (`notes`)
 
@@ -348,6 +360,8 @@ projects:
     url: ""                    # page a session's browser opens first
     browser: true              # tell sessions about the browser and evidence commands
     digest: weekly             # weekly or off
+    pr_watch: ""               # webhook or poll; "" tries gh webhook forward and polls when it does not work
+    pr_poll: 30s               # how often to poll the pull requests; at least 1s
 ```
 
 A label that maps to no lane puts an issue in `idea`; an issue with no labels is in `inbox`. When labels map to several lanes the first of
@@ -360,7 +374,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 | What | Where |
 |---|---|
 | notes, note images, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
-| evidence, PR tracking, clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
+| evidence, PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
 | state files, sockets, tmux config, last project, app location | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.
@@ -372,8 +386,8 @@ All files are written by writing a temp file and renaming it into place; folders
 browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
-The texts given to agents (the harness check, the digest run, the browser lines in a session's system prompt, `agentos browser help`) are Markdown
-files in `internal/prompts`.
+The texts given to agents (the harness check, the digest run, the browser lines in a session's system prompt, `agentos browser help`, the two
+pull request wakes) are Markdown files in `internal/prompts`.
 
 ## Command line
 
