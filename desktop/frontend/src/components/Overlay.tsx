@@ -19,11 +19,11 @@ export function Overlay({ label, align, wide = false, onClose, children }: Overl
       <div
         role="dialog"
         aria-label={label}
-        className={`absolute flex flex-col overflow-hidden rounded-md border border-line-strong bg-surface shadow-2xl ${wide ? 'max-h-[88vh]' : 'max-h-[70vh]'}`}
+        className={`absolute flex flex-col overflow-hidden rounded-md border border-line-strong bg-surface shadow-2xl ${wide ? 'max-h-[95vh]' : 'max-h-[70vh]'}`}
         style={
           align === 'left'
             ? { top: 'calc(var(--topbar-h) + 4px)', left: '50%', width: 'min(34rem, calc(100vw - 1.5rem))', transform: 'translateX(-50%)' }
-            : { top: wide ? '5vh' : '12vh', left: '50%', width: wide ? 'min(72rem, 94vw)' : 'min(40rem, 92vw)', transform: 'translateX(-50%)' }
+            : { top: wide ? '2.5vh' : '12vh', left: '50%', width: wide ? 'min(72rem, 94vw)' : 'min(40rem, 92vw)', transform: 'translateX(-50%)' }
         }
       >
         {children}

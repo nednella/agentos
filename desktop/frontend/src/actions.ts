@@ -58,7 +58,7 @@ export const LIST_KEYS: { keys: string; summary: string }[] = [
   { keys: 'A / D or ← / →', summary: 'Switch Queue and Notes, or fold a lane' },
   { keys: 'Space', summary: 'Fold or unfold the lane under the cursor' },
   { keys: 'P / E in notes', summary: 'Pin or archive the note under the cursor' },
-  { keys: 'Esc', summary: 'Close a panel or overlay. In the terminal it goes to the agent; ⌘↑ brings you back' },
+  { keys: 'Esc', summary: 'Close a panel or overlay. Inside the terminal it goes to the agent' },
 ]
 
 const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
@@ -329,38 +329,6 @@ export function useActions(): Action[] {
       group: 'Navigate',
       shortcut: { key: 's' },
       run: () => layout.focusPanel('command'),
-    },
-    {
-      id: 'panel-left',
-      label: 'Move to the panel on the left',
-      group: 'Navigate',
-      shortcut: { key: 'arrowleft', unlessTyping: true },
-      palette: false,
-      run: () => layout.movePanel(-1),
-    },
-    {
-      id: 'panel-right',
-      label: 'Move to the panel on the right',
-      group: 'Navigate',
-      shortcut: { key: 'arrowright', unlessTyping: true },
-      palette: false,
-      run: () => layout.movePanel(1),
-    },
-    {
-      id: 'panel-down',
-      label: 'Move to the command line',
-      group: 'Navigate',
-      shortcut: { key: 'arrowdown' },
-      palette: false,
-      run: () => layout.focusPanel('command'),
-    },
-    {
-      id: 'panel-up',
-      label: 'Back to the terminal',
-      group: 'Navigate',
-      shortcut: { key: 'arrowup' },
-      palette: false,
-      run: toTerminal,
     },
     {
       id: 'panel-sidebar',

@@ -59,7 +59,6 @@ type Layout = {
   closePeek(): void
   returnToTerminal(): void
   focusPanel(panel: Panel): void
-  movePanel(delta: -1 | 1): void
 }
 
 const LayoutContext = createContext<Layout | null>(null)
@@ -84,12 +83,6 @@ function useWindowWidth(): number {
     return () => window.removeEventListener('resize', update)
   }, [])
   return width
-}
-
-function currentPanel(): Panel {
-  const el = document.activeElement
-  const panel = el instanceof HTMLElement ? el.closest<HTMLElement>('[data-panel]')?.dataset.panel : undefined
-  return (panel as Panel | undefined) ?? 'terminal'
 }
 
 const clamp = (value: number, [min, max]: [number, number]) => Math.min(Math.max(value, min), max)
@@ -255,12 +248,6 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         focus('terminal')
       },
       focusPanel,
-      movePanel(delta) {
-        const order: Panel[] = ['sidebar', 'terminal', 'sessions']
-        const found = order.indexOf(currentPanel())
-        const at = found < 0 ? 1 : found
-        focusPanel(order[(at + delta + order.length) % order.length])
-      },
     }),
     [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, peek, mobilePanel, fitted.widths, fitted.full, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )

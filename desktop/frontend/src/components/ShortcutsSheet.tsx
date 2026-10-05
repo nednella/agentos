@@ -1,117 +1,130 @@
+import { useMemo, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { formatShortcut, LIST_KEYS, useActions } from '../actions'
 import type { Action } from '../actions'
+import { Icon } from './Icon'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 
-type Group = { title: string; ids: string[] }
+type Row = { id: string; label: string; syntax?: string; summary?: string; keys?: string }
+type Group = { title: string; ids: string[]; extra?: Row[] }
 
 const GROUPS: Group[] = [
   { title: 'Sessions', ids: ['new-session', 'open-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'open-pr', 'cleanup', 'harness'] },
-  { title: 'Navigation', ids: ['panel-left', 'panel-right', 'panel-down', 'panel-up', 'panel-sidebar', 'panel-terminal', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'project', 'palette', 'shortcuts'] },
-  { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues', 'start-issue'] },
+  { title: 'Navigate', ids: ['panel-sidebar', 'focus-command', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'project', 'palette', 'shortcuts'] },
+  { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues', 'start-issue'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
   { title: 'Views', ids: ['stats', 'digest', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
-  { title: 'Command line', ids: ['focus-command', 'clear'] },
+  {
+    title: 'Command line',
+    ids: ['clear'],
+    extra: [
+      { id: 'tab', label: 'Complete a command or argument', keys: 'Tab' },
+      { id: 'history', label: 'Walk the history', keys: '↑ ↓' },
+      { id: 'esc', label: 'Back to the terminal', keys: 'Esc' },
+    ],
+  },
+  { title: 'In a list', ids: [], extra: LIST_KEYS.map((k) => ({ id: k.keys, label: k.summary, keys: k.keys })) },
 ]
 
+const LEFT = ['Sessions', 'Queue', 'In a list']
+const RIGHT = ['Navigate', 'Notes', 'Views', 'Command line']
 const listed = new Set(GROUPS.flatMap((g) => g.ids))
 
-type EntryProps = { action: Action }
-
-function Entry({ action }: EntryProps) {
-  const keys = action.keysLabel ?? (action.shortcut ? formatShortcut(action.shortcut) : null)
-  const title = action.keysLabel ? 'Open session n' : action.label
-  return (
-    <div className="flex min-h-11 items-start justify-between gap-3 border-b border-line py-2 last:border-b-0">
-      <div className="min-w-0">
-        {action.shortcut ? (
-          <p className="text-body">{title}</p>
-        ) : (
-          <code className="mono block text-small text-accent">{action.command?.syntax}</code>
-        )}
-        {action.shortcut && action.command && <code className="mono block text-label text-dim">{action.command.syntax}</code>}
-        {!action.shortcut && <p className="text-small text-dim">{action.command?.summary}</p>}
-      </div>
-      {keys && <Keycap>{keys}</Keycap>}
-    </div>
-  )
+function toRow(action: Action): Row {
+  const keys = action.keysLabel ?? (action.shortcut ? formatShortcut(action.shortcut) : undefined)
+  if (action.shortcut) return { id: action.id, label: action.keysLabel ? 'Open session n' : action.label, syntax: action.command?.syntax, keys }
+  return { id: action.id, label: action.command?.name ?? action.label, syntax: action.command?.syntax, summary: action.command?.summary }
 }
 
-type BlockProps = { title: string; children: React.ReactNode }
+const matches = (row: Row, query: string) =>
+  [row.label, row.syntax, row.summary, row.keys].some((text) => text?.toLowerCase().includes(query))
 
-function Block({ title, children }: BlockProps) {
+type RowViewProps = { row: Row }
+
+function RowView({ row }: RowViewProps) {
   return (
-    <section className="rounded-md border border-line bg-raised/40 px-3 pt-2.5 pb-1">
-      <h3 className="label pb-1">{title}</h3>
-      {children}
-    </section>
+    <li className="flex h-7 items-center gap-3 border-b border-line last:border-b-0">
+      {row.summary || (row.syntax && !row.keys) ? (
+        <>
+          <code className="mono flex-none text-small text-accent">{row.syntax ?? row.label}</code>
+          <span className="min-w-0 flex-1 truncate text-small text-dim" title={row.summary}>
+            {row.summary}
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="min-w-0 truncate text-body">{row.label}</span>
+          {row.syntax && <code className="mono hidden flex-none text-label text-dim sm:inline">{row.syntax}</code>}
+          <span className="flex-1" />
+        </>
+      )}
+      {row.keys && <Keycap>{row.keys}</Keycap>}
+    </li>
   )
 }
-
-const LEFT = ['Sessions', 'Queue']
-const RIGHT = ['Navigation', 'Notes', 'Views']
 
 export function ShortcutsSheet() {
   const { overlay, setOverlay } = useAgentos()
   const actions = useActions()
+  const [query, setQuery] = useState('')
+
+  const groups = useMemo(() => {
+    const byId = new Map(actions.map((a) => [a.id, a]))
+    const needle = query.trim().toLowerCase()
+    const build = (group: Group) => {
+      const rows = [
+        ...group.ids.map((id) => byId.get(id)).filter((a): a is Action => Boolean(a && (a.shortcut || a.command) && !a.hidden)).map(toRow),
+        ...(group.extra ?? []),
+      ]
+      return { title: group.title, rows: needle ? rows.filter((r) => matches(r, needle)) : rows }
+    }
+    const all = GROUPS.map(build)
+    const leftovers = actions.filter((a) => !listed.has(a.id) && (a.shortcut || a.command) && !a.hidden).map(toRow)
+    if (leftovers.length > 0) all.push({ title: 'More', rows: needle ? leftovers.filter((r) => matches(r, needle)) : leftovers })
+    return all.filter((g) => g.rows.length > 0)
+  }, [actions, query])
+
   if (overlay !== 'shortcuts') return null
 
-  const byId = new Map(actions.map((a) => [a.id, a]))
-  const rows = (ids: string[]) => ids.map((id) => byId.get(id)).filter((a): a is Action => Boolean(a && (a.shortcut || a.command) && !a.hidden))
-  const leftovers = actions.filter((a) => !listed.has(a.id) && (a.shortcut || a.command) && !a.hidden)
-  const group = (title: string) => {
-    const g = GROUPS.find((x) => x.title === title)!
-    return (
-      <Block key={title} title={title}>
-        {rows(g.ids).map((a) => (
-          <Entry key={a.id} action={a} />
-        ))}
-        {title === 'Queue' && (
-          <div className="flex items-start justify-between gap-3 border-b border-line py-2 last:border-b-0">
-            <p className="text-body">Start an issue without leaving the queue</p>
-            <Keycap>⌥ click</Keycap>
-          </div>
-        )}
-      </Block>
-    )
-  }
+  const column = (titles: string[]) => groups.filter((g) => titles.includes(g.title) || (titles === RIGHT && g.title === 'More'))
+  const blocks = (list: typeof groups) =>
+    list.map((g) => (
+      <section key={g.title} className="min-w-0">
+        <h3 className="label pb-0.5">{g.title}</h3>
+        <ul>
+          {g.rows.map((row) => (
+            <RowView key={row.id} row={row} />
+          ))}
+        </ul>
+      </section>
+    ))
 
   return (
     <Overlay align="center" wide label="Keyboard shortcuts" onClose={() => setOverlay(null)}>
-      <div className="flex flex-none items-center justify-between border-b border-line px-4 py-3">
-        <h2 className="text-title font-semibold">Shortcuts and commands</h2>
+      <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2.5">
+        <h2 className="flex-none text-title font-semibold">Shortcuts</h2>
+        <div className="relative min-w-0 flex-1">
+          <span className="pointer-events-none absolute top-2 left-2 text-dim">
+            <Icon name="search" size={13} />
+          </span>
+          <input
+            autoFocus
+            value={query}
+            spellCheck={false}
+            aria-label="Filter shortcuts"
+            placeholder="Filter shortcuts and commands"
+            className="field w-full pl-7 text-small"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
         <Keycap>esc</Keycap>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-          <div className="flex min-w-0 flex-col gap-4">{LEFT.map(group)}</div>
-          <div className="flex min-w-0 flex-col gap-4">{RIGHT.map(group)}</div>
-          <div className="grid min-w-0 grid-cols-1 items-start gap-4 lg:col-span-2 lg:grid-cols-2">
-            <Block title="Command line">
-              {rows(GROUPS.find((g) => g.title === 'Command line')!.ids).map((a) => (
-                <Entry key={a.id} action={a} />
-              ))}
-              <p className="py-2 text-small text-dim">Tab completes, ↑ ↓ walk the history, Esc returns to the terminal. Every command is also in the palette (⌘K).</p>
-            </Block>
-            <Block title="In a focused list">
-              {LIST_KEYS.map((k) => (
-                <div key={k.keys} className="border-b border-line py-2 last:border-b-0">
-                  <Keycap>{k.keys}</Keycap>
-                  <p className="pt-1 text-small text-dim">{k.summary}</p>
-                </div>
-              ))}
-            </Block>
-          </div>
-          {leftovers.length > 0 && (
-            <div className="lg:col-span-2">
-              <Block title="More">
-                {leftovers.map((a) => (
-                  <Entry key={a.id} action={a} />
-                ))}
-              </Block>
-            </div>
-          )}
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
+        {groups.length === 0 && <p className="py-8 text-center text-small text-dim">Nothing matches.</p>}
+        <div className="grid grid-cols-1 items-start gap-x-10 gap-y-4 lg:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-4">{blocks(column(LEFT))}</div>
+          <div className="flex min-w-0 flex-col gap-4">{blocks(column(RIGHT))}</div>
         </div>
       </div>
     </Overlay>
