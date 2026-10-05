@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { filterIssues, isFiltering } from '../issueFilter'
 import { LANES } from '../lanes'
+import { readStored, writeStored } from '../storage'
 import type { Issue, Lane } from '../types'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
@@ -16,6 +17,8 @@ import type { NavRef } from './Sidebar'
 type Item = { kind: 'lane'; lane: Lane; count: number } | { kind: 'issue'; issue: Issue }
 
 const itemKey = (item: Item) => (item.kind === 'lane' ? `lane:${item.lane}` : `issue:${item.issue.number}`)
+
+const CLOSED_KEY = 'agentos.queue.closed'
 
 type QueueProps = { nav: NavRef }
 
@@ -53,7 +56,7 @@ type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 
 function QueueList({ nav, shown, filtering }: QueueListProps) {
   const { issues, issuesLoading, select, startIssue, focus, report } = useAgentos()
-  const [closed, setClosed] = useState<Set<Lane>>(() => new Set<Lane>(['idea']))
+  const [closed, setClosed] = useState<Set<Lane>>(() => new Set(readStored<Lane[]>(CLOSED_KEY, ['idea'])))
   const list = useRef<HTMLDivElement>(null)
 
   const sections = useMemo(
@@ -80,6 +83,7 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
       const next = new Set(set)
       if (open) next.delete(lane)
       else next.add(lane)
+      writeStored(CLOSED_KEY, [...next])
       return next
     })
 
