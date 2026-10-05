@@ -3,6 +3,7 @@ module github.com/nednella/agentos
 go 1.26.5
 
 require (
+	github.com/creack/pty v1.1.24
 	github.com/spf13/cobra v1.10.2
 	github.com/wailsapp/wails/v2 v2.14.0
 	gopkg.in/yaml.v3 v3.0.1

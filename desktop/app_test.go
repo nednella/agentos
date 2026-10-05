@@ -77,7 +77,7 @@ func TestSnapshotListsTheProjectsOnce(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		snap := newApp(cfg, host{emit: func(string, any) {}}).Snapshot()
+		snap := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}}).Snapshot()
 		if snap.Project.Name != "api" || len(snap.Projects) != 1 || snap.Version != "dev" {
 			t.Errorf("snapshot = %+v", snap)
 		}
@@ -93,7 +93,7 @@ func TestSnapshotListsTheProjectsOnce(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		snap := newApp(cfg, host{emit: func(string, any) {}}).Snapshot()
+		snap := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}}).Snapshot()
 		if snap.Project.Name != "scratch" || len(snap.Projects) != 2 || snap.Projects[1].Name != "scratch" {
 			t.Errorf("snapshot = %+v", snap)
 		}

@@ -26,7 +26,8 @@ type Snapshot struct {
 
 // host is what the window provides. The logic never touches Wails directly.
 type host struct {
-	emit func(event string, payload any)
+	emit      func(event string, payload any)
+	clipboard func(text string)
 }
 
 type config struct {
@@ -99,12 +100,14 @@ func pickAgent(name string) agent.Agent {
 type App struct {
 	ctx      context.Context
 	sessions *Sessions
+	terms    *Terms
 }
 
 func newApp(c config, h host) *App {
 	return &App{
 		ctx:      context.Background(),
 		sessions: newSessions(c.tmux, c.agent, c.stateDir, c.projects, c.project, h.emit),
+		terms:    newTerms(c.tmux, h.emit, h.clipboard),
 	}
 }
 
@@ -113,6 +116,8 @@ func (a *App) start(ctx context.Context) error {
 	a.ctx = ctx
 	return a.sessions.Start(ctx)
 }
+
+func (a *App) stop() { a.terms.CloseAll() }
 
 func (a *App) Snapshot() Snapshot {
 	cur := a.sessions.Current()
@@ -131,7 +136,10 @@ func (a *App) NewSession(title, prefill string) (Session, error) {
 	return a.sessions.Create(title, prefill)
 }
 
-func (a *App) KillSession(id string) error { return a.sessions.Kill(id) }
+func (a *App) KillSession(id string) error {
+	a.terms.Close(id)
+	return a.sessions.Kill(id)
+}
 
 // DismissSession removes the row of an ended session.
 func (a *App) DismissSession(id string) error { return a.sessions.Dismiss(id) }
@@ -144,3 +152,10 @@ func (a *App) SwitchProject(name string) (Snapshot, error) {
 	}
 	return a.Snapshot(), nil
 }
+
+func (a *App) TermOpen(id string, cols, rows int) error { return a.terms.Open(id, cols, rows) }
+func (a *App) TermWrite(id, data string) error          { return a.terms.Write(id, data) }
+func (a *App) TermResize(id string, cols, rows int) error {
+	return a.terms.Resize(id, cols, rows)
+}
+func (a *App) TermClose(id string) { a.terms.Close(id) }

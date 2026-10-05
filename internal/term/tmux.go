@@ -22,7 +22,14 @@ set -g status off
 set -g prefix None
 unbind C-b
 set -g default-terminal tmux-256color
+set -sa terminal-features ',*:RGB:extkeys'
 set -s escape-time 0
+set -g focus-events on
+set -g mouse on
+set -s extended-keys always
+set -s extended-keys-format csi-u
+set -g allow-passthrough on
+set -g set-clipboard on
 set -g history-limit 50000
 `
 
@@ -142,6 +149,14 @@ func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) erro
 	}
 	return nil
 }
+
+// AttachArgv is the command that shows a session in a terminal.
+func (t *Tmux) AttachArgv(name session.Name) []string {
+	return t.argv("attach-session", "-t", name.String())
+}
+
+// Env is the environment for a process that attaches to the server.
+func (t *Tmux) Env() []string { return cleanEnv() }
 
 // Type puts text into the session's prompt without pressing Enter. Text with
 // line breaks goes in as a paste, so the breaks cannot submit it.

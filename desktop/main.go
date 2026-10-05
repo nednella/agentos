@@ -5,7 +5,10 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"os"
+	"os/signal"
 	"sync/atomic"
+	"syscall"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/menu"
@@ -41,7 +44,13 @@ func run() error {
 				runtime.EventsEmit(*c, event, payload)
 			}
 		},
+		clipboard: func(text string) {
+			if c := window.Load(); c != nil {
+				_ = runtime.ClipboardSetText(*c, text)
+			}
+		},
 	})
+	quitOnSignal(app)
 
 	return wails.Run(&options.App{
 		Title:            "agentos",
@@ -58,7 +67,8 @@ func run() error {
 				log.Printf("agentos: %v", err)
 			}
 		},
-		Bind: []any{app},
+		OnShutdown: func(context.Context) { app.stop() },
+		Bind:       []any{app},
 		// The Edit menu is what makes ⌘C, ⌘V and ⌘X reach the web view on macOS. Select All loses its key in stripMenuShortcuts.
 		Menu: menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
 		Mac: &mac.Options{
@@ -66,4 +76,15 @@ func run() error {
 			Appearance: mac.NSAppearanceNameDarkAqua,
 		},
 	})
+}
+
+// quitOnSignal stops the app's terminals before the process ends.
+func quitOnSignal(app *App) {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
+	go func() {
+		<-quit
+		app.stop()
+		os.Exit(0)
+	}()
 }

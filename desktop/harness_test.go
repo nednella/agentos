@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
@@ -17,6 +19,7 @@ import (
 type recorder struct {
 	mu     sync.Mutex
 	events []recorded
+	clips  []string
 }
 
 type recorded struct {
@@ -28,6 +31,26 @@ func (r *recorder) emit(name string, payload any) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.events = append(r.events, recorded{name, payload})
+}
+
+func (r *recorder) clip(text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.clips = append(r.clips, text)
+}
+
+// output is everything a terminal stream has sent for the session, decoded.
+func (r *recorder) output(id string) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out bytes.Buffer
+	for _, e := range r.events {
+		if m, ok := e.payload.(map[string]string); ok && e.name == "term:data" && m["id"] == id {
+			b, _ := base64.StdEncoding.DecodeString(m["data"])
+			out.Write(b)
+		}
+	}
+	return out.String()
 }
 
 func (r *recorder) count(name string) int {
@@ -116,7 +139,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 		t.Fatal(err)
 	}
 	rec := &recorder{}
-	app := newApp(cfg, host{emit: rec.emit})
+	app := newApp(cfg, host{emit: rec.emit, clipboard: rec.clip})
 	app.sessions.prefillFor = 300 * time.Millisecond
 	if tweak != nil {
 		tweak(app)
@@ -127,6 +150,7 @@ func newHarnessWith(t *testing.T, tweak func(*App)) *harness {
 	}
 	t.Cleanup(func() {
 		cancel()
+		app.stop()
 		_ = exec.Command("tmux", "-L", socket, "kill-server").Run()
 		os.RemoveAll(state)
 	})
@@ -204,9 +228,10 @@ func (h *harness) restart(t *testing.T) *App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := newApp(cfg, host{emit: func(string, any) {}})
+	app := newApp(cfg, host{emit: func(string, any) {}, clipboard: func(string) {}})
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
+	t.Cleanup(app.stop)
 	if err := app.start(ctx); err != nil {
 		t.Fatal(err)
 	}
