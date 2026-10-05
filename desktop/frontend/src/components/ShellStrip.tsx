@@ -3,7 +3,6 @@ import type { KeyboardEvent, PointerEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { Icon } from './Icon'
-import { Keycap } from './Keycap'
 import { ShellTerminal } from './ShellTerminal'
 
 const HEADER_REM = 1.75
@@ -54,9 +53,6 @@ export function ShellStrip() {
         >
           <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
           <span className="text-small text-dim">Shell</span>
-          <span className="ml-auto">
-            <Keycap>⌘S</Keycap>
-          </span>
         </button>
       </div>
     )
@@ -80,17 +76,14 @@ export function ShellStrip() {
       >
         <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
         <span className="text-small text-dim">Shell</span>
-        <span className="ml-auto flex items-center gap-1">
-          <Keycap>⌘S</Keycap>
-          <button
-            className="btn btn-ghost h-6 w-6 justify-center px-0"
-            title="Collapse the shell"
-            aria-label="Collapse the shell"
-            onClick={() => setShellOpen(false)}
-          >
-            <Icon name="chevron" size={13} />
-          </button>
-        </span>
+        <button
+          className="btn btn-ghost ml-auto h-6 w-6 justify-center px-0"
+          title="Collapse the shell"
+          aria-label="Collapse the shell"
+          onClick={() => setShellOpen(false)}
+        >
+          <Icon name="chevron" size={13} />
+        </button>
       </div>
       <div className="relative" style={{ height: `${shellRem}rem` }}>
         <ShellTerminal visible />

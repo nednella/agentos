@@ -5,7 +5,6 @@ export const shellActions = ({ layout }: ActionContext): Action[] => [
     id: 'focus-shell',
     label: 'Focus the shell',
     group: 'Navigate',
-    shortcut: { key: 's' },
     run: () => layout.focusPanel('shell'),
   },
 ]
