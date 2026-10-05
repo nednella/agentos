@@ -35,7 +35,7 @@ func TestEvidenceStore(t *testing.T) {
 	if got := again.List("main/4"); len(got) != 0 {
 		t.Errorf("another session's evidence: %+v", got)
 	}
-	if err := again.Delete(id, img.ID); err != nil || again.Count(id) != 1 || exists(e.fileOf(img.URL)) {
+	if err := again.Delete(id, img.ID); err != nil || again.Count(id) != 1 || exists(e.File(img.URL)) {
 		t.Errorf("Delete: %v", err)
 	}
 	if n := again.Purge(id); n != 1 || again.Count(id) != 0 || exists(filepath.Join(e.dir, "main", "evidence", "3")) {

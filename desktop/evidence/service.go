@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"unicode/utf8"
 
+	"github.com/nednella/agentos/desktop/internal/media"
 	ctl "github.com/nednella/agentos/internal/control"
 )
 
@@ -86,7 +87,7 @@ func (c *Commands) Show(_ context.Context, req ctl.Request) (string, error) {
 	if err != nil || !info.Mode().IsRegular() {
 		return "", fmt.Errorf("%s is not a file", path)
 	}
-	if info.Size() > maxImageSize {
+	if info.Size() > media.MaxImageSize {
 		return "", fmt.Errorf("%s is over 10 MB", path)
 	}
 	data, err := os.ReadFile(path)

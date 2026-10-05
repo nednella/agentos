@@ -3,6 +3,7 @@ package digest
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"slices"
@@ -10,10 +11,12 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
+	"github.com/nednella/agentos/internal/util"
 )
 
 // Projects knows the current project.
@@ -48,7 +51,7 @@ func (m *Manager) SetLoop(first, tick time.Duration) { m.first, m.tick = first, 
 
 func (m *Manager) emitNotes(key string) {
 	if list, err := m.notes.List(key); err == nil {
-		m.emit("notes", list)
+		m.emit("notes", scoped.Of(key, list))
 	}
 }
 
@@ -63,7 +66,7 @@ func (m *Manager) emitDigest(key string) {
 	}
 }
 
-// RunDigest starts the current project's digest run in the background.
+// runCurrent starts the current project's digest run in the background.
 func (m *Manager) runCurrent() error { return m.start(m.project.Current()) }
 
 func (m *Manager) start(proj project.Project) error {
@@ -75,10 +78,7 @@ func (m *Manager) start(proj project.Project) error {
 	go func() {
 		ctx, cancel := context.WithTimeout(m.ctx(), digestTimeout)
 		defer cancel()
-		env := append(slices.DeleteFunc(os.Environ(), func(kv string) bool {
-			return strings.HasPrefix(kv, "AGENTOS_SESSION=") || strings.HasPrefix(kv, digestProjects+"=")
-		}), digestProjects+"="+key, "AGENTOS_SOCKET="+bus.SocketPath(m.stateDir))
-		_, err := m.run(ctx, proj.Dir, env, "claude", "-p", prompts.Digest(), "--allowedTools", digestTools)
+		_, err := m.claude(ctx, proj, key)
 		failure := ""
 		switch {
 		case ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):
@@ -86,7 +86,7 @@ func (m *Manager) start(proj project.Project) error {
 		case errors.Is(err, exec.ErrNotFound):
 			failure = "claude was not found on PATH"
 		case err != nil:
-			failure = firstLine(err.Error())
+			failure = util.FirstLine(err.Error())
 		}
 		m.digests.Finish(key, time.Now(), failure)
 		m.emitDigest(key)
@@ -94,7 +94,34 @@ func (m *Manager) start(proj project.Project) error {
 	return nil
 }
 
-// digestLoop starts the current project's digest when it is due: first after a minute, then hourly.
+// claude runs the digest prompt in an empty folder, with the few tools the digest needs and
+// only the environment claude needs: the run reads the web, so it must not see the project or its secrets.
+func (m *Manager) claude(ctx context.Context, proj project.Project, key string) ([]byte, error) {
+	dir, err := os.MkdirTemp("", "agentos-digest")
+	if err != nil {
+		return nil, fmt.Errorf("making the digest folder: %w", err)
+	}
+	defer os.RemoveAll(dir)
+	env := append(claudeEnv(os.Environ()), digestProjects+"="+key, "AGENTOS_SOCKET="+bus.SocketPath(m.stateDir))
+	return m.run(ctx, dir, env, "claude", "-p", prompts.Digest(dependencies(proj.Dir)), "--allowedTools", digestTools)
+}
+
+// claudeEnv keeps what claude needs to start, find its login and reach its provider.
+func claudeEnv(env []string) []string {
+	exact := []string{"PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS",
+		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy", "GOOGLE_APPLICATION_CREDENTIALS"}
+	prefixes := []string{"ANTHROPIC_", "CLAUDE_", "AWS_", "CLOUD_ML_", "VERTEX_"}
+	var out []string
+	for _, kv := range env {
+		name, _, _ := strings.Cut(kv, "=")
+		if slices.Contains(exact, name) || slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(name, p) }) {
+			out = append(out, kv)
+		}
+	}
+	return out
+}
+
+// Loop starts the current project's digest when it is due, checking first after m.first, then every m.tick, until ctx ends.
 func (m *Manager) Loop(ctx context.Context) {
 	timer := time.NewTimer(m.first)
 	defer timer.Stop()
@@ -136,9 +163,4 @@ func (m *Manager) dismiss(itemID string) error {
 	}
 	m.emitDigest(key)
 	return nil
-}
-
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-	return line
 }

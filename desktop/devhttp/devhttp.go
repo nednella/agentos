@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/nednella/agentos/desktop/internal/media"
 	"io"
 	"io/fs"
 	"net/http"
@@ -22,7 +23,7 @@ const devShim = `
 const listeners = {}
 const proxy = (get) => new Proxy({}, { get: (_, name) => get(name) })
 window.go = proxy((pkg) => proxy((type) => proxy((method) => async (...args) => {
-  const res = await fetch('/__call/' + pkg + '.' + type + '/' + method, { method: 'POST', body: JSON.stringify(args) })
+  const res = await fetch('/__call/' + pkg + '.' + type + '/' + method, { method: 'POST', headers: { 'X-Agentos': '1' }, body: JSON.stringify(args) })
   const text = await res.text()
   if (!res.ok) throw text
   return text ? JSON.parse(text) : undefined
@@ -147,9 +148,6 @@ type Options struct {
 	Addr     string
 }
 
-// MediaPrefix is where the pictures are served.
-const MediaPrefix = "/media/"
-
 // Serve runs the app in a browser.
 func Serve(o Options) error {
 	if err := o.Start(context.Background()); err != nil {
@@ -170,8 +168,12 @@ func Serve(o Options) error {
 		io.WriteString(w, devShim)
 	})
 	mux.HandleFunc("/__events", o.Hub.serve)
-	mux.Handle(MediaPrefix, o.Media)
+	mux.Handle(media.Prefix, o.Media)
 	mux.HandleFunc("/__call/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get(callHeader) != "1" {
+			http.Error(w, "missing "+callHeader+" header", http.StatusForbidden)
+			return
+		}
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
@@ -196,5 +198,23 @@ func Serve(o Options) error {
 		files.ServeHTTP(w, r)
 	})
 	fmt.Println("agentos: serving on http://" + o.Addr)
-	return http.ListenAndServe(o.Addr, mux)
+	return http.ListenAndServe(o.Addr, sameOrigin(o.Addr, mux))
+}
+
+// callHeader marks a /__call/ request as sent by the shim: a page on another site cannot add it without a preflight this server refuses.
+const callHeader = "X-Agentos"
+
+// sameOrigin refuses requests meant for another host name (DNS rebinding) and requests from a page on another origin.
+func sameOrigin(addr string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Host != addr {
+			http.Error(w, "unexpected host", http.StatusForbidden)
+			return
+		}
+		if origin := r.Header.Get("Origin"); origin != "" && origin != "http://"+addr {
+			http.Error(w, "unexpected origin", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

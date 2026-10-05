@@ -15,7 +15,6 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		hash string
 	}{
 		{"harness check", HarnessCheck(), "8337a3069da3450c56372a6047babb19e6395e7a6f5a830c1aae565fbb96fd0b"},
-		{"digest", Digest(), "d4b5dd6e11d8dd7aa0c2ce9a9c9944bcf96e3499bbc9c1b8b9ccb60b0530b6e5"},
 		{"browser session", BrowserSession(), "479d542f0a6920f861bf8db587040d05b7999c1421491e52640b3a23f3e20312"},
 		{"browser help", BrowserHelp(), "5ce9b1d5055ded6f64387636a5fa93a9c88fb048cc99b0eb74729ccad64d41e4"},
 	}
@@ -42,5 +41,20 @@ func TestBodyWithoutComment(t *testing.T) {
 		if got := body(tt.in); got != tt.want {
 			t.Errorf("body(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestDigestNamesTheDependencies(t *testing.T) {
+	got := Digest([]string{"react", "gopkg.in/yaml.v3"})
+	for _, want := range []string{"react\ngopkg.in/yaml.v3\n", "agentos digest add --title", "Do nothing else."} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the digest prompt lacks %q:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "{dependencies}") || strings.Contains(got, "<!--") {
+		t.Errorf("the digest prompt keeps its framing:\n%s", got)
+	}
+	if strings.Contains(Digest(nil), "{dependencies}") {
+		t.Error("an empty list left the placeholder")
 	}
 }

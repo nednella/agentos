@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nednella/agentos/desktop/internal/media"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
 )
@@ -45,6 +46,9 @@ func New(dataDir string) *Store {
 	return &Store{dir: dataDir, items: map[string][]Evidence{}}
 }
 
+// File is the file behind the URL of a picture, or "".
+func (e *Store) File(url string) string { return media.File(e.dir, media.EvidenceFolder, url) }
+
 // folder is where the session's evidence lives. The session's number is reused
 // after it ends, so the folder is emptied when a session ends.
 func (e *Store) folder(id string) (string, error) {
@@ -52,7 +56,7 @@ func (e *Store) folder(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(e.dir, name.Project, evidenceFolder, strconv.Itoa(name.N)), nil
+	return filepath.Join(e.dir, name.Project, media.EvidenceFolder, strconv.Itoa(name.N)), nil
 }
 
 // load needs mu.
@@ -127,11 +131,11 @@ func newEvidenceID() (string, error) {
 
 // AddImage files a picture. Its type comes from the bytes, not from the name.
 func (e *Store) AddImage(id string, data []byte, caption, source string) (Evidence, error) {
-	ext, ok := imageTypes[http.DetectContentType(data)]
+	ext, ok := media.Ext(http.DetectContentType(data))
 	if !ok {
 		return Evidence{}, errors.New("the file is not a png, jpeg, gif or webp picture")
 	}
-	if len(data) > maxImageSize {
+	if len(data) > media.MaxImageSize {
 		return Evidence{}, errors.New("the picture is over 10 MB")
 	}
 	name, err := newEvidenceID()
@@ -147,7 +151,7 @@ func (e *Store) AddImage(id string, data []byte, caption, source string) (Eviden
 	}
 	parsed, _ := session.ParseName(id)
 	item := Evidence{ID: name, Kind: "image", Caption: caption, Source: source, At: time.Now().UnixMilli(),
-		URL: path.Join(MediaPrefix, parsed.Project, evidenceFolder, strconv.Itoa(parsed.N), name+ext)}
+		URL: path.Join(media.Prefix, parsed.Project, media.EvidenceFolder, strconv.Itoa(parsed.N), name+ext)}
 	return e.add(id, item, filepath.Join(dir, name+ext))
 }
 
@@ -185,7 +189,7 @@ func (e *Store) Delete(id, evidenceID string) error {
 	if i < 0 {
 		return errors.New("no such evidence")
 	}
-	if file := e.fileOf(items[i].URL); file != "" {
+	if file := e.File(items[i].URL); file != "" {
 		_ = os.Remove(file)
 	}
 	return e.save(id, slices.Delete(slices.Clone(items), i, i+1))

@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/internal/control"
 )
 
@@ -34,7 +35,7 @@ func (c *Commands) Note(_ context.Context, req control.Request) (string, error) 
 	}
 	if key == c.project.Current().Key() {
 		if list, err := c.notes.List(key); err == nil {
-			c.emit("notes", list)
+			c.emit("notes", scoped.Of(key, list))
 		} else {
 			log.Printf("agentos: %v", err)
 		}

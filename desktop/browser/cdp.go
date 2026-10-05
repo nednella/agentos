@@ -21,7 +21,6 @@ type cdp struct {
 	mu      sync.Mutex
 	next    int
 	pending map[int]chan cdpReply
-	done    chan struct{}
 }
 
 type cdpReply struct {
@@ -47,14 +46,13 @@ func dialCDP(ctx context.Context, url string, onEvent func(sessionID, method str
 		return nil, fmt.Errorf("connecting to the browser: %w", err)
 	}
 	conn.SetReadLimit(64 << 20)
-	c := &cdp{conn: conn, onEvent: onEvent, pending: map[int]chan cdpReply{}, done: make(chan struct{})}
+	c := &cdp{conn: conn, onEvent: onEvent, pending: map[int]chan cdpReply{}}
 	go c.read()
 	return c, nil
 }
 
 // read hands replies to their callers and events to onEvent. onEvent must not wait for a reply.
 func (c *cdp) read() {
-	defer close(c.done)
 	for {
 		_, data, err := c.conn.ReadMessage()
 		if err != nil {

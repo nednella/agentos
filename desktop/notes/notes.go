@@ -146,11 +146,16 @@ func (s *Notes) Get(key, id string) (Note, error) {
 	return Note{}, errors.New("note not found")
 }
 
+// Add keeps a note that has text.
 func (s *Notes) Add(key, text string) (Note, error) {
-	text = strings.TrimSpace(text)
-	if text == "" {
+	if strings.TrimSpace(text) == "" {
 		return Note{}, errors.New("the note is empty")
 	}
+	return s.add(key, text)
+}
+
+func (s *Notes) add(key, text string) (Note, error) {
+	text = strings.TrimSpace(text)
 	id := make([]byte, 6)
 	if _, err := rand.Read(id); err != nil {
 		return Note{}, fmt.Errorf("making a note id: %w", err)

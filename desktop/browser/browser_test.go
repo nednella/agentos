@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -67,5 +68,51 @@ func TestWebAddress(t *testing.T) {
 		if (err == nil) != tt.ok || got != tt.want {
 			t.Errorf("webAddress(%q) = %q, %v", tt.in, got, err)
 		}
+	}
+}
+
+func newTestBrowsers(t *testing.T) (*Browsers, context.Context) {
+	t.Helper()
+	b := New(t.TempDir(), func(string, any) {})
+	if !b.Available() {
+		t.Skip("no Chromium based browser installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	t.Cleanup(func() { cancel(); b.CloseAll() })
+	return b, ctx
+}
+
+func TestConcurrentOpensShareOneTab(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	var wg sync.WaitGroup
+	states := make([]BrowserState, 2)
+	for i := range states {
+		wg.Go(func() {
+			st, err := b.Open(ctx, "p/1", "about:blank")
+			if err != nil {
+				t.Errorf("Open %d: %v", i, err)
+			}
+			states[i] = st
+		})
+	}
+	wg.Wait()
+	if !states[0].Open || !states[1].Open || states[0].ID != states[1].ID {
+		t.Errorf("the two opens returned %+v and %+v", states[0], states[1])
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if len(b.tabs) != 1 || b.procs["p"] == nil || b.procs["p"].tabs != 1 {
+		t.Errorf("%d tabs, browser counts %d", len(b.tabs), b.procs["p"].tabs)
+	}
+}
+
+func TestOpenReportsAFirstPageThatFails(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	st, err := b.Open(ctx, "p/1", "http://127.0.0.1:1/")
+	if err == nil || !strings.Contains(err.Error(), "could not open") {
+		t.Errorf("Open of an address nobody serves = %v", err)
+	}
+	if !st.Open || !b.Has("p/1") {
+		t.Errorf("the tab did not stay open: %+v", st)
 	}
 }

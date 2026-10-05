@@ -3,13 +3,13 @@ package app
 import (
 	"context"
 	"net/http"
-	"strings"
 	"sync/atomic"
 
 	"github.com/nednella/agentos/desktop/browser"
 	"github.com/nednella/agentos/desktop/control"
 	"github.com/nednella/agentos/desktop/digest"
 	"github.com/nednella/agentos/desktop/evidence"
+	"github.com/nednella/agentos/desktop/internal/media"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/desktop/notes"
@@ -37,6 +37,7 @@ type App struct {
 	browsers *browser.Browsers
 	digests  *digest.Manager
 	router   *control.Router
+	media    http.Handler
 	stateDir string
 	services []any
 }
@@ -63,6 +64,7 @@ func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
 	a.browsers = browsers
+	a.media = media.Handler(c.DataDir, c.LocalDir)
 	browsers.Hook(func(id string) string {
 		name, err := session.ParseName(id)
 		if err != nil {
@@ -149,19 +151,12 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) Stop() {
 	a.terms.CloseAll()
 	a.browsers.CloseAll()
+	a.sessions.Stop()
 	a.router.Close()
 }
 
 // Media serves the pictures of notes and evidence under /media/<project key>/<folder>/.
-func (a *App) Media() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.Contains(r.URL.Path, "/evidence/") {
-			a.evidence.MediaHandler().ServeHTTP(w, r)
-			return
-		}
-		a.notes.MediaHandler().ServeHTTP(w, r)
-	})
-}
+func (a *App) Media() http.Handler { return a.media }
 
 // Sessions is the session list, for tests and wiring.
 func (a *App) Sessions() *sessions.Sessions { return a.sessions }

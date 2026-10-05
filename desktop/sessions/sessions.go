@@ -15,12 +15,15 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/scoped"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
+	"github.com/nednella/agentos/internal/util"
 )
 
 const (
@@ -70,6 +73,7 @@ type Session struct {
 
 // Project is a project as the front end sees it, with how its sessions stand.
 type Project struct {
+	Key      string `json:"key"` // the project's key, as in the project field of events and in session ids
 	Name     string `json:"name"`
 	Dir      string `json:"dir"`
 	Repo     string `json:"repo"`
@@ -84,8 +88,9 @@ type Sessions struct {
 	agent    agent.Agent
 	stateDir string
 	emit     func(event string, payload any)
+	warn     *warn.Warnings
 
-	createMu sync.Mutex // one creation at a time, so two sessions never pick the same number
+	createMu sync.Mutex // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
 
 	mu         sync.Mutex
 	ctx        context.Context
@@ -162,6 +167,9 @@ func New(o Options) *Sessions {
 	return s
 }
 
+// Stop ends the clean-ups that are running and waits for them.
+func (s *Sessions) Stop() { s.life.stopCleanups() }
+
 // Hook sets what the sessions ask of the issues: the repo of a folder, and a
 // nudge when the sessions tied to issues change.
 func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func()) {
@@ -170,12 +178,17 @@ func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func()) {
 	s.repoOf, s.onIssues = repoOf, onIssues
 }
 
+// HarnessCheck starts the session titled "Harness check" with the review prompt typed in, not sent.
+func (s *Sessions) HarnessCheck() (Session, error) {
+	return s.Create("Harness check", prompts.HarnessCheck(), 0)
+}
+
 // Touch tells the front end that something shown in the session list changed.
 func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit,
+		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -218,22 +231,35 @@ func (s *Sessions) Start(ctx context.Context) error {
 }
 
 // Refresh reads tmux and the state files. A state file with no tmux session
-// behind it is a session that ended.
+// behind it is a session that ended. When tmux cannot be listed the state stays as it was:
+// a failed listing says nothing about which sessions are gone.
 func (s *Sessions) Refresh() {
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
 	s.mu.Lock()
-	ctx := s.ctx
+	parent := s.ctx
 	s.mu.Unlock()
-	ctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	ctx, cancel := context.WithTimeout(parent, tmuxTimeout)
 	defer cancel()
 	infos, shells, err := s.tmux.ListAll(ctx)
 	if err != nil {
+		if parent.Err() == nil {
+			s.warn.Report("tmux", util.FirstLine(err.Error()))
+		}
 		return
 	}
+	s.warn.Clear("tmux")
 	records := bus.ReadAll(s.stateDir)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.info = infos
 	s.shells = shells
+	for _, in := range infos {
+		if name := in.Name.String(); s.ended[name] != nil {
+			s.revive(name)
+			delete(records, name)
+		}
+	}
 	for name, rec := range records {
 		if slices.ContainsFunc(infos, func(i term.Info) bool { return i.Name.String() == name }) {
 			s.take(rec)
@@ -244,6 +270,13 @@ func (s *Sessions) Refresh() {
 	s.expireEnded(time.Now())
 	s.loaded = true
 	s.sync()
+}
+
+// revive takes back a session that tmux lists although it was marked ended. The saved
+// record says ended, so it goes: the next hook writes a true one. It needs mu.
+func (s *Sessions) revive(name string) {
+	delete(s.ended, name)
+	_ = bus.RemoveState(s.stateDir, name)
 }
 
 // endedSession is a session that is gone but whose row stays until dismissed.
@@ -268,7 +301,11 @@ func (e *endedSession) record() session.Record {
 // adoptEnded takes in a state file whose tmux session is gone. It needs mu.
 func (s *Sessions) adoptEnded(name string, rec session.Record) {
 	n, err := session.ParseName(name)
-	if err != nil || s.dismissed[name] {
+	if err != nil {
+		return
+	}
+	if s.dismissed[name] {
+		_ = bus.RemoveState(s.stateDir, name) // a hook that ran late wrote it again
 		return
 	}
 	if e, ok := s.ended[name]; ok {
@@ -350,6 +387,7 @@ func (s *Sessions) drop(id string) {
 	delete(s.history, id)
 	delete(s.known, id)
 	s.dismissed[id] = true
+	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
 	go s.evidence.Purge(id)
 }
@@ -458,7 +496,7 @@ func (s *Sessions) sync() {
 		return
 	}
 	s.lastSent = string(b)
-	s.emit("sessions", list)
+	s.emit("sessions", scoped.Of(key, list))
 	for _, a := range attention {
 		s.emit("attention", map[string]string{"id": a[0], "state": a[1]})
 	}
@@ -498,7 +536,7 @@ func (s *Sessions) announceIssues() {
 func (s *Sessions) projectViews() []Project {
 	var views []Project
 	for _, p := range s.projects() {
-		v := Project{Name: p.Name, Dir: p.Dir, Repo: s.repoOf(p.Dir)}
+		v := Project{Key: p.Key(), Name: p.Name, Dir: p.Dir, Repo: s.repoOf(p.Dir)}
 		for _, in := range s.info {
 			if in.Name.Project != p.Key() {
 				continue
@@ -624,6 +662,9 @@ func (s *Sessions) SwitchProject(name string) (project.Project, error) {
 
 // Forget removes a configured project, moving to another one if it was current.
 func (s *Sessions) Forget(name string) (project.Project, error) {
+	if live := s.liveIssueSessions(project.Project{Name: name}.Key()); len(live) > 0 {
+		return project.Project{}, fmt.Errorf("cannot remove %q: it has live issue sessions (%s), which need its branch pattern and clean-up command; end them first", name, strings.Join(live, ", "))
+	}
 	removed, err := s.configured.Remove(name)
 	if err != nil {
 		return project.Project{}, err
@@ -645,6 +686,19 @@ func (s *Sessions) Forget(name string) (project.Project, error) {
 	return s.project, nil
 }
 
+// liveIssueSessions names the running sessions of the project that work on an issue. It takes mu.
+func (s *Sessions) liveIssueSessions(key string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []string
+	for _, in := range s.info {
+		if issue, _ := strconv.Atoi(in.Issue); issue > 0 && in.Name.Project == key {
+			out = append(out, fmt.Sprintf("session %d for #%d", in.Name.N, issue))
+		}
+	}
+	return out
+}
+
 // IssueSessions maps issue numbers to the live session started for each, in the current project.
 func (s *Sessions) IssueSessions() map[int]string {
 	out := map[int]string{}
@@ -662,8 +716,29 @@ func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
+	name, proj, ctx, ready := s.reserve(prefill)
+	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
+	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	defer cancel()
+	if err := s.launch(tctx, name, title, proj, issue); err != nil {
+		s.mu.Lock()
+		delete(s.ready, name.String())
+		s.mu.Unlock()
+		return Session{}, err
+	}
+	view := s.register(name, title, proj, issue)
+	if ready != nil {
+		go s.typeWhenReady(name, ready, prefill)
+	}
+	return view, nil
+}
+
+// reserve picks the lowest free number of the current project. With a prefill it also
+// returns the channel that closes when the agent says it is ready. It takes mu.
+func (s *Sessions) reserve(prefill string) (name session.Name, proj project.Project, ctx context.Context, ready chan struct{}) {
 	s.mu.Lock()
-	ctx, proj := s.ctx, s.project
+	defer s.mu.Unlock()
+	ctx, proj = s.ctx, s.project
 	var used []int
 	for _, in := range s.info {
 		if in.Name.Project == proj.Key() {
@@ -675,31 +750,28 @@ func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 			used = append(used, e.info.Name.N)
 		}
 	}
-	name := session.Name{Project: proj.Key(), N: session.NextN(used)}
+	name = session.Name{Project: proj.Key(), N: session.NextN(used)}
 	delete(s.dismissed, name.String())
-	var ready chan struct{}
 	if prefill != "" {
 		ready = make(chan struct{})
 		s.ready[name.String()] = ready
 	}
-	s.mu.Unlock()
+	return name, proj, ctx, ready
+}
 
-	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
+// launch starts the agent of the session in tmux.
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
 	}
-	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
-	defer cancel()
-	err := s.start(tctx, name, title, proj.Dir, env, s.commandFor(name, proj), issue)
-	if err != nil {
-		s.mu.Lock()
-		delete(s.ready, name.String())
-		s.mu.Unlock()
-		return Session{}, err
-	}
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj), issue)
+}
 
+// register adds the new session to the list and returns its row. It takes mu.
+func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int) Session {
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Created: time.Now()}
 	if issue > 0 {
 		in.Issue = strconv.Itoa(issue)
@@ -708,18 +780,12 @@ func (s *Sessions) Create(title, prefill string, issue int) (Session, error) {
 		s.info = append(s.info, in)
 	}
 	s.sync()
-	var view Session
 	for _, v := range s.list() {
 		if v.ID == name.String() {
-			view = v
+			return v
 		}
 	}
-	s.mu.Unlock()
-
-	if ready != nil {
-		go s.typeWhenReady(name, ready, prefill)
-	}
-	return view, nil
+	return Session{}
 }
 
 func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int) error {
@@ -731,7 +797,13 @@ func (s *Sessions) start(ctx context.Context, name session.Name, title, dir stri
 		return err
 	}
 	if issue > 0 {
-		return s.tmux.SetIssue(ctx, name, issue)
+		if err := s.tmux.SetIssue(ctx, name, issue); err != nil {
+			// Without the issue tag the session would be a stray: untracked, and tmux would still run it.
+			killCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxTimeout)
+			defer cancel()
+			_ = s.tmux.Kill(killCtx, name)
+			return err
+		}
 	}
 	return nil
 }
@@ -878,15 +950,6 @@ func (s *Sessions) TypeInto(id, text string) error {
 	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
 	defer cancel()
 	return s.tmux.Type(ctx, name, text)
-}
-
-// projectKeyOf is the project key of a session id.
-func projectKeyOf(id string) string {
-	name, err := session.ParseName(id)
-	if err != nil {
-		return "project"
-	}
-	return name.Project
 }
 
 // Run follows tmux, the hook bus and the pull requests until ctx ends.

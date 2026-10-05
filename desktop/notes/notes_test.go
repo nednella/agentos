@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,8 +20,15 @@ import (
 
 func TestNotes(t *testing.T) {
 	h := newHarness(t)
-	if _, err := h.AddNote("  "); err == nil {
-		t.Error("an empty note was accepted")
+	blank, err := h.AddNote("  ") // a note that waits for its pictures
+	if err != nil || blank.Text != "" {
+		t.Fatalf("AddNote with no text = %+v, %v", blank, err)
+	}
+	if _, err := h.UpdateNote(blank.ID, "  "); err == nil {
+		t.Error("a note was emptied by an edit")
+	}
+	if err := h.DeleteNote(blank.ID); err != nil {
+		t.Fatal(err)
 	}
 	first, err := h.AddNote("first title\nbody line")
 	if err != nil {
@@ -50,7 +58,10 @@ func TestNotes(t *testing.T) {
 	if got := ids(h.Snapshot().Notes); got != "edited|second" {
 		t.Errorf("done notes sort last: %q", got)
 	}
-	if events, _ := h.Rec.Last("notes").([]notes.Note); ids(events) != "edited|second" {
+	if got := h.Rec.ProjectOf("notes"); got != "main" {
+		t.Errorf("notes event project = %q", got)
+	}
+	if events := h.Rec.LastNotes(); ids(events) != "edited|second" {
 		t.Errorf("notes event = %q", ids(events))
 	}
 
@@ -107,7 +118,7 @@ func TestNoteToIssue(t *testing.T) {
 	if h.Rec.Last("issues") == nil {
 		t.Error("no issues event")
 	}
-	if got, _ := h.Rec.Last("notes").([]notes.Note); len(got) != 1 || got[0].Issue != 55 {
+	if got := h.Rec.LastNotes(); len(got) != 1 || got[0].Issue != 55 {
 		t.Errorf("notes event = %+v", got)
 	}
 	if _, err := h.NoteToIssue(n.ID); err == nil {
@@ -233,7 +244,7 @@ func TestNoteImages(t *testing.T) {
 		t.Errorf("%d files stored, want 1", len(files))
 	}
 
-	srv := httptest.NewServer(h.Notes().MediaHandler())
+	srv := httptest.NewServer(h.App.Media())
 	defer srv.Close()
 	get := func(path string) (int, string, []byte) {
 		resp, err := http.Get(srv.URL + path)
@@ -302,7 +313,7 @@ func TestMediaServedInHTTPMode(t *testing.T) {
 		t.Fatal(err)
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/media/", h.Notes().MediaHandler())
+	mux.Handle("/media/", h.App.Media())
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest("GET", n.Images[0], nil))
 	if rec.Code != 200 || rec.Header().Get("X-Content-Type-Options") != "nosniff" {
@@ -350,4 +361,57 @@ func addNote(a *app.App, text string) (notes.Note, error) {
 		}
 	}
 	return notes.Note{}, errors.New("no notes service")
+}
+
+func TestNoteToIssueFilesOneIssueUnderConcurrentCalls(t *testing.T) {
+	h := newHarness(t)
+	h.GH.Create = "https://github.com/acme/widgets/issues/61\n"
+	h.GH.Delay = 300 * time.Millisecond
+	if _, err := h.Issues(false); err != nil {
+		t.Fatal(err)
+	}
+	n, err := h.AddNote("Double click")
+	if err != nil {
+		t.Fatal(err)
+	}
+	errs := make([]error, 3)
+	var wg sync.WaitGroup
+	for i := range errs {
+		wg.Go(func() { _, errs[i] = h.NoteToIssue(n.ID) })
+	}
+	wg.Wait()
+
+	created, failed := 0, 0
+	for _, c := range h.GH.CallLog() {
+		if strings.HasPrefix(c, "issue create") {
+			created++
+		}
+	}
+	for _, err := range errs {
+		if err != nil {
+			failed++
+		}
+	}
+	if created != 1 || failed != 2 {
+		t.Errorf("%d issues created, %d calls failed; want 1 and 2 (%v)", created, failed, errs)
+	}
+	if got, _ := h.Notes().Get("main", n.ID); got.Issue != 61 {
+		t.Errorf("note = %+v", got)
+	}
+}
+
+func TestNoteWithoutTextCannotBecomeAnIssue(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.Issues(false); err != nil {
+		t.Fatal(err)
+	}
+	n, _ := h.AddNote("")
+	if _, err := h.NoteToIssue(n.ID); err == nil {
+		t.Error("a note with no text was filed")
+	}
+	for _, c := range h.GH.CallLog() {
+		if strings.HasPrefix(c, "issue create") {
+			t.Errorf("gh was asked to file it: %s", c)
+		}
+	}
 }

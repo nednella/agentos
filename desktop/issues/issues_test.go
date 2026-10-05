@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/internal/project"
 )
@@ -72,7 +73,7 @@ func TestIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 	issuesEvent := func(number int) string {
-		list, _ := h.Rec.Last("issues").([]issues.Issue)
+		list := h.Rec.LastIssues()
 		for _, is := range list {
 			if is.Number == number {
 				return is.SessionID
@@ -81,6 +82,9 @@ func TestIssues(t *testing.T) {
 		return "?"
 	}
 	eventually(t, "issues event with the session", func() bool { return issuesEvent(7) == s.ID })
+	if got := h.Rec.ProjectOf("issues"); got != "main" {
+		t.Errorf("issues event project = %q", got)
+	}
 	if err := h.KillSession(s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -89,8 +93,8 @@ func TestIssues(t *testing.T) {
 }
 
 func TestIssuesWithoutRepo(t *testing.T) {
-	gh := &apptest.FakeGH{Repo: errors.New("not a repo")}
-	is := issues.New(gh.Run, nil, nil)
+	gh := &apptest.FakeGH{Repo: errors.New("gh repo view: exit status 1: not a git repository")}
+	is := issues.New(gh.Run, nil, func(string, any) {})
 	list, err := is.List(context.Background(), project.Project{Dir: "/x"}, false)
 	if err != nil || list == nil || len(list) != 0 {
 		t.Errorf("List = %v, %v", list, err)
@@ -114,5 +118,39 @@ func TestInboxAndIdeaCommands(t *testing.T) {
 	time.Sleep(600 * time.Millisecond)
 	if pane := h.Pane(t, idea.ID); strings.Contains(pane, "/") && strings.Contains(pane, "investigate") {
 		t.Errorf("an idea got a command:\n%s", pane)
+	}
+}
+
+func TestRepoFailureIsWarnedAboutAndNotRemembered(t *testing.T) {
+	gh := &apptest.FakeGH{Repo: errors.New("gh repo view: exit status 1: error connecting to api.github.com\nsecond line")}
+	var warnings []warn.Warning
+	is := issues.New(gh.Run, nil, func(event string, payload any) {
+		if w, ok := payload.(warn.Warning); ok && event == "warnings" {
+			warnings = append(warnings, w)
+		}
+	})
+	ctx := context.Background()
+	if repo := is.Repo(ctx, "/x"); repo != "" {
+		t.Fatalf("repo = %q", repo)
+	}
+	if len(warnings) != 1 || warnings[0].Source != "github" || !strings.Contains(warnings[0].Message, "error connecting") || strings.Contains(warnings[0].Message, "second line") {
+		t.Fatalf("warnings = %+v", warnings)
+	}
+	if is.Repo(ctx, "/x") != "" || len(warnings) != 1 {
+		t.Errorf("an immediate retry ran gh again: warnings %+v", warnings)
+	}
+
+	gh.Repo = nil
+	if is.CachedRepo("/x") != "" {
+		t.Error("the failed lookup was cached as no repo")
+	}
+	if _, err := is.List(ctx, project.Project{Dir: "/x"}, true); err != nil {
+		t.Fatal(err)
+	}
+	if repo := is.Repo(ctx, "/x"); repo != "acme/widgets" {
+		t.Errorf("after gh worked again, repo = %q", repo)
+	}
+	if len(warnings) != 2 || warnings[1] != (warn.Warning{Source: "github"}) {
+		t.Errorf("recovery was not announced: %+v", warnings)
 	}
 }

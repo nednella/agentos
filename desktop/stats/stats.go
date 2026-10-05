@@ -18,14 +18,6 @@ import (
 	"github.com/nednella/agentos/internal/session"
 )
 
-func keyOf(id string) string {
-	name, err := session.ParseName(id)
-	if err != nil {
-		return "project"
-	}
-	return name.Project
-}
-
 // Opened starts a wait for a session that now needs the user: the reason comes from its record.
 func (w *Waits) Opened(id, title string, issue int, rec session.Record, at time.Time) {
 	kind, label := CauseOf(rec)
@@ -125,7 +117,7 @@ func (w *Waits) End(id string, at time.Time) bool {
 		return false
 	}
 	wait.WaitedMs = max(at.UnixMilli()-wait.StartedAt, 1)
-	if err := w.append(keyOf(id), wait); err != nil {
+	if err := w.append(session.ProjectKey(id), wait); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: recording a wait: %v\n", err)
 	}
 	return true
@@ -176,7 +168,7 @@ func (w *Waits) Stats(key string, days int, now time.Time) (Stats, error) {
 	}
 	w.mu.Lock()
 	for id, wait := range w.open {
-		if keyOf(id) == key {
+		if session.ProjectKey(id) == key {
 			wait.WaitedMs = 0
 			waits = append(waits, wait)
 		}

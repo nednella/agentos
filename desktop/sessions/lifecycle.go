@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -15,15 +16,21 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/scoped"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/session"
+	"github.com/nednella/agentos/internal/util"
 )
 
 const (
 	prPollEvery  = 3 * time.Minute
 	cleanupsKept = 100
 	gitTimeout   = 30 * time.Second
+
+	closedReason = "app closed during clean-up"
 )
 
 // PR is a pull request as the front end sees it.
@@ -34,6 +41,8 @@ type PR struct {
 	Checks    string `json:"checks"`
 	Comments  int    `json:"comments"`
 	UpdatedAt int64  `json:"updatedAt"`
+
+	HeadOid string `json:"-"` // the commit the PR's branch ended on
 }
 
 // Cleanup is one entry of the clean-up log.
@@ -78,6 +87,7 @@ type Lifecycle struct {
 	dataDir  string
 	stateDir string
 	emit     func(event string, payload any)
+	warn     *warn.Warnings
 	sessions *Sessions
 
 	pollMu sync.Mutex // one poll at a time
@@ -86,13 +96,47 @@ type Lifecycle struct {
 	mu     sync.Mutex
 	tracks map[string]*track
 	files  map[string]*prsFile // by project key
+
+	cleanMu   sync.Mutex // guards stopping against cleanups starting
+	stopping  bool
+	cleanups  sync.WaitGroup // the clean-ups a poll started on its own
+	stopped   context.Context
+	stopClean context.CancelFunc
 }
 
 func newLifecycle(runner run.Runner, dataDir, stateDir string, s *Sessions, emit func(string, any)) *Lifecycle {
+	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
-		run: runner, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit,
-		tracks: map[string]*track{}, files: map[string]*prsFile{},
+		run: runner, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit),
+		tracks: map[string]*track{}, files: map[string]*prsFile{}, stopped: stopped, stopClean: stop,
 	}
+}
+
+// autoCleanup cleans up after a session in the background, until ctx or stopCleanups ends it.
+func (l *Lifecycle) autoCleanup(ctx context.Context, id string) {
+	l.cleanMu.Lock()
+	defer l.cleanMu.Unlock()
+	if l.stopping {
+		return
+	}
+	l.cleanups.Go(func() {
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		defer context.AfterFunc(l.stopped, cancel)()
+		_ = l.Cleanup(ctx, id, false)
+	})
+}
+
+// stopCleanups cancels the clean-ups a poll started and waits until each has logged where it stopped.
+func (l *Lifecycle) stopCleanups() {
+	if l == nil {
+		return
+	}
+	l.cleanMu.Lock()
+	l.stopping = true
+	l.cleanMu.Unlock()
+	l.stopClean()
+	l.cleanups.Wait()
 }
 
 // sessionFields is what a session row shows of its track.
@@ -126,10 +170,10 @@ func (l *Lifecycle) forget(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.tracks, id)
-	key := projectKeyOf(id)
-	if live := l.liveFile(key); live[id] {
+	key := session.ProjectKey(id)
+	if live := l.prs(key).Live; live[id] {
 		delete(live, id)
-		l.saveLive(key)
+		l.savePRs(key)
 	}
 }
 
@@ -154,23 +198,43 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 	targets := l.sessions.issueTargets()
 	trees := map[string]worktrees{}
 	var auto []string
+	var treeFailure, prFailure string
 	for _, t := range targets {
 		if _, ok := trees[t.proj.Dir]; !ok {
-			trees[t.proj.Dir], _ = l.worktrees(ctx, t.proj.Dir)
+			var err error
+			if trees[t.proj.Dir], err = l.worktrees(ctx, t.proj.Dir); err != nil && treeFailure == "" {
+				treeFailure = util.FirstLine(err.Error())
+			}
 		}
 		branch := t.proj.BranchFor(t.issue)
 		pr, err := l.findPR(ctx, t.proj.Dir, branch)
 		if err != nil {
+			if prFailure == "" {
+				prFailure = util.FirstLine(err.Error())
+			}
 			continue
 		}
 		if l.update(t, trees[t.proj.Dir].byBranch[branch], pr) {
 			auto = append(auto, t.id)
 		}
 	}
+	if ctx.Err() == nil {
+		l.report("worktrees", treeFailure)
+		l.report("pull requests", prFailure)
+	}
 	for _, id := range auto {
-		go func() { _ = l.Cleanup(ctx, id, false) }()
+		l.autoCleanup(ctx, id)
 	}
 	l.sessions.changed()
+}
+
+// report warns about a failure of the source, or says it works again when failure is "".
+func (l *Lifecycle) report(source, failure string) {
+	if failure == "" {
+		l.warn.Clear(source)
+		return
+	}
+	l.warn.Report(source, failure)
 }
 
 // update stores what a poll found. It reports whether the session should be cleaned up now.
@@ -180,14 +244,14 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) bool {
 	key := t.proj.Key()
 	tr := l.tracks[t.id]
 	if tr == nil {
-		tr = &track{sawLive: l.liveFile(key)[t.id]}
+		tr = &track{sawLive: l.prs(key).Live[t.id]}
 		l.tracks[t.id] = tr
 	}
 	tr.worktree, tr.pr = worktree, pr
 	if pr != nil && (pr.State == "draft" || pr.State == "open") && !tr.sawLive {
 		tr.sawLive = true
-		l.liveFile(key)[t.id] = true
-		l.saveLive(key)
+		l.prs(key).Live[t.id] = true
+		l.savePRs(key)
 	}
 	attention := ""
 	if pr != nil {
@@ -242,16 +306,6 @@ func (l *Lifecycle) prs(key string) *prsFile {
 	return f
 }
 
-// liveFile is the sessions of a project whose PR was seen open, by session id. It needs mu.
-func (l *Lifecycle) liveFile(key string) map[string]bool { return l.prs(key).Live }
-
-// ackFile needs mu.
-func (l *Lifecycle) ackFile(key string) map[string]ack { return l.prs(key).Acks }
-
-func (l *Lifecycle) saveLive(key string) { l.savePRs(key) }
-
-func (l *Lifecycle) saveAcks(key string) { l.savePRs(key) }
-
 // savePRs needs mu.
 func (l *Lifecycle) savePRs(key string) {
 	data, err := json.Marshal(l.prs(key))
@@ -266,18 +320,18 @@ func (l *Lifecycle) savePRs(key string) {
 // attentionFor says what about the PR needs the user: failing checks, or more
 // comments than they last saw. It needs mu.
 func (l *Lifecycle) attentionFor(key string, pr *PR) string {
-	acks := l.ackFile(key)
+	acks := l.prs(key).Acks
 	n := strconv.Itoa(pr.Number)
 	a, seen := acks[n]
 	if !seen {
 		a = ack{Comments: pr.Comments}
 		acks[n] = a
-		l.saveAcks(key)
+		l.savePRs(key)
 	}
 	if pr.Checks != "failing" && a.Checks {
 		a.Checks = false
 		acks[n] = a
-		l.saveAcks(key)
+		l.savePRs(key)
 	}
 	switch {
 	case pr.Checks == "failing" && !a.Checks:
@@ -301,8 +355,8 @@ func (l *Lifecycle) Ack(id string) error {
 		return nil
 	}
 	key := t.proj.Key()
-	l.ackFile(key)[strconv.Itoa(tr.pr.Number)] = ack{Comments: tr.pr.Comments, Checks: tr.pr.Checks == "failing"}
-	l.saveAcks(key)
+	l.prs(key).Acks[strconv.Itoa(tr.pr.Number)] = ack{Comments: tr.pr.Comments, Checks: tr.pr.Checks == "failing"}
+	l.savePRs(key)
 	tr.attention = ""
 	l.mu.Unlock()
 	l.sessions.changed()
@@ -362,7 +416,7 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
-		"number,url,state,isDraft,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
+		"number,url,state,isDraft,headRefOid,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
 	if err != nil {
 		return nil, fmt.Errorf("finding the PR of %s: %w", branch, err)
 	}
@@ -375,6 +429,7 @@ func parsePR(data []byte) (*PR, error) {
 		URL     string `json:"url"`
 		State   string `json:"state"`
 		IsDraft bool   `json:"isDraft"`
+		HeadOid string `json:"headRefOid"`
 		Rollup  []struct {
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
@@ -391,7 +446,7 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments) + len(r.Reviews), UpdatedAt: millis(r.UpdatedAt), Checks: "none"}
+	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments) + len(r.Reviews), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid}
 	switch {
 	case r.State == "MERGED":
 		pr.State = "merged"
@@ -443,6 +498,9 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 	l.sessions.changed()
 
 	removed, reason := l.removeAll(ctx, t, pr, force)
+	if reason != "" && ctx.Err() != nil {
+		reason = closedReason
+	}
 	entry := Cleanup{At: time.Now().UnixMilli(), SessionTitle: t.title, Issue: t.issue, Status: "done", Removed: removed, Reason: reason}
 	if pr != nil {
 		entry.PR = pr.Number
@@ -457,46 +515,78 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 		fmt.Fprintf(os.Stderr, "agentos: logging a clean-up: %v\n", err)
 	}
 	l.sessions.changed()
-	l.emitCleanups()
+	key := t.proj.Key()
+	l.emit("cleanups", scoped.Of(key, l.Cleanups(key)))
 	return nil
 }
 
 // removeAll runs the clean-up steps in order. A non-empty reason means it stopped before the end.
+// A step that finds the context cancelled stops with closedReason.
 func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool) (removed []string, reason string) {
 	removed = []string{}
+	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.removeWorktreeAndBranch, l.removeSession}
+	plan, reason := l.plan(ctx, t, pr, force)
+	for _, step := range steps {
+		if reason != "" {
+			break
+		}
+		if ctx.Err() != nil {
+			return removed, closedReason
+		}
+		var done []string
+		done, reason = step(ctx, t, &plan)
+		removed = append(removed, done...)
+	}
+	return removed, reason
+}
+
+// cleanupPlan is what a clean-up found out before it removes anything.
+type cleanupPlan struct {
+	worktree     string
+	inMain       bool // the branch is checked out in the project folder itself
+	branchExists bool
+	force        bool
+}
+
+// plan looks at the worktree and branch, and unless forced, says why removing them could lose work.
+func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, force bool) (cleanupPlan, string) {
 	dir, branch := t.proj.Dir, t.proj.BranchFor(t.issue)
 	trees, err := l.worktrees(ctx, dir)
 	if err != nil {
-		return removed, fmt.Sprintf("git could not list the worktrees: %v", err)
+		return cleanupPlan{}, fmt.Sprintf("git could not list the worktrees: %v", err)
 	}
-	worktree := trees.byBranch[branch]
-	inMain := worktree != "" && samePath(worktree, trees.main)
+	p := cleanupPlan{worktree: trees.byBranch[branch], force: force}
+	p.inMain = p.worktree != "" && samePath(p.worktree, trees.main)
 	_, rerr := l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
-	branchExists := rerr == nil
-
-	if !force && !inMain {
-		if reason := l.unsafe(ctx, dir, worktree, branch, branchExists, pr); reason != "" {
-			return removed, reason
-		}
+	p.branchExists = rerr == nil
+	if !force && !p.inMain {
+		return p, l.unsafe(ctx, dir, p.worktree, branch, p.branchExists, pr)
 	}
+	return p, ""
+}
 
-	if worktree != "" && !inMain {
-		if err := l.removeWorktree(ctx, t.proj, branch, worktree, force); err != nil {
+func (l *Lifecycle) removeWorktreeAndBranch(ctx context.Context, t target, p *cleanupPlan) (removed []string, reason string) {
+	dir, branch := t.proj.Dir, t.proj.BranchFor(t.issue)
+	if p.worktree != "" && !p.inMain {
+		if err := l.removeWorktree(ctx, t.proj, branch, p.worktree, p.force); err != nil {
 			return removed, fmt.Sprintf("removing the worktree failed: %v", err)
 		}
-		removed = append(removed, "worktree "+display(dir, worktree))
+		removed = append(removed, "worktree "+display(dir, p.worktree))
 	}
-
 	switch {
-	case inMain:
+	case p.inMain:
 		removed = append(removed, "branch "+branch+" kept: it is checked out in the main working tree")
-	case branchExists:
+	case p.branchExists:
 		if _, err := l.git(ctx, dir, "branch", "-D", branch); err != nil {
 			return removed, fmt.Sprintf("deleting the branch failed: %v", err)
 		}
 		removed = append(removed, "branch "+branch)
 	}
+	return removed, ""
+}
 
+// removeSession removes what agentos itself keeps for the session, then the session.
+func (l *Lifecycle) removeSession(ctx context.Context, t target, _ *cleanupPlan) (removed []string, reason string) {
 	// Only the state file is ours: Claude Code's own files and anything in /tmp stay.
 	if rec, _ := bus.ReadState(l.stateDir, t.id); rec.Session != "" {
 		if err := bus.RemoveState(l.stateDir, t.id); err != nil {
@@ -504,7 +594,6 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool)
 		}
 		removed = append(removed, "temp files")
 	}
-
 	if l.sessions.browsers.Has(t.id) {
 		l.sessions.browsers.Close(ctx, t.id)
 		removed = append(removed, "browser tab")
@@ -535,10 +624,12 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 	if !branchExists {
 		return ""
 	}
+	merged := pr != nil && pr.State == "merged"
 	out, err := l.git(ctx, dir, "rev-list", "origin/"+branch+".."+branch)
 	switch {
-	case err != nil && pr != nil && pr.State == "merged":
-		return "" // GitHub deletes the remote branch on merge
+	case err != nil && merged:
+		// GitHub deletes the remote branch on merge, so compare with what the PR merged instead.
+		return l.afterMergedHead(ctx, dir, branch, pr.HeadOid)
 	case err != nil:
 		return "the branch has no copy on origin to compare with"
 	}
@@ -551,9 +642,25 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 	return ""
 }
 
+// afterMergedHead says why the branch holds commits the merged pull request does not, or "".
+func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head string) string {
+	if head == "" {
+		return "GitHub did not say which commit the merged pull request ended on"
+	}
+	_, err := l.git(ctx, dir, "merge-base", "--is-ancestor", branch, head)
+	var exit *exec.ExitError
+	switch {
+	case err == nil:
+		return ""
+	case errors.As(err, &exit) && exit.ExitCode() == 1:
+		return "the branch has commits that are not in the merged pull request"
+	}
+	return fmt.Sprintf("git could not compare the branch with the merged pull request: %v", err)
+}
+
 func (l *Lifecycle) removeWorktree(ctx context.Context, proj project.Project, branch, worktree string, force bool) error {
 	if proj.Cleanup != "" {
-		cmd := strings.NewReplacer("{branch}", shellQuote(branch), "{worktree}", shellQuote(worktree)).Replace(proj.Cleanup)
+		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.Cleanup)
 		ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
 		defer cancel()
 		_, err := l.run(ctx, proj.Dir, "sh", "-c", cmd)
@@ -566,8 +673,6 @@ func (l *Lifecycle) removeWorktree(ctx context.Context, proj project.Project, br
 	_, err := l.git(ctx, proj.Dir, append(args, worktree)...)
 	return err
 }
-
-func shellQuote(s string) string { return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'" }
 
 // display shows path relative to dir when it lies inside it. Git prints real
 // paths, so symlinks in dir are resolved first.
@@ -619,15 +724,4 @@ func (l *Lifecycle) Cleanups(key string) []Cleanup {
 	}
 	slices.Reverse(out)
 	return out[:min(len(out), cleanupsKept)]
-}
-
-func (l *Lifecycle) emitCleanups() {
-	l.emit("cleanups", l.Cleanups(l.sessions.Current().Key()))
-}
-
-func millis(t time.Time) int64 {
-	if t.IsZero() {
-		return 0
-	}
-	return t.UnixMilli()
 }

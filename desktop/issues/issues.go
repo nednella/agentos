@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/scoped"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/util"
 )
 
 // Sessions is what the issues need of the session list.
@@ -43,38 +47,70 @@ type Issues struct {
 	sessions Sessions
 	emit     func(event string, payload any)
 
-	mu    sync.Mutex
-	repos map[string]string
-	lists map[string][]Issue
+	warn *warn.Warnings
+
+	mu         sync.Mutex
+	repos      map[string]string
+	repoFailed map[string]time.Time // when gh last failed to name a folder's repo for a reason that may pass
+	lists      map[string][]Issue
 }
+
+// repoRetry is how long a failed lookup of a folder's repo is not repeated.
+const repoRetry = 30 * time.Second
 
 // New reads issues through run.
 func New(runner run.Runner, sessions Sessions, emit func(string, any)) *Issues {
-	return &Issues{run: runner, sessions: sessions, emit: emit, repos: map[string]string{}, lists: map[string][]Issue{}}
+	return &Issues{run: runner, sessions: sessions, emit: emit, warn: warn.New(emit), repos: map[string]string{}, repoFailed: map[string]time.Time{}, lists: map[string][]Issue{}}
 }
 
-// Repo is "owner/name" of the folder's GitHub repository, or "" when gh cannot say.
+// Repo is "owner/name" of the folder's GitHub repository, or "" when it has none or gh cannot say.
+// A folder with no GitHub repo is remembered; a failure that may pass is warned about and tried again later.
 func (i *Issues) Repo(ctx context.Context, dir string) string {
 	i.mu.Lock()
 	repo, ok := i.repos[dir]
+	failedAt, failed := i.repoFailed[dir]
 	i.mu.Unlock()
-	if ok {
+	if ok || (failed && time.Since(failedAt) < repoRetry) {
 		return repo
 	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
-	if out, err := i.run(ctx, dir, "gh", "repo", "view", "--json", "nameWithOwner"); err == nil {
+	out, err := i.run(ctx, dir, "gh", "repo", "view", "--json", "nameWithOwner")
+	if err == nil {
 		var v struct {
 			NameWithOwner string `json:"nameWithOwner"`
 		}
-		if json.Unmarshal(out, &v) == nil {
-			repo = v.NameWithOwner
+		if err = json.Unmarshal(out, &v); err != nil {
+			err = fmt.Errorf("reading gh repo view: %w", err)
 		}
+		repo = v.NameWithOwner
+	}
+	if err != nil && !hasNoRepo(err) {
+		i.mu.Lock()
+		i.repoFailed[dir] = time.Now()
+		i.mu.Unlock()
+		if ctx.Err() == nil {
+			i.warn.Report("github", util.FirstLine(err.Error()))
+		}
+		return ""
 	}
 	i.mu.Lock()
 	i.repos[dir] = repo
+	delete(i.repoFailed, dir)
 	i.mu.Unlock()
+	i.warn.Clear("github")
 	return repo
+}
+
+// hasNoRepo says whether gh failed because the folder has no GitHub repository, which no retry changes.
+func hasNoRepo(err error) bool {
+	msg := err.Error()
+	for _, s := range []string{"no git remotes", "none of the git remotes", "not a git repository", "Could not resolve to a Repository"} {
+		if strings.Contains(msg, s) {
+			return true
+		}
+	}
+	return false
 }
 
 // Cached returns the folder's issues if they were read before; it never runs gh.
@@ -91,6 +127,7 @@ func (i *Issues) List(ctx context.Context, proj project.Project, refresh bool) (
 	if refresh {
 		i.mu.Lock()
 		delete(i.repos, dir)
+		delete(i.repoFailed, dir)
 		delete(i.lists, dir)
 		i.mu.Unlock()
 	}
@@ -149,7 +186,7 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 		out = append(out, Issue{
 			Number: r.Number, Title: r.Title, URL: r.URL, Lane: proj.Lane(labels), Type: typeOf(labels),
 			Author: r.Author.Login, Assignees: assignees, Labels: labels,
-			CreatedAt: millis(r.CreatedAt), UpdatedAt: millis(r.UpdatedAt),
+			CreatedAt: util.Millis(r.CreatedAt), UpdatedAt: util.Millis(r.UpdatedAt),
 		})
 	}
 	return out, nil
@@ -172,13 +209,6 @@ func (i Issue) sessionTitle() string {
 	return fmt.Sprintf("#%d %s", i.Number, string(title))
 }
 
-func millis(t time.Time) int64 {
-	if t.IsZero() {
-		return 0
-	}
-	return t.UnixMilli()
-}
-
 // CachedRepo is the repo of a folder if gh was asked before; it never runs gh.
 func (i *Issues) CachedRepo(dir string) string {
 	i.mu.Lock()
@@ -197,8 +227,9 @@ func (i *Issues) WithSessions(list []Issue) []Issue {
 
 // Emit sends the cached issues of the current project, when there are any, with their current sessions.
 func (i *Issues) Emit() {
-	if list, ok := i.Cached(i.sessions.Current().Dir); ok {
-		i.emit("issues", i.WithSessions(list))
+	cur := i.sessions.Current()
+	if list, ok := i.Cached(cur.Dir); ok {
+		i.emit("issues", scoped.Of(cur.Key(), i.WithSessions(list)))
 	}
 }
 

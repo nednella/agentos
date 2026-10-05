@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
@@ -23,7 +24,7 @@ const (
 	digestPerRun   = 5
 	digestTimeout  = 10 * time.Minute
 	digestRetry    = 6 * time.Hour
-	digestTools    = "WebSearch WebFetch Read Glob Grep Bash(agentos digest add:*)"
+	digestTools    = "WebSearch WebFetch Bash(agentos digest add:*)"
 	digestProjects = "AGENTOS_DIGEST_PROJECT"
 )
 
@@ -40,6 +41,7 @@ type DigestItem struct {
 
 // Digest is a project's digest as the front end sees it.
 type Digest struct {
+	Project   string       `json:"project"` // the key of the project it belongs to
 	Running   bool         `json:"running"`
 	LastRunAt int64        `json:"lastRunAt"`
 	NextRunAt int64        `json:"nextRunAt"`
@@ -94,7 +96,7 @@ func (d *Digests) View(key string, auto bool) Digest {
 	defer d.mu.Unlock()
 	f := d.read(key)
 	_, running := d.running[key]
-	v := Digest{Running: running, LastRunAt: f.LastRunAt, Error: d.errors[key], Items: f.Items}
+	v := Digest{Project: key, Running: running, LastRunAt: f.LastRunAt, Error: d.errors[key], Items: f.Items}
 	if v.Items == nil {
 		v.Items = []DigestItem{}
 	}
@@ -155,6 +157,9 @@ func (d *Digests) Add(key string, item DigestItem) (bool, error) {
 	item.Title, item.Why, item.URL, item.Source = strings.TrimSpace(item.Title), strings.TrimSpace(item.Why), strings.TrimSpace(item.URL), strings.TrimSpace(item.Source)
 	if item.Title == "" || item.URL == "" {
 		return false, errors.New("an item needs a --title and a --url")
+	}
+	if u, err := url.Parse(item.URL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		return false, errors.New("the --url must be an http or https link")
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()

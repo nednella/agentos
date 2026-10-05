@@ -21,8 +21,10 @@ var (
 // HarnessCheck is typed into the "Harness check" session.
 func HarnessCheck() string { return body(harnessCheck) }
 
-// Digest is what the weekly digest run asks Claude to do.
-func Digest() string { return body(digest) }
+// Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
+func Digest(dependencies []string) string {
+	return strings.Replace(body(digest), "{dependencies}", strings.Join(dependencies, "\n"), 1)
+}
 
 // BrowserSession is appended to a session's system prompt when it has a browser.
 func BrowserSession() string { return body(browserSession) }

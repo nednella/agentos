@@ -24,6 +24,8 @@ import (
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/scoped"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/desktop/projects"
@@ -159,15 +161,71 @@ func (r *Recorder) LastUI() control.UICommand {
 	return cmd
 }
 
+// lastList is the payload of the latest event of that name, which carries one project's list.
+func lastList[T any](r *Recorder, name string) scoped.List[T] {
+	list, _ := r.Last(name).(scoped.List[T])
+	return list
+}
+
+// LastSessions is the list of the latest sessions event.
 func (r *Recorder) LastSessions() []sessions.Session {
+	return lastList[sessions.Session](r, "sessions").Items
+}
+
+// LastNotes is the list of the latest notes event.
+func (r *Recorder) LastNotes() []notes.Note { return lastList[notes.Note](r, "notes").Items }
+
+// LastIssues is the list of the latest issues event.
+func (r *Recorder) LastIssues() []issues.Issue { return lastList[issues.Issue](r, "issues").Items }
+
+// LastCleanups is the list of the latest cleanups event.
+func (r *Recorder) LastCleanups() []sessions.Cleanup {
+	return lastList[sessions.Cleanup](r, "cleanups").Items
+}
+
+// Warnings are the warnings events so far, in order.
+func (r *Recorder) Warnings() []warn.Warning {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, e := range slices.Backward(r.events) {
-		if e.name == "sessions" {
-			return e.payload.([]sessions.Session)
+	var out []warn.Warning
+	for _, e := range r.events {
+		if w, ok := e.payload.(warn.Warning); ok && e.name == "warnings" {
+			out = append(out, w)
 		}
 	}
-	return nil
+	return out
+}
+
+// Ended are the ids of the sessions that any sessions event showed as ended.
+func (r *Recorder) Ended() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []string
+	for _, e := range r.events {
+		if list, ok := e.payload.(scoped.List[sessions.Session]); ok && e.name == "sessions" {
+			for _, s := range list.Items {
+				if s.State == "ended" && !slices.Contains(out, s.ID) {
+					out = append(out, s.ID)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// ProjectOf is the project key of the latest event of that name (sessions, notes, issues or cleanups), or "".
+func (r *Recorder) ProjectOf(name string) string {
+	switch name {
+	case "sessions":
+		return lastList[sessions.Session](r, name).Project
+	case "notes":
+		return lastList[notes.Note](r, name).Project
+	case "issues":
+		return lastList[issues.Issue](r, name).Project
+	case "cleanups":
+		return lastList[sessions.Cleanup](r, name).Project
+	}
+	return ""
 }
 
 func Eventually(t *testing.T, what string, cond func() bool) {
@@ -187,8 +245,10 @@ type FakeGH struct {
 	mu     sync.Mutex
 	calls  []string
 	Repo   error
-	Create string // what gh issue create prints
-	pr     string // what gh pr list prints
+	Create string        // what gh issue create prints
+	Delay  time.Duration // how long gh issue create takes
+	pr     string        // what gh pr list prints
+	PRErr  error         // what gh pr list fails with, if set
 }
 
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -200,6 +260,9 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 	f.calls = append(f.calls, strings.Join(args, " "))
 	switch {
 	case args[0] == "pr":
+		if f.PRErr != nil {
+			return nil, f.PRErr
+		}
 		if f.pr == "" {
 			return []byte("[]"), nil
 		}
@@ -210,6 +273,9 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		}
 		return []byte(`{"nameWithOwner":"acme/widgets"}`), nil
 	case args[0] == "issue" && args[1] == "create":
+		f.mu.Unlock()
+		time.Sleep(f.Delay)
+		f.mu.Lock()
 		return []byte(f.Create), nil
 	case args[0] == "issue":
 		return []byte(`[
@@ -534,6 +600,11 @@ func PRJSON(state string, draft bool, rollup string, comments, reviews int) stri
 	}
 	return fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"statusCheckRollup":%s,"comments":%s,"reviews":%s,"updatedAt":"2026-10-01T12:00:00Z"}]`,
 		state, draft, rollup, repeat(comments), repeat(reviews))
+}
+
+// WithHead adds the commit the PR's branch ended on to what PRJSON printed.
+func WithHead(prJSON, oid string) string {
+	return strings.Replace(prJSON, `"isDraft"`, fmt.Sprintf(`"headRefOid":%q,"isDraft"`, oid), 1)
 }
 
 // Ask sends a command to the app's control socket, as the agentos command does.

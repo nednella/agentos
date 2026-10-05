@@ -163,8 +163,8 @@ func TestCleanupMerged(t *testing.T) {
 	if want := []string{"worktree trees/issue-7", "branch issue-7", "temp files", "evidence", "session"}; !slices.Equal(log[0].Removed, want) {
 		t.Errorf("removed = %q, want %q", log[0].Removed, want)
 	}
-	if rec := h.Rec.Last("cleanups"); rec == nil {
-		t.Error("no cleanups event")
+	if got := h.Rec.ProjectOf("cleanups"); got != "main" || len(h.Rec.LastCleanups()) != 1 {
+		t.Errorf("cleanups event: project %q, %d entries", got, len(h.Rec.LastCleanups()))
 	}
 	if out, _ := exec.Command("tmux", "-L", h.Socket, "list-sessions").CombinedOutput(); strings.Contains(string(out), s.ID) {
 		t.Errorf("tmux session still there: %s", out)
@@ -267,10 +267,54 @@ func TestCleanupMergedWithRemoteBranchGone(t *testing.T) {
 	gitIn(t, h.Dir, "fetch", "--prune")
 	s := issueSession(h, t, 7)
 
-	openThenMerge(h)
+	openThenMergeAt(h, gitIn(t, h.Dir, "rev-parse", "issue-7"))
 	eventually(t, "clean-up of a merged branch GitHub deleted", func() bool { _, ok := h.Session(s.ID); return !ok })
 	if exists(wt) || branches(t, h.Dir) != "" {
 		t.Error("left things behind")
+	}
+}
+
+func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
+	tests := []struct {
+		name   string
+		head   func(t *testing.T, h *apptest.Harness, wt string) string
+		reason string
+	}{
+		{"a commit after the last push", func(t *testing.T, h *apptest.Harness, wt string) string {
+			head := gitIn(t, wt, "rev-parse", "HEAD")
+			if err := os.WriteFile(filepath.Join(wt, "later.txt"), []byte("x\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			gitIn(t, wt, "add", "later.txt")
+			gitIn(t, wt, "commit", "-m", "after the merge")
+			return head
+		}, "the branch has commits that are not in the merged pull request"},
+		{"a head git does not know", func(t *testing.T, h *apptest.Harness, wt string) string {
+			return strings.Repeat("0", 40)
+		}, "git could not compare the branch with the merged pull request"},
+		{"no head from GitHub", func(t *testing.T, h *apptest.Harness, wt string) string { return "" },
+			"GitHub did not say which commit the merged pull request ended on"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			origin := repoFixture(t, h)
+			wt := issueWorktree(t, h)
+			head := tt.head(t, h, wt)
+			gitIn(t, origin, "branch", "-D", "issue-7")
+			gitIn(t, h.Dir, "fetch", "--prune")
+			s := issueSession(h, t, 7)
+
+			openThenMergeAt(h, head)
+			eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+			got, _ := h.Session(s.ID)
+			if !strings.HasPrefix(got.CleanupReason, tt.reason) {
+				t.Errorf("reason = %q, want %q", got.CleanupReason, tt.reason)
+			}
+			if !exists(wt) || branches(t, h.Dir) == "" {
+				t.Error("something was removed although the branch holds work the merged PR lacks")
+			}
+		})
 	}
 }
 
@@ -331,6 +375,14 @@ func openThenMerge(h *apptest.Harness) {
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
 	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	h.RefreshPRs()
+}
+
+// openThenMergeAt is openThenMerge for a merged PR that says which commit its branch ended on.
+func openThenMergeAt(h *apptest.Harness, head string) {
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(apptest.WithHead(prJSON("MERGED", false, "[]", 0, 0), head))
 	h.RefreshPRs()
 }
 

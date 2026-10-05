@@ -3,7 +3,9 @@ package digest_test
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -30,9 +32,19 @@ func lastDigest(h *apptest.Harness) digest.Digest {
 func TestDigestRun(t *testing.T) {
 	h := newHarness(t)
 	t.Setenv("AGENTOS_SESSION", "main/9") // a run must not inherit a session
+	t.Setenv("DEPLOY_TOKEN", "secret")
+	t.Setenv("ANTHROPIC_API_KEY", "claude-needs-this")
+	if err := os.WriteFile(filepath.Join(h.Dir, "package.json"), []byte(`{"dependencies":{"wails-ish":"1"}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	h.Claude.SetDo(func(call apptest.DigestCall) {
-		if envValue(call.Env, "AGENTOS_SESSION") != "" {
-			t.Errorf("AGENTOS_SESSION leaked into the digest run")
+		for _, leaked := range []string{"AGENTOS_SESSION", "DEPLOY_TOKEN"} {
+			if envValue(call.Env, leaked) != "" {
+				t.Errorf("%s leaked into the digest run", leaked)
+			}
+		}
+		if entries, err := os.ReadDir(call.Dir); err != nil || len(entries) != 0 {
+			t.Errorf("the run's folder %s is not empty: %v, %v", call.Dir, entries, err)
 		}
 		for i, item := range [][4]string{
 			{"Wails 2.15 released", "you build on Wails", "https://example.com/wails", "wails"},
@@ -55,12 +67,24 @@ func TestDigestRun(t *testing.T) {
 	eventually(t, "the digest to finish", func() bool { d := lastDigest(h); return !d.Running && d.LastRunAt > 0 })
 
 	call := h.Claude.Calls()[0]
-	if call.Dir != h.Dir || len(call.Args) != 5 || call.Args[0] != "claude" || call.Args[1] != "-p" || call.Args[3] != "--allowedTools" ||
-		call.Args[4] != "WebSearch WebFetch Read Glob Grep Bash(agentos digest add:*)" || !strings.Contains(call.Args[2], "agentos digest add --title") {
+	if call.Dir == h.Dir || !strings.Contains(call.Dir, "agentos-digest") || exists(call.Dir) {
+		t.Errorf("the run's folder = %s (the project is %s): want a fresh folder that is removed afterwards", call.Dir, h.Dir)
+	}
+	if envValue(call.Env, "ANTHROPIC_API_KEY") != "claude-needs-this" || envValue(call.Env, "PATH") == "" || envValue(call.Env, "HOME") == "" {
+		t.Errorf("claude's own environment was dropped: %v", call.Env)
+	}
+	if !strings.Contains(call.Args[2], "wails-ish") {
+		t.Errorf("the prompt does not list the project's dependencies:\n%s", call.Args[2])
+	}
+	if len(call.Args) != 5 || call.Args[0] != "claude" || call.Args[1] != "-p" || call.Args[3] != "--allowedTools" ||
+		call.Args[4] != "WebSearch WebFetch Bash(agentos digest add:*)" || !strings.Contains(call.Args[2], "agentos digest add --title") {
 		t.Errorf("command = %q in %s", call.Args, call.Dir)
 	}
 	if envValue(call.Env, "AGENTOS_DIGEST_PROJECT") != "main" || envValue(call.Env, "AGENTOS_SOCKET") == "" {
 		t.Errorf("env = %v", call.Env)
+	}
+	if got := lastDigest(h).Project; got != "main" {
+		t.Errorf("digest event project = %q", got)
 	}
 	d := h.Digest()
 	if len(d.Items) != 2 || d.Items[0].Title != "Wails 2.15 released" || d.Items[1].Source != "Claude Code" || d.Error != "" || d.NextRunAt <= d.LastRunAt {
@@ -79,11 +103,36 @@ func TestDigestRun(t *testing.T) {
 	if err := h.DismissDigestItem("nope"); err == nil {
 		t.Error("dismissed an unknown item")
 	}
-	if resp := h.Ask(t, ctl.Request{Cmd: "digest-add", Project: "main", Opts: map[string]string{"title": "x", "url": "u"}}); resp.OK {
+	if resp := h.Ask(t, ctl.Request{Cmd: "digest-add", Project: "main", Opts: map[string]string{"title": "x", "url": "https://example.com"}}); resp.OK {
 		t.Error("digest-add outside a run succeeded")
 	}
-	if resp := h.Ask(t, ctl.Request{Cmd: "digest-add", Opts: map[string]string{"title": "x", "url": "u"}}); resp.OK {
+	if resp := h.Ask(t, ctl.Request{Cmd: "digest-add", Opts: map[string]string{"title": "x", "url": "https://example.com"}}); resp.OK {
 		t.Error("digest-add without a project succeeded")
+	}
+}
+
+func TestDigestAddOnlyTakesWebLinks(t *testing.T) {
+	h := newHarness(t)
+	h.Claude.SetDo(func(call apptest.DigestCall) {
+		for url, ok := range map[string]bool{
+			"https://example.com/a": true, "http://example.com/b": true,
+			"javascript:alert(1)": false, "file:///etc/passwd": false, "ftp://example.com/x": false, "example.com/c": false, "https://": false,
+		} {
+			resp := h.Ask(t, ctl.Request{Cmd: "digest-add", Project: envValue(call.Env, "AGENTOS_DIGEST_PROJECT"), Opts: map[string]string{"title": "t", "url": url}})
+			if resp.OK != ok {
+				t.Errorf("digest-add %q: ok %v, want %v (%s)", url, resp.OK, ok, resp.Error)
+			}
+			if !ok && !strings.Contains(resp.Error, "http or https") {
+				t.Errorf("digest-add %q: error %q does not say why", url, resp.Error)
+			}
+		}
+	})
+	if err := h.RunDigest(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the digest to finish", func() bool { d := lastDigest(h); return !d.Running && d.LastRunAt > 0 })
+	if n := len(h.Digest().Items); n != 2 {
+		t.Errorf("%d items kept, want the 2 web links", n)
 	}
 }
 

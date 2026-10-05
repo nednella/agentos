@@ -20,7 +20,8 @@ import (
 const (
 	flushEvery = 8 * time.Millisecond
 	flushSize  = 32 << 10
-	oscLimit   = 1 << 20
+	oscLimit   = 1 << 20 // the most base64 text of one OSC 52 sequence that reaches the clipboard
+	redrawGap  = 30 * time.Millisecond
 )
 
 var oscClipboard = []byte("\x1b]52;")
@@ -40,28 +41,30 @@ func New(tmux *term.Tmux, emit func(string, any), clip func(string)) *Terms {
 	return &Terms{tmux: tmux, emit: emit, clip: clip, streams: map[string]*stream{}}
 }
 
-// Open attaches a PTY of the given size to the session. Opening an open session
-// attaches afresh, which makes tmux redraw the whole screen.
+// Open attaches a PTY of the given size to the session. Opening an open session keeps its
+// stream, at the new size, and makes tmux redraw the whole screen.
 func (t *Terms) Open(id string, cols, rows int) error {
 	name, err := session.ParseName(id)
 	if err != nil {
 		return err
 	}
+	t.mu.Lock()
+	if st := t.streams[id]; st != nil {
+		t.mu.Unlock()
+		return st.redraw(cols, rows)
+	}
 	argv := t.tmux.AttachArgv(name)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Env = append(t.tmux.Env(), "TERM=xterm-256color", "COLORTERM=truecolor")
-	f, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	size := pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
+	f, err := pty.StartWithSize(cmd, &size)
 	if err != nil {
+		t.mu.Unlock()
 		return fmt.Errorf("attaching to %s: %w", id, err)
 	}
-	st := &stream{id: id, pty: f, cmd: cmd, emit: t.emit, clip: t.clip}
-	t.mu.Lock()
-	old := t.streams[id]
+	st := &stream{id: id, pty: f, cmd: cmd, emit: t.emit, clip: t.clip, size: size}
 	t.streams[id] = st
 	t.mu.Unlock()
-	if old != nil {
-		old.close()
-	}
 	go func() {
 		st.pump()
 		t.mu.Lock()
@@ -98,7 +101,7 @@ func (t *Terms) Resize(id string, cols, rows int) error {
 	if st == nil {
 		return fmt.Errorf("terminal %s is not open", id)
 	}
-	if err := pty.Setsize(st.pty, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}); err != nil {
+	if err := st.resize(cols, rows); err != nil {
 		return fmt.Errorf("resizing %s: %w", id, err)
 	}
 	return nil
@@ -132,11 +135,53 @@ type stream struct {
 	emit func(string, any)
 	clip func(string)
 
+	ptyMu   sync.Mutex // the pty is resized and closed one at a time: Setsize reads the file's descriptor
 	mu      sync.Mutex
 	pending []byte
 	timer   *time.Timer
 	done    bool
 	osc     []byte // the unfinished tail of an OSC 52 sequence
+	size    pty.Winsize
+}
+
+func (s *stream) resize(cols, rows int) error {
+	s.mu.Lock()
+	s.size = pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
+	size := s.size
+	s.mu.Unlock()
+	return s.setSize(size)
+}
+
+func (s *stream) setSize(size pty.Winsize) error {
+	s.ptyMu.Lock()
+	defer s.ptyMu.Unlock()
+	return pty.Setsize(s.pty, &size)
+}
+
+func (s *stream) closePTY() {
+	s.ptyMu.Lock()
+	defer s.ptyMu.Unlock()
+	_ = s.pty.Close()
+}
+
+// redraw makes tmux paint the whole screen again, by making the window one column wider for a moment.
+// The size it restores is the latest asked for, so a resize that comes in between is not undone.
+func (s *stream) redraw(cols, rows int) error {
+	s.mu.Lock()
+	s.size = pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)}
+	s.mu.Unlock()
+	if err := s.setSize(pty.Winsize{Cols: uint16(cols + 1), Rows: uint16(rows)}); err != nil {
+		return fmt.Errorf("redrawing %s: %w", s.id, err)
+	}
+	time.AfterFunc(redrawGap, func() {
+		s.mu.Lock()
+		size, done := s.size, s.done
+		s.mu.Unlock()
+		if !done {
+			_ = s.setSize(size)
+		}
+	})
+	return nil
 }
 
 func (s *stream) closed() bool {
@@ -149,7 +194,7 @@ func (s *stream) close() {
 	s.mu.Lock()
 	s.done = true
 	s.mu.Unlock()
-	_ = s.pty.Close()
+	s.closePTY()
 	_ = s.cmd.Process.Kill()
 }
 
@@ -159,7 +204,7 @@ func (s *stream) pump() {
 		s.mu.Lock()
 		s.flush()
 		s.mu.Unlock()
-		_ = s.pty.Close()
+		s.closePTY()
 		_ = s.cmd.Wait()
 	}()
 	buf := make([]byte, flushSize)
@@ -225,7 +270,7 @@ func (s *stream) copyOSC52(b []byte) {
 			}
 			return
 		}
-		if _, b64, ok := bytes.Cut(body[:end], []byte(";")); ok {
+		if _, b64, ok := bytes.Cut(body[:end], []byte(";")); ok && len(b64) <= oscLimit {
 			if text, err := base64.StdEncoding.DecodeString(string(b64)); err == nil && len(text) > 0 {
 				s.clip(string(text))
 			}

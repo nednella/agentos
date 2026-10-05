@@ -62,7 +62,7 @@ func (s *Service) Snapshot() Snapshot {
 	repo := s.repos.Repo(s.ctx(), cur.Dir)
 	projects := s.sessions.Projects()
 	snap := Snapshot{Projects: projects, Sessions: s.sessions.List(), Version: version.Version, Shell: s.sessions.ShellID()}
-	snap.Project = sessions.Project{Name: cur.Name, Dir: cur.Dir}
+	snap.Project = sessions.Project{Key: cur.Key(), Name: cur.Name, Dir: cur.Dir}
 	for i, p := range projects {
 		if p.Dir == cur.Dir {
 			projects[i].Repo = repo

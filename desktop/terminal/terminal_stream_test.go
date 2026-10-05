@@ -150,3 +150,36 @@ func TestTerminalAttachesToTheShell(t *testing.T) {
 	})
 	h.TermClose(shell.ID)
 }
+
+func TestOpeningAnOpenTerminalKeepsItsStream(t *testing.T) {
+	h := newHarness(t)
+	s, _ := h.NewSession("keep the stream", "")
+	if err := h.TermOpen(s.ID, 80, 24); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the first draw", func() bool { return len(h.Rec.Output(s.ID)) > 0 })
+	clients := func() string {
+		out, err := exec.Command("tmux", "-L", h.Socket, "list-clients", "-F", "#{client_pid} #{client_width}x#{client_height}").Output()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	before := clients()
+	if strings.Count(before, "\n") != 0 || before == "" {
+		t.Fatalf("clients = %q, want one", before)
+	}
+	pid, _, _ := strings.Cut(before, " ")
+
+	if err := h.TermOpen(s.ID, 90, 26); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the same client at the new size", func() bool { return clients() == pid+" 90x26" })
+	if h.Rec.Count("term:exit") != 0 {
+		t.Error("reopening ended the stream")
+	}
+	if err := h.TermWrite(s.ID, "echo still-here\n"); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the stream to carry on", func() bool { return strings.Contains(h.Rec.Output(s.ID), "still-here") })
+}

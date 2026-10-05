@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/internal/session"
+	"github.com/nednella/agentos/internal/util"
 )
 
 const (
@@ -89,9 +90,10 @@ type Browsers struct {
 	onTabs   func()                        // a tab opened or closed
 	launchMu sync.Mutex
 
-	mu    sync.Mutex
-	procs map[string]*browserProc // by project key
-	tabs  map[string]*tab         // by session id
+	mu      sync.Mutex
+	procs   map[string]*browserProc // by project key
+	tabs    map[string]*tab         // by session id
+	opening map[string]*sync.Mutex  // by session id: one Open at a time per session
 }
 
 // New runs the browsers with their profiles under dataDir.
@@ -99,7 +101,7 @@ func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
 		dataDir: dataDir, binary: findBrowser(), emit: emit, grace: closeGrace,
 		urlFor: func(string) string { return "" }, onTabs: func() {},
-		procs: map[string]*browserProc{}, tabs: map[string]*tab{},
+		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
 }
 
@@ -283,8 +285,22 @@ func (b *Browsers) exited(p *browserProc) {
 	}
 }
 
+// openLock is the lock that keeps two Opens of one session from each making a tab.
+func (b *Browsers) openLock(id string) *sync.Mutex {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.opening[id] == nil {
+		b.opening[id] = &sync.Mutex{}
+	}
+	return b.opening[id]
+}
+
 // Open gives the session a tab, starting the project's browser if needed, and goes to url when it is not empty.
+// When the first page cannot be opened the tab stays, and Open returns its state with the error.
 func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, error) {
+	lock := b.openLock(id)
+	lock.Lock()
+	defer lock.Unlock()
 	if t := b.tab(id); t != nil {
 		if url != "" {
 			if err := b.Goto(ctx, id, url); err != nil {
@@ -293,7 +309,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 		}
 		return t.snapshotState(), nil
 	}
-	key := keyOf(id)
+	key := session.ProjectKey(id)
 	p, err := b.start(ctx, key)
 	if err != nil {
 		return BrowserState{ID: id, Error: err.Error()}, err
@@ -363,7 +379,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	if url != "" {
 		if err := b.Goto(ctx, id, url); err != nil {
 			t.publish()
-			return t.snapshotState(), nil
+			return t.snapshotState(), err
 		}
 	}
 	t.publish()
@@ -595,6 +611,9 @@ func (b *Browsers) CloseAll() {
 	b.mu.Lock()
 	procs := slices.Collect(func(yield func(*browserProc) bool) {
 		for _, p := range b.procs {
+			if p.timer != nil {
+				p.timer.Stop()
+			}
 			if !yield(p) {
 				return
 			}
@@ -602,9 +621,6 @@ func (b *Browsers) CloseAll() {
 	})
 	b.mu.Unlock()
 	for _, p := range procs {
-		if p.timer != nil {
-			p.timer.Stop()
-		}
 		p.kill()
 		<-p.gone
 	}
@@ -737,7 +753,7 @@ func (t *tab) event(method string, params json.RawMessage) {
 			if msg == "" {
 				msg = ev.ExceptionDetails.Text
 			}
-			t.logConsole("uncaught: " + firstLine(msg))
+			t.logConsole("uncaught: " + util.FirstLine(msg))
 		}
 	case "Network.requestWillBeSent":
 		var ev struct {
@@ -782,11 +798,6 @@ func (t *tab) event(method string, params json.RawMessage) {
 			t.logConsole(fmt.Sprintf("request failed: %s -> %s", req, ev.ErrorText))
 		}
 	}
-}
-
-func firstLine(s string) string {
-	line, _, _ := strings.Cut(strings.TrimSpace(s), "\n")
-	return line
 }
 
 // View turns the live picture on or off. Frames are only produced while it is on.
@@ -1058,7 +1069,7 @@ func (t *tab) eval(ctx context.Context, expression string) (json.RawMessage, err
 		return nil, fmt.Errorf("reading the result: %w", err)
 	}
 	if res.Exception != nil {
-		msg := firstLine(res.Exception.Exception.Description)
+		msg := util.FirstLine(res.Exception.Exception.Description)
 		if msg == "" {
 			msg = res.Exception.Text
 		}
@@ -1119,14 +1130,6 @@ func (t *tab) elementBox(ctx context.Context, ref string) (box, error) {
 		return box{}, fmt.Errorf("%s is not visible", ref)
 	}
 	return box{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height, PageX: r.PageX, PageY: r.PageY, Covered: r.Covered}, nil
-}
-
-func keyOf(id string) string {
-	name, err := session.ParseName(id)
-	if err != nil {
-		return "project"
-	}
-	return name.Project
 }
 
 // Hook sets what the browsers ask of the app: the page a new tab opens first, and a nudge when a tab opens or closes.

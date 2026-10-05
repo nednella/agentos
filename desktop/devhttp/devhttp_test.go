@@ -141,7 +141,7 @@ func TestBrowserModeServesTheAppAndTheShim(t *testing.T) {
 		t.Errorf("the page does not load the shim:\n%s", page)
 	}
 
-	resp, err = http.Post(base+"/__call/projects.Service/Snapshot", "application/json", strings.NewReader(`[]`))
+	resp, err = post(base+"/__call/projects.Service/Snapshot", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestBrowserModeServesTheAppAndTheShim(t *testing.T) {
 	}
 	resp.Body.Close()
 
-	resp, err = http.Post(base+"/__call/projects.Service/Nope", "application/json", strings.NewReader(`[]`))
+	resp, err = post(base+"/__call/projects.Service/Nope", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,6 +159,68 @@ func TestBrowserModeServesTheAppAndTheShim(t *testing.T) {
 		t.Errorf("an unknown method gave %d", resp.StatusCode)
 	}
 	resp.Body.Close()
+
+	for _, tt := range []struct {
+		name    string
+		headers map[string]string
+		host    string
+		want    int
+	}{
+		{"the shim's call", nil, "", http.StatusOK},
+		{"same origin", map[string]string{"Origin": base}, "", http.StatusOK},
+		{"a foreign origin", map[string]string{"Origin": "https://evil.example"}, "", http.StatusForbidden},
+		{"a null origin", map[string]string{"Origin": "null"}, "", http.StatusForbidden},
+		{"a foreign host name", nil, "evil.example", http.StatusForbidden},
+		{"no marker header", map[string]string{callHeader: ""}, "", http.StatusForbidden},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := post(base+"/__call/projects.Service/Snapshot", tt.headers, withHost(tt.host))
+			if err != nil {
+				t.Fatal(err)
+			}
+			resp.Body.Close()
+			if resp.StatusCode != tt.want {
+				t.Errorf("status %d, want %d", resp.StatusCode, tt.want)
+			}
+		})
+	}
+	resp, err = http.Get(base + "/__shim.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shim, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if !strings.Contains(string(shim), "'"+callHeader+"': '1'") {
+		t.Error("the shim does not send the marker header")
+	}
+}
+
+func withHost(host string) func(*http.Request) {
+	return func(r *http.Request) {
+		if host != "" {
+			r.Host = host
+		}
+	}
+}
+
+// post sends an empty-argument call as the shim does, with headers changed by the given ones.
+func post(url string, headers map[string]string, edits ...func(*http.Request)) (*http.Response, error) {
+	req, err := http.NewRequest("POST", url, strings.NewReader(`[]`))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set(callHeader, "1")
+	for k, v := range headers {
+		if v == "" {
+			req.Header.Del(k)
+		} else {
+			req.Header.Set(k, v)
+		}
+	}
+	for _, edit := range edits {
+		edit(req)
+	}
+	return http.DefaultClient.Do(req)
 }
 
 func freePort(t *testing.T) string {

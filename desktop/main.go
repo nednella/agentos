@@ -36,6 +36,9 @@ func launch() error {
 	if err != nil {
 		return err
 	}
+	if err := app.RecordBundle(cfg.StateDir); err != nil {
+		log.Printf("agentos: %v", err)
+	}
 	assets, err := fs.Sub(assetsFS, assetsRoot)
 	if err != nil {
 		return err
