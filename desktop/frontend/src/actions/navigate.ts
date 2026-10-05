@@ -1,5 +1,5 @@
+import { api } from '../api'
 import type { Action, ActionContext } from './types'
-
 
 export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
   {
@@ -8,6 +8,15 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     group: 'Projects',
     shortcut: { key: 'p' },
     run: () => a.setOverlay('projects'),
+  },
+  {
+    id: 'open-repo',
+    label: 'Open repository on GitHub',
+    group: 'Projects',
+    async run() {
+      if (!a.project?.repo) throw 'This project has no GitHub repo'
+      await api.openURL(`https://github.com/${a.project.repo}`)
+    },
   },
   {
     id: 'add-project',
