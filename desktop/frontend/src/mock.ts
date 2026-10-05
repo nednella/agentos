@@ -1,4 +1,4 @@
-import { buildIssues } from './mockIssues'
+import { buildIssueDetail, buildIssues } from './mockIssues'
 import { handleInput, newPage, normalizeUrl, pageRects, pageTitle, renderPage } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
@@ -764,6 +764,10 @@ export function createMock(params: URLSearchParams) {
       const session = startSessionFor(`#${number} ${short}`, number, command)
       emit('issues', { project: current.name, items: currentIssues() })
       return session
+    },
+    IssueDetail: async (number: number) => {
+      if (!current.issues.some((i) => i.number === number)) throw `reading issue #${number}: gh api: HTTP 404: Not Found`
+      return delay(buildIssueDetail(number), 350)
     },
     ShellOpen: async () => {
       const existing = shells.get(current.name)

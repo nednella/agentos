@@ -51,6 +51,7 @@ export type Layout = {
   peekWidths: Record<SidePanel, number>
   statsOpen: boolean
   digestOpen: boolean
+  issueOpen: number | null
   zoom(step: -1 | 0 | 1): void
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
@@ -65,6 +66,7 @@ export type Layout = {
   showSidebarTab(tab: SidebarTab): void
   toggleStats(): void
   toggleDigest(): void
+  toggleIssue(number: number): void
   closeCentre(): void
   closePeek(): void
   returnToTerminal(): void
@@ -126,6 +128,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
   const [statsOpen, setStatsOpen] = useState(devFlags.view === 'stats')
   const [digestOpen, setDigestOpen] = useState(devFlags.view === 'digest')
+  const [issueOpen, setIssueOpen] = useState<number | null>(null)
 
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(scale))
@@ -156,6 +159,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     if (first) return
     setStatsOpen(false)
     setDigestOpen(false)
+    setIssueOpen(null)
     setPeek(null)
     if (narrow) setMobilePanel('session')
   }, [selectedId, narrow])
@@ -224,6 +228,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       statsOpen,
       digestOpen,
+      issueOpen,
       zoom(step) {
         const at = SCALES.indexOf(scale)
         const next = step === 0 ? DEFAULT_SCALE : SCALES[Math.min(Math.max((at < 0 ? 2 : at) + step, 0), SCALES.length - 1)]
@@ -255,18 +260,28 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       toggleStats() {
         setStatsOpen(!statsOpen)
         setDigestOpen(false)
+        setIssueOpen(null)
         setPeek(null)
         if (!statsOpen && narrow) setMobilePanel('session')
       },
       toggleDigest() {
         setDigestOpen(!digestOpen)
         setStatsOpen(false)
+        setIssueOpen(null)
         setPeek(null)
         if (!digestOpen && narrow) setMobilePanel('session')
+      },
+      toggleIssue(number) {
+        const opening = issueOpen !== number
+        setIssueOpen(opening ? number : null)
+        setStatsOpen(false)
+        setDigestOpen(false)
+        if (opening && narrow) setMobilePanel('session')
       },
       closeCentre() {
         setStatsOpen(false)
         setDigestOpen(false)
+        setIssueOpen(null)
       },
       closePeek: () => setPeek(null),
       returnToTerminal() {
@@ -275,7 +290,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, issueOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>
