@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { useAgentos } from '../AgentosContext'
 
 type Size = 'default' | 'reading' | 'wide'
 
-const CENTRED: Record<Size, { top: string; width: string; maxHeight: string }> = {
-  default: { top: '12vh', width: 'min(40rem, 92vw)', maxHeight: '70vh' },
-  reading: { top: '7vh', width: 'min(56rem, 92vw)', maxHeight: '84vh' },
-  wide: { top: '2.5vh', width: 'min(72rem, 94vw)', maxHeight: '95vh' },
+const CENTRED: Record<Size, CSSProperties> = {
+  default: { top: '12vh', width: 'min(40rem, 92vw)', maxHeight: '70vh', transform: 'translateX(-50%)' },
+  reading: { top: '50%', width: 'min(44rem, 92vw)', maxHeight: '84vh', transform: 'translate(-50%, -50%)' },
+  wide: { top: '2.5vh', width: 'min(72rem, 94vw)', maxHeight: '95vh', transform: 'translateX(-50%)' },
 }
 
 type OverlayProps = {
@@ -49,7 +49,7 @@ export function Overlay({ label, align, size = 'default', onClose, children }: O
         style={
           align === 'left'
             ? { top: 'calc(var(--topbar-h) + 4px)', left: '50%', width: 'min(34rem, calc(100vw - 1.5rem))', maxHeight: '70vh', transform: 'translateX(-50%)' }
-            : { ...CENTRED[size], left: '50%', transform: 'translateX(-50%)' }
+            : { ...CENTRED[size], left: '50%' }
         }
       >
         {children}
