@@ -2,6 +2,7 @@ import { useAgentos } from './AgentosContext'
 import type { Overlay } from './AgentosContext'
 import { isFiltering } from './issueFilter'
 import { useLayout } from './LayoutContext'
+import type { Session } from './types'
 
 export type Shortcut = {
   key: string
@@ -13,13 +14,15 @@ export type Shortcut = {
   unlessTyping?: boolean
   label?: string
 }
-export type ActionGroup = 'Navigate' | 'Projects' | 'Queue' | 'App'
+export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Queue' | 'App'
 
 export type Action = {
   id: string
   label: string
   group: ActionGroup
   shortcut?: Shortcut
+  keysLabel?: string
+  hidden?: boolean
   run(args: string[]): string | void | Promise<string | void>
 }
 
@@ -37,14 +40,83 @@ export function matchShortcut(e: KeyboardEvent, shortcut: Shortcut): boolean {
   return [shortcut.key, ...(shortcut.aliases ?? [])].includes(e.key.toLowerCase())
 }
 
+const includes = (text: string, partial: string) => text.toLowerCase().includes(partial.toLowerCase())
 
+function findSession(sessions: Session[], query: string): Session {
+  const text = query.trim().replace(/^#?/, '')
+  if (!text) throw 'Give a session number or part of its title'
+  if (/^\d+$/.test(text)) {
+    const byNumber = sessions.find((s) => s.n === Number(text))
+    if (byNumber) return byNumber
+  }
+  const matches = sessions.filter((s) => includes(s.title, query.trim()))
+  if (matches.length === 1) return matches[0]
+  if (matches.length > 1) throw `${matches.length} sessions match "${query}": ${matches.map((s) => s.n).join(', ')}`
+  throw `No session matches "${query}"`
+}
+
+const describe = (s: Session) => `${s.n} ${s.title}`
 
 export function useActions(): Action[] {
   const a = useAgentos()
   const layout = useLayout()
+  const current = a.sessions.find((s) => s.id === a.selectedId)
   const openOverlay = (overlay: Overlay) => () => a.setOverlay(overlay)
+  const toTerminal = () => {
+    layout.focusPanel('terminal')
+  }
 
   const actions: Action[] = [
+    {
+      id: 'new-session',
+      label: 'New session',
+      group: 'Sessions',
+      shortcut: { key: 'n' },
+      run() {
+        a.setComposing(true)
+      },
+    },
+    {
+      id: 'open-session',
+      label: 'Open session',
+      group: 'Sessions',
+      run(args) {
+        const session = findSession(a.sessions, args.join(' '))
+        a.select(session.id)
+        return `Opened ${describe(session)}`
+      },
+    },
+    {
+      id: 'next-attention',
+      label: 'Next that needs you',
+      group: 'Sessions',
+      shortcut: { key: 'e' },
+      run() {
+        a.nextAttention()
+      },
+    },
+    {
+      id: 'kill-session',
+      label: current ? `Kill session ${describe(current)}` : 'Kill session',
+      group: 'Sessions',
+      async run(args) {
+        const target = args.length ? findSession(a.sessions, args.join(' ')) : current
+        if (!target) throw 'No session to kill'
+        await a.killSession(target.id)
+        return `Killed ${describe(target)}`
+      },
+    },
+    {
+      id: 'rename-session',
+      label: current ? `Rename session ${describe(current)}` : 'Rename session',
+      group: 'Sessions',
+      async run(args) {
+        if (!current) throw 'No session to rename'
+        if (args.length === 0) throw 'Give the new title: rename <title>'
+        await a.renameSession(current.id, args.join(' '))
+        return `Renamed to "${args.join(' ')}"`
+      },
+    },
     {
       id: 'start-issue',
       label: 'Start issue',
@@ -104,6 +176,36 @@ export function useActions(): Action[] {
       run: layout.toggleSidebar,
     },
     {
+      id: 'toggle-sessions',
+      label: 'Toggle sessions panel',
+      group: 'Navigate',
+      shortcut: { key: 'b', code: 'KeyB', alt: true },
+      run: layout.toggleSessions,
+    },
+    {
+      id: 'panel-sidebar',
+      label: 'Left panel: queue and notes',
+      group: 'Navigate',
+      shortcut: { key: 'a', unlessTyping: true },
+      run() {
+        layout.showSidebarTab(a.sidebarTab)
+        a.focus(a.sidebarTab === 'queue' ? 'queue-filter' : 'sidebar')
+      },
+    },
+    {
+      id: 'panel-terminal',
+      label: 'Middle panel: the active session',
+      group: 'Navigate',
+      run: toTerminal,
+    },
+    {
+      id: 'panel-sessions',
+      label: 'Right panel: sessions',
+      group: 'Navigate',
+      shortcut: { key: 'd' },
+      run: () => layout.focusPanel('sessions'),
+    },
+    {
       id: 'zoom-in',
       label: 'Larger text',
       group: 'App',
@@ -124,7 +226,36 @@ export function useActions(): Action[] {
       shortcut: { key: '0' },
       run: () => layout.zoom(0),
     },
+    {
+      id: 'previous-session',
+      label: 'Previous session',
+      group: 'Navigate',
+      shortcut: { key: '[' },
+      run: () => a.stepSession(-1),
+    },
+    {
+      id: 'next-session',
+      label: 'Next session',
+      group: 'Navigate',
+      shortcut: { key: ']' },
+      run: () => a.stepSession(1),
+    },
   ]
 
+  for (let n = 1; n <= 9; n++) {
+    actions.push({
+      id: `goto-${n}`,
+      label: `Open session ${n}`,
+      group: 'Sessions',
+      shortcut: { key: String(n) },
+      keysLabel: n === 1 ? '⌘1–9' : undefined,
+      hidden: n > 1,
+      run() {
+        const target = a.sessions.find((s) => s.n === n)
+        if (!target) throw `No session ${n}`
+        a.select(target.id)
+      },
+    })
+  }
   return actions
 }

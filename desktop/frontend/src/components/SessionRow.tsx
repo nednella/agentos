@@ -1,0 +1,76 @@
+import { useAgentos } from '../AgentosContext'
+import { api } from '../api'
+import { STATE_LABEL } from '../stateMeta'
+import { ago, useNow } from '../time'
+import type { Session } from '../types'
+import { Icon } from './Icon'
+import { StateDot } from './StateDot'
+import { Timeline } from './Timeline'
+
+type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
+
+export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
+  const { select, focus, dismissSession, report, issues } = useAgentos()
+  const now = useNow()
+  const waiting = session.state === 'waiting'
+  const ended = session.state === 'ended'
+  const issue = issues.find((i) => i.number === session.issue)
+  const hasFooter = ended
+
+  return (
+    <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
+      <button
+        className={`flex w-full flex-col gap-1 px-4 text-left ${dense ? 'py-2' : 'pt-2.5 pb-2.5'}`}
+        aria-current={selected}
+        disabled={ended}
+        title={ended ? `${session.title} (ended)` : session.title}
+        style={ended ? { cursor: 'default', opacity: 1 } : undefined}
+        onClick={() => {
+          select(session.id)
+          focus('terminal')
+        }}
+      >
+        <span className="flex w-full items-center gap-2">
+          <StateDot state={session.state} />
+          <span className="mono w-4 flex-none text-small text-dim">{session.n}</span>
+          <span className="min-w-0 flex-1 truncate text-body font-medium">{session.title}</span>
+          <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
+        </span>
+        {!compact && !dense && (
+          <span
+            className="mono w-full truncate pl-[1.625rem] text-small"
+            style={{ color: waiting ? 'var(--waiting)' : 'var(--text-dim)' }}
+          >
+            {session.detail || STATE_LABEL[session.state]}
+          </span>
+        )}
+        {!dense && (
+          <span className="w-full pl-[1.625rem]">
+            <Timeline session={session} size="mini" />
+          </span>
+        )}
+      </button>
+      {hasFooter && (
+        <div className="flex w-full flex-wrap items-center gap-2 pr-3 pb-2.5 pl-[2.625rem]">
+          {ended && (
+            <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
+          )}
+          {ended && issue && (
+            <button
+              className="btn btn-ghost h-6 px-2"
+              title={`Open #${issue.number} on GitHub`}
+              onClick={() => report(() => api.openURL(issue.url))}
+            >
+              <Icon name="external" size={12} /> #{issue.number}
+            </button>
+          )}
+          {ended && (
+            <button className="btn ml-auto h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
+              Dismiss
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

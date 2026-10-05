@@ -4,6 +4,7 @@ import { useActions, formatShortcut } from '../actions'
 import { useLayout } from '../LayoutContext'
 import type { State } from '../types'
 import { Icon } from './Icon'
+import { Keycap } from './Keycap'
 import { StateDot } from './StateDot'
 
 const drag = { '--wails-draggable': 'drag' } as CSSProperties
@@ -11,6 +12,7 @@ const noDrag = { '--wails-draggable': 'no-drag' } as CSSProperties
 
 const FULL_MIN = 1100
 const DOTS_MIN = 640
+const NEXT_FULL_MIN = 780
 
 type CountProps = { state: State; count: number; label: string; condensed: boolean }
 
@@ -36,6 +38,7 @@ export function TopBar() {
   const othersNeedYou = projects.some((p) => p.name !== project?.name && p.needsYou > 0)
   const find = (id: string) => actions.find((a) => a.id === id)!
   const keys = (id: string) => formatShortcut(find(id).shortcut!)
+  const iconButton = 'btn btn-ghost h-8 w-8 justify-center px-0'
   const full = width >= FULL_MIN
   const badge = width < DOTS_MIN
 
@@ -74,6 +77,18 @@ export function TopBar() {
         {othersNeedYou && <span className="dot" data-state="waiting" title="Another project needs you" />}
         <Icon name="chevron" size={12} />
       </button>
+      <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
+        {width >= NEXT_FULL_MIN ? (
+          <button className="btn" onClick={() => find('next-attention').run([])}>
+            Next
+            <Keycap>{keys('next-attention')}</Keycap>
+          </button>
+        ) : (
+          <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
+            <Icon name="next" />
+          </button>
+        )}
+      </div>
     </header>
   )
 }

@@ -13,21 +13,30 @@ type Agentos = {
   projects: Project[]
   sessions: Session[]
   selectedId: string | null
+  openedIds: string[]
   issues: Issue[]
   issuesLoading: boolean
   issueFilter: string
   notes: Note[]
   overlay: Overlay
   sidebarTab: SidebarTab
+  composing: boolean
   focusRequest: { target: FocusTarget; n: number }
   select(id: string): void
+  stepSession(delta: number): void
+  newSession(title?: string): Promise<Session>
+  killSession(id: string): Promise<void>
+  dismissSession(id: string): Promise<void>
+  renameSession(id: string, title: string): Promise<void>
   startIssue(number: number, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
   addProject(dir?: string): Promise<void>
   removeProject(name: string): Promise<void>
   refreshIssues(): Promise<void>
+  nextAttention(): void
   setSidebarTab(tab: SidebarTab): void
   setOverlay(overlay: Overlay): void
+  setComposing(open: boolean): void
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
   report(run: () => unknown): void
@@ -50,12 +59,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [openedIds, setOpenedIds] = useState<string[]>([])
   const [rawIssues, setRawIssues] = useState<Issue[]>([])
   const [issuesLoading, setIssuesLoading] = useState(true)
   const [issueFilter, setIssueFilterState] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
+  const [composing, setComposing] = useState(false)
   const [focusRequest, setFocusRequest] = useState<Agentos['focusRequest']>({ target: 'terminal', n: 0 })
 
   const sessionsRef = useRef(sessions)
@@ -68,6 +79,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const selectId = useCallback((id: string | null) => {
     selectedRef.current = id
     setSelectedId(id)
+    if (id) setOpenedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
   }, [])
 
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
@@ -88,6 +100,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const applySessions = useCallback(
     (list: Session[]) => {
       setSessions(list)
+      setOpenedIds((ids) => ids.filter((id) => list.some((s) => s.id === id)))
       const current = selectedRef.current
       if (current && list.some((s) => s.id === current)) return
       const remembered = list.find((s) => s.id === lastSelected.current.get(projectRef.current?.name ?? ''))
@@ -158,14 +171,39 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       projects,
       sessions,
       selectedId,
+      openedIds,
       issues,
       issuesLoading,
       issueFilter,
       notes,
       overlay,
       sidebarTab,
+      composing,
       focusRequest,
       select: selectId,
+      stepSession(delta) {
+        const list = sessionsRef.current
+        if (list.length === 0) return
+        const at = list.findIndex((s) => s.id === selectedRef.current)
+        selectId(list[(at + delta + list.length) % list.length].id)
+      },
+      async newSession(title = '') {
+        return addSession(await api.newSession(title, ''))
+      },
+      async killSession(id) {
+        await api.killSession(id)
+        applySessions(sessionsRef.current.filter((s) => s.id !== id))
+      },
+      async dismissSession(id) {
+        await api.dismissSession(id)
+        applySessions(sessionsRef.current.filter((s) => s.id !== id))
+      },
+      async renameSession(id, title) {
+        const trimmed = title.trim()
+        if (!trimmed) throw 'A title cannot be empty'
+        await api.renameSession(id, trimmed)
+        setSessions((list) => list.map((s) => (s.id === id ? { ...s, title: trimmed } : s)))
+      },
       async startIssue(number, background = false) {
         return addSession(await api.startIssue(number), background)
       },
@@ -182,8 +220,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         else enterProject(snap)
       },
       refreshIssues: () => loadIssues(true),
+      nextAttention() {
+        const list = sessionsRef.current
+        const urgent = [...list.filter((s) => s.state === 'waiting'), ...list.filter((s) => s.state === 'idle')]
+        if (urgent.length === 0) throw 'Nothing needs you right now'
+        const at = urgent.findIndex((s) => s.id === selectedRef.current)
+        selectId(urgent[(at + 1) % urgent.length].id)
+      },
       setSidebarTab,
       setOverlay,
+      setComposing,
       setIssueFilter(query) {
         setIssueFilterState(query)
         if (projectRef.current) writeStored(filterKey(projectRef.current.name), query)
@@ -191,7 +237,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       focus,
       report,
     }),
-    [project, projects, sessions, selectedId, issues, issuesLoading, issueFilter, notes, overlay, sidebarTab, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, overlay, sidebarTab, composing, focusRequest, selectId, addSession, applySessions, enterProject, loadIssues, focus, report],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

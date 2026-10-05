@@ -4,6 +4,7 @@
 @import '@fontsource/ibm-plex-sans/latin-600.css';
 @import '@fontsource/jetbrains-mono/latin-400.css';
 @import '@fontsource/jetbrains-mono/latin-600.css';
+@import '@xterm/xterm/css/xterm.css';
 @import './tokens.css';
 
 @custom-variant short (@media (max-height: 30rem));
@@ -302,6 +303,25 @@
   .divider[data-dragging='true']::after {
     background: var(--accent);
   }
+
+  .timeline {
+    display: flex;
+    width: 100%;
+    overflow: hidden;
+    border-radius: 1px;
+    background: var(--bg-raised);
+  }
+
+  .timeline > span {
+    min-width: 2px;
+    background: var(--c);
+    border-right: 1px solid var(--bg-surface);
+  }
+
+  .timeline > span[data-state='working'] { opacity: 0.7; }
+  .timeline > span[data-state='waiting'] { opacity: 0.85; }
+  .timeline > span[data-state='idle'] { opacity: 0.4; }
+  .timeline > span[data-state='ended'] { opacity: 0.3; }
 
   .fade-in {
     animation: fade-in 0.12s ease-out;
