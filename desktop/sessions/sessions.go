@@ -116,6 +116,7 @@ type Sessions struct {
 	repoOf     func(dir string) string
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
+	wakes      map[string]string        // prompts for sessions that were waiting on the user when their PR needed them
 	prefillFor time.Duration
 }
 
@@ -154,6 +155,7 @@ type Options struct {
 	Current       project.Project
 	Emit          func(event string, payload any)
 	Run           run.Runner
+	Stream        run.Streamer // long-running commands: gh webhook forward
 	Tally         Tally
 	CloseTerminal func(id string)
 	Evidence      Evidence
@@ -163,19 +165,20 @@ type Options struct {
 // New tracks the sessions of o.Tmux, and follows their pull requests.
 func New(o Options) *Sessions {
 	s := newSessions(o)
-	s.life = newLifecycle(o.Run, o.LocalDir, o.StateDir, s, o.Emit)
+	s.life = newLifecycle(o.Run, o.Stream, o.LocalDir, o.StateDir, s, o.Emit)
 	return s
 }
 
 // Stop ends the clean-ups that are running and waits for them.
 func (s *Sessions) Stop() { s.life.stopCleanups() }
 
-// Hook sets what the sessions ask of the issues: the repo of a folder, and a
-// nudge when the sessions tied to issues change.
-func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func()) {
+// Hook sets what the sessions ask of the issues: the repo of a folder, a nudge when the
+// sessions tied to issues change, and what the pull request watch needs.
+func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func(), repos Repos) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.repoOf, s.onIssues = repoOf, onIssues
+	s.life.repos = repos
 }
 
 // HarnessCheck starts the session titled "Harness check" with the review prompt typed in, not sent.
@@ -196,6 +199,7 @@ func newSessions(o Options) *Sessions {
 		seen:       map[string]session.State{},
 		history:    map[string][]Change{},
 		ready:      map[string]chan struct{}{},
+		wakes:      map[string]string{},
 		prefillFor: prefillWait,
 		ctx:        context.Background(),
 	}
@@ -477,7 +481,6 @@ func (s *Sessions) sync() {
 			if s.tally.Closed(id, time.Now()) {
 				waitsChanged = true
 			}
-			s.life.forget(id)
 			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
@@ -487,6 +490,7 @@ func (s *Sessions) sync() {
 	if waitsChanged {
 		s.emit("stats", nil)
 	}
+	s.deliverWakes()
 
 	s.announceProjects()
 	s.announceIssues()
@@ -713,10 +717,15 @@ func (s *Sessions) IssueSessions() map[int]string {
 // Create starts the agent in the current project. A non-empty text is typed
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
+	return s.createIn(s.Current(), title, text, send, issue)
+}
+
+// createIn is Create in the project given, which need not be the current one.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
-	name, proj, ctx, ready := s.reserve(text)
+	name, ctx, ready := s.reserve(proj, text)
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
@@ -730,15 +739,18 @@ func (s *Sessions) Create(title, text string, send bool, issue int) (Session, er
 	if ready != nil {
 		go s.typeWhenReady(name, ready, text, send)
 	}
+	if issue > 0 {
+		s.life.ensureWatchers(ctx)
+	}
 	return view, nil
 }
 
-// reserve picks the lowest free number of the current project. With a prefill it also
+// reserve picks the lowest free number of the project. With a prefill it also
 // returns the channel that closes when the agent says it is ready. It takes mu.
-func (s *Sessions) reserve(prefill string) (name session.Name, proj project.Project, ctx context.Context, ready chan struct{}) {
+func (s *Sessions) reserve(proj project.Project, prefill string) (name session.Name, ctx context.Context, ready chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	ctx, proj = s.ctx, s.project
+	ctx = s.ctx
 	var used []int
 	for _, in := range s.info {
 		if in.Name.Project == proj.Key() {
@@ -756,7 +768,7 @@ func (s *Sessions) reserve(prefill string) (name session.Name, proj project.Proj
 		ready = make(chan struct{})
 		s.ready[name.String()] = ready
 	}
-	return name, proj, ctx, ready
+	return name, ctx, ready
 }
 
 // launch starts the agent of the session in tmux.
@@ -829,9 +841,14 @@ func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text 
 	s.mu.Lock()
 	delete(s.ready, name.String())
 	s.mu.Unlock()
+	s.send(ctx, name, text, send)
+}
+
+// send types text into the session's prompt and, when submit is set, presses Enter.
+func (s *Sessions) send(ctx context.Context, name session.Name, text string, submit bool) {
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.tmux.Type(tctx, name, text); err != nil || !send {
+	if err := s.tmux.Type(tctx, name, text); err != nil || !submit {
 		return
 	}
 	// Enter right behind the text can reach the agent before the text has landed.
@@ -841,6 +858,51 @@ func (s *Sessions) typeWhenReady(name session.Name, ready <-chan struct{}, text 
 		return
 	}
 	_ = s.tmux.Submit(tctx, name)
+}
+
+// wake sends the prompt to the session, once it is not waiting on the user: typed into a
+// permission prompt, the text could answer it. A session that has ended gets a new one for
+// its issue, with the prompt sent, and its row goes.
+func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
+	if t.ended {
+		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue); err != nil {
+			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
+			return
+		}
+		_ = s.Dismiss(t.id)
+		return
+	}
+	name, err := session.ParseName(t.id)
+	if err != nil {
+		return
+	}
+	s.mu.Lock()
+	if rec := s.records[t.id]; rec.State == session.Waiting {
+		s.wakes[t.id] = prompt
+		s.mu.Unlock()
+		return
+	}
+	s.mu.Unlock()
+	s.send(ctx, name, prompt, true)
+}
+
+// deliverWakes sends the prompts held back while their sessions waited on the user. It needs mu.
+func (s *Sessions) deliverWakes() {
+	for id, prompt := range s.wakes {
+		_, live := s.seen[id]
+		switch {
+		case s.dismissed[id]:
+			delete(s.wakes, id)
+		case s.ended[id] != nil:
+			delete(s.wakes, id)
+			if t, err := s.targetOrErr(s.ended[id].info, true); err == nil {
+				go s.wake(s.ctx, t, prompt)
+			}
+		case live && s.records[id].State != session.Waiting:
+			delete(s.wakes, id)
+			go s.send(s.ctx, s.known[id].Name, prompt, true)
+		}
+	}
 }
 
 func (s *Sessions) Kill(id string) error {
@@ -909,13 +971,19 @@ func (s *Sessions) changed() {
 	s.sync()
 }
 
-// issueTargets are the sessions that work on an issue, in any project we know.
+// issueTargets are the sessions that work on an issue, live or ended, in any project we know.
 func (s *Sessions) issueTargets() []target {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []target
 	for _, in := range s.info {
 		if t, ok := s.targetOf(in); ok {
+			out = append(out, t)
+		}
+	}
+	for _, e := range s.ended {
+		if t, ok := s.targetOf(e.info); ok {
+			t.ended = true
 			out = append(out, t)
 		}
 	}
@@ -927,13 +995,23 @@ func (s *Sessions) target(id string) (target, error) {
 	defer s.mu.Unlock()
 	for _, in := range s.info {
 		if in.Name.String() == id {
-			if t, ok := s.targetOf(in); ok {
-				return t, nil
-			}
-			return target{}, fmt.Errorf("session %s has no issue to clean up after", id)
+			return s.targetOrErr(in, false)
 		}
 	}
+	if e, ok := s.ended[id]; ok {
+		return s.targetOrErr(e.info, true)
+	}
 	return target{}, fmt.Errorf("no session %s", id)
+}
+
+// targetOrErr needs mu.
+func (s *Sessions) targetOrErr(in term.Info, ended bool) (target, error) {
+	t, ok := s.targetOf(in)
+	if !ok {
+		return target{}, fmt.Errorf("session %s has no issue to clean up after", in.Name)
+	}
+	t.ended = ended
+	return t, nil
 }
 
 // targetOf needs mu.

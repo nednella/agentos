@@ -43,7 +43,7 @@ type App struct {
 }
 
 // New wires the services: who needs whom is decided here, and nowhere else.
-func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
+func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.EnvRunner) *App {
 	a := &App{}
 	ctx := func() context.Context {
 		if c := a.ctx.Load(); c != nil {
@@ -57,10 +57,10 @@ func New(c Config, h Host, runner run.Runner, claude run.EnvRunner) *App {
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
-		Current: c.Project, Emit: h.Emit, Run: runner, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
+		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
 	})
 	iss := issues.New(runner, sess, h.Emit)
-	sess.Hook(iss.CachedRepo, iss.Emit)
+	sess.Hook(iss.CachedRepo, iss.Emit, iss)
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
 	a.browsers = browsers

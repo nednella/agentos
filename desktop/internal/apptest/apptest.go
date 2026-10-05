@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -249,6 +250,10 @@ type FakeGH struct {
 	Delay  time.Duration // how long gh issue create takes
 	pr     string        // what gh pr list prints
 	PRErr  error         // what gh pr list fails with, if set
+	pulls  string        // the body gh api prints for the repo's pull request list
+	etag   string        // its ETag: a request carrying it gets a 304
+	hooks  []*io.PipeWriter
+	hooked bool // gh webhook forward works
 }
 
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -259,6 +264,14 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, strings.Join(args, " "))
 	switch {
+	case args[0] == "api" && args[1] == "-i":
+		if f.pulls == "" {
+			return nil, fmt.Errorf("gh api: exit status 1: gh: HTTP 404: Not Found")
+		}
+		if i := slices.Index(args, "-H"); i >= 0 && args[i+1] == "If-None-Match: "+f.etag {
+			return nil, fmt.Errorf("gh api: exit status 1: gh: HTTP 304")
+		}
+		return []byte("HTTP/2.0 200 OK\r\nEtag: " + f.etag + "\r\nX-Ratelimit-Remaining: 4999\r\n\r\n" + f.pulls), nil
 	case args[0] == "pr":
 		if f.PRErr != nil {
 			return nil, f.PRErr
@@ -303,12 +316,76 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 	return nil, fmt.Errorf("unexpected %s %v", name, args)
 }
 
-func (f *FakeGH) IssueCalls() int {
+func (f *FakeGH) IssueCalls() int { return f.Calls("issue list") }
+
+// Calls counts the gh calls that start with prefix.
+func (f *FakeGH) Calls(prefix string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	n := 0
 	for _, c := range f.calls {
-		if strings.HasPrefix(c, "issue list") {
+		if strings.HasPrefix(c, prefix) {
+			n++
+		}
+	}
+	return n
+}
+
+// SetPulls sets what the repo's pull request list answers: its ETag and the body.
+func (f *FakeGH) SetPulls(etag, body string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.etag, f.pulls = etag, body
+}
+
+// Stream is the run.Streamer: gh webhook forward streams the events the test sends, when the test
+// said it works; any other command fails.
+func (f *FakeGH) Stream(_ context.Context, _, name string, args ...string) (io.ReadCloser, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, strings.Join(args, " "))
+	if name != "gh" || args[0] != "webhook" || !f.hooked {
+		return nil, fmt.Errorf("gh %s: exit status 1: unknown command %q for \"gh\"", args[0], args[0])
+	}
+	r, w := io.Pipe()
+	f.hooks = append(f.hooks, w)
+	return r, nil
+}
+
+// WebhookWorks makes gh webhook forward run, as it does where the user is admin.
+func (f *FakeGH) WebhookWorks() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.hooked = true
+}
+
+// Event sends a webhook payload down every forward stream.
+func (f *FakeGH) Event(payload string) {
+	f.mu.Lock()
+	hooks := slices.Clone(f.hooks)
+	f.mu.Unlock()
+	for _, w := range hooks {
+		_, _ = io.WriteString(w, payload+"\n")
+	}
+}
+
+// DropWebhooks ends every forward stream, as a lost connection would.
+func (f *FakeGH) DropWebhooks() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, w := range f.hooks {
+		_ = w.Close()
+	}
+	f.hooks = nil
+}
+
+// Forwards counts the gh webhook forward runs.
+func (f *FakeGH) Forwards() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "webhook forward") {
 			n++
 		}
 	}
@@ -331,6 +408,11 @@ func (f *FakeGH) CallLog() []string {
 // NoGH is a runner for tests that must not reach GitHub.
 func NoGH(context.Context, string, string, ...string) ([]byte, error) {
 	return nil, errors.New("gh is not available in this test")
+}
+
+// NoStream is a streamer for tests that must not start anything.
+func NoStream(context.Context, string, string, ...string) (io.ReadCloser, error) {
+	return nil, errors.New("streams are not available in this test")
 }
 
 // NoClaude is an env runner for tests that must not run claude.
@@ -420,7 +502,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker}, h.GH.Run, h.Claude.RunEnv)
+	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
 	for _, svc := range a.Services() {
 		switch s := svc.(type) {
 		case *projects.Service:
