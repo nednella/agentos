@@ -6,6 +6,10 @@ import { ShellTerminal } from './ShellTerminal'
 
 const HEADER_REM = 1.75
 const KEY_STEP_REM = 1
+// The strip sits on the window's rounded bottom corners; the terminal pads itself 0.75rem, so this margin
+// puts its text in line with the header and clear of the curve.
+const cornerPad = { paddingLeft: 'var(--corner-pad)', paddingRight: 'var(--corner-pad)' }
+const terminalInset = { marginLeft: 'calc(var(--corner-pad) - 0.75rem)', marginRight: 'calc(var(--corner-pad) - 0.75rem)', marginBottom: '0.375rem' }
 
 export function ShellStrip() {
   const { project, focus } = useAgentos()
@@ -44,7 +48,8 @@ export function ShellStrip() {
     return (
       <div data-panel="shell" className="flex-none border-t border-line bg-surface">
         <button
-          className="flex h-9 w-full items-center gap-2 px-4 text-left"
+          className="flex h-9 w-full items-center gap-2 text-left"
+          style={cornerPad}
           aria-label="Open the shell"
           onClick={() => {
             setShellOpen(true)
@@ -74,15 +79,15 @@ export function ShellStrip() {
         onDoubleClick={resetShellHeight}
       />
       <button
-        className="panel-head flex w-full items-center gap-2 border-b border-line px-4 text-left"
-        style={{ height: `${HEADER_REM}rem` }}
+        className="panel-head flex w-full items-center gap-2 border-b border-line text-left"
+        style={{ ...cornerPad, height: `${HEADER_REM}rem` }}
         aria-label="Collapse the shell"
         onClick={() => setShellOpen(false)}
       >
         <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
         <span className="text-small text-dim">Shell</span>
       </button>
-      <div className="relative" style={{ height: `${shellRem}rem` }}>
+      <div className="relative" style={{ ...terminalInset, height: `${shellRem}rem` }}>
         <ShellTerminal visible />
       </div>
     </div>
