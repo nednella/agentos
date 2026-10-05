@@ -77,6 +77,7 @@ func New(c Config, h Host, runner run.Runner) *App {
 	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
 	a.router.Handle("show", evidence.NewCommands(proofs, a.router, changes).Show)
+	a.router.Handle("browser", browser.NewCommands(browsers, a.router, proofs, changes).Browser)
 	a.router.Handle("stats", stats.NewCommands(waits, a.router).Stats)
 	a.services = []any{
 		projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx),

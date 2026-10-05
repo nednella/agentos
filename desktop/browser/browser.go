@@ -1143,3 +1143,6 @@ func (b *Browsers) Eval(ctx context.Context, id, js string) (string, error) {
 	raw, err := t.eval(ctx, js)
 	return string(raw), err
 }
+
+// SetGrace sets how long a browser outlives its last tab.
+func (b *Browsers) SetGrace(d time.Duration) { b.grace = d }
