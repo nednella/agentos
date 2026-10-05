@@ -10,12 +10,15 @@
 @custom-variant short (@media (max-height: 30rem));
 
 /* Outside the components layer so these beat xterm.css. The fit addon subtracts padding set on
-   .xterm itself, not on its host; the viewport then spans that padding, so its black must go. */
+   .xterm itself, not on its host; the viewport then spans that padding, so its black must go.
+   xterm 6 scrolls through its own slider yet leaves the viewport overflow-y: scroll; that native
+   bar has nothing to scroll and shows as a dead track, so it goes too. */
 .xterm {
   padding: 0.5rem 0.75rem;
 }
 
 .xterm .xterm-viewport {
+  overflow: hidden;
   background-color: var(--bg-term);
 }
 
