@@ -25,6 +25,8 @@ type Project struct {
 	URL      string            `yaml:"url,omitempty"`      // the page a session's browser opens first
 	Browser  *bool             `yaml:"browser,omitempty"`  // give sessions the browser and evidence commands; on unless false
 	Digest   string            `yaml:"digest,omitempty"`   // weekly (the default) or off
+	PRWatch  string            `yaml:"pr_watch,omitempty"` // webhook or poll; unset tries the webhook and polls when it does not work
+	PRPoll   string            `yaml:"pr_poll,omitempty"`  // how often to poll pull requests, "30s" by default
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.
@@ -75,6 +77,12 @@ func Load(path string) (Config, error) {
 			return Config{}, fmt.Errorf("%s: project %d needs a name and a dir", path, i+1)
 		}
 		cfg.Projects[i].Dir = ExpandHome(p.Dir)
+		if p.PRWatch != "" && p.PRWatch != "webhook" && p.PRWatch != "poll" {
+			return Config{}, fmt.Errorf("%s: project %s: pr_watch must be webhook or poll, not %q", path, p.Name, p.PRWatch)
+		}
+		if _, err := p.PRPollEvery(); err != nil {
+			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
+		}
 	}
 	return cfg, nil
 }
