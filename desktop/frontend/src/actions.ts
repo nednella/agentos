@@ -23,6 +23,7 @@ export type Action = {
   shortcut?: Shortcut
   keysLabel?: string
   hidden?: boolean
+  uiCommand?: string
   palette?: false | { prompt?: string; initial?: string }
   confirm?: boolean
   run(args: string[]): string | void | Promise<string | void>
@@ -93,6 +94,7 @@ export function useActions(): Action[] {
       label: 'Open session',
       group: 'Sessions',
       palette: false,
+      uiCommand: 'open',
       run(args) {
         const session = findSession(a.sessions, args.join(' '))
         a.select(session.id)
@@ -104,6 +106,7 @@ export function useActions(): Action[] {
       label: 'Next that needs you',
       group: 'Sessions',
       shortcut: { key: 'e' },
+      uiCommand: 'next',
       run() {
         a.nextAttention()
       },
@@ -184,6 +187,7 @@ export function useActions(): Action[] {
       id: 'show-notes',
       label: 'Show notes',
       group: 'Notes',
+      uiCommand: 'notes',
       run() {
         layout.showSidebarTab('notes')
         a.focus('note-input')
@@ -193,6 +197,7 @@ export function useActions(): Action[] {
       id: 'show-queue',
       label: 'Search the queue',
       group: 'Queue',
+      uiCommand: 'queue',
       run() {
         layout.showSidebarTab('queue')
         a.focus('queue-filter')
@@ -203,6 +208,7 @@ export function useActions(): Action[] {
       label: 'Filter the queue…',
       group: 'Queue',
       palette: { prompt: 'Filter, e.g. @mariam-k label:idea -type:bug', initial: a.issueFilter },
+      uiCommand: 'filter',
       run(args) {
         layout.showSidebarTab('queue')
         a.setIssueFilter(args.join(' '))
@@ -214,6 +220,7 @@ export function useActions(): Action[] {
       label: 'Refresh issues and PRs',
       group: 'Queue',
       shortcut: { key: 'r' },
+      uiCommand: 'refresh',
       async run() {
         await Promise.all([a.refreshIssues(), a.refreshPRs()])
         return 'Issues and pull requests refreshed'
@@ -232,6 +239,13 @@ export function useActions(): Action[] {
       group: 'Navigate',
       shortcut: { key: 'b', code: 'KeyB', alt: true },
       run: layout.toggleSessions,
+    },
+    {
+      id: 'focus-shell',
+      label: 'Focus the shell',
+      group: 'Navigate',
+      shortcut: { key: 's' },
+      run: () => layout.focusPanel('shell'),
     },
     {
       id: 'panel-sidebar',
@@ -282,12 +296,14 @@ export function useActions(): Action[] {
       label: 'Stats: what interrupts you',
       group: 'App',
       shortcut: { key: 's', shift: true },
+      uiCommand: 'stats',
       run: layout.toggleStats,
     },
     {
       id: 'show-terminal',
       label: 'Show terminal',
       group: 'Sessions',
+      uiCommand: 'term',
       run() {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -298,6 +314,7 @@ export function useActions(): Action[] {
       id: 'show-browser',
       label: 'Show browser',
       group: 'Sessions',
+      uiCommand: 'browser',
       async run(args) {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -313,6 +330,7 @@ export function useActions(): Action[] {
       id: 'show-evidence',
       label: 'Show evidence',
       group: 'Sessions',
+      uiCommand: 'evidence',
       run() {
         if (!current) throw 'No session selected'
         layout.closeCentre()
@@ -340,12 +358,14 @@ export function useActions(): Action[] {
       label: 'Weekly digest',
       group: 'App',
       shortcut: { key: 'd', shift: true },
+      uiCommand: 'digest',
       run: layout.toggleDigest,
     },
     {
       id: 'harness',
       label: "Check this project's harness",
       group: 'Projects',
+      uiCommand: 'harness',
       async run() {
         await a.harnessCheck()
         return 'Started the harness check'
@@ -355,6 +375,7 @@ export function useActions(): Action[] {
       id: 'open-pr',
       label: current?.pr ? `Open PR #${current.pr.number}` : 'Open the pull request',
       group: 'Sessions',
+      uiCommand: 'pr',
       async run() {
         if (!current) throw 'No session selected'
         await a.openPR(current)

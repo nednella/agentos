@@ -5,6 +5,8 @@ import { Palette } from './components/Palette'
 import { ProjectPanel } from './components/ProjectPanel'
 import { SessionsPanel } from './components/SessionsPanel'
 import { ShortcutsSheet } from './components/ShortcutsSheet'
+import { ShellPanel } from './components/ShellPanel'
+import { ShellStrip } from './components/ShellStrip'
 import { Sidebar } from './components/Sidebar'
 import { Stats } from './components/Stats'
 import { Toasts } from './components/Toasts'
@@ -12,9 +14,11 @@ import { TopBar } from './components/TopBar'
 import { Viewport } from './components/Viewport'
 import { useLayout } from './LayoutContext'
 import { useShortcuts } from './useShortcuts'
+import { useUiCommands } from './useUiCommands'
 
 export function App() {
   useShortcuts()
+  useUiCommands()
   const { mode, sidebarOpen, sessionsOpen, mobilePanel, statsOpen, digestOpen } = useLayout()
   const narrow = mode === 'narrow'
   const showCentre = !narrow || mobilePanel === 'session'
@@ -36,8 +40,10 @@ export function App() {
         {!narrow && sessionsOpen && <Divider panel="sessions" />}
         {!narrow && !sessionsOpen && <span className="w-3 flex-none" />}
         <SessionsPanel />
+        {narrow && mobilePanel === 'shell' && <ShellPanel />}
       </main>
       {narrow && <MobileTabs />}
+      {!narrow && <ShellStrip />}
       <Palette />
       <ProjectPanel />
       <ShortcutsSheet />

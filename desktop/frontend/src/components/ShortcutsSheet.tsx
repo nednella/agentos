@@ -15,11 +15,22 @@ const GROUPS: Group[] = [
   { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
   { title: 'Views', ids: ['stats', 'digest', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
+  {
+    title: 'Shell',
+    ids: [],
+    extra: [
+      { id: 'shell-keys', label: 'Back to the terminal', keys: 'Esc Esc' },
+      { id: 'shell-ex-1', label: 'agentos issue 394 393', mono: true },
+      { id: 'shell-ex-2', label: 'agentos open 2', mono: true },
+      { id: 'shell-ex-3', label: 'agentos filter @nednella type:bug', mono: true },
+      { id: 'shell-ex-4', label: 'agentos next', mono: true },
+    ],
+  },
   { title: 'In a list', ids: [], extra: LIST_KEYS.map((k) => ({ id: k.keys, label: k.summary, keys: k.keys })) },
 ]
 
 const LEFT = ['Sessions', 'Queue', 'In a list']
-const RIGHT = ['Navigate', 'Notes', 'Views']
+const RIGHT = ['Navigate', 'Notes', 'Views', 'Shell']
 const listed = new Set(GROUPS.flatMap((g) => g.ids))
 
 function toRow(action: Action): Row {
@@ -68,6 +79,7 @@ export function ShortcutsSheet() {
     list.map((g) => (
       <section key={g.title} className="min-w-0">
         <h3 className="label pb-0.5">{g.title}</h3>
+        {g.title === 'Shell' && <p className="pb-1 text-small text-dim">A zsh in the project folder. Run agentos &lt;command&gt; here, or in any terminal, to drive the app.</p>}
         <ul>
           {g.rows.map((row) => (
             <RowView key={row.id} row={row} />

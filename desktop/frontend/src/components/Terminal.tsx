@@ -8,7 +8,9 @@ import { api, on } from '../api'
 import { useLayout } from '../LayoutContext'
 import { terminalFont, terminalTheme } from '../terminalTheme'
 
-type TerminalProps = { id: string; active: boolean }
+type TerminalProps = { id: string; active: boolean; kind?: 'session' | 'shell'; onLeave?(): void }
+
+const DOUBLE_ESC_MS = 500
 
 const BASE_FONT_PX = 14
 const SHIFT_ENTER = '\x1b[13;2u'
@@ -23,8 +25,11 @@ function decode(base64: string): Uint8Array {
 
 const DEVICE_REPORT = /^(\x1b\[[?>]?[\d;]*c|\x1bP[^\x1b]*\x1b\\|\x1b\]\d+;[^\x07\x1b]*(\x07|\x1b\\))+$/
 
-export function Terminal({ id, active }: TerminalProps) {
-  const focusTarget = 'terminal'
+export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProps) {
+  const focusTarget = kind === 'shell' ? 'shell' : 'terminal'
+  const leave = useRef(onLeave)
+  leave.current = onLeave
+  const lastEsc = useRef(0)
   const { focusRequest } = useAgentos()
   const { scale } = useLayout()
   const host = useRef<HTMLDivElement>(null)
@@ -63,6 +68,15 @@ export function Terminal({ id, active }: TerminalProps) {
     }
 
     term.attachCustomKeyEventHandler((event) => {
+      if (kind === 'shell' && event.key === 'Escape' && event.type === 'keydown') {
+        const now = performance.now()
+        if (now - lastEsc.current < DOUBLE_ESC_MS) {
+          lastEsc.current = 0
+          leave.current?.()
+          return false
+        }
+        lastEsc.current = now
+      }
       const key = event.key.toLowerCase()
       if (event.metaKey && key === 'c' && term.hasSelection()) {
         void navigator.clipboard.writeText(term.getSelection())
@@ -131,10 +145,10 @@ export function Terminal({ id, active }: TerminalProps) {
     if (!active) return
     const frame = requestAnimationFrame(() => {
       sync.current()
-      xterm.current?.focus()
+      if (kind !== 'shell') xterm.current?.focus()
     })
     return () => cancelAnimationFrame(frame)
-  }, [active])
+  }, [active, kind])
 
   useEffect(() => {
     if (active && focusRequest.target === focusTarget) xterm.current?.focus()
