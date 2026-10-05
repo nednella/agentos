@@ -12,7 +12,7 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
 
   return (
     <div
-      className={`panel flex min-h-0 flex-col items-center gap-2 overflow-y-auto pt-1 pb-2 ${inShell ? 'edge-strip' : 'flex-none'}`}
+      className={`panel flex min-h-0 flex-col items-center gap-3 overflow-y-auto pt-1 pb-3 ${inShell ? 'edge-strip' : 'flex-none'}`}
       style={inShell ? undefined : { width: 'var(--edge-strip-w)' }}
     >
       <button
@@ -25,10 +25,10 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
       </button>
       {left ? (
         <>
-          <button className="mono text-small text-soft hover:text-ink" title="Queue" onClick={() => showSidebarTab('queue')}>
+          <button className="mono text-small text-soft py-1 hover:text-ink" title="Queue" onClick={() => showSidebarTab('queue')}>
             Q {issues.length}
           </button>
-          <button className="mono text-small text-soft hover:text-ink" title="Notes" onClick={() => showSidebarTab('notes')}>
+          <button className="mono text-small text-soft py-1 hover:text-ink" title="Notes" onClick={() => showSidebarTab('notes')}>
             N {notes.filter((n) => !n.archived).length}
           </button>
         </>
@@ -36,7 +36,7 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
         sessions.map((s) => (
           <button
             key={s.id}
-            className="flex w-full flex-col items-center gap-1 py-1"
+            className="flex w-full flex-col items-center gap-1.5 py-1.5"
             data-state={s.state}
             title={`${s.n} ${s.title}`}
             aria-label={`Open session ${s.n}, ${s.title}`}
