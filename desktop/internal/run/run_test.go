@@ -1,9 +1,11 @@
 package run
 
 import (
+	"bufio"
 	"context"
 	"os"
 	"os/exec"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -66,5 +68,41 @@ func TestExecEnvKillsChildrenWhenCancelled(t *testing.T) {
 	}
 	if syscall.Kill(pid, 0) == nil {
 		t.Errorf("the grandchild %d is still running", pid)
+	}
+}
+
+func TestStreamReadsOutputAsItComes(t *testing.T) {
+	out, err := Stream(context.Background(), t.TempDir(), "sh", "-c", "echo one; sleep 0.2; echo two; echo oops >&2; exit 3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := bufio.NewScanner(out)
+	var lines []string
+	for sc.Scan() {
+		lines = append(lines, sc.Text())
+	}
+	if want := []string{"one", "two"}; !slices.Equal(lines, want) {
+		t.Errorf("lines = %q, want %q", lines, want)
+	}
+	err = out.Close()
+	if err == nil || !strings.Contains(err.Error(), "exit status 3") || !strings.Contains(err.Error(), "oops") {
+		t.Errorf("Close = %v, want the exit status and stderr", err)
+	}
+}
+
+func TestStreamCloseKillsTheCommand(t *testing.T) {
+	out, err := Stream(context.Background(), t.TempDir(), "sh", "-c", "sleep 30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- out.Close() }()
+	select {
+	case err := <-done:
+		if err == nil {
+			t.Error("Close reported a killed command as a clean exit")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not return")
 	}
 }
