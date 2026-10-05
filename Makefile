@@ -13,7 +13,10 @@ test:
 fmt:
 	gofmt -w .
 
-desktop:
+desktop-frontend:
+	cd desktop/frontend && (npm ci || npm install) && npm run build
+
+desktop: desktop-frontend
 	CGO_LDFLAGS='-framework UniformTypeIdentifiers' go build -tags desktop,production -ldflags '-w -s $(LDFLAGS)' -o bin/agentos-desktop ./desktop
 
 desktop-run: desktop
@@ -42,4 +45,4 @@ desktop-install: desktop-app
 clean:
 	rm -rf bin
 
-.PHONY: build install test fmt desktop desktop-run desktop-app desktop-install clean
+.PHONY: build install test fmt desktop-frontend desktop desktop-run desktop-app desktop-install clean

@@ -1,8 +1,10 @@
+//go:build !stub
+
 package main
 
 import "embed"
 
-//go:embed all:stubassets
+//go:embed all:frontend/dist
 var assetsFS embed.FS
 
-const assetsRoot = "stubassets"
+const assetsRoot = "frontend/dist"
