@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
-import { useActions } from '../actions'
 import { useLayout } from '../LayoutContext'
 import { activeValue, applyCompletion, completionAt, facet, TYPES, withToken } from '../issueFilter'
 import { FacetMenu } from './FacetMenu'
@@ -9,9 +8,7 @@ import { Icon } from './Icon'
 type QueueSearchProps = { shown: number | null }
 
 export function QueueSearch({ shown }: QueueSearchProps) {
-  const { project, issues, issuesLoading, issueFilter, setIssueFilter, focusRequest, refreshIssues, report } = useAgentos()
-  const actions = useActions()
-  const find = (id: string) => actions.find((a) => a.id === id)!
+  const { issues, issuesLoading, issueFilter, setIssueFilter, focusRequest, refreshIssues, report } = useAgentos()
   const { returnToTerminal } = useLayout()
   const input = useRef<HTMLInputElement>(null)
   const [cursor, setCursor] = useState(0)
@@ -121,14 +118,6 @@ export function QueueSearch({ shown }: QueueSearchProps) {
           <span className={issuesLoading ? 'inline-flex animate-spin' : 'inline-flex'}>
             <Icon name="refresh" size={13} />
           </span>
-        </button>
-        <button
-          className="btn btn-ghost h-[1.875rem] w-[1.875rem] flex-none justify-center px-0"
-          title={`Open ${project?.repo} on GitHub`}
-          aria-label="Open repository on GitHub"
-          onClick={() => report(() => find('open-repo').run([]))}
-        >
-          <Icon name="external" size={13} />
         </button>
       </div>
       <div className="flex items-center gap-1">
