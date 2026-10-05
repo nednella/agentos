@@ -68,7 +68,10 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       fontSize: Math.round(BASE_FONT_PX * scale * 2) / 2,
       lineHeight: 1.18,
       cursorBlink: true,
-      scrollback: 5000,
+      // tmux holds the history. A mount onto a running stream never sees tmux's switch to the
+      // alternate screen, so any scrollback here fills with lines tmux pushes off the bottom
+      // and xterm offers a slider over them.
+      scrollback: 0,
       allowProposedApi: true,
       theme: terminalTheme,
     })
