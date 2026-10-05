@@ -3,9 +3,11 @@ package app
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync/atomic"
 
 	"github.com/nednella/agentos/desktop/control"
+	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/desktop/notes"
@@ -28,6 +30,7 @@ type App struct {
 	sessions *sessions.Sessions
 	terms    *terminal.Terms
 	notes    *notes.Notes
+	evidence *evidence.Store
 	router   *control.Router
 	stateDir string
 	services []any
@@ -43,17 +46,20 @@ func New(c Config, h Host, runner run.Runner) *App {
 		return context.Background()
 	}
 	waits := stats.New(c.DataDir)
+	proofs := evidence.New(c.LocalDir)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
-		Current: c.Project, Emit: h.Emit, Run: runner, Tally: waits, CloseTerminal: terms.Close,
+		Current: c.Project, Emit: h.Emit, Run: runner, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs,
 	})
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit)
 	store := notes.New(c.DataDir)
-	a.sessions, a.terms, a.notes, a.stateDir = sess, terms, store, c.StateDir
+	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
 	a.router = control.New(sess)
 	a.router.Handle("note", notes.NewCommands(store, a.router, sess, h.Emit).Note)
+	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
+	a.router.Handle("show", evidence.NewCommands(proofs, a.router, changes).Show)
 	a.router.Handle("stats", stats.NewCommands(waits, a.router).Stats)
 	a.services = []any{
 		projects.NewService(c.Registry, sess, store, iss, c.StateDir, h.PickDir, ctx),
@@ -61,6 +67,7 @@ func New(c Config, h Host, runner run.Runner) *App {
 		terminal.NewService(terms),
 		issues.NewService(iss, ctx),
 		notes.NewService(store, sess, sess, iss, runner, h.Emit, ctx),
+		evidence.NewService(proofs, changes),
 		stats.NewService(waits, sess),
 	}
 	return a
@@ -85,8 +92,16 @@ func (a *App) Stop() {
 	a.router.Close()
 }
 
-// Media serves the pictures under /media/.
-func (a *App) Media() http.Handler { return a.notes.MediaHandler() }
+// Media serves the pictures of notes and evidence under /media/<project key>/<folder>/.
+func (a *App) Media() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/evidence/") {
+			a.evidence.MediaHandler().ServeHTTP(w, r)
+			return
+		}
+		a.notes.MediaHandler().ServeHTTP(w, r)
+	})
+}
 
 // Sessions is the session list, for tests and wiring.
 func (a *App) Sessions() *sessions.Sessions { return a.sessions }

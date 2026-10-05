@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/issues"
@@ -265,6 +266,7 @@ type Harness struct {
 	issues   *issues.Service
 	notes    *notes.Service
 	stats    *stats.Service
+	evidence *evidence.Service
 }
 
 // New starts an app for the test; the cleanup stops it and its tmux server.
@@ -330,6 +332,8 @@ func (h *Harness) build(t *testing.T) *app.App {
 			h.notes = s
 		case *stats.Service:
 			h.stats = s
+		case *evidence.Service:
+			h.evidence = s
 		}
 	}
 	return a
@@ -511,4 +515,9 @@ func (h *Harness) Ask(t *testing.T, req ctl.Request) ctl.Response {
 		t.Fatalf("asking %s: %v", req.Cmd, err)
 	}
 	return resp
+}
+
+func (h *Harness) Evidence(id string) []evidence.Evidence { return h.evidence.Evidence(id) }
+func (h *Harness) DeleteEvidence(id, evidenceID string) error {
+	return h.evidence.DeleteEvidence(id, evidenceID)
 }

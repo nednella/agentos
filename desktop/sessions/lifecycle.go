@@ -505,6 +505,9 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool)
 		removed = append(removed, "temp files")
 	}
 
+	if l.sessions.evidence.Purge(t.id) > 0 {
+		removed = append(removed, "evidence")
+	}
 	if err := l.sessions.Kill(t.id); err != nil {
 		return removed, fmt.Sprintf("ending the session failed: %v", err)
 	}

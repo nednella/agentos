@@ -52,6 +52,7 @@ type Session struct {
 	CreatedAt   int64         `json:"createdAt"`
 	Issue       int           `json:"issue"`
 	History     []Change      `json:"history"`
+	Evidence    int           `json:"evidence"`
 
 	Branch        string `json:"branch"`
 	Worktree      string `json:"worktree"`
@@ -88,6 +89,7 @@ type Sessions struct {
 	configured ProjectList
 	tally      Tally
 	closeTerm  func(id string)
+	evidence   Evidence
 	info       []term.Info
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
@@ -118,6 +120,12 @@ type Tally interface {
 	Closed(id string, at time.Time) bool
 }
 
+// Evidence is what the sessions need of the evidence store.
+type Evidence interface {
+	Count(id string) int
+	Purge(id string) int
+}
+
 // Options is what a Sessions needs from outside.
 type Options struct {
 	Tmux          *term.Tmux
@@ -130,6 +138,7 @@ type Options struct {
 	Run           run.Runner
 	Tally         Tally
 	CloseTerminal func(id string)
+	Evidence      Evidence
 }
 
 // New tracks the sessions of o.Tmux, and follows their pull requests.
@@ -147,10 +156,13 @@ func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func()) {
 	s.repoOf, s.onIssues = repoOf, onIssues
 }
 
+// Touch tells the front end that something shown in the session list changed.
+func (s *Sessions) Touch() { s.changed() }
+
 func newSessions(o Options) *Sessions {
 	return &Sessions{
 		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit,
-		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal,
+		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
@@ -324,6 +336,7 @@ func (s *Sessions) drop(id string) {
 	delete(s.known, id)
 	s.dismissed[id] = true
 	_ = bus.RemoveState(s.stateDir, id)
+	go s.evidence.Purge(id)
 }
 
 // Dismiss removes an ended session's row.
@@ -525,7 +538,7 @@ func (s *Sessions) list() []Session {
 		view := Session{
 			ID: id, N: ss.Name.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(), Issue: issue,
+			CreatedAt: in.Created.UnixMilli(), Issue: issue, Evidence: s.evidence.Count(id),
 			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {

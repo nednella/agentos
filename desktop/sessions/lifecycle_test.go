@@ -13,6 +13,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
+	ctl "github.com/nednella/agentos/internal/control"
 )
 
 func issueSession(h *apptest.Harness, t *testing.T, issue int) sessions.Session {
@@ -145,6 +146,9 @@ func TestCleanupMerged(t *testing.T) {
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+	if resp := h.Ask(t, ctl.Request{Cmd: "show", Session: s.ID, Opts: map[string]string{"text": "tested by hand"}}); !resp.OK {
+		t.Fatalf("show = %+v", resp)
+	}
 
 	openThenMerge(h)
 	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
@@ -156,7 +160,7 @@ func TestCleanupMerged(t *testing.T) {
 	if len(log) != 1 || log[0].Status != "done" || log[0].Issue != 7 || log[0].PR != 12 || log[0].SessionTitle != "#7 work" {
 		t.Fatalf("log = %+v", log)
 	}
-	if want := []string{"worktree trees/issue-7", "branch issue-7", "temp files", "session"}; !slices.Equal(log[0].Removed, want) {
+	if want := []string{"worktree trees/issue-7", "branch issue-7", "temp files", "evidence", "session"}; !slices.Equal(log[0].Removed, want) {
 		t.Errorf("removed = %q, want %q", log[0].Removed, want)
 	}
 	if rec := h.Rec.Last("cleanups"); rec == nil {
