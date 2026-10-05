@@ -26,3 +26,8 @@ func (s *Service) Issues(refresh bool) ([]Issue, error) {
 func (s *Service) StartIssue(number int) (sessions.Session, error) {
 	return s.issues.Start(s.ctx(), number)
 }
+
+// IssueDetail is the issue's body and comments as GitHub renders them.
+func (s *Service) IssueDetail(number int) (IssueDetail, error) {
+	return s.issues.Detail(s.ctx(), s.issues.sessions.Current().Dir, number)
+}
