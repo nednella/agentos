@@ -57,7 +57,7 @@ function ProjectPanelContent() {
             if (e.key === 'Enter' && shown[cursor]) choose(shown[cursor].name)
           }}
         />
-        <Keycap>esc</Keycap>
+        <Keycap>Esc</Keycap>
       </div>
       <div className="max-h-80 overflow-y-auto py-1">
         {shown.length === 0 && <p className="px-4 py-4 text-small text-dim">No project matches.</p>}

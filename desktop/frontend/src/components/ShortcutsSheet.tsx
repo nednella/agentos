@@ -106,7 +106,7 @@ export function ShortcutsSheet() {
             onChange={(e) => setQuery(e.target.value)}
           />
         </div>
-        <Keycap>esc</Keycap>
+        <Keycap>Esc</Keycap>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
         {groups.length === 0 && <p className="py-8 text-center text-small text-dim">Nothing matches.</p>}
