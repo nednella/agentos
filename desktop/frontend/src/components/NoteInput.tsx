@@ -33,29 +33,40 @@ export function NoteInput() {
   }
 
   return (
-    <div className="group flex flex-col gap-1.5 px-3 pt-3 pb-2" onDragOver={(e) => e.preventDefault()} onDrop={(e) => attach(imageFiles(e.dataTransfer)) && e.preventDefault()}>
-      <AutoTextarea
-        taRef={input}
-        value={noteDraft}
-        onChange={(e) => setNoteDraft(e.target.value)}
-        placeholder="Jot something down…"
-        aria-label="New note"
-        className="note-jot text-body"
-        onPaste={(e) => attach(imageFiles(e.clipboardData)) && e.preventDefault()}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation()
-            returnToTerminal()
-          }
-          if (e.key !== 'Enter' || e.shiftKey) return
-          e.preventDefault()
-          submit()
-        }}
-      />
-      <p className="px-1 text-label opacity-0 transition-opacity group-focus-within:opacity-100" style={{ color: 'var(--text-note-dim)' }}>
-        Enter adds · Shift+Enter new line
-      </p>
-      <NoteImages urls={images.map((i) => i.preview)} onRemove={(url) => setImages((list) => list.filter((i) => i.preview !== url))} />
+    <div className="group px-3 pt-3 pb-2" onDragOver={(e) => e.preventDefault()} onDrop={(e) => attach(imageFiles(e.dataTransfer)) && e.preventDefault()}>
+      <div className="composer">
+        <AutoTextarea
+          taRef={input}
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          placeholder="Jot something down…"
+          aria-label="New note"
+          className="px-3 pt-2.5 pb-1 text-body"
+          onPaste={(e) => attach(imageFiles(e.clipboardData)) && e.preventDefault()}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              e.stopPropagation()
+              returnToTerminal()
+            }
+            if (e.key !== 'Enter' || e.shiftKey) return
+            e.preventDefault()
+            submit()
+          }}
+        />
+        {images.length > 0 && (
+          <div className="px-3 pb-1">
+            <NoteImages urls={images.map((i) => i.preview)} onRemove={(url) => setImages((list) => list.filter((i) => i.preview !== url))} />
+          </div>
+        )}
+        <div className="composer-bar">
+          <span className="text-label opacity-0 transition-opacity group-focus-within:opacity-100" style={{ color: 'var(--text-note-dim)' }}>
+            Enter adds · Shift+Enter new line · paste an image to attach
+          </span>
+          <button className="btn btn-accent ml-auto h-6 px-2 text-label" disabled={!noteDraft.trim() && images.length === 0} onMouseDown={(e) => e.preventDefault()} onClick={submit}>
+            Add
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
