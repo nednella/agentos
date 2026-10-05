@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/nednella/agentos/internal/bus"
+	"github.com/nednella/agentos/internal/control"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/term"
 )
@@ -56,10 +57,14 @@ func loadEnv() (env, error) {
 func newKillCmd() *cobra.Command {
 	var all bool
 	cmd := &cobra.Command{
-		Use:   "kill",
-		Short: "Stop this project's agents (--all for every project)",
-		Args:  cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Use:     "kill [n]",
+		Short:   "Stop session n in the app, or without n this project's agents (--all: every project)",
+		GroupID: groupWork,
+		Args:    cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 1 {
+				return askApp(cmd, control.Request{Cmd: "kill", Args: args})
+			}
 			e, err := loadEnv()
 			if err != nil {
 				return err
