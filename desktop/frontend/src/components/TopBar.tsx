@@ -31,7 +31,7 @@ function Count({ state, count, label, condensed }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseen } = useAgentos()
+  const { project, projects, sessions, setOverlay, digestUnseen, report } = useAgentos()
   const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
@@ -67,18 +67,24 @@ export function TopBar() {
           </>
         )}
       </div>
-      <button
-        className="btn btn-ghost absolute top-1/2 left-1/2 h-8 min-w-0 -translate-x-1/2 -translate-y-1/2 gap-2 px-2 text-body font-semibold text-ink"
-        style={noDrag}
-        aria-haspopup="dialog"
-        title={`Switch project (${keys('switch-project')})`}
-        onClick={() => setOverlay('projects')}
-      >
-        {width >= 520 && <Icon name="folder" />}
-        <span className={`truncate ${width < 520 ? 'max-w-[5.5rem]' : 'max-w-[10rem]'}`}>{project?.name ?? '…'}</span>
-        {othersNeedYou && <span className="dot" data-state="waiting" title="Another project needs you" />}
-        <Icon name="chevron" size={12} />
-      </button>
+      <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1" style={noDrag}>
+        <button
+          className="btn btn-ghost h-8 min-w-0 gap-2 px-2 text-body font-semibold text-ink"
+          aria-haspopup="dialog"
+          title={`Switch project (${keys('switch-project')})`}
+          onClick={() => setOverlay('projects')}
+        >
+          {width >= 520 && <Icon name="folder" />}
+          <span className={`truncate ${width < 520 ? 'max-w-[5.5rem]' : 'max-w-[10rem]'}`}>{project?.name ?? '…'}</span>
+          {othersNeedYou && <span className="dot" data-state="waiting" title="Another project needs you" />}
+          <Icon name="chevron" size={12} />
+        </button>
+        {project?.repo && (
+          <button className={iconButton} title={`Open ${project.repo} on GitHub`} aria-label="Open repository on GitHub" onClick={() => report(() => find('open-repo').run([]))}>
+            <Icon name="external" />
+          </button>
+        )}
+      </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
         {width >= NEXT_FULL_MIN ? (
           <button className="btn" onClick={() => find('next-attention').run([])}>
