@@ -4,7 +4,6 @@ package prompts
 
 import (
 	_ "embed"
-	"strconv"
 	"strings"
 )
 
@@ -15,10 +14,6 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
-	//go:embed pr-review.md
-	prReview string
-	//go:embed pr-checks.md
-	prChecks string
 )
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
@@ -31,12 +26,6 @@ func BrowserSession() string { return body(browserSession) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
-
-// PRReview wakes a session whose pull request got a review or a comment.
-func PRReview(n int) string { return strings.Replace(body(prReview), "{n}", strconv.Itoa(n), 1) }
-
-// PRChecks wakes a session whose pull request has failing checks.
-func PRChecks(n int) string { return strings.Replace(body(prChecks), "{n}", strconv.Itoa(n), 1) }
 
 // body drops the leading comment and the final newline of a file.
 func body(file string) string {

@@ -57,11 +57,3 @@ func TestDigestNamesTheDependencies(t *testing.T) {
 		t.Error("an empty list left the placeholder")
 	}
 }
-
-func TestPRPromptsNameTheNumber(t *testing.T) {
-	for _, got := range []string{PRReview(41), PRChecks(41)} {
-		if !strings.Contains(got, "PR #41") || strings.Contains(got, "{n}") || strings.Contains(got, "<!--") || strings.HasSuffix(got, "\n") {
-			t.Errorf("prompt = %q", got)
-		}
-	}
-}

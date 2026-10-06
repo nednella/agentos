@@ -72,23 +72,23 @@ func TestQueueIsReadAgainWhenAPRMergesOrCloses(t *testing.T) {
 }
 
 func TestReviewWakesTheSession(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
 	h.Hook(t, s.ID, "Stop", `{}`)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 0))
 	h.RefreshPRs()
 	time.Sleep(500 * time.Millisecond)
-	if strings.Contains(h.Pane(t, s.ID), "PR #12") {
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
 		t.Fatal("the comments a PR had when first seen woke the session")
 	}
 
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 1))
 	h.RefreshPRs()
-	eventually(t, "the review prompt in the session", func() bool { return strings.Contains(h.Pane(t, s.ID), "address the review on PR #12") })
+	eventually(t, "the review prompt in the session", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
 	h.RefreshPRs()
 	time.Sleep(500 * time.Millisecond)
-	if n := strings.Count(h.Pane(t, s.ID), "address the review on PR #12"); n != 1 {
+	if n := strings.Count(h.Pane(t, s.ID), "/address-review 12"); n != 1 {
 		t.Errorf("the prompt appears %d times, want once", n)
 	}
 
@@ -96,34 +96,34 @@ func TestReviewWakesTheSession(t *testing.T) {
 		fresh := h.Restart(t)
 		fresh.RefreshPRs()
 		time.Sleep(500 * time.Millisecond)
-		if n := strings.Count(h.Pane(t, s.ID), "address the review on PR #12"); n != 1 {
+		if n := strings.Count(h.Pane(t, s.ID), "/address-review 12"); n != 1 {
 			t.Errorf("the prompt appears %d times after a restart, want once", n)
 		}
 	})
 }
 
 func TestFailingChecksWakeOncePerCommit(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	failing := `[{"status":"COMPLETED","conclusion":"FAILURE"}]`
 	h.GH.SetPR(apptest.WithHead(prJSON("OPEN", false, failing, 0, 0), "aaa"))
 	h.RefreshPRs()
-	eventually(t, "the checks prompt", func() bool { return strings.Contains(h.Pane(t, s.ID), "fix the failing checks on PR #12") })
+	eventually(t, "the checks prompt", func() bool { return strings.Contains(h.Pane(t, s.ID), "/fix-checks 12") })
 	h.RefreshPRs()
 	h.RefreshPRs()
 	time.Sleep(500 * time.Millisecond)
-	if n := strings.Count(h.Pane(t, s.ID), "fix the failing checks on PR #12"); n != 1 {
+	if n := strings.Count(h.Pane(t, s.ID), "/fix-checks 12"); n != 1 {
 		t.Fatalf("the same failure woke the session %d times, want once", n)
 	}
 	h.GH.SetPR(apptest.WithHead(prJSON("OPEN", false, failing, 0, 0), "bbb"))
 	h.RefreshPRs()
 	eventually(t, "a second checks prompt for the new commit", func() bool {
-		return strings.Count(h.Pane(t, s.ID), "fix the failing checks on PR #12") == 2
+		return strings.Count(h.Pane(t, s.ID), "/fix-checks 12") == 2
 	})
 }
 
 func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
@@ -133,15 +133,15 @@ func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 1, 0))
 	h.RefreshPRs()
 	time.Sleep(500 * time.Millisecond)
-	if strings.Contains(h.Pane(t, s.ID), "PR #12") {
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
 		t.Fatal("the prompt was typed into a session waiting on the user")
 	}
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"yes"}`)
-	eventually(t, "the held prompt once the session works again", func() bool { return strings.Contains(h.Pane(t, s.ID), "address the review on PR #12") })
+	eventually(t, "the held prompt once the session works again", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
 }
 
 func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
@@ -161,7 +161,7 @@ func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
 		return false
 	})
 	eventually(t, "the ended row to go", func() bool { _, ok := h.Session(s.ID); return !ok })
-	eventually(t, "the prompt in the new session", func() bool { return strings.Contains(h.Pane(t, fresh), "address the review on PR #12") })
+	eventually(t, "the prompt in the new session", func() bool { return strings.Contains(h.Pane(t, fresh), "/address-review 12") })
 	if got, _ := h.Session(fresh); got.Title != "#12 work" {
 		t.Errorf("the new session is titled %q", got.Title)
 	}
@@ -248,5 +248,20 @@ func TestWebhookThatDoesNotWorkLeavesThePoll(t *testing.T) {
 		if w == (warn.Warning{Source: "pull requests", Message: w.Message}) && w.Message != "" {
 			t.Errorf("a webhook that was never asked for warned: %q", w.Message)
 		}
+	}
+}
+
+func TestNoWakeWithoutACommand(t *testing.T) {
+	h := newHarness(t)
+	s := issueSession(h, t, 12)
+	failing := `[{"status":"COMPLETED","conclusion":"FAILURE"}]`
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(apptest.WithHead(prJSON("OPEN", false, failing, 1, 1), "aaa"))
+	h.RefreshPRs()
+	eventually(t, "the row flagged", func() bool { got, _ := h.Session(s.ID); return got.PRAttention != "" })
+	time.Sleep(500 * time.Millisecond)
+	if pane := h.Pane(t, s.ID); strings.Contains(pane, "PR") || strings.Contains(pane, "12") {
+		t.Errorf("a project with no wake settings typed into the session:\n%s", pane)
 	}
 }

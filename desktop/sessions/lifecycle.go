@@ -22,7 +22,6 @@ import (
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
-	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/util"
 )
@@ -396,7 +395,7 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 	}
 	tr.attention = attention
 	if live {
-		o.wake = l.nudgeFor(key, pr)
+		o.wake = l.nudgeFor(t.proj, pr)
 	}
 	o.queue = !live && (prev == nil || prev.State != pr.State)
 	switch {
@@ -490,8 +489,11 @@ func (l *Lifecycle) attentionFor(key string, pr *PR) string {
 }
 
 // nudgeFor is the prompt the PR's session should get: once per new comment or review, and once
-// per commit whose checks fail. Comments a PR had when first seen are not news. It needs mu.
-func (l *Lifecycle) nudgeFor(key string, pr *PR) string {
+// per commit whose checks fail. Comments a PR had when first seen are not news. A project
+// that sets no on_review or on_checks gets no prompt, but the event still counts as seen.
+// It needs mu.
+func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) string {
+	key := proj.Key()
 	nudged := l.prs(key).Nudged
 	n := strconv.Itoa(pr.Number)
 	seen, known := nudged[n]
@@ -503,10 +505,10 @@ func (l *Lifecycle) nudgeFor(key string, pr *PR) string {
 	switch {
 	case pr.Comments > seen.Comments:
 		seen.Comments = pr.Comments
-		prompt = prompts.PRReview(pr.Number)
+		prompt = proj.ReviewCommand(pr.Number)
 	case pr.Checks == "failing" && seen.Head != head:
 		seen.Head = head
-		prompt = prompts.PRChecks(pr.Number)
+		prompt = proj.ChecksCommand(pr.Number)
 	}
 	if !known || prompt != "" {
 		nudged[n] = seen
