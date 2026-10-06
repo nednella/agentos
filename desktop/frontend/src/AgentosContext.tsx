@@ -414,9 +414,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         focus('terminal')
       },
       detach() {
+        const id = selectedRef.current
+        if (!id) return
         detached.current = true
         selectId(null)
-        setOpenedIds([])
+        setOpenedIds((ids) => ids.filter((opened) => opened !== id))
       },
       stepSession(delta) {
         const list = sessionsRef.current

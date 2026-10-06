@@ -10,7 +10,7 @@ type Row = { id: string; label: string; keys?: string; mono?: boolean }
 type Group = { title: string; ids: string[]; extra?: Row[] }
 
 const GROUPS: Group[] = [
-  { title: 'Sessions', ids: ['new-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'detach-all', 'open-pr', 'cleanup', 'harness'] },
+  { title: 'Sessions', ids: ['new-session', 'goto-1', 'next-attention', 'previous-session', 'next-session', 'rename-session', 'kill-session', 'detach-session', 'open-pr', 'cleanup', 'harness'] },
   { title: 'Navigate', ids: ['panel-sidebar', 'focus-shell', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'open-repo', 'palette', 'shortcuts'] },
   { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
