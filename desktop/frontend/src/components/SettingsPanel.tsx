@@ -31,7 +31,7 @@ type SettingRowProps = { label: string; hint: string; children: ReactNode }
 
 function SettingRow({ label, hint, children }: SettingRowProps) {
   return (
-    <div className="flex items-center gap-6 border-b border-line py-4 last:border-b-0">
+    <div className="flex items-center gap-6 border-b border-line py-3.5 last:border-b-0">
       <div className="min-w-0 flex-1">
         <p className="text-body font-medium">{label}</p>
         <p className="mt-0.5 text-small text-dim">{hint}</p>
@@ -47,7 +47,7 @@ export function SettingsPanel() {
   if (overlay !== 'settings') return null
 
   return (
-    <Overlay align="center" label="Settings" onClose={() => setOverlay(null)}>
+    <Overlay align="center" size="reading" label="Settings" onClose={() => setOverlay(null)}>
       <div className="flex flex-none items-center gap-3 border-b border-line px-5 py-3.5">
         <h2 className="flex-1 text-title font-semibold">Settings</h2>
         <Keycap>Esc</Keycap>
