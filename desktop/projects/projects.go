@@ -44,6 +44,26 @@ func (r *Registry) KeepAwake(key string) bool {
 	return r.cfg.KeepsAwake(r.cfg.Projects[i])
 }
 
+// Theme is the configured theme, "" when the app follows the system.
+func (r *Registry) Theme() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cfg.Theme
+}
+
+// SetTheme saves the theme; "" makes the app follow the system.
+func (r *Registry) SetTheme(theme string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	next := r.cfg
+	next.Theme = theme
+	if err := project.Save(r.path, next); err != nil {
+		return err
+	}
+	r.cfg = next
+	return nil
+}
+
 // Add registers a folder under its own name, or under name-2, name-3 when another
 // folder already has that name. A folder that is registered already comes back as is.
 func (r *Registry) Add(dir string) (project.Project, error) {

@@ -32,6 +32,7 @@ import (
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/desktop/projects"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/desktop/settings"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
 	ctl "github.com/nednella/agentos/internal/control"
@@ -510,6 +511,7 @@ type Harness struct {
 	evidence *evidence.Service
 	browser  *browser.Service
 	digest   *digest.Service
+	settings *settings.Service
 }
 
 // New starts an app for the test; the cleanup stops it and its tmux server.
@@ -595,6 +597,8 @@ func (h *Harness) build(t *testing.T) *app.App {
 			h.browser = s
 		case *digest.Service:
 			h.digest = s
+		case *settings.Service:
+			h.settings = s
 		}
 	}
 	return a
@@ -777,6 +781,11 @@ func (h *Harness) RemoveNoteImage(id, url string) (notes.Note, error) {
 func (h *Harness) NoteToIssue(id string) error { return h.notes.NoteToIssue(id) }
 func (h *Harness) NoteToSession(id string) (sessions.Session, error) {
 	return h.notes.NoteToSession(id)
+}
+
+func (h *Harness) Settings() settings.Settings { return h.settings.Settings() }
+func (h *Harness) SetTheme(theme string) (settings.Settings, error) {
+	return h.settings.SetTheme(theme)
 }
 
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
