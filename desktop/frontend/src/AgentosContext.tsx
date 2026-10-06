@@ -6,8 +6,10 @@ import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Ses
 
 export type Toast = {
   key: number
-  tone: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' | 'error' | 'info'
+  tone: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' | 'error' | 'info' | 'done'
   text: string
+  detail?: string
+  url?: string
   sessionId?: string
   view?: SessionView
   sticky?: boolean
@@ -99,8 +101,15 @@ export function useAgentos(): Agentos {
   return value
 }
 
-const cleanupToast = (entry: Cleanup, merged: boolean) =>
-  `${entry.issue > 0 ? `#${entry.issue}` : entry.sessionTitle} ${merged ? 'merged, ' : ''}cleaned up`
+const cleanupToast = (entry: Cleanup, repo: string): Omit<Toast, 'key'> => {
+  if (!entry.merged) return { tone: 'info', text: `${entry.issue > 0 ? `#${entry.issue}` : entry.sessionTitle} cleaned up` }
+  return {
+    tone: 'done',
+    text: entry.sessionTitle,
+    detail: `Merged in #${entry.pr}, worktree and branch cleaned up`,
+    url: repo ? `https://github.com/${repo}/pull/${entry.pr}` : undefined,
+  }
+}
 
 const WARNING_SOURCES: Record<Warning['source'], string> = { tmux: 'tmux', github: 'GitHub', 'pull requests': 'Pull requests', worktrees: 'Worktrees' }
 
@@ -165,7 +174,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     (toast: Omit<Toast, 'key'>) => {
       const key = ++toastKey.current
       setToasts((list) => [...list.slice(-2), { ...toast, key }])
-      if (!toast.sticky) toastTimers.current.set(key, window.setTimeout(() => dismissToast(key), toast.tone === 'error' ? 8000 : 5000))
+      if (!toast.sticky) toastTimers.current.set(key, window.setTimeout(() => dismissToast(key), toast.tone === 'error' || toast.tone === 'done' ? 8000 : 5000))
       return key
     },
     [dismissToast],
@@ -284,8 +293,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
           const entry = list[0]
           if (!entry || entry.status !== 'done' || entry.at === lastCleanupToast.current) return
           lastCleanupToast.current = entry.at
-          const merged = sessionsRef.current.find((s) => s.title === entry.sessionTitle)?.pr?.state === 'merged'
-          pushToast({ tone: 'info', text: cleanupToast(entry, merged) })
+          pushToast(cleanupToast(entry, projectRef.current?.repo ?? ''))
         }),
       ),
     [pushToast],

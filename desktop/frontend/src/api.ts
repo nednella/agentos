@@ -94,7 +94,7 @@ function bindServices(go: NonNullable<Window['go']>): Backend {
   return { ...Object.fromEntries(methods), OpenURL: openInBrowser } as Backend
 }
 
-export type DevFlags = { overlay?: string; tab?: string; cmd?: string; view?: string }
+export type DevFlags = { overlay?: string; tab?: string; cmd?: string; view?: string; done?: string }
 
 const mock = window.go ? null : createMock(new URLSearchParams(location.search))
 const backend: Backend = window.go ? bindServices(window.go) : mock!.backend
