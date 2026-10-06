@@ -116,7 +116,7 @@ func TestKillAllStopsEveryProject(t *testing.T) {
 
 func TestKillLeavesShellsUnlessAll(t *testing.T) {
 	tmux, _ := killSetup(t)
-	shell := session.Name{Project: "demo"}
+	shell := session.Name{Project: "demo", Shell: 1}
 	if err := tmux.NewSession(context.Background(), shell, "shell", t.TempDir(), nil, []string{"sleep", "60"}, 80, 24); err != nil {
 		t.Fatal(err)
 	}

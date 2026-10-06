@@ -103,7 +103,7 @@ func TestParseEvent(t *testing.T) {
 func TestSort(t *testing.T) {
 	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	mk := func(n int, s State, ago time.Duration) Session {
-		return Session{Name: Name{"p", n}, State: s, At: t0.Add(-ago)}
+		return Session{Name: Name{Project: "p", N: n}, State: s, At: t0.Add(-ago)}
 	}
 	ss := []Session{
 		mk(1, Idle, 0),
@@ -134,8 +134,8 @@ func TestParseName(t *testing.T) {
 		want    Name
 		wantErr bool
 	}{
-		{"api/3", Name{"api", 3}, false},
-		{"my-app/12", Name{"my-app", 12}, false},
+		{"api/3", Name{Project: "api", N: 3}, false},
+		{"my-app/12", Name{Project: "my-app", N: 12}, false},
 		{"a/b/7", Name{}, true},
 		{"../7", Name{}, true},
 		{"a..b/7", Name{}, true},
@@ -145,7 +145,12 @@ func TestParseName(t *testing.T) {
 		{"api/", Name{}, true},
 		{"api/x", Name{}, true},
 		{"api/0", Name{}, true},
-		{"api/shell", Name{Project: "api"}, false},
+		{"api/shell", Name{Project: "api", Shell: 1}, false},
+		{"api/shell-2", Name{Project: "api", Shell: 2}, false},
+		{"api/shell-12", Name{Project: "api", Shell: 12}, false},
+		{"api/shell-1", Name{}, true},
+		{"api/shell-02", Name{}, true},
+		{"api/shell-x", Name{}, true},
 		{"a/b/shell", Name{}, true},
 		{"api/shells", Name{}, true},
 		{"/shell", Name{}, true},
@@ -159,7 +164,7 @@ func TestParseName(t *testing.T) {
 			if err == nil && got.String() != tt.in {
 				t.Errorf("round trip = %q, want %q", got.String(), tt.in)
 			}
-			if err == nil && got.IsShell() != strings.HasSuffix(tt.in, "/shell") {
+			if err == nil && got.IsShell() != strings.Contains(tt.in, "/shell") {
 				t.Errorf("IsShell = %v for %q", got.IsShell(), tt.in)
 			}
 		})

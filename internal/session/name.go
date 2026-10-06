@@ -8,24 +8,29 @@ import (
 
 // Name is the tmux session name: "<project key>/<n>". The title shown to the
 // user lives in a tmux option, so renaming never changes the name the agent's
-// hooks report under. N 0 names the project's shell, "<project key>/shell",
-// which is not an agent and never reports.
+// hooks report under. A name with Shell set is one of the project's shells,
+// "<project key>/shell" for the first and "<project key>/shell-<k>" for the
+// rest; a shell is not an agent and never reports.
 type Name struct {
 	Project string
 	N       int
+	Shell   int
 }
 
 const shellSuffix = "shell"
 
 func (n Name) String() string {
-	if n.N == 0 {
+	switch {
+	case n.Shell == 1:
 		return n.Project + "/" + shellSuffix
+	case n.Shell > 1:
+		return fmt.Sprintf("%s/%s-%d", n.Project, shellSuffix, n.Shell)
 	}
 	return fmt.Sprintf("%s/%d", n.Project, n.N)
 }
 
-// IsShell says whether the name is a project's shell rather than an agent.
-func (n Name) IsShell() bool { return n.N == 0 }
+// IsShell says whether the name is one of a project's shells rather than an agent.
+func (n Name) IsShell() bool { return n.Shell > 0 }
 
 // ParseName decodes a tmux session name. It fails for sessions agentos did not create.
 func ParseName(s string) (Name, error) {
@@ -34,7 +39,14 @@ func ParseName(s string) (Name, error) {
 		return Name{}, fmt.Errorf("session name %q is not <project>/<n>", s)
 	}
 	if s[i+1:] == shellSuffix {
-		return Name{Project: s[:i]}, nil
+		return Name{Project: s[:i], Shell: 1}, nil
+	}
+	if rest, ok := strings.CutPrefix(s[i+1:], shellSuffix+"-"); ok {
+		k, err := strconv.Atoi(rest)
+		if err != nil || k < 2 || strconv.Itoa(k) != rest {
+			return Name{}, fmt.Errorf("session name %q has no valid shell number", s)
+		}
+		return Name{Project: s[:i], Shell: k}, nil
 	}
 	n, err := strconv.Atoi(s[i+1:])
 	if err != nil || n < 1 {
