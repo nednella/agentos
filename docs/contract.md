@@ -105,7 +105,8 @@ type Snapshot = {
   sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
   shell: string         // the current project's shell session id ("<key>/shell"), "" until ShellOpen
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
-  version: string
+  version: string       // the running version: "1.2.3", or "dev" for a local build
+  update: string        // the version of a newer release, "" when the app is current
 }
 
 // The sessions, notes, issues and cleanups events carry a list of one project. Drop an event whose project is not
@@ -309,6 +310,14 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 | `DigestToNote(itemId)` | `Note` | saves the item as a note (title, why, link) and marks it saved |
 | `DismissDigestItem(itemId)` | | |
 
+### Update (`update`)
+
+| Method | What it does |
+|---|---|
+| `Update()` | downloads the newer release (`agentos-darwin-arm64.zip` of the latest GitHub release, through curl, so no quarantine flag is set), checks its sha256, swaps the `.app` bundle and relaunches the app; sessions live in tmux and survive. Resolves once the relaunch is arranged; rejects with the reason otherwise, and when the app runs from no bundle |
+
+The app asks GitHub's releases API on start and every hour. A release newer than `Snapshot.version` arrives as `update`; a dev build is never behind.
+
 ## Events
 
 | Name | Payload | When |
@@ -327,6 +336,7 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 | `browser:state` | `BrowserState` | URL, title, loading or open changed |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
+| `update` | `{ version: string }` | a release newer than the running one is out; once per release |
 | `warnings` | `Warning` | a service met a failure it cannot show otherwise: tmux could not be listed (`tmux`; the sessions stay as they were), `gh` could not name the repo (`github`; retried after 30 s), pull requests or worktrees could not be read (`pull requests`, `worktrees`). Sent once per distinct message of a source, and again with `message: ""` when the source works |
 
 Opening a web address is the front end's job: the window runtime's `BrowserOpenURL`, else `window.open`. No Go method does it.
@@ -395,7 +405,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 |---|---|
 | notes, note images, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
 | evidence, PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
-| state files, sockets, tmux config, last project, app location | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`) |
+| state files, sockets, tmux config, last project, app location, release check | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`; `update.json`: the last release check, so the command asks GitHub at most once a day) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.
 
@@ -411,7 +421,11 @@ pull request wakes) are Markdown files in `internal/prompts`.
 
 ## Command line
 
-`agentos` with no command opens the app (`open -a` on `agentos.app`, looked for next to the command, in `~/Applications`, in `/Applications`, then at the path in `app-path`; it prints where it looked when there is none); `agentos --help` lists the commands by group. Every command below except `kill` without a number talks to the running app over its control
+The `agentos` command is the app's own binary: `~/.local/bin/agentos` is a link to `agentos.app/Contents/MacOS/agentos`, so hooks, the
+command and the app are always one version. `agentos` with no command, typed at a terminal, opens the app (`open -a` on `agentos.app`, looked
+for next to the command, in `~/Applications`, in `/Applications`, then at the path in `app-path`; it prints where it looked when there is
+none). With no terminal attached (Finder, `open`, the dock) it is the app starting; `AGENTOS_HTTP` makes it serve the browser mode instead.
+`agentos --help` lists the commands by group. Every command below except `kill` without a number talks to the running app over its control
 socket, and exits 1 with "agentos is not running: open the app and try again" when there is none. The project is `AGENTOS_PROJECT` (set in the shell
 session) or the asking session's, else the current one; the app switches to it. Commands that start or change sessions do the work and say what
 happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:command` event and answer "ok".
@@ -427,4 +441,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux (works with
 the app closed); `--all` does it for every project and stops the shells too. Used by the app itself: `agentos hook <Event>`, `agentos digest add`.
-Also `agentos version`.
+Also `agentos version`, and `agentos update`: it installs the latest release over the bundle it finds (as `Update()` does), then asks a
+running app to relaunch (`relaunch` over the control socket), or says to run `agentos` when none runs. Every command typed at a terminal
+prints `agentos vX.Y.Z is out: run agentos update` on stderr when a newer release exists, asking GitHub at most once a day; hooks and
+agents have no terminal and never see or wait for it.

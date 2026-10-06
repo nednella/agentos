@@ -4,12 +4,14 @@ agentos: one desktop window for every coding-agent session Ned runs. It shows wh
 session needs him, the project's GitHub issues as a queue, his notes, and each agent's
 real terminal. Agents keep running in a hidden tmux when the window closes.
 
-`desktop/` Go core (Wails v2), one package per service (`sessions`, `terminal`, `issues`,
-`projects`, `notes`, `stats`, `evidence`, `browser`, `digest`, `control`, `devhttp`), wired in
+`desktop/` Go core (Wails v2) and the one binary: the app, which is also the `agentos`
+command; one package per service (`sessions`, `terminal`, `issues`, `projects`, `notes`,
+`stats`, `evidence`, `browser`, `digest`, `update`, `control`, `devhttp`), wired in
 `desktop/internal/app`; `desktop/internal/apptest` is the test harness, `desktop/internal/run`
 runs commands · `desktop/frontend/` React 18, TypeScript strict, Tailwind, xterm.js · `cli/`
 the `agentos` command the agents and hooks call · `internal/` shared packages (session,
-project, bus, term, control socket, agent, `prompts`: the texts agents read, as Markdown).
+project, bus, term, control socket, agent, update, `prompts`: the texts agents read, as Markdown).
+`install.sh` installs a release; release-please cuts them from conventional commits.
 `docs/contract.md` is the single description of how the front end and the core talk.
 Go is the reference when they disagree.
 
@@ -18,8 +20,9 @@ Go is the reference when they disagree.
 - Tests and manual checks run in an isolated setup: always set `AGENTOS_TMUX_SOCKET`,
   `AGENTOS_STATE_DIR`, `AGENTOS_DATA_DIR` and `AGENTOS_CONFIG` to throwaway values. The
   default socket holds Ned's live sessions; a test on it has killed them twice.
-- Never install the app to `/Applications` or `~/Applications` and never run
-  `make install` unless Ned asks. Live sessions' hooks call the installed `agentos`.
+- Never install the app to `/Applications` or `~/Applications`, never run
+  `make desktop-install`, `install.sh` or `agentos update` against the real home, unless Ned asks.
+  Live sessions' hooks call the installed `agentos`, a link into the installed bundle.
 - Draft PRs only; never merge, mark ready or request reviewers. Ned's own Claude settings enforce this.
 - Clean-up code deletes worktrees and branches. Any change to it ships with tests against
   throwaway git repos, never a real one.
@@ -31,7 +34,8 @@ Go is the reference when they disagree.
 |---|---|
 | Go tests, vet | `go test -race ./...` · `go vet ./...` |
 | Front end typecheck + build | `cd desktop/frontend && npm run build` |
-| Build the app | `make desktop-app` → `bin/agentos.app` |
+| Build the app | `make desktop-app` → `bin/agentos.app` (`VERSION=v1.2.3` stamps a version) |
+| Build a release zip | `make release` → `bin/agentos-darwin-arm64.zip` and its `.sha256` |
 | Open the app | `open bin/agentos.app` |
 | Run the real app in a browser for checks | `AGENTOS_HTTP=127.0.0.1:34777 bin/agentos.app/Contents/MacOS/agentos` (with the isolation env above) |
 | Drive that browser | `node scripts/cdp.mjs http://127.0.0.1:34777/ 1512 945 '<steps>'` |

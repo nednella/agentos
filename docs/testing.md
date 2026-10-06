@@ -37,8 +37,10 @@ Each `desktop/<pkg>` service has its tests beside it. They build the whole app t
 repos in temp folders, and real headless Brave or Chrome on temp profiles. GitHub and `claude` are always
 replaced by fake runners (`apptest.FakeGH`, `FakeClaude`); commands run through `desktop/internal/run`.
 The browser tests skip when no Chromium browser is installed. `desktop` embeds `frontend/dist`; build it
-first, or run with `-tags stub`, which embeds a small page instead. The `cli` tests answer from a fake app
-on a temp control socket.
+first, or run with `-tags stub`, which embeds a small page instead. The hooks in the tests run the
+`agentos` command built from `./desktop` with that tag: the app's binary is the command. The `cli`
+tests answer from a fake app on a temp control socket. The release check never reaches GitHub: the
+harness answers curl with `Options.Releases` and refuses every other download.
 
 ## The real front end, in a browser
 
@@ -69,6 +71,13 @@ node scripts/cdp.mjs http://127.0.0.1:18772/ 1400 900 \
 ```
 
 Read the screenshot to check what the page shows. Resize with the width and height arguments to check the layouts.
+
+## Releases
+
+`make release VERSION=v1.2.3` builds `bin/agentos-darwin-arm64.zip` and its `.sha256` the way the release
+workflow does, with the version stamped in `agentos version` and the bundle's Info.plist. To try the
+installer or `agentos update` without a real release, serve `bin/` over HTTP and point them at it with
+a throwaway `HOME`; never run either against the owner's `~/Applications` or `~/.local/bin`.
 
 ## What needs a human
 
