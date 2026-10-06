@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.6.0](https://github.com/nednella/agentos/compare/v0.5.0...v0.6.0) (2026-10-06)
+
+
+### Features
+
+* **cli:** remove harness command ([f677455](https://github.com/nednella/agentos/commit/f677455947d2cf777f0cfba42ff3b91160f7a6a9))
+* **desktop:** add settings service ([7790516](https://github.com/nednella/agentos/commit/7790516792b8bf722075ae89f121414c3151eb78))
+* **desktop:** remove harness check ([d7b9c03](https://github.com/nednella/agentos/commit/d7b9c0360e5fb839fc1925a984ccd720718adfb7))
+* **desktop:** resume an ended session's conversation on a wake ([d04eb8b](https://github.com/nednella/agentos/commit/d04eb8b7f027709b2b784c99878743cd94d2a98d))
+* **desktop:** run the digest on the first agent that is signed in ([454689b](https://github.com/nednella/agentos/commit/454689b96ebd2dd1fa9389c9b3f6060510c29a2f))
+* **desktop:** save a project's clean-up settings ([b85a4f6](https://github.com/nednella/agentos/commit/b85a4f6d7e2859f11ad3ae8defe688fd8bdb9503))
+* **desktop:** sessions report their branch, no built-in issue branch ([f36dbf2](https://github.com/nednella/agentos/commit/f36dbf247c98c861303aec93f3ee1d930e76f29f))
+* **desktop:** set AGENTOS_ISSUE in issue sessions ([b4e24d4](https://github.com/nednella/agentos/commit/b4e24d4d28028dad924130ec116425b445a6561e))
+* **desktop:** wake sessions with the project's commands ([776d620](https://github.com/nednella/agentos/commit/776d620f6545b9fb7f12c595bef596cb8303a52b))
+* **internal:** add on_review and on_checks project keys ([e248fb9](https://github.com/nednella/agentos/commit/e248fb9288bb093c66937927b311ce5421d0d426))
+* **internal:** add theme to the config file ([bd1a233](https://github.com/nednella/agentos/commit/bd1a2338d2d7443ba4d6a5ac38acde67d50bc130))
+* **internal:** choose clean-up per event, per project ([cf3801c](https://github.com/nednella/agentos/commit/cf3801cb76c776fac2c84a90d4f44868b3c10d32))
+* **internal:** record the agent's conversation id from hooks ([80a2719](https://github.com/nednella/agentos/commit/80a2719c546e11b357ee541437106a5baf506365))
+* **ui:** add settings panel with theme choice ([0839d15](https://github.com/nednella/agentos/commit/0839d15ff138470146adc4b4eabdef2306298253))
+* **ui:** add theme toggle button to top bar ([ded2396](https://github.com/nednella/agentos/commit/ded2396ff46765b88c49912ec9977a99fc864f4f))
+* **ui:** remove harness check action and stats button ([c32fd5c](https://github.com/nednella/agentos/commit/c32fd5cb278628a748cd7ccd2946371fb7a034c6))
+* **ui:** show a toast while a new project is created ([b6de651](https://github.com/nednella/agentos/commit/b6de65122032f65467ba6562b97e193c58595025))
+* **ui:** show clean-up settings in the settings panel ([f32e749](https://github.com/nednella/agentos/commit/f32e749f9d4b02e04209bfc356cc9049796f5979))
+
 ## [0.5.0](https://github.com/nednella/agentos/compare/v0.4.0...v0.5.0) (2026-10-06)
 
 
