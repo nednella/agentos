@@ -24,7 +24,7 @@ type Config struct {
 	Registry *projects.Registry
 	Project  project.Project
 	StateDir string
-	DataDir  string // notes and stats: may be a synced folder
+	DataDir  string // notes, evidence and stats: may be a synced folder
 	LocalDir string // PR tracking and the clean-up log: never synced
 	Tmux     *term.Tmux
 	Agent    agent.Agent

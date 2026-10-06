@@ -30,7 +30,6 @@ func Ext(mime string) (string, bool) {
 }
 
 // File maps a /media/<project key>/<folder>/... URL to a picture below dir, or "" for anything else.
-// Both kinds of picture sit in their own root: dir is the one that holds folder.
 func File(dir, folder, url string) string {
 	rel, ok := strings.CutPrefix(path.Clean(url), Prefix)
 	if !ok {
@@ -52,12 +51,12 @@ func File(dir, folder, url string) string {
 	return ""
 }
 
-// Handler serves the pictures of notes (kept under notesDir) and evidence (under evidenceDir), and nothing else in them.
-func Handler(notesDir, evidenceDir string) http.Handler {
+// Handler serves the pictures of notes and evidence kept under dir, and nothing else in it.
+func Handler(dir string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		file := File(notesDir, NotesFolder, r.URL.Path)
+		file := File(dir, NotesFolder, r.URL.Path)
 		if file == "" {
-			file = File(evidenceDir, EvidenceFolder, r.URL.Path)
+			file = File(dir, EvidenceFolder, r.URL.Path)
 		}
 		if file == "" {
 			http.NotFound(w, r)

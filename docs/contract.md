@@ -471,8 +471,8 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 
 | What | Where |
 |---|---|
-| notes, note images, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
-| evidence, PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `evidence/<n>/`, `prs.json`, `cleanups.json`, `browser/` |
+| notes, note images, evidence, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `evidence/<n>/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
+| PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/` |
 | state files, sockets, tmux config, last project, app location, release check | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`; `update.json`: the last release check, so the command asks GitHub at most once a day) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.
