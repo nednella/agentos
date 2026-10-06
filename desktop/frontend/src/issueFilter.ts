@@ -1,15 +1,17 @@
-import type { Issue, IssueType, Lane } from './types'
+import type { Issue, IssueType } from './types'
 
-export type Field = 'author' | 'assignee' | 'label' | 'type' | 'lane' | 'is'
+export type Field = 'author' | 'assignee' | 'label' | 'type' | 'section' | 'is'
 
 export type Token = { field: Field; value: string; negate: boolean }
 export type Word = { text: string; negate: boolean }
 export type ParsedQuery = { words: Word[]; tokens: Token[] }
 
 export const TYPES: IssueType[] = ['bug', 'feature', 'refactor', 'chore']
-export const LANE_IDS: Lane[] = ['ready', 'plan', 'you', 'inbox', 'idea']
 
-const TOKEN = /^(author|assignee|label|type|lane|is):(.*)$/i
+// A section's name as it is typed after section:, which has no room for a space.
+export const sectionSlug = (name: string) => name.toLowerCase().replace(/\s+/g, '-')
+
+const TOKEN = /^(author|assignee|label|type|section|is):(.*)$/i
 
 export function parseQuery(query: string): ParsedQuery {
   const parsed: ParsedQuery = { words: [], tokens: [] }
@@ -40,7 +42,7 @@ function tokenMatches(issue: Issue, { field, value }: Token): boolean {
   }
   if (field === 'label') return issue.labels.some((l) => l.toLowerCase().startsWith(value))
   if (field === 'type') return issue.type === value
-  if (field === 'lane') return issue.lane === value
+  if (field === 'section') return sectionSlug(issue.section) === value
   return value === 'running' && issue.sessionId !== ''
 }
 
@@ -72,7 +74,7 @@ function valuesFor(field: string, issues: Issue[]): Facet[] {
   if (field === 'assignee') return [{ value: 'none', count: issues.filter((i) => i.assignees.length === 0).length }, ...facet(issues, (i) => i.assignees)]
   if (field === 'label') return facet(issues, (i) => i.labels)
   if (field === 'type') return TYPES.map((value) => ({ value, count: issues.filter((i) => i.type === value).length }))
-  if (field === 'lane') return LANE_IDS.map((value) => ({ value, count: issues.filter((i) => i.lane === value).length }))
+  if (field === 'section') return facet(issues, (i) => [sectionSlug(i.section)])
   return [{ value: 'running', count: issues.filter((i) => i.sessionId).length }]
 }
 

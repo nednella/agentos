@@ -59,7 +59,7 @@ export type Agentos = {
   killSession(id: string): Promise<void>
   dismissSession(id: string): Promise<void>
   renameSession(id: string, title: string): Promise<void>
-  startIssue(number: number, background?: boolean): Promise<Session>
+  startIssue(number: number, action?: string, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
   addProject(dir?: string): Promise<void>
   newProject(name: string): Promise<void>
@@ -500,8 +500,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         await api.renameSession(id, trimmed)
         setSessions((list) => list.map((s) => (s.id === id ? { ...s, title: trimmed } : s)))
       },
-      async startIssue(number, background = false) {
-        return addSession(await api.startIssue(number), background)
+      async startIssue(number, action = '', background = false) {
+        return addSession(await api.startIssue(number, action), background)
       },
       async switchProject(name) {
         if (name === projectRef.current?.name) return

@@ -1,6 +1,7 @@
 import type { Issue, IssueDetail } from './types'
 
-type Seed = [number, Issue['lane'], Issue['type'], string, string, string[], string[]?]
+type Lane = 'ready' | 'plan' | 'you' | 'idea' | 'inbox'
+type Seed = [number, Lane, Issue['type'], string, string, string[], string[]?]
 
 const day = 86_400_000
 
@@ -45,18 +46,28 @@ const seedsByRepo: Record<string, Seed[]> = {
   'nednella/agentos': agentosSeeds,
 }
 
-const labelFor = (lane: Issue['lane']) =>
-  ({ ready: 'ready', plan: 'needs-plan', you: 'needs-human', idea: 'idea', inbox: '' })[lane]
+const labelFor = (lane: Lane) => ({ ready: 'ready', plan: 'needs-plan', you: 'needs-human', idea: 'idea', inbox: '' })[lane]
+
+// The queue sections of the mock project; an issue no section takes goes in Other, as in the core.
+const sections: Record<Lane, { name: string; actions: string[] }> = {
+  inbox: { name: 'Inbox', actions: ['Plan', 'Investigate', 'Work'] },
+  ready: { name: 'Ready', actions: ['Work'] },
+  plan: { name: 'Needs plan', actions: ['Investigate'] },
+  you: { name: 'Other', actions: ['Start'] },
+  idea: { name: 'Other', actions: ['Start'] },
+}
+const sectionOrder = ['Inbox', 'Ready', 'Needs plan', 'Other']
 
 export function buildIssues(repo: string): Issue[] {
   const now = Date.now()
-  return (seedsByRepo[repo] ?? []).map(([number, lane, type, title, author, assignees, extra = []], i) => {
+  const issues = (seedsByRepo[repo] ?? []).map(([number, lane, type, title, author, assignees, extra = []], i) => {
     const label = labelFor(lane)
     return {
       number,
       title,
       type,
-      lane,
+      section: sections[lane].name,
+      actions: sections[lane].actions,
       url: `https://github.com/${repo}/issues/${number}`,
       sessionId: '',
       author,
@@ -66,6 +77,7 @@ export function buildIssues(repo: string): Issue[] {
       updatedAt: now - (i % 5) * day,
     }
   })
+  return issues.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section))
 }
 
 const html = (parts: string[]) => parts.join('\n')

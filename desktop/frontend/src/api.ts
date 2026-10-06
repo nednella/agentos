@@ -22,7 +22,7 @@ type Backend = {
   NoteToIssue(id: string): Promise<void>
   NoteToSession(id: string): Promise<Session>
   Issues(refresh: boolean): Promise<Issue[]>
-  StartIssue(number: number): Promise<Session>
+  StartIssue(number: number, action: string): Promise<Session>
   IssueDetail(number: number): Promise<IssueDetail>
   ShellOpen(): Promise<{ id: string }>
   TermOpen(id: string, cols: number, rows: number): Promise<void>
@@ -130,7 +130,7 @@ export const api = {
   noteToIssue: (id: string) => backend.NoteToIssue(id),
   noteToSession: (id: string) => backend.NoteToSession(id),
   issues: (refresh: boolean) => backend.Issues(refresh),
-  startIssue: (number: number) => backend.StartIssue(number),
+  startIssue: (number: number, action: string) => backend.StartIssue(number, action),
   issueDetail: (number: number) => backend.IssueDetail(number),
   shellOpen: () => backend.ShellOpen(),
   termOpen: (id: string, cols: number, rows: number) => backend.TermOpen(id, cols, rows),

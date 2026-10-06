@@ -56,18 +56,21 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
                 Session {session.n}
               </button>
             )}
-            {issue && !session && (
-              <button
-                className="btn btn-accent"
-                title="Start a session for this issue"
-                onClick={() => {
-                  close()
-                  report(() => startIssue(number))
-                }}
-              >
-                Start
-              </button>
-            )}
+            {issue &&
+              !session &&
+              issue.actions.map((action, i) => (
+                <button
+                  key={action}
+                  className={i === 0 ? 'btn btn-accent' : 'btn'}
+                  title={`${action}: start a session for this issue`}
+                  onClick={() => {
+                    close()
+                    report(() => startIssue(number, action))
+                  }}
+                >
+                  {action}
+                </button>
+              ))}
             {issue && (
               <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Open on GitHub" aria-label="Open on GitHub" onClick={() => report(() => api.openURL(issue.url))}>
                 <Icon name="external" />

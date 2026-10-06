@@ -73,13 +73,15 @@ export function usePaletteItems(query: string): PaletteItem[] {
   const issues: PaletteItem[] = a.issues
     .filter((i) => !i.sessionId && matchIssue(i, parsed))
     .slice(0, ISSUE_LIMIT)
-    .map((i) => ({
-      key: `i-${i.number}`,
-      group: 'Issues',
-      label: `#${i.number} ${i.title}`,
-      hint: `start · ${i.lane}`,
-      run: () => a.startIssue(i.number),
-    }))
+    .flatMap((i) =>
+      i.actions.map((action) => ({
+        key: `i-${i.number}-${action}`,
+        group: 'Issues',
+        label: `${action} #${i.number} ${i.title}`,
+        hint: i.section,
+        run: () => a.startIssue(i.number, action),
+      })),
+    )
 
   if (parsed.tokens.length > 0) return issues
   const rest = [...sessions, ...commands, ...projects, ...notes]
