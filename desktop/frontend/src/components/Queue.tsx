@@ -22,9 +22,12 @@ const CLOSED_KEY = 'agentos.queue.closed'
 type QueueProps = { nav: NavRef }
 
 export function Queue({ nav }: QueueProps) {
-  const { project, issues, issueFilter } = useAgentos()
+  const { project, issues, issuesDisabled, issueFilter } = useAgentos()
   if (project && !project.repo) {
     return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} />
+  }
+  if (project && issuesDisabled) {
+    return <Notice title="Issues are off" hint={`Turn on issues for ${project.repo} on GitHub to use the queue.`} />
   }
   const filtering = isFiltering(issueFilter)
   const shown = filtering ? filterIssues(issues, issueFilter) : issues
