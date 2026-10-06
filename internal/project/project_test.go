@@ -64,6 +64,8 @@ func TestLoad(t *testing.T) {
 		{name: "bad effort", path: write("effort: huge\n"), wantErr: true},
 		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, dir: /srv/api, model: --x}\n"), wantErr: true},
 		{name: "bad lane effort", path: write("projects:\n  - {name: api, dir: /srv/api, models: {plan: {effort: huge}}}\n"), wantErr: true},
+		{name: "theme", path: write("theme: dark\n"), want: Config{Theme: "dark"}},
+		{name: "unknown theme", path: write("theme: sepia\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
 	}
 	for _, tt := range tests {

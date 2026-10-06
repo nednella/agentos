@@ -40,8 +40,12 @@ type Config struct {
 	Model     string    `yaml:"model,omitempty"`      // model of a Claude session, "sonnet" by default
 	Effort    string    `yaml:"effort,omitempty"`     // effort of a Claude session, "medium" by default
 	KeepAwake *bool     `yaml:"keep_awake,omitempty"` // hold off idle sleep while a session works; on unless false
+	Theme     string    `yaml:"theme,omitempty"`      // light or dark; unset follows the system
 	Projects  []Project `yaml:"projects"`
 }
+
+// Themes are the values of Config.Theme.
+var Themes = []string{"light", "dark"}
 
 // Key is the form of the name that is safe inside a tmux session name and a file path.
 func (p Project) Key() string {
@@ -81,6 +85,9 @@ func Load(path string) (Config, error) {
 	}
 	if err := cfg.Default().Validate(); err != nil {
 		return Config{}, fmt.Errorf("%s: %w", path, err)
+	}
+	if cfg.Theme != "" && !slices.Contains(Themes, cfg.Theme) {
+		return Config{}, fmt.Errorf("%s: theme must be %s, not %q", path, strings.Join(Themes, " or "), cfg.Theme)
 	}
 	for i, p := range cfg.Projects {
 		if p.Name == "" || p.Dir == "" {
@@ -165,6 +172,7 @@ func encode(path string, c Config) ([]byte, error) {
 	root := doc.Content[0]
 	syncScalar(root, "agent", c.Agent, nil)
 	syncScalar(root, "data_dir", c.DataDir, ExpandHome)
+	syncScalar(root, "theme", c.Theme, nil)
 	if err := syncProjects(root, c.Projects); err != nil {
 		return nil, err
 	}
