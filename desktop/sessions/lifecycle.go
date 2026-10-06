@@ -726,6 +726,7 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, prBranch st
 // cleanupPlan is what a clean-up found out before it runs the project's command.
 type cleanupPlan struct {
 	branches []branchPlan
+	force    bool
 }
 
 type branchPlan struct {
@@ -742,7 +743,7 @@ func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string,
 	if err != nil {
 		return cleanupPlan{}, fmt.Sprintf("git could not list the worktrees: %v", err)
 	}
-	var p cleanupPlan
+	p := cleanupPlan{force: force}
 	for _, branch := range t.branches {
 		b := branchPlan{branch: branch, worktree: trees.byBranch[branch]}
 		_, rerr := l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
@@ -772,7 +773,7 @@ func (l *Lifecycle) runCleanupCommand(ctx context.Context, t target, p *cleanupP
 		if b.worktree == "" && !b.branchExists {
 			continue
 		}
-		if err := l.runProjectCommand(ctx, t.proj, b); err != nil {
+		if err := l.runProjectCommand(ctx, t.proj, b, p.force); err != nil {
 			if !l.leftBehind(ctx, t.proj.Dir, b.branch) {
 				removed = append(removed, fmt.Sprintf("clean-up command for %s (failed with nothing left: %v)", b.branch, err))
 				continue
@@ -874,11 +875,16 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 	return fmt.Sprintf("git could not compare the branch with the merged pull request: %v", err)
 }
 
-func (l *Lifecycle) runProjectCommand(ctx context.Context, proj project.Project, b branchPlan) error {
+func (l *Lifecycle) runProjectCommand(ctx context.Context, proj project.Project, b branchPlan, force bool) error {
+	forceFlag := ""
+	if force {
+		forceFlag = "--force"
+	}
 	cmd := strings.NewReplacer(
 		"{branch}", util.ShellQuote(b.branch),
 		"{worktree}", util.ShellQuote(b.worktree),
 		"{dir}", util.ShellQuote(proj.Dir),
+		"{force}", forceFlag,
 	).Replace(proj.CleanupCommand)
 	ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
 	defer cancel()

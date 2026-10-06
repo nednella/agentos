@@ -321,7 +321,7 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 }
 
 func TestCleanupCustomCommand(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git worktree remove --force {worktree} && git branch -D {branch} && touch {dir}/cleaned-{branch}"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git worktree remove {force} {worktree} && git branch -D {branch} && touch {dir}/cleaned-{branch}"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -333,6 +333,33 @@ func TestCleanupCustomCommand(t *testing.T) {
 	}
 	if branches(t, h.Dir) != "" {
 		t.Error("the branch was kept")
+	}
+}
+
+func TestCleanupCommandGetsForceOnlyWhenForced(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "printf '[%s]' {force} > {dir}/force-{branch}; git worktree remove {force} {worktree} && git branch -D {branch}"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	marker := filepath.Join(h.Dir, "force-issue-7")
+
+	openThenMerge(h)
+	eventually(t, "clean-up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if got, _ := os.ReadFile(marker); string(got) != "[]" {
+		t.Errorf("unforced {force} = %q, want empty", got)
+	}
+
+	gitIn(t, h.Dir, "worktree", "add", "-b", "issue-8", filepath.Join(filepath.Dir(wt), "issue-8"))
+	dirty := filepath.Join(filepath.Dir(wt), "issue-8")
+	if err := os.WriteFile(filepath.Join(dirty, "new.txt"), []byte("x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	s8 := issueSession(h, t, 8)
+	if err := h.Cleanup(s8.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(h.Dir, "force-issue-8")); string(got) != "[--force]" || exists(dirty) {
+		t.Errorf("forced {force} = %q, worktree exists %v", got, exists(dirty))
 	}
 }
 
