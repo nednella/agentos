@@ -17,9 +17,9 @@ export AGENTOS_CONFIG=$S/config.yaml        # never ~/.config/agentos/config.yam
 A throwaway config with a plain shell as the agent keeps Claude out of it:
 
 ```yaml
-agent: bash
+agent_command: bash
 projects:
-  - {name: demo, dir: /tmp/aos.XXXX/demo}
+  - {name: demo, directory: /tmp/aos.XXXX/demo}
 ```
 
 Clean up afterwards: `tmux -L $AGENTOS_TMUX_SOCKET kill-server`, kill the app and any browser started on
