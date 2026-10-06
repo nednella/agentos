@@ -403,16 +403,22 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 		if tr.cleanup == "ask" {
 			tr.cleanup = ""
 		}
-	case pr.State == "closed" && tr.cleanup == "":
+	case tr.cleanup != "":
+	case !tr.sawLive || !wantsAuto(t.proj.Cleanup, pr.State):
+		// Without sight of the PR open, the branch may be old: the user decides.
 		tr.cleanup = "ask"
-	case pr.State == "merged" && tr.cleanup == "" && !tr.sawLive:
-		// Merged before this session saw it open: the branch may be old, so the user decides.
-		tr.cleanup = "ask"
-	case pr.State == "merged" && tr.cleanup == "" && !tr.autoTried:
+	case !tr.autoTried:
 		tr.autoTried = true
 		o.auto = true
 	}
 	return o
+}
+
+func wantsAuto(c project.Cleanup, state string) bool {
+	if state == "merged" {
+		return c.OnMerge() == "auto"
+	}
+	return c.OnClose() == "auto"
 }
 
 func (l *Lifecycle) prsPath(key string) string { return filepath.Join(l.dataDir, key, "prs.json") }
@@ -867,8 +873,8 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 }
 
 func (l *Lifecycle) removeWorktree(ctx context.Context, proj project.Project, branch, worktree string, force bool) error {
-	if proj.Cleanup != "" {
-		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.Cleanup)
+	if proj.RemoveWorktree != "" {
+		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.RemoveWorktree)
 		ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
 		defer cancel()
 		_, err := l.run(ctx, proj.Dir, "sh", "-c", cmd)

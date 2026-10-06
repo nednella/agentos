@@ -237,3 +237,23 @@ projects:
 		}
 	})
 }
+
+func TestLoadRejectsTheOldCleanupCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("projects:\n  - name: a\n    dir: /a\n    cleanup: make clean\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "remove_worktree") {
+		t.Errorf("Load = %v, want an error naming remove_worktree", err)
+	}
+}
+
+func TestLoadRejectsAnUnknownCleanupMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("projects:\n  - name: a\n    dir: /a\n    cleanup: {merge: now}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "auto or manual") {
+		t.Errorf("Load = %v, want an error naming auto or manual", err)
+	}
+}

@@ -321,7 +321,7 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 }
 
 func TestCleanupCustomCommand(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    remove_worktree: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -506,4 +506,69 @@ func TestPROpenedAttention(t *testing.T) {
 			t.Errorf("opened attention events after a second reply = %d, want 1", got)
 		}
 	})
+}
+
+func openThenClose(h *apptest.Harness) {
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(prJSON("CLOSED", false, "[]", 0, 0))
+	h.RefreshPRs()
+}
+
+func TestCleanupMergeManualAsks(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {merge: manual}\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(wt) || len(h.Cleanups()) != 0 {
+		t.Fatalf("manual merge: cleanup %q, worktree %v", got.Cleanup, exists(wt))
+	}
+}
+
+func TestCleanupCloseAuto(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenClose(h)
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Errorf("worktree exists: %v, branches: %q", exists(wt), branches(t, h.Dir))
+	}
+}
+
+func TestCleanupCloseAutoKeepsSafetyChecks(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	if err := os.WriteFile(filepath.Join(wt, "unsaved"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	openThenClose(h)
+	eventually(t, "the clean-up to block", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if !exists(wt) {
+		t.Error("an automatic clean-up removed a worktree with unsaved changes")
+	}
+}
+
+func TestCleanupCloseAutoAsksForAPRNeverSeenOpen(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	h.GH.SetPR(prJSON("CLOSED", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(wt) {
+		t.Fatalf("an old closed PR: cleanup %q, worktree %v", got.Cleanup, exists(wt))
+	}
 }

@@ -64,6 +64,41 @@ func (r *Registry) SetTheme(theme string) error {
 	return nil
 }
 
+// Cleanup is the project's clean-up settings, the defaults filled in. A project that is not configured has the defaults.
+func (r *Registry) Cleanup(key string) project.Cleanup {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	i := r.index(key)
+	if i < 0 {
+		return project.Cleanup{}.Resolved()
+	}
+	return r.cfg.Projects[i].Cleanup.Resolved()
+}
+
+// SetCleanup saves how the project cleans up after an event, "merge" or "close", to "auto" or "manual".
+func (r *Registry) SetCleanup(key, event, mode string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	i := r.index(key)
+	if i < 0 {
+		return fmt.Errorf("project %s is not in the config", key)
+	}
+	next := r.cfg
+	next.Projects = slices.Clone(r.cfg.Projects)
+	if err := next.Projects[i].Cleanup.Set(event, mode); err != nil {
+		return err
+	}
+	if err := project.Save(r.path, next); err != nil {
+		return err
+	}
+	r.cfg = next
+	return nil
+}
+
+func (r *Registry) index(key string) int {
+	return slices.IndexFunc(r.cfg.Projects, func(p project.Project) bool { return p.Key() == key })
+}
+
 // Add registers a folder under its own name, or under name-2, name-3 when another
 // folder already has that name. A folder that is registered already comes back as is.
 func (r *Registry) Add(dir string) (project.Project, error) {
