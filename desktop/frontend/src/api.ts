@@ -25,6 +25,8 @@ type Backend = {
   StartIssue(number: number, action: string): Promise<Session>
   IssueDetail(number: number): Promise<IssueDetail>
   ShellOpen(): Promise<{ id: string }>
+  ShellNew(): Promise<{ id: string }>
+  ShellClose(id: string): Promise<void>
   TermOpen(id: string, cols: number, rows: number): Promise<void>
   TermWrite(id: string, data: string): Promise<void>
   TermResize(id: string, cols: number, rows: number): Promise<void>
@@ -79,7 +81,7 @@ declare global {
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'RemoveProject'],
-  sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen'],
+  sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
@@ -137,6 +139,8 @@ export const api = {
   startIssue: (number: number, action: string) => backend.StartIssue(number, action),
   issueDetail: (number: number) => backend.IssueDetail(number),
   shellOpen: () => backend.ShellOpen(),
+  shellNew: () => backend.ShellNew(),
+  shellClose: (id: string) => backend.ShellClose(id),
   termOpen: (id: string, cols: number, rows: number) => backend.TermOpen(id, cols, rows),
   // A terminal can close (project switch, session end) while keys or a resize
   // are still in flight; that is not an error worth surfacing.

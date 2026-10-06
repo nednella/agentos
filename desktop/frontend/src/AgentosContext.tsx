@@ -46,11 +46,15 @@ export type Agentos = {
   noteDraft: string
   composing: boolean
   focusRequest: { target: FocusTarget; n: number }
+  shellIds: string[]
   shellId: string
   version: string
   update: string
   updating: boolean
   openShell(): Promise<void>
+  newShell(): Promise<void>
+  closeShell(id: string): Promise<void>
+  selectShell(id: string): void
   applyUpdate(): Promise<void>
   select(id: string): void
   detach(): void
@@ -150,7 +154,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
   const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, browserEnabled: true, digestSchedule: 'weekly' })
-  const [shellId, setShellId] = useState('')
+  const [shellIds, setShellIds] = useState<string[]>([])
+  const [pickedShell, setPickedShell] = useState('')
+  const shellId = shellIds.includes(pickedShell) ? pickedShell : (shellIds[0] ?? '')
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
   const [updating, setUpdating] = useState(false)
@@ -260,7 +266,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setProject(snap.project)
       setProjects(snap.projects)
       setNotes(snap.notes)
-      setShellId(snap.shell)
+      setShellIds(snap.shells)
       setVersion(snap.version)
       setUpdate(snap.update)
       setRawIssues([])
@@ -312,7 +318,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     }
 
   useEffect(() => on('sessions', ifCurrent(applySessions)), [applySessions])
-  useEffect(() => on('term:exit', ({ id }) => setShellId((shell) => (shell === id ? '' : shell))), [])
+  useEffect(() => on('term:exit', ({ id }) => setShellIds((ids) => ids.filter((x) => x !== id))), [])
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
   useEffect(() => on('awake', setAwake), [])
   useEffect(() => on('issues', ifCurrent(setRawIssues)), [])
@@ -451,6 +457,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       noteDraft,
       composing,
       focusRequest,
+      shellIds,
       shellId,
       version,
       update,
@@ -465,10 +472,20 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         }
       },
       async openShell() {
-        if (shellId) return
+        if (shellIds.length) return
         const shell = await api.shellOpen()
-        setShellId(shell.id)
+        setShellIds([shell.id])
       },
+      async newShell() {
+        const shell = await api.shellNew()
+        setShellIds((ids) => [...ids, shell.id])
+        setPickedShell(shell.id)
+      },
+      async closeShell(id) {
+        await api.shellClose(id)
+        setShellIds((ids) => ids.filter((x) => x !== id))
+      },
+      selectShell: setPickedShell,
       select(id) {
         selectId(id)
         focus('terminal')
@@ -665,7 +682,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
