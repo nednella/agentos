@@ -505,7 +505,12 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         await enterFrom(dir ? api.addProjectDir(dir) : api.addProject())
       },
       async newProject(name) {
-        await enterFrom(api.newProject(name))
+        const key = pushToast({ tone: 'info', text: `Creating ${name}…`, sticky: true })
+        try {
+          await enterFrom(api.newProject(name))
+        } finally {
+          dismissToast(key)
+        }
       },
       async removeProject(name) {
         const epoch = projectEpoch.current
