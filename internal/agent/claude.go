@@ -39,5 +39,8 @@ func (c Claude) Command(_ string, l Launch) []string {
 	if l.Effort != "" {
 		argv = append(argv, "--effort", l.Effort)
 	}
+	if l.Resume != "" {
+		argv = append(argv, "--resume", l.Resume)
+	}
 	return argv
 }

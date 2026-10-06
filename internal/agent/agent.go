@@ -3,7 +3,8 @@ package agent
 import "strings"
 
 // Launch is what a session is started with besides its name. An empty field leaves the choice to the agent.
-type Launch struct{ Model, Effort string }
+// Resume is a conversation to continue, which an agent that cannot resume ignores.
+type Launch struct{ Model, Effort, Resume string }
 
 // Agent builds the command a session runs.
 type Agent interface {
