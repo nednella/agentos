@@ -671,9 +671,14 @@ func (s *Sessions) List() []Session {
 	return s.list()
 }
 
+// Current is the current project as the config holds it now, so a setting saved from the panel applies at once.
 func (s *Sessions) Current() project.Project {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	configured := s.configured.List()
+	if i := slices.IndexFunc(configured, func(p project.Project) bool { return p.Key() == s.project.Key() }); i >= 0 {
+		return configured[i]
+	}
 	return s.project
 }
 
