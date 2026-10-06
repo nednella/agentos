@@ -16,6 +16,7 @@ import (
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/desktop/projects"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/desktop/settings"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
 	"github.com/nednella/agentos/desktop/update"
@@ -131,6 +132,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		awake.NewService(stayAwake),
 		stats.NewService(waits, sess),
 		update.NewService(a.updates, ctx),
+		settings.NewService(c.Registry),
 	}
 	return a
 }
