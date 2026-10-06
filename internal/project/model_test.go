@@ -8,8 +8,8 @@ func TestDefault(t *testing.T) {
 		c    Config
 		want Model
 	}{
-		{"unset", Config{}, Model{"sonnet", "medium"}},
-		{"model only", Config{Model: "opus"}, Model{"opus", "medium"}},
+		{"unset", Config{}, Model{}},
+		{"model only", Config{Model: "opus"}, Model{"opus", ""}},
 		{"both", Config{Model: "haiku", Effort: "low"}, Model{"haiku", "low"}},
 	}
 	for _, tt := range tests {
@@ -20,34 +20,29 @@ func TestDefault(t *testing.T) {
 }
 
 func TestPick(t *testing.T) {
-	base := Config{}.Default()
-	custom := Project{
-		Model: "haiku", Effort: "low",
-		Models: map[string]Model{"ready": {Model: "opus"}, "plan": {Effort: "high"}},
-	}
+	base := Model{"sonnet", "medium"}
+	project := Project{Model: "haiku", Effort: "low"}
+	plan := Action{Name: "Plan", Model: "opus"}
 	tests := []struct {
 		name   string
 		p      Project
-		lane   string
+		base   Model
+		action Action
 		labels []string
 		want   Model
 	}{
-		{"no lane takes the default", Project{}, "", nil, Model{"sonnet", "medium"}},
-		{"ready", Project{}, "ready", nil, Model{"sonnet", "medium"}},
-		{"inbox", Project{}, "inbox", nil, Model{"sonnet", "medium"}},
-		{"idea", Project{}, "idea", nil, Model{"sonnet", "medium"}},
-		{"plan runs on opus", Project{}, "plan", nil, Model{"opus", "medium"}},
-		{"project overrides the default", custom, "", nil, Model{"haiku", "low"}},
-		{"project lane overrides the project", custom, "ready", nil, Model{"opus", "low"}},
-		{"project lane keeps the built-in model", custom, "plan", nil, Model{"opus", "high"}},
-		{"labels win", custom, "ready", []string{"type:bug", "model:sonnet", "effort:max"}, Model{"sonnet", "max"}},
-		{"first label of a kind wins", Project{}, "ready", []string{"model:opus", "model:haiku"}, Model{"opus", "medium"}},
-		{"bad labels are skipped", Project{}, "ready", []string{"model:--x", "effort:huge"}, Model{"sonnet", "medium"}},
-		{"unknown lane", Project{}, "you", nil, Model{"sonnet", "medium"}},
+		{"nothing set passes nothing", Project{}, Model{}, Action{}, nil, Model{}},
+		{"the config's", Project{}, base, Action{}, nil, Model{"sonnet", "medium"}},
+		{"project over config", project, base, Action{}, nil, Model{"haiku", "low"}},
+		{"action over project", project, base, plan, nil, Model{"opus", "low"}},
+		{"action over config, field by field", Project{}, base, Action{Effort: "high"}, nil, Model{"sonnet", "high"}},
+		{"labels over action", project, base, plan, []string{"type:bug", "model:sonnet", "effort:max"}, Model{"sonnet", "max"}},
+		{"first label of a kind wins", Project{}, Model{}, Action{}, []string{"model:opus", "model:haiku"}, Model{"opus", ""}},
+		{"bad labels are skipped", Project{}, base, plan, []string{"model:--x", "effort:huge"}, Model{"opus", "medium"}},
 	}
 	for _, tt := range tests {
-		if got := tt.p.Pick(base, tt.lane, tt.labels); got != tt.want {
-			t.Errorf("%s: Pick(%q, %v) = %+v, want %+v", tt.name, tt.lane, tt.labels, got, tt.want)
+		if got := tt.p.Pick(tt.base, tt.action, tt.labels); got != tt.want {
+			t.Errorf("%s: Pick = %+v, want %+v", tt.name, got, tt.want)
 		}
 	}
 }

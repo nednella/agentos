@@ -14,6 +14,8 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
+	//go:embed start-issue.md
+	startIssue string
 )
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
@@ -26,6 +28,10 @@ func BrowserSession() string { return body(browserSession) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
+
+// StartIssue is what a session for an issue is started with when the project defines no action for it.
+// {n} is the issue number and {title} its title.
+func StartIssue() string { return body(startIssue) }
 
 // body drops the leading comment and the final newline of a file.
 func body(file string) string {

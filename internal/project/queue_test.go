@@ -5,52 +5,74 @@ import (
 	"time"
 )
 
-func TestLane(t *testing.T) {
-	custom := Project{Lanes: map[string]string{"go": "ready", "later": "idea", "blocked": "you"}}
+func TestSection(t *testing.T) {
+	p := Project{QueueSections: []Section{
+		{Name: "Inbox"},
+		{Name: "Ready", Labels: []string{"ready", "go"}},
+		{Name: "Plan", Labels: []string{"needs-plan"}},
+	}}
 	tests := []struct {
 		name   string
 		p      Project
 		labels []string
 		want   string
+		at     int
 	}{
-		{"default ready wins", Project{}, []string{"idea", "ready", "type:bug"}, "ready"},
-		{"default plan", Project{}, []string{"needs-plan"}, "plan"},
-		{"default you", Project{}, []string{"needs-human"}, "you"},
-		{"no labels", Project{}, nil, "inbox"},
-		{"unmapped label", Project{}, []string{"roadmap"}, "idea"},
-		{"custom", custom, []string{"later", "go"}, "ready"},
-		{"custom ignores defaults", custom, []string{"ready"}, "idea"},
+		{"no labels take the section without labels", p, nil, "Inbox", 0},
+		{"any label of a section", p, []string{"type:bug", "go"}, "Ready", 1},
+		{"first section wins", p, []string{"needs-plan", "ready"}, "Ready", 1},
+		{"no section takes it", p, []string{"roadmap"}, OtherSection, 3},
+		{"labels never take the section without labels", Project{QueueSections: p.QueueSections[:1]}, []string{"ready"}, OtherSection, 1},
+		{"no sections", Project{}, []string{"ready"}, "", 0},
+		{"no sections, no labels", Project{}, nil, "", 0},
 	}
 	for _, tt := range tests {
-		if got := tt.p.Lane(tt.labels); got != tt.want {
-			t.Errorf("%s: Lane(%v) = %q, want %q", tt.name, tt.labels, got, tt.want)
+		if at, s := tt.p.Section(tt.labels); s.Name != tt.want || at != tt.at {
+			t.Errorf("%s: Section(%v) = %d %q, want %d %q", tt.name, tt.labels, at, s.Name, tt.at, tt.want)
 		}
 	}
 }
 
-func TestCommands(t *testing.T) {
-	custom := Project{Commands: map[string]string{"ready": "/ship #{n}"}}
-	tests := []struct {
-		name string
-		got  string
-		want string
-	}{
-		{"default ready", Project{}.IssueCommand("ready", 4), "/work 4"},
-		{"default plan", Project{}.IssueCommand("plan", 5), "/investigate 5"},
-		{"idea has no default", Project{}.IssueCommand("idea", 5), ""},
-		{"inbox has no default", Project{}.IssueCommand("inbox", 5), ""},
-		{"you has none", Project{Commands: map[string]string{"you": "x"}}.IssueCommand("you", 5), ""},
-		{"custom inbox", Project{Commands: map[string]string{"inbox": "/investigate {n}"}}.IssueCommand("inbox", 9), "/investigate 9"},
-		{"default note", Project{}.NoteCommand("buy milk"), "buy milk"},
-		{"custom empty note", Project{Commands: map[string]string{"note": ""}}.NoteCommand("buy milk"), ""},
-		{"note template", Project{Commands: map[string]string{"note": "/plan {text}"}}.NoteCommand("x"), "/plan x"},
-		{"custom idea", Project{Commands: map[string]string{"idea": "/think {n}"}}.IssueCommand("idea", 3), "/think 3"},
-		{"custom ready", custom.IssueCommand("ready", 4), "/ship #4"},
-		{"unset plan keeps default", custom.IssueCommand("plan", 6), "/investigate 6"},
+func TestActionList(t *testing.T) {
+	own := Section{Actions: []Action{{Name: "Plan"}, {Name: "Work"}}}
+	if got := own.ActionList(); len(got) != 2 || got[0].Name != "Plan" {
+		t.Errorf("a section's own actions = %+v", got)
+	}
+	got := Section{}.ActionList()
+	if len(got) != 1 || got[0].Name != "Start" || got[0].Render(7, "Fix it") != "Work on issue #7: Fix it" {
+		t.Errorf("without actions: %+v", got)
+	}
+}
+
+func TestRender(t *testing.T) {
+	tests := []struct{ command, want string }{
+		{"/work {n}", "/work 4"},
+		{"/plan {n}: {title}", "/plan 4: Add {n} things"},
+		{"", ""},
 	}
 	for _, tt := range tests {
-		if tt.got != tt.want {
-			t.Errorf("%s: got %q, want %q", tt.name, tt.got, tt.want)
+		if got := (Action{Command: tt.command}).Render(4, "Add {n} things"); got != tt.want {
+			t.Errorf("Render(%q) = %q, want %q", tt.command, got, tt.want)
+		}
+	}
+}
+
+func TestNoteCommand(t *testing.T) {
+	if got := (Project{}).NoteCommand("buy milk"); got != "buy milk" {
+		t.Errorf("default = %q", got)
+	}
+	if got := (Project{NoteSessionCommand: "/plan {text}"}).NoteCommand("x"); got != "/plan x" {
+		t.Errorf("template = %q", got)
+	}
+}
+
+func TestSendsPrompt(t *testing.T) {
+	for _, tt := range []struct {
+		mode string
+		want bool
+	}{{"", true}, {"auto", true}, {"manual", false}} {
+		if got := (Project{SessionPromptSend: tt.mode}).SendsPrompt(); got != tt.want {
+			t.Errorf("SendsPrompt(%q) = %v, want %v", tt.mode, got, tt.want)
 		}
 	}
 }
@@ -63,7 +85,6 @@ func TestBranchFor(t *testing.T) {
 		t.Errorf("custom branch = %q", got)
 	}
 }
-
 func TestKeepsAwake(t *testing.T) {
 	off, on := false, true
 	for _, tt := range []struct {

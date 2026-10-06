@@ -10,62 +10,106 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v3"
+
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 // DefaultPRPoll is how often pull requests are polled when pr_poll is not set.
 const DefaultPRPoll = 30 * time.Second
 
-var defaultLanes = map[string]string{
-	"ready": "ready", "needs-plan": "plan", "needs-human": "you", "idea": "idea",
+// OtherSection holds the issues no queue section matches.
+const OtherSection = "Other"
+
+// Action is a way to start a session for an issue: a command to type, run with its own model and effort.
+type Action struct {
+	Name    string `yaml:"name"`
+	Command string `yaml:"command,omitempty"` // {n} is the issue number, {title} its title
+	Model   string `yaml:"model,omitempty"`
+	Effort  string `yaml:"effort,omitempty"`
 }
 
-var defaultCommands = map[string]string{
-	"ready": "/work {n}", "plan": "/investigate {n}", "inbox": "", "idea": "", "note": "{text}",
+// Section is a group of the queue. It takes the issues that have any of its labels, or the issues that have
+// none when it names no labels.
+type Section struct {
+	Name    string   `yaml:"name"`
+	Labels  []string `yaml:"labels,omitempty"`
+	Actions []Action `yaml:"actions,omitempty"` // the first is the default
 }
 
-// laneOrder ranks lanes when an issue's labels map to several.
-var laneOrder = []string{"ready", "plan", "you", "idea"}
-
-// Lane places an issue by its labels: the first lane in laneOrder that a label
-// maps to, "inbox" when there are no labels at all, else "idea".
-func (p Project) Lane(labels []string) string {
-	lanes := p.Lanes
-	if len(lanes) == 0 {
-		lanes = defaultLanes
+// Section is the index of the first section an issue with these labels goes in, and the section.
+// An issue no section takes goes in OtherSection, one place past the last. A project with no sections
+// has one nameless group of every issue.
+func (p Project) Section(labels []string) (int, Section) {
+	if len(p.QueueSections) == 0 {
+		return 0, Section{}
 	}
-	var hit []string
-	for _, l := range labels {
-		hit = append(hit, lanes[l])
-	}
-	for _, lane := range laneOrder {
-		if slices.Contains(hit, lane) {
-			return lane
+	for i, s := range p.QueueSections {
+		if len(s.Labels) == 0 && len(labels) == 0 || slices.ContainsFunc(labels, func(l string) bool { return slices.Contains(s.Labels, l) }) {
+			return i, s
 		}
 	}
-	if len(labels) == 0 {
-		return "inbox"
-	}
-	return "idea"
+	return len(p.QueueSections), Section{Name: OtherSection}
 }
 
-func (p Project) command(key string) string {
-	if c, ok := p.Commands[key]; ok {
-		return c
+// StartAction is the only action of an issue whose section lists none: it types a line that names the issue.
+func StartAction() Action { return Action{Name: "Start", Command: prompts.StartIssue()} }
+
+// ActionList is what can be done with an issue of the section, the default first.
+func (s Section) ActionList() []Action {
+	if len(s.Actions) == 0 {
+		return []Action{StartAction()}
 	}
-	return defaultCommands[key]
+	return s.Actions
 }
 
-// IssueCommand is what a session for an issue in the lane sends to the agent, or "".
-func (p Project) IssueCommand(lane string, number int) string {
-	if lane != "ready" && lane != "plan" && lane != "inbox" && lane != "idea" {
-		return ""
-	}
-	return strings.ReplaceAll(p.command(lane), "{n}", strconv.Itoa(number))
+// Render is the command to type for the issue.
+func (a Action) Render(number int, title string) string {
+	return strings.NewReplacer("{n}", strconv.Itoa(number), "{title}", title).Replace(a.Command)
 }
 
-// NoteCommand is what a session for a note types into the agent.
+// NoteCommand is what a session for a note types into the agent; the note itself unless the project sets
+// note_session_command.
 func (p Project) NoteCommand(text string) string {
-	return strings.ReplaceAll(p.command("note"), "{text}", text)
+	return strings.ReplaceAll(cmp.Or(p.NoteSessionCommand, "{text}"), "{text}", text)
+}
+
+// The values of Project.SessionPromptSend.
+const (
+	PromptAuto   = "auto"
+	PromptManual = "manual"
+)
+
+// SendsPrompt says whether the text a session is started with is sent at once, or waits for Enter.
+func (p Project) SendsPrompt() bool { return p.SessionPromptSend != PromptManual }
+
+func (p Project) validateQueue() error {
+	if p.SessionPromptSend != "" && p.SessionPromptSend != PromptAuto && p.SessionPromptSend != PromptManual {
+		return fmt.Errorf("session_prompt_send must be %s or %s, not %q", PromptAuto, PromptManual, p.SessionPromptSend)
+	}
+	var sections []string
+	for _, s := range p.QueueSections {
+		if s.Name == "" {
+			return errors.New("queue_sections: a section needs a name")
+		}
+		if slices.Contains(sections, s.Name) {
+			return fmt.Errorf("queue_sections: two sections are named %q", s.Name)
+		}
+		sections = append(sections, s.Name)
+		var actions []string
+		for _, a := range s.Actions {
+			if a.Name == "" {
+				return fmt.Errorf("queue_sections.%s: an action needs a name", s.Name)
+			}
+			if slices.Contains(actions, a.Name) {
+				return fmt.Errorf("queue_sections.%s: two actions are named %q", s.Name, a.Name)
+			}
+			actions = append(actions, a.Name)
+			if err := (Model{Model: a.Model, Effort: a.Effort}).Validate(); err != nil {
+				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
+			}
+		}
+	}
+	return nil
 }
 
 // ReviewCommand is what a session whose PR got a review or a comment is sent, or "".
