@@ -31,6 +31,8 @@ type Project struct {
 	PRWatch   string            `yaml:"pr_watch,omitempty"`   // webhook or poll; unset tries the webhook and polls when it does not work
 	PRPoll    string            `yaml:"pr_poll,omitempty"`    // how often to poll pull requests, "30s" by default
 	KeepAwake *bool             `yaml:"keep_awake,omitempty"` // overrides the config's keep_awake for this project
+	OnReview  string            `yaml:"on_review,omitempty"`  // typed into a session whose PR got a review or comment; {n} is the PR number
+	OnChecks  string            `yaml:"on_checks,omitempty"`  // typed into a session whose PR has failing checks; {n} is the PR number
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.

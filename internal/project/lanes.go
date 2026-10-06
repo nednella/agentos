@@ -64,6 +64,16 @@ func (p Project) NoteCommand(text string) string {
 	return strings.ReplaceAll(p.command("note"), "{text}", text)
 }
 
+// ReviewCommand is what a session whose PR got a review or a comment is sent, or "".
+func (p Project) ReviewCommand(pr int) string {
+	return strings.ReplaceAll(p.OnReview, "{n}", strconv.Itoa(pr))
+}
+
+// ChecksCommand is what a session whose PR has failing checks is sent, or "".
+func (p Project) ChecksCommand(pr int) string {
+	return strings.ReplaceAll(p.OnChecks, "{n}", strconv.Itoa(pr))
+}
+
 // BranchFor is the branch the work on an issue happens on, or "" when the project names none.
 func (p Project) BranchFor(number int) string {
 	return strings.ReplaceAll(p.Branch, "{n}", strconv.Itoa(number))

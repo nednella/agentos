@@ -125,3 +125,17 @@ func TestPRPollEvery(t *testing.T) {
 		}
 	}
 }
+
+func TestPRCommands(t *testing.T) {
+	p := Project{OnReview: "/address-review {n}", OnChecks: "/fix {n} now"}
+	for _, tt := range []struct{ name, got, want string }{
+		{"review", p.ReviewCommand(41), "/address-review 41"},
+		{"checks", p.ChecksCommand(41), "/fix 41 now"},
+		{"review unset", Project{}.ReviewCommand(41), ""},
+		{"checks unset", Project{}.ChecksCommand(41), ""},
+	} {
+		if tt.got != tt.want {
+			t.Errorf("%s: got %q, want %q", tt.name, tt.got, tt.want)
+		}
+	}
+}
