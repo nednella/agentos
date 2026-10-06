@@ -341,6 +341,8 @@ folders are served. Use the URL in `<img src>`.
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
 agent: claude                  # claude (the default, with hooks) or any command, which runs plain
+model: sonnet                  # model of every Claude session unless a project, lane or issue label says otherwise
+effort: medium                 # low, medium, high, xhigh or max
 projects:
   - name: livedocument
     dir: /Users/me/code/livedocument
@@ -356,6 +358,10 @@ projects:
       needs-plan: plan
       needs-human: you
       idea: idea
+    model: ""                  # this project's model; "" uses the top-level one
+    effort: ""                 # this project's effort; "" uses the top-level one
+    models:                    # lane -> model and effort of sessions started for an issue there; either key may be left out
+      plan: {model: opus}      # the built-in choice: plan runs on opus, every other lane on the project's model
     branch: "issue-{n}"        # branch of an issue's work
     cleanup: ""                # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
     url: ""                    # page a session's browser opens first

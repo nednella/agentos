@@ -56,6 +56,14 @@ func TestLoad(t *testing.T) {
 		},
 		{name: "unknown pr_watch", path: write("projects:\n  - {name: api, dir: /srv/api, pr_watch: push}\n"), wantErr: true},
 		{name: "bad pr_poll", path: write("projects:\n  - {name: api, dir: /srv/api, pr_poll: often}\n"), wantErr: true},
+		{
+			name: "models",
+			path: write("model: haiku\neffort: low\nprojects:\n  - {name: api, dir: /srv/api, model: opus, models: {plan: {effort: high}}}\n"),
+			want: Config{Model: "haiku", Effort: "low", Projects: []Project{{Name: "api", Dir: "/srv/api", Model: "opus", Models: map[string]Model{"plan": {Effort: "high"}}}}},
+		},
+		{name: "bad effort", path: write("effort: huge\n"), wantErr: true},
+		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, dir: /srv/api, model: --x}\n"), wantErr: true},
+		{name: "bad lane effort", path: write("projects:\n  - {name: api, dir: /srv/api, models: {plan: {effort: huge}}}\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
 	}
 	for _, tt := range tests {
