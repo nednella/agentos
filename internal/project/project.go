@@ -16,29 +16,31 @@ import (
 
 // Project is the unit agentos is scoped to: a name and the folder agents start in.
 type Project struct {
-	Name     string            `yaml:"name"`
-	Dir      string            `yaml:"dir"`
-	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea, note
-	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
-	Model    string            `yaml:"model,omitempty"`    // overrides the config's model for this project
-	Effort   string            `yaml:"effort,omitempty"`   // overrides the config's effort for this project
-	Models   map[string]Model  `yaml:"models,omitempty"`   // lane -> model and effort of the sessions started there
-	Branch   string            `yaml:"branch,omitempty"`   // branch of an issue's work; {n} is the number
-	Cleanup  string            `yaml:"cleanup,omitempty"`  // shell command that removes a worktree; {branch} and {worktree}
-	URL      string            `yaml:"url,omitempty"`      // the page a session's browser opens first
-	Browser  *bool             `yaml:"browser,omitempty"`  // give sessions the browser and evidence commands; on unless false
-	Digest   string            `yaml:"digest,omitempty"`   // weekly (the default) or off
-	PRWatch  string            `yaml:"pr_watch,omitempty"` // webhook or poll; unset tries the webhook and polls when it does not work
-	PRPoll   string            `yaml:"pr_poll,omitempty"`  // how often to poll pull requests, "30s" by default
+	Name      string            `yaml:"name"`
+	Dir       string            `yaml:"dir"`
+	Commands  map[string]string `yaml:"commands,omitempty"`   // keys: ready, plan, inbox, idea, note
+	Lanes     map[string]string `yaml:"lanes,omitempty"`      // GitHub label -> lane
+	Model     string            `yaml:"model,omitempty"`      // overrides the config's model for this project
+	Effort    string            `yaml:"effort,omitempty"`     // overrides the config's effort for this project
+	Models    map[string]Model  `yaml:"models,omitempty"`     // lane -> model and effort of the sessions started there
+	Branch    string            `yaml:"branch,omitempty"`     // branch of an issue's work; {n} is the number
+	Cleanup   string            `yaml:"cleanup,omitempty"`    // shell command that removes a worktree; {branch} and {worktree}
+	URL       string            `yaml:"url,omitempty"`        // the page a session's browser opens first
+	Browser   *bool             `yaml:"browser,omitempty"`    // give sessions the browser and evidence commands; on unless false
+	Digest    string            `yaml:"digest,omitempty"`     // weekly (the default) or off
+	PRWatch   string            `yaml:"pr_watch,omitempty"`   // webhook or poll; unset tries the webhook and polls when it does not work
+	PRPoll    string            `yaml:"pr_poll,omitempty"`    // how often to poll pull requests, "30s" by default
+	KeepAwake *bool             `yaml:"keep_awake,omitempty"` // overrides the config's keep_awake for this project
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.
 type Config struct {
-	DataDir  string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
-	Agent    string    `yaml:"agent"`
-	Model    string    `yaml:"model,omitempty"`  // model of a Claude session, "sonnet" by default
-	Effort   string    `yaml:"effort,omitempty"` // effort of a Claude session, "medium" by default
-	Projects []Project `yaml:"projects"`
+	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
+	Agent     string    `yaml:"agent"`
+	Model     string    `yaml:"model,omitempty"`      // model of a Claude session, "sonnet" by default
+	Effort    string    `yaml:"effort,omitempty"`     // effort of a Claude session, "medium" by default
+	KeepAwake *bool     `yaml:"keep_awake,omitempty"` // hold off idle sleep while a session works; on unless false
+	Projects  []Project `yaml:"projects"`
 }
 
 // Key is the form of the name that is safe inside a tmux session name and a file path.
