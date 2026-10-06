@@ -18,10 +18,6 @@ func TestSessionCommands(t *testing.T) {
 	if resp := h.Ask(t, ctl.Request{Cmd: "new", Args: []string{"fix logout"}}); !resp.OK || resp.Out != "started session 2: fix logout" {
 		t.Fatalf("second new = %+v", resp)
 	}
-	harness := h.Ask(t, ctl.Request{Cmd: "harness"})
-	if !harness.OK || harness.Out != "started session 3: Harness check" {
-		t.Fatalf("harness = %+v", harness)
-	}
 
 	tests := []struct {
 		name string

@@ -866,8 +866,6 @@ func (h *Harness) BrowserScreenshot(id, caption string) (evidence.Evidence, erro
 }
 func (h *Harness) BrowserClose(id string) { h.browser.BrowserClose(id) }
 
-func (h *Harness) HarnessCheck() (sessions.Session, error) { return h.sessions.HarnessCheck() }
-
 // DigestCall is one run of claude as the digest makes it.
 type DigestCall struct {
 	Dir  string

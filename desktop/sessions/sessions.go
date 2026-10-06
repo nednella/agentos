@@ -196,11 +196,6 @@ func (s *Sessions) Hook(repoOf func(dir string) string, onIssues func(), repos R
 	s.life.repos = repos
 }
 
-// HarnessCheck starts the session titled "Harness check" with the review prompt typed in, not sent.
-func (s *Sessions) HarnessCheck() (Session, error) {
-	return s.Create("Harness check", prompts.HarnessCheck(), false, 0)
-}
-
 // Touch tells the front end that something shown in the session list changed.
 func (s *Sessions) Touch() { s.changed() }
 

@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	//go:embed harness-check.md
-	harnessCheck string
 	//go:embed digest.md
 	digest string
 	//go:embed browser-session.md
@@ -22,9 +20,6 @@ var (
 	//go:embed pr-checks.md
 	prChecks string
 )
-
-// HarnessCheck is typed into the "Harness check" session.
-func HarnessCheck() string { return body(harnessCheck) }
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
 func Digest(dependencies []string) string {
