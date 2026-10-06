@@ -269,10 +269,10 @@ through `gh webhook forward` (needs the extension and admin on the repo; a strea
 instead; one that drops later is retried after 30 s, with a warning when `pr_watch: webhook` asked for it). Polling asks GitHub for the repo's
 PR list every `pr_poll` (30 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
 plus those whose checks are still running. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
-comment or review, the app types `address the review on PR #<n>` into its session and sends it; failing checks on a new commit send
-`fix the failing checks on PR #<n>` (the texts are in `internal/prompts`). A session waiting on the user gets the text once it is not;
-an ended session gets a new session for its issue with the text sent, and its row goes. Each comment count and each failing commit wakes
-once, remembered in `prs.json`.
+comment or review, the app types the project's `on_review` command into its session and sends it; failing checks on a new commit send
+`on_checks` (`{n}` is the PR number). A key that is not set sends nothing: the row is still flagged and the notice still shows. A session
+waiting on the user gets the text once it is not; an ended session gets a new session for its issue with the text sent, and its row goes.
+Each comment count and each failing commit counts once, remembered in `prs.json`, whether or not a command is set.
 
 ### Notes (`notes`)
 
@@ -407,6 +407,8 @@ projects:
     keep_awake: true           # this project's choice; unset follows the top-level one
     pr_watch: ""               # webhook or poll; "" tries gh webhook forward and polls when it does not work
     pr_poll: 30s               # how often to poll the pull requests; at least 1s
+    on_review: ""              # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
+    on_checks: ""              # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
 ```
 
 A label that maps to no lane puts an issue in `idea`; an issue with no labels is in `inbox`. When labels map to several lanes the first of
@@ -448,8 +450,8 @@ All files are written by writing a temp file and renaming it into place; folders
 browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, and for a session started for an issue `AGENTOS_ISSUE` (its number). In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. It runs on the first agent that is installed and signed in, found without spending a request (`claude auth status` exits 0 when signed in); only `claude` is supported so far. With none, the digest's `error` says so. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
-The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`, the two
-pull request wakes) are Markdown files in `internal/prompts`.
+The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`)
+are Markdown files in `internal/prompts`.
 
 ## Command line
 
