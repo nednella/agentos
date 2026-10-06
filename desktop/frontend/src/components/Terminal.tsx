@@ -12,6 +12,7 @@ import { terminalFont, terminalThemes } from '../terminalTheme'
 type TerminalProps = { id: string; active: boolean; kind?: 'session' | 'shell'; onLeave?(): void }
 
 const DOUBLE_ESC_MS = 500
+const RESIZE_SETTLE_MS = 120
 
 const BASE_FONT_PX = 14
 const SHIFT_ENTER = '\x1b[13;2u'
@@ -40,10 +41,13 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
   const fit = useRef<FitAddon | null>(null)
   const opened = useRef(false)
   const sent = useRef({ cols: 0, rows: 0 })
+  const settle = useRef(0)
   const renderer = useRef({ attach() {}, detach() {} })
 
   // A terminal mounted hidden has no size, so the core opens it at the first fit while visible.
-  // The grid refits on every size change; the core hears only when the cell count moves.
+  // The grid refits on every size change; the core hears only when the cell count moves, and only
+  // once a drag settles: each resize makes the shell redraw its prompt, and a redraw per
+  // step leaves stale prompt fragments behind.
   const sync = useRef(() => {})
   sync.current = () => {
     const term = xterm.current
@@ -51,9 +55,12 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     fit.current.fit()
     const { cols, rows } = term
     if (opened.current) {
+      window.clearTimeout(settle.current)
       if (cols === sent.current.cols && rows === sent.current.rows) return
-      sent.current = { cols, rows }
-      void api.termResize(id, cols, rows)
+      settle.current = window.setTimeout(() => {
+        sent.current = { cols, rows }
+        void api.termResize(id, cols, rows)
+      }, RESIZE_SETTLE_MS)
       return
     }
     opened.current = true
@@ -176,6 +183,7 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
 
     return () => {
       observer.disconnect()
+      window.clearTimeout(settle.current)
       hostEl.removeEventListener('wheel', wheel, { capture: true })
       offData()
       offExit()
