@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0](https://github.com/nednella/agentos/compare/v0.3.1...v0.4.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** follow the branch and PR of sessions with no issue ([a061e63](https://github.com/nednella/agentos/commit/a061e632940213f3a78daa87e81be519ffa783b6))
+* **internal:** record the agent's working directory from hooks ([ab8c4e6](https://github.com/nednella/agentos/commit/ab8c4e6d875255b71a23dc5cf858fb7a14645318))
+
+
+### Bug Fixes
+
+* **ui:** ignore detach shortcut when no session is in view ([8ccece1](https://github.com/nednella/agentos/commit/8ccece19f59c0e5e573433900b8d4a54b8c48838))
+* **ui:** keep panel focus style off session clicks ([71e5c46](https://github.com/nednella/agentos/commit/71e5c46de9b649bbe1a84713062d16c9a083428b))
+
 ## [0.3.1](https://github.com/nednella/agentos/compare/v0.3.0...v0.3.1) (2026-10-06)
 
 
