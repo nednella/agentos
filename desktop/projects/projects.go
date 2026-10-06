@@ -26,10 +26,12 @@ type Registry struct {
 	cfg project.Config
 }
 
+// List is the configured projects whose folder exists here. The config may be shared with a
+// machine that has others; those stay in the file but out of the app.
 func (r *Registry) List() []project.Project {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return slices.Clone(r.cfg.Projects)
+	return slices.DeleteFunc(slices.Clone(r.cfg.Projects), func(p project.Project) bool { return !p.Present() })
 }
 
 // KeepAwake says whether a working session of the project holds off idle sleep. A project that is

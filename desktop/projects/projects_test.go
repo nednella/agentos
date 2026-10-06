@@ -178,3 +178,21 @@ func TestRegistryKeepAwake(t *testing.T) {
 		}
 	}
 }
+
+func TestRegistryListSkipsMissingFolders(t *testing.T) {
+	here := t.TempDir()
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	r := projects.NewRegistry(path, project.Config{
+		Projects: []project.Project{{Name: "here", Dir: here}, {Name: "elsewhere", Dir: filepath.Join(here, "missing")}},
+	})
+	if got := r.List(); len(got) != 1 || got[0].Name != "here" {
+		t.Fatalf("List = %+v, want only here", got)
+	}
+	if _, err := r.Remove("here"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := project.Load(path)
+	if err != nil || len(cfg.Projects) != 1 || cfg.Projects[0].Name != "elsewhere" {
+		t.Errorf("saved config = %+v, %v; want the missing project kept", cfg.Projects, err)
+	}
+}
