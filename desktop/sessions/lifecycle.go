@@ -59,10 +59,12 @@ type Cleanup struct {
 	Reason       string   `json:"reason"`
 }
 
-// target is a session that works on an issue, with the project it belongs to.
+// target is a session that works on a branch, with the project it belongs to. A session of an
+// issue works on the issue's branch; another one on the branches it was seen on, oldest first.
 type target struct {
 	id, title string
 	issue     int
+	branches  []string
 	proj      project.Project
 	model     project.Model // what the session ran, so a replacement for an ended one runs the same
 	ended     bool
@@ -70,6 +72,7 @@ type target struct {
 
 // track is what is known about the pull request and clean-up of one session.
 type track struct {
+	branch    string // the branch the PR was found on, or the newest one when there is none
 	worktree  string
 	pr        *PR
 	attention string
@@ -169,8 +172,8 @@ func (l *Lifecycle) stopCleanups() {
 
 // sessionFields is what a session row shows of its track.
 type sessionFields struct {
-	worktree, attention, cleanup, reason string
-	pr                                   *PR
+	branch, worktree, attention, cleanup, reason string
+	pr                                           *PR
 }
 
 func (l *Lifecycle) fields(id string) sessionFields {
@@ -183,7 +186,7 @@ func (l *Lifecycle) fields(id string) sessionFields {
 	if t == nil {
 		return sessionFields{}
 	}
-	f := sessionFields{worktree: t.worktree, attention: t.attention, cleanup: t.cleanup, reason: t.reason}
+	f := sessionFields{branch: t.branch, worktree: t.worktree, attention: t.attention, cleanup: t.cleanup, reason: t.reason}
 	if t.pr != nil {
 		pr := *t.pr
 		f.pr = &pr
@@ -214,8 +217,11 @@ func (l *Lifecycle) forget(id string) {
 	defer l.mu.Unlock()
 	delete(l.tracks, id)
 	key := session.ProjectKey(id)
-	if live := l.prs(key).Live; live[id] {
-		delete(live, id)
+	f := l.prs(key)
+	_, worked := f.Branches[id]
+	if f.Live[id] || worked {
+		delete(f.Live, id)
+		delete(f.Branches, id)
 		l.savePRs(key)
 	}
 }
@@ -234,13 +240,13 @@ func (l *Lifecycle) Run(ctx context.Context) {
 	}
 }
 
-// group is the issue sessions of one project.
+// group is the sessions of one project that work on a branch.
 type group struct {
 	proj    project.Project
 	targets []target
 }
 
-// groups splits the issue sessions by project.
+// groups splits the sessions by project.
 func groups(targets []target) []group {
 	var out []group
 	for _, t := range targets {
@@ -254,12 +260,12 @@ func groups(targets []target) []group {
 	return out
 }
 
-// Poll looks up the worktree and pull request of every issue session, live or ended.
+// Poll looks up the worktree and pull request of every session on a branch, live or ended.
 func (l *Lifecycle) Poll(ctx context.Context) {
 	l.pollMu.Lock()
 	defer l.pollMu.Unlock()
 	var treeFailure, prFailure string
-	for _, g := range groups(l.sessions.issueTargets()) {
+	for _, g := range groups(l.sessions.workTargets()) {
 		treeErr, prErr := l.refresh(ctx, g.proj, g.targets, nil)
 		if treeErr != nil && treeFailure == "" {
 			treeFailure = util.FirstLine(treeErr.Error())
@@ -275,7 +281,7 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 	l.ensureWatchers(ctx)
 }
 
-// refresh fetches the pull requests of the project's issue sessions, all of them or only those on
+// refresh fetches the pull requests of the project's sessions, all of them or only those on
 // the branches named, and acts on what changed: clean-ups, a fresh queue, and wakes.
 func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets []target, only []string) (treeErr, prErr error) {
 	trees, treeErr := l.worktrees(ctx, proj.Dir)
@@ -284,20 +290,15 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	var wakes []wake
 	reload := false
 	for _, t := range targets {
-		branch := proj.BranchFor(t.issue)
-		if only != nil && !slices.Contains(only, branch) {
+		if only != nil && !slices.ContainsFunc(t.branches, func(b string) bool { return slices.Contains(only, b) }) {
 			continue
 		}
-		pr, ok := prs[branch]
-		if !ok {
-			var err error
-			if pr, err = l.findPR(ctx, proj.Dir, branch); err != nil {
-				prErr = cmp.Or(prErr, err)
-				continue
-			}
-			prs[branch] = pr
+		branch, pr, err := l.latestPR(ctx, proj.Dir, t.branches, prs)
+		if err != nil {
+			prErr = cmp.Or(prErr, err)
+			continue
 		}
-		o := l.update(t, trees.byBranch[branch], pr)
+		o := l.update(t, branch, trees.byBranch[branch], pr)
 		if o.auto {
 			auto = append(auto, t.id)
 		}
@@ -317,6 +318,25 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		l.repos.Reload(ctx, proj)
 	}
 	return treeErr, prErr
+}
+
+// latestPR is the PR on the newest of the branches that has one, with its branch; without one it is
+// nil, with the newest branch. found caches the lookups by branch.
+func (l *Lifecycle) latestPR(ctx context.Context, dir string, branches []string, found map[string]*PR) (string, *PR, error) {
+	for _, branch := range slices.Backward(branches) {
+		pr, ok := found[branch]
+		if !ok {
+			var err error
+			if pr, err = l.findPR(ctx, dir, branch); err != nil {
+				return "", nil, err
+			}
+			found[branch] = pr
+		}
+		if pr != nil {
+			return branch, pr, nil
+		}
+	}
+	return branches[len(branches)-1], nil, nil
 }
 
 // wake is a prompt to send a session.
@@ -342,7 +362,7 @@ type outcome struct {
 }
 
 // update stores what a fetch found and says what it calls for.
-func (l *Lifecycle) update(t target, worktree string, pr *PR) outcome {
+func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	key := t.proj.Key()
@@ -352,7 +372,7 @@ func (l *Lifecycle) update(t target, worktree string, pr *PR) outcome {
 		l.tracks[t.id] = tr
 	}
 	prev := tr.pr
-	tr.worktree, tr.pr = worktree, pr
+	tr.branch, tr.worktree, tr.pr = branch, worktree, pr
 	var o outcome
 	if pr == nil {
 		if tr.cleanup == "ask" {
@@ -403,6 +423,8 @@ type prsFile struct {
 	Acks   map[string]ack   `json:"acks"`   // PR number -> ack
 	Live   map[string]bool  `json:"live"`   // session id -> its PR was seen draft or open
 	Nudged map[string]nudge `json:"nudged"` // PR number -> nudge
+
+	Branches map[string][]string `json:"branches"` // session id -> the branches it worked on, oldest first; only for sessions with no issue
 }
 
 // prs needs mu.
@@ -422,6 +444,9 @@ func (l *Lifecycle) prs(key string) *prsFile {
 	}
 	if f.Nudged == nil {
 		f.Nudged = map[string]nudge{}
+	}
+	if f.Branches == nil {
+		f.Branches = map[string][]string{}
 	}
 	l.files[key] = f
 	return f
@@ -641,10 +666,11 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 		c := *tr.pr
 		pr = &c
 	}
+	prBranch := tr.branch
 	l.mu.Unlock()
 	l.sessions.changed()
 
-	removed, reason := l.removeAll(ctx, t, pr, force)
+	removed, reason := l.removeAll(ctx, t, pr, prBranch, force)
 	if reason != "" && ctx.Err() != nil {
 		reason = closedReason
 	}
@@ -669,10 +695,10 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 
 // removeAll runs the clean-up steps in order. A non-empty reason means it stopped before the end.
 // A step that finds the context cancelled stops with closedReason.
-func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool) (removed []string, reason string) {
+func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, prBranch string, force bool) (removed []string, reason string) {
 	removed = []string{}
 	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.removeWorktreeAndBranch, l.removeSession}
-	plan, reason := l.plan(ctx, t, pr, force)
+	plan, reason := l.plan(ctx, t, pr, prBranch, force)
 	for _, step := range steps {
 		if reason != "" {
 			break
@@ -689,45 +715,75 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, force bool)
 
 // cleanupPlan is what a clean-up found out before it removes anything.
 type cleanupPlan struct {
+	branches []branchPlan
+	main     string // the branch a project folder goes back to; only for sessions with no issue
+	force    bool
+}
+
+type branchPlan struct {
+	branch       string
 	worktree     string
 	inMain       bool // the branch is checked out in the project folder itself
 	branchExists bool
-	force        bool
 }
 
-// plan looks at the worktree and branch, and unless forced, says why removing them could lose work.
-func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, force bool) (cleanupPlan, string) {
-	dir, branch := t.proj.Dir, t.proj.BranchFor(t.issue)
+// plan looks at the worktree and branch of each branch the session worked on, and unless forced,
+// says why removing them could lose work. The PR counts only for the branch it was found on.
+func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string, force bool) (cleanupPlan, string) {
+	dir := t.proj.Dir
 	trees, err := l.worktrees(ctx, dir)
 	if err != nil {
 		return cleanupPlan{}, fmt.Sprintf("git could not list the worktrees: %v", err)
 	}
-	p := cleanupPlan{worktree: trees.byBranch[branch], force: force}
-	p.inMain = p.worktree != "" && samePath(p.worktree, trees.main)
-	_, rerr := l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
-	p.branchExists = rerr == nil
-	if !force && !p.inMain {
-		return p, l.unsafe(ctx, dir, p.worktree, branch, p.branchExists, pr)
+	p := cleanupPlan{force: force}
+	if t.issue == 0 {
+		p.main = l.mainBranch(ctx, dir)
+	}
+	for _, branch := range t.branches {
+		b := branchPlan{branch: branch, worktree: trees.byBranch[branch]}
+		b.inMain = b.worktree != "" && samePath(b.worktree, trees.main)
+		_, rerr := l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
+		b.branchExists = rerr == nil
+		p.branches = append(p.branches, b)
+		if force || (b.inMain && t.issue > 0) {
+			continue
+		}
+		branchPR := pr
+		if branch != prBranch {
+			branchPR = nil
+		}
+		if reason := l.unsafe(ctx, dir, b.worktree, branch, b.branchExists, branchPR); reason != "" {
+			return p, reason
+		}
 	}
 	return p, ""
 }
 
 func (l *Lifecycle) removeWorktreeAndBranch(ctx context.Context, t target, p *cleanupPlan) (removed []string, reason string) {
-	dir, branch := t.proj.Dir, t.proj.BranchFor(t.issue)
-	if p.worktree != "" && !p.inMain {
-		if err := l.removeWorktree(ctx, t.proj, branch, p.worktree, p.force); err != nil {
-			return removed, fmt.Sprintf("removing the worktree failed: %v", err)
+	dir := t.proj.Dir
+	for _, b := range p.branches {
+		keep := b.inMain && t.issue > 0
+		if b.worktree != "" && !b.inMain {
+			if err := l.removeWorktree(ctx, t.proj, b.branch, b.worktree, p.force); err != nil {
+				return removed, fmt.Sprintf("removing the worktree failed: %v", err)
+			}
+			removed = append(removed, "worktree "+display(dir, b.worktree))
 		}
-		removed = append(removed, "worktree "+display(dir, p.worktree))
-	}
-	switch {
-	case p.inMain:
-		removed = append(removed, "branch "+branch+" kept: it is checked out in the main working tree")
-	case p.branchExists:
-		if _, err := l.git(ctx, dir, "branch", "-D", branch); err != nil {
-			return removed, fmt.Sprintf("deleting the branch failed: %v", err)
+		if b.inMain && !keep {
+			if _, err := l.git(ctx, b.worktree, "switch", p.main); err != nil {
+				return removed, fmt.Sprintf("switching the project folder to %s failed: %v", p.main, err)
+			}
+			removed = append(removed, "project folder back on "+p.main)
 		}
-		removed = append(removed, "branch "+branch)
+		switch {
+		case keep:
+			removed = append(removed, "branch "+b.branch+" kept: it is checked out in the main working tree")
+		case b.branchExists:
+			if _, err := l.git(ctx, dir, "branch", "-D", b.branch); err != nil {
+				return removed, fmt.Sprintf("deleting the branch failed: %v", err)
+			}
+			removed = append(removed, "branch "+b.branch)
+		}
 	}
 	return removed, ""
 }
@@ -873,4 +929,63 @@ func (l *Lifecycle) Cleanups(key string) []Cleanup {
 	}
 	slices.Reverse(out)
 	return out[:min(len(out), cleanupsKept)]
+}
+
+// branchesOf are the branches a session with no issue worked on, oldest first.
+func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
+	if l == nil {
+		return nil
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Clone(l.prs(proj.Key()).Branches[id])
+}
+
+// learn notes the branch checked out in cwd as one the session works on, when cwd is in the
+// project's repo and the branch is not the main one, and looks up its pull request.
+func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string) {
+	branch, ok := l.workBranch(ctx, proj, cwd)
+	if !ok {
+		return
+	}
+	key := proj.Key()
+	l.mu.Lock()
+	f := l.prs(key)
+	known := f.Branches[id]
+	if len(known) > 0 && known[len(known)-1] == branch {
+		l.mu.Unlock()
+		return
+	}
+	f.Branches[id] = append(slices.DeleteFunc(slices.Clone(known), func(b string) bool { return b == branch }), branch)
+	l.savePRs(key)
+	l.mu.Unlock()
+	l.ensureWatchers(ctx)
+	l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
+}
+
+// workBranch is the branch checked out in cwd, unless cwd is detached, on the main branch or in another repo.
+func (l *Lifecycle) workBranch(ctx context.Context, proj project.Project, cwd string) (string, bool) {
+	out, err := l.git(ctx, cwd, "branch", "--show-current")
+	branch := strings.TrimSpace(string(out))
+	if err != nil || branch == "" || branch == l.mainBranch(ctx, proj.Dir) {
+		return "", false
+	}
+	common := func(dir string) string {
+		out, err := l.git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+		if err != nil {
+			return ""
+		}
+		return strings.TrimSpace(string(out))
+	}
+	here := common(cwd)
+	return branch, here != "" && samePath(here, common(proj.Dir))
+}
+
+// mainBranch is the branch origin calls its default, or main when origin does not say.
+func (l *Lifecycle) mainBranch(ctx context.Context, dir string) string {
+	out, err := l.git(ctx, dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+	if err != nil {
+		return "main"
+	}
+	return cmp.Or(strings.TrimPrefix(strings.TrimSpace(string(out)), "origin/"), "main")
 }

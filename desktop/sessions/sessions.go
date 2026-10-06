@@ -112,6 +112,7 @@ type Sessions struct {
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
 	dismissed  map[string]bool          // ended sessions the user dismissed: the poll must not bring them back
 	records    map[string]session.Record
+	cwds       map[string]string // the working directory each session's last hook reported
 	seen       map[string]session.State
 	history    map[string][]Change
 	loaded     bool // the first refresh is in, so later changes may raise attention
@@ -210,6 +211,7 @@ func newSessions(o Options) *Sessions {
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
+		cwds:       map[string]string{},
 		seen:       map[string]session.State{},
 		history:    map[string][]Change{},
 		ready:      map[string]chan struct{}{},
@@ -439,9 +441,28 @@ func (s *Sessions) take(rec session.Record) {
 		return
 	}
 	s.records[rec.Session] = rec
+	s.followBranch(rec)
 	if ch, ok := s.ready[rec.Session]; ok && rec.Event == "SessionStart" {
 		close(ch)
 		delete(s.ready, rec.Session)
+	}
+}
+
+// followBranch has the lifecycle look at the branch of a session that has no issue, when the
+// agent moved or finished a turn. It needs mu.
+func (s *Sessions) followBranch(rec session.Record) {
+	moved := rec.Cwd != "" && (rec.Cwd != s.cwds[rec.Session] || rec.Event == "Stop")
+	if !moved {
+		return
+	}
+	s.cwds[rec.Session] = rec.Cwd
+	for _, in := range s.info {
+		if in.Name.String() != rec.Session || in.Issue != "" {
+			continue
+		}
+		if proj, ok := s.projectOf(in); ok {
+			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd)
+		}
 	}
 }
 
@@ -635,10 +656,11 @@ func (s *Sessions) list() []Session {
 		if ss.State == session.Ended {
 			view.EndedAt = ss.At.UnixMilli()
 		}
+		f := s.life.fields(id)
+		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
+		view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
 		if issue > 0 {
-			f := s.life.fields(id)
-			view.Branch, view.Worktree, view.PR = s.project.BranchFor(issue), f.worktree, f.pr
-			view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
+			view.Branch = s.project.BranchFor(issue)
 		}
 		if view.History == nil {
 			view.History = []Change{}
@@ -942,6 +964,9 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 // permission prompt, the text could answer it. A session that has ended gets a new one for
 // its issue, with the prompt sent, and its row goes.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
+	if t.ended && t.issue == 0 {
+		return
+	}
 	if t.ended {
 		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
@@ -1049,8 +1074,8 @@ func (s *Sessions) changed() {
 	s.sync()
 }
 
-// issueTargets are the sessions that work on an issue, live or ended, in any project we know.
-func (s *Sessions) issueTargets() []target {
+// workTargets are the sessions that have a branch to follow, live or ended, in any project we know.
+func (s *Sessions) workTargets() []target {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []target
@@ -1086,7 +1111,7 @@ func (s *Sessions) target(id string) (target, error) {
 func (s *Sessions) targetOrErr(in term.Info, ended bool) (target, error) {
 	t, ok := s.targetOf(in)
 	if !ok {
-		return target{}, fmt.Errorf("session %s has no issue to clean up after", in.Name)
+		return target{}, fmt.Errorf("session %s has no issue or branch to clean up after", in.Name)
 	}
 	t.ended = ended
 	return t, nil
@@ -1094,16 +1119,30 @@ func (s *Sessions) targetOrErr(in term.Info, ended bool) (target, error) {
 
 // targetOf needs mu.
 func (s *Sessions) targetOf(in term.Info) (target, bool) {
-	issue, _ := strconv.Atoi(in.Issue)
-	if issue == 0 {
+	proj, ok := s.projectOf(in)
+	if !ok {
 		return target{}, false
 	}
+	issue, _ := strconv.Atoi(in.Issue)
+	id := in.Name.String()
+	branches := s.life.branchesOf(proj, id)
+	if issue > 0 {
+		branches = []string{proj.BranchFor(issue)}
+	}
+	if len(branches) == 0 {
+		return target{}, false
+	}
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
+}
+
+// projectOf needs mu.
+func (s *Sessions) projectOf(in term.Info) (project.Project, bool) {
 	for _, p := range s.projects() {
 		if p.Key() == in.Name.Project {
-			return target{id: in.Name.String(), title: cmp.Or(in.Title, defaultTitle), issue: issue, proj: p, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
+			return p, true
 		}
 	}
-	return target{}, false
+	return project.Project{}, false
 }
 
 // TypeInto puts text into the session's prompt without pressing Enter.

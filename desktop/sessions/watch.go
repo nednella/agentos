@@ -30,10 +30,10 @@ type watcher struct {
 	config string // the pr_watch and pr_poll it was started with
 }
 
-// ensureWatchers keeps a watcher running for every project with issue sessions, and stops the rest.
+// ensureWatchers keeps a watcher running for every project with a session on a branch, and stops the rest.
 func (l *Lifecycle) ensureWatchers(ctx context.Context) {
 	want := map[string]project.Project{}
-	for _, g := range groups(l.sessions.issueTargets()) {
+	for _, g := range groups(l.sessions.workTargets()) {
 		want[g.proj.Key()] = g.proj
 	}
 	l.mu.Lock()
@@ -150,7 +150,7 @@ func (l *Lifecycle) onEvent(ctx context.Context, proj project.Project, payload [
 	targets := l.targetsOf(proj)
 	var only []string
 	for _, n := range numbers {
-		branch, ok := l.branchOfPR(proj, targets, n)
+		branch, ok := l.branchOfPR(targets, n)
 		if !ok {
 			only = nil
 			break
@@ -161,21 +161,21 @@ func (l *Lifecycle) onEvent(ctx context.Context, proj project.Project, payload [
 }
 
 // branchOfPR is the branch of the session that tracks the pull request.
-func (l *Lifecycle) branchOfPR(proj project.Project, targets []target, number int) (string, bool) {
+func (l *Lifecycle) branchOfPR(targets []target, number int) (string, bool) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, t := range targets {
 		if tr := l.tracks[t.id]; tr != nil && tr.pr != nil && tr.pr.Number == number {
-			return proj.BranchFor(t.issue), true
+			return tr.branch, true
 		}
 	}
 	return "", false
 }
 
-// targetsOf are the project's issue sessions.
+// targetsOf are the project's sessions on a branch.
 func (l *Lifecycle) targetsOf(proj project.Project) []target {
 	var out []target
-	for _, t := range l.sessions.issueTargets() {
+	for _, t := range l.sessions.workTargets() {
 		if t.proj.Key() == proj.Key() {
 			out = append(out, t)
 		}
@@ -218,7 +218,7 @@ func (l *Lifecycle) pollPRs(ctx context.Context, proj project.Project, repo stri
 			continue
 		}
 		// Checks do not touch a PR's updated_at, so pending ones are looked at every time.
-		l.refreshOnly(ctx, proj, targets, append(changed, l.pendingBranches(proj, targets)...))
+		l.refreshOnly(ctx, proj, targets, append(changed, l.pendingBranches(targets)...))
 	}
 }
 
@@ -259,12 +259,17 @@ func (l *Lifecycle) changedBranches(ctx context.Context, proj project.Project, r
 	l.etags[key] = etag
 	changed := []string{}
 	for _, t := range targets {
-		branch := proj.BranchFor(t.issue)
-		at, listed := updated[branch]
 		tr := l.tracks[t.id]
-		known := tr != nil && tr.pr != nil
-		if listed && (!known || tr.pr.UpdatedAt != at) && !slices.Contains(changed, branch) {
-			changed = append(changed, branch)
+		for _, branch := range slices.Backward(t.branches) { // the newest branch with a PR is the one tracked
+			at, listed := updated[branch]
+			if !listed {
+				continue
+			}
+			known := tr != nil && tr.pr != nil && tr.branch == branch
+			if (!known || tr.pr.UpdatedAt != at) && !slices.Contains(changed, branch) {
+				changed = append(changed, branch)
+			}
+			break
 		}
 	}
 	return changed, nil
@@ -290,13 +295,13 @@ func splitResponse(out []byte) (etag string, body []byte) {
 }
 
 // pendingBranches are the tracked branches whose PR has checks still running.
-func (l *Lifecycle) pendingBranches(proj project.Project, targets []target) []string {
+func (l *Lifecycle) pendingBranches(targets []target) []string {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	var out []string
 	for _, t := range targets {
 		if tr := l.tracks[t.id]; tr != nil && tr.pr != nil && tr.pr.Checks == "pending" {
-			out = append(out, proj.BranchFor(t.issue))
+			out = append(out, tr.branch)
 		}
 	}
 	return out
