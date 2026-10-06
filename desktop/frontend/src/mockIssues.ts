@@ -1,20 +1,20 @@
 import type { Issue, IssueDetail } from './types'
 
-type Seed = [number, Issue['lane'], Issue['type'], string, string, string[]]
+type Seed = [number, Issue['lane'], Issue['type'], string, string, string[], string[]?]
 
 const day = 86_400_000
 
 const livedocumentSeeds: Seed[] = [
   [454, 'ready', 'refactor', 'Split the document entry into edit and view', 'nednella', ['ned']],
   [444, 'ready', 'refactor', 'Restructure the embed route and providers', 'nednella', ['ned']],
-  [326, 'ready', 'bug', 'sendBeacon drops the last view duration', 'mariam-k', []],
+  [326, 'ready', 'bug', 'sendBeacon drops the last view duration', 'mariam-k', [], ['model:haiku']],
   [412, 'ready', 'chore', 'Sweep the locale keys for the billing pages', 'tomasz', ['tomasz']],
   [389, 'ready', 'feature', 'Stripe webhook retries with backoff', 'nednella', []],
-  [401, 'ready', 'bug', 'Password prompt flashes before the document loads', 'mariam-k', ['mariam-k']],
+  [401, 'ready', 'bug', 'Password prompt flashes before the document loads', 'mariam-k', ['mariam-k'], ['effort:high']],
   [405, 'plan', 'feature', 'Per-link expiry with a grace period', 'dev-bot', []],
   [398, 'plan', 'feature', 'Lead capture form on the viewer', 'tomasz', ['nednella']],
   [372, 'plan', 'refactor', 'One plan catalogue for every billing surface', 'nednella', []],
-  [361, 'plan', 'bug', 'Embed ignores the allowlist on first paint', 'mariam-k', []],
+  [361, 'plan', 'bug', 'Embed ignores the allowlist on first paint', 'mariam-k', [], ['model:opus', 'effort:max']],
   [418, 'you', 'chore', 'Decide the retention window for viewer events', 'tomasz', ['nednella']],
   [415, 'you', 'feature', 'Pick the default sort for the library', 'mariam-k', ['nednella']],
   [377, 'you', 'bug', 'Duplicate contacts after a Google import', 'dev-bot', []],
@@ -50,7 +50,7 @@ const labelFor = (lane: Issue['lane']) =>
 
 export function buildIssues(repo: string): Issue[] {
   const now = Date.now()
-  return (seedsByRepo[repo] ?? []).map(([number, lane, type, title, author, assignees], i) => {
+  return (seedsByRepo[repo] ?? []).map(([number, lane, type, title, author, assignees, extra = []], i) => {
     const label = labelFor(lane)
     return {
       number,
@@ -61,7 +61,7 @@ export function buildIssues(repo: string): Issue[] {
       sessionId: '',
       author,
       assignees,
-      labels: [label, type ? `type:${type}` : ''].filter(Boolean),
+      labels: [label, type ? `type:${type}` : '', ...extra].filter(Boolean),
       createdAt: now - (i + 2) * day,
       updatedAt: now - (i % 5) * day,
     }

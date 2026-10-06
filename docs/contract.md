@@ -34,6 +34,8 @@ type Session = {
   lastEventAt: number   // unix ms; 0 if none
   createdAt: number     // unix ms
   issue: number         // GitHub issue the session was started for; 0 if none
+  model: string         // model the agent was started with ("sonnet"); "" for an agent other than claude or a session from before the field
+  effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
   branch: string        // branch of the issue's work (from the project's `branch` pattern); "" without an issue
   worktree: string      // path of the git worktree on that branch; "" if none
@@ -131,6 +133,7 @@ type Evidence = {
 type Wait = {           // one time a session waited on the user
   sessionTitle: string
   issue: number
+  model: string         // the session's model, "" when unknown
   kind: 'permission' | 'question' | 'idle'
   label: string         // "Bash: yarn test", "Edit", "Question", "Reply landed"
   startedAt: number
@@ -212,7 +215,7 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder; a non-empty `prefill` is typed in, not sent, once the agent is ready |
+| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder with the project's model and effort; a non-empty `prefill` is typed in, not sent, once the agent is ready |
 | `KillSession(id)` | | stops the agent; the row stays as `ended`; rejects the shell |
 | `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | rejects the shell |
@@ -234,7 +237,7 @@ type Digest = {
 | Method | Returns | What it does |
 |---|---|---|
 | `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
-| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
+| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and starts the agent with the model and effort of the issue's lane, or of its `model:` and `effort:` labels, and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
 | `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 
 ### Pull requests and clean-up (`sessions`)
@@ -341,6 +344,8 @@ folders are served. Use the URL in `<img src>`.
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
 agent: claude                  # claude (the default, with hooks) or any command, which runs plain
+model: sonnet                  # model of every Claude session unless a project, lane or issue label says otherwise
+effort: medium                 # low, medium, high, xhigh or max
 projects:
   - name: livedocument
     dir: /Users/me/code/livedocument
@@ -356,6 +361,10 @@ projects:
       needs-plan: plan
       needs-human: you
       idea: idea
+    model: ""                  # this project's model; "" uses the top-level one
+    effort: ""                 # this project's effort; "" uses the top-level one
+    models:                    # lane -> model and effort of sessions started for an issue there; either key may be left out
+      plan: {model: opus}      # the built-in choice: plan runs on opus, every other lane on the project's model
     branch: "issue-{n}"        # branch of an issue's work
     cleanup: ""                # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
     url: ""                    # page a session's browser opens first
@@ -367,6 +376,16 @@ projects:
 
 A label that maps to no lane puts an issue in `idea`; an issue with no labels is in `inbox`. When labels map to several lanes the first of
 ready, plan, you, idea wins. Only the lanes `ready`, `plan`, `inbox` and `idea` have a command.
+
+### How a session picks its model
+
+Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets
+a value, model and effort each on their own: the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored); the
+project's `models` entry for the lane; the built-in choice for the lane (`plan` runs on `opus`); the project's `model` and `effort`; the top-level
+`model` and `effort`; then `sonnet` and `medium`. A session started for an issue uses the issue's lane and labels; a new session or one started
+from a note uses the project's own setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`)
+and in the state file of an ended one, so it outlives a restart. `Session.model` and `Session.effort` show it, and each wait in the tally records
+the model.
 
 ### Where things are stored
 

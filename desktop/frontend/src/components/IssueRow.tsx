@@ -3,6 +3,7 @@ import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
 import { Icon } from './Icon'
+import { ModelTag } from './ModelTag'
 import { PRMark } from './PRMark'
 import { StateDot } from './StateDot'
 import { TypeMark } from './TypeMark'
@@ -14,6 +15,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
   const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
   const dense = mode === 'compact'
+  const labelled = (key: string) => issue.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1) ?? ''
   const open = typeof overlay === 'object' && overlay?.issue === issue.number
 
   return (
@@ -26,6 +28,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
+        <ModelTag model={labelled('model')} effort={labelled('effort')} />
       </button>
       <span className="reveal">
         <button

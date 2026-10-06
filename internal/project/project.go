@@ -20,6 +20,9 @@ type Project struct {
 	Dir      string            `yaml:"dir"`
 	Commands map[string]string `yaml:"commands,omitempty"` // keys: ready, plan, inbox, idea, note
 	Lanes    map[string]string `yaml:"lanes,omitempty"`    // GitHub label -> lane
+	Model    string            `yaml:"model,omitempty"`    // overrides the config's model for this project
+	Effort   string            `yaml:"effort,omitempty"`   // overrides the config's effort for this project
+	Models   map[string]Model  `yaml:"models,omitempty"`   // lane -> model and effort of the sessions started there
 	Branch   string            `yaml:"branch,omitempty"`   // branch of an issue's work; {n} is the number
 	Cleanup  string            `yaml:"cleanup,omitempty"`  // shell command that removes a worktree; {branch} and {worktree}
 	URL      string            `yaml:"url,omitempty"`      // the page a session's browser opens first
@@ -33,6 +36,8 @@ type Project struct {
 type Config struct {
 	DataDir  string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
 	Agent    string    `yaml:"agent"`
+	Model    string    `yaml:"model,omitempty"`  // model of a Claude session, "sonnet" by default
+	Effort   string    `yaml:"effort,omitempty"` // effort of a Claude session, "medium" by default
 	Projects []Project `yaml:"projects"`
 }
 
@@ -72,6 +77,9 @@ func Load(path string) (Config, error) {
 	if cfg.DataDir != "" {
 		cfg.DataDir = ExpandHome(cfg.DataDir)
 	}
+	if err := cfg.Default().Validate(); err != nil {
+		return Config{}, fmt.Errorf("%s: %w", path, err)
+	}
 	for i, p := range cfg.Projects {
 		if p.Name == "" || p.Dir == "" {
 			return Config{}, fmt.Errorf("%s: project %d needs a name and a dir", path, i+1)
@@ -79,6 +87,9 @@ func Load(path string) (Config, error) {
 		cfg.Projects[i].Dir = ExpandHome(p.Dir)
 		if p.PRWatch != "" && p.PRWatch != "webhook" && p.PRWatch != "poll" {
 			return Config{}, fmt.Errorf("%s: project %s: pr_watch must be webhook or poll, not %q", path, p.Name, p.PRWatch)
+		}
+		if err := p.validateModels(); err != nil {
+			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if _, err := p.PRPollEvery(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)

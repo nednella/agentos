@@ -34,7 +34,7 @@ func TestClaudeGetsTheBrowserPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
-			argv := s.commandFor(session.Name{Project: "p", N: 1}, tt.proj)
+			argv := s.commandFor(session.Name{Project: "p", N: 1}, tt.proj, project.Model{})
 			i := slices.Index(argv, "--append-system-prompt")
 			if (i >= 0) != tt.want || (tt.want && argv[i+1] != prompts.BrowserSession()) {
 				t.Errorf("argv = %q", argv)

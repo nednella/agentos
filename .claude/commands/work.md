@@ -14,6 +14,7 @@ Ned unless a decision is genuinely his. Read `CLAUDE.md` first; its hard rules a
   truth for how the front end and the Go core talk; `docs/testing.md` says how to verify.
 - If the issue allows more than one reasonable reading, pick the simplest and say so in
   your Agent Review (step 5); do not stop to ask.
+- If the task is clearly beyond your model, say so in your Agent Review and stop rather than grind.
 
 ## 2. Branch
 

@@ -20,6 +20,8 @@ export type Session = {
   lastEventAt: number
   createdAt: number
   issue: number
+  model: string
+  effort: string
   history: HistoryEntry[]
   branch: string
   worktree: string
@@ -95,6 +97,7 @@ export type WaitKind = 'permission' | 'question' | 'idle'
 export type Wait = {
   sessionTitle: string
   issue: number
+  model: string
   kind: WaitKind
   label: string
   startedAt: number

@@ -4,6 +4,7 @@ package apptest
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/base64"
 	"errors"
@@ -315,7 +316,7 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			{"number":9,"title":"Human","url":"https://x/9","labels":[{"name":"needs-human"}]},
 			{"number":10,"title":"Maybe","url":"https://x/10","labels":[{"name":"idea"},{"name":"type:chore"}]},
 			{"number":11,"title":"New","url":"https://x/11","labels":[]},
-			{"number":12,"title":"Other","url":"https://x/12","labels":[{"name":"roadmap"}]}
+			{"number":12,"title":"Other","url":"https://x/12","labels":[{"name":"roadmap"},{"name":"model:haiku"},{"name":"effort:high"}]}
 		]`), nil
 	}
 	return nil, fmt.Errorf("unexpected %s %v", name, args)
@@ -428,6 +429,8 @@ func NoClaude(context.Context, string, []string, string, ...string) ([]byte, err
 // Options changes the harness's config.
 type Options struct {
 	ProjectExtra string        // yaml lines added under the project "main"
+	Agent        string        // the config's agent; bash by default
+	TopExtra     string        // yaml lines added at the top of the config
 	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
 	DigestTick   time.Duration
 }
@@ -468,7 +471,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	}
 	dir := t.TempDir()
 	confPath := filepath.Join(state, "config.yaml")
-	conf := fmt.Sprintf("agent: bash\nprojects:\n  - name: main\n    dir: %s\n    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n%s", dir, o.ProjectExtra)
+	conf := fmt.Sprintf("agent: %s\n%sprojects:\n  - name: main\n    dir: %s\n    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, o.ProjectExtra)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -611,6 +614,20 @@ func CLIPath(t *testing.T) string {
 		t.Fatal(cliErr)
 	}
 	return cliBin
+}
+
+// ClaudeOnPath puts a stand-in `claude` and the built agentos command first on PATH, so the app runs its Claude
+// adapter and tmux starts the stand-in. The stand-in writes its arguments to <dir>/<session id, "/" as "_">.args and
+// waits. Call it before New. It returns dir.
+func ClaudeOnPath(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + dir + "/$(echo \"$AGENTOS_SESSION\" | tr / _).args\"\nexec sleep 60\n"
+	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+filepath.Dir(CLIPath(t))+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return dir
 }
 
 // Main runs a package's tests and removes the command they built.

@@ -56,6 +56,9 @@ func TestSessionLifecycle(t *testing.T) {
 	if err := tmux.SetIssue(ctx, name, 394); err != nil {
 		t.Fatal(err)
 	}
+	if err := tmux.SetModel(ctx, name, "opus", "high"); err != nil {
+		t.Fatal(err)
+	}
 	infos, err := list(tmux, ctx)
 	if err != nil || len(infos) != 2 {
 		t.Fatalf("List = %v, %v", infos, err)
@@ -66,6 +69,12 @@ func TestSessionLifecycle(t *testing.T) {
 	}
 	if got := byName[other].Title; got != "tabs and ünïcode" {
 		t.Errorf("second title = %q", got)
+	}
+	if got := byName[name]; got.Model != "opus" || got.Effort != "high" {
+		t.Errorf("first model = %q, effort = %q", got.Model, got.Effort)
+	}
+	if got := byName[other]; got.Model != "" || got.Effort != "" {
+		t.Errorf("second model = %q, effort = %q, want none", got.Model, got.Effort)
 	}
 	if byName[name].Issue != "394" || byName[other].Issue != "" {
 		t.Errorf("issues = %q and %q", byName[name].Issue, byName[other].Issue)
