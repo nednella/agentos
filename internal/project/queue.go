@@ -80,6 +80,14 @@ const (
 // SendsPrompt says whether the text a session is started with is sent at once, or waits for Enter.
 func (p Project) SendsPrompt() bool { return p.SessionPromptSend != PromptManual }
 
+// PromptSend is the project's prompt send mode, the default filled in.
+func (p Project) PromptSend() string {
+	if p.SendsPrompt() {
+		return PromptAuto
+	}
+	return PromptManual
+}
+
 func (p Project) validateQueue() error {
 	if p.SessionPromptSend != "" && p.SessionPromptSend != PromptAuto && p.SessionPromptSend != PromptManual {
 		return fmt.Errorf("session_prompt_send must be %s or %s, not %q", PromptAuto, PromptManual, p.SessionPromptSend)
