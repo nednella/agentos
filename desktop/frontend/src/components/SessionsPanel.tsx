@@ -81,7 +81,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         {sessions.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {sessions.length === 0 && <p className="flex h-full items-center justify-center px-4 text-center text-small text-dim">No sessions yet.</p>}
+        {sessions.length === 0 && <p className="flex h-full items-center justify-center px-4 text-center text-body font-medium">No sessions yet</p>}
       </div>
       <NewSessionRow cursor={nav.cursorKey === NEW_SESSION_KEY} compact={compact} />
     </aside>
