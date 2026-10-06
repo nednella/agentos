@@ -479,6 +479,22 @@ func NoClaude(context.Context, string, []string, string, ...string) ([]byte, err
 	return nil, errors.New("claude is not available in this test")
 }
 
+// queueSections is the queue of the project "main": the issues of FakeGH fall in Ready (7), Plan (8), Inbox (11) and Other (9, 10, 12).
+const queueSections = `    queue_sections:
+      - name: Ready
+        labels: [ready]
+        actions:
+          - {name: Work, command: "/ship {n}"}
+          - {name: Plan, command: "/plan {n}", model: opus, effort: high}
+      - name: Plan
+        labels: [needs-plan]
+        actions:
+          - {name: Investigate, command: "/investigate {n}", model: opus}
+      - name: Inbox
+        actions:
+          - {name: Investigate, command: "/investigate {n}"}
+`
+
 // Options changes the harness's config.
 type Options struct {
 	ProjectExtra string        // yaml lines added under the project "main"
@@ -533,7 +549,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	if o.NoBranch {
 		branch = ""
 	}
-	conf := fmt.Sprintf("agent: %s\n%sprojects:\n  - name: main\n    dir: %s\n%s    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, o.ProjectExtra)
+	conf := fmt.Sprintf("agent: %s\n%sprojects:\n  - name: main\n    dir: %s\n%s%s%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, queueSections, o.ProjectExtra)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -760,7 +776,10 @@ func (h *Harness) TermClose(id string) { h.terminal.TermClose(id) }
 
 func (h *Harness) Issues(refresh bool) ([]issues.Issue, error) { return h.issues.Issues(refresh) }
 func (h *Harness) StartIssue(number int) (sessions.Session, error) {
-	return h.issues.StartIssue(number)
+	return h.issues.StartIssue(number, "")
+}
+func (h *Harness) StartIssueWith(number int, action string) (sessions.Session, error) {
+	return h.issues.StartIssue(number, action)
 }
 func (h *Harness) IssueDetail(number int) (issues.IssueDetail, error) {
 	return h.issues.IssueDetail(number)

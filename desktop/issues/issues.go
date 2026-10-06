@@ -1,7 +1,8 @@
-// Package issues reads a project's GitHub issues into lanes and starts sessions for them.
+// Package issues reads a project's GitHub issues into queue sections and starts sessions for them.
 package issues
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -24,15 +25,16 @@ type Sessions interface {
 	Current() project.Project
 	IssueSessions() map[int]string
 	List() []sessions.Session
-	CreateIssue(title, text string, issue int, lane string, labels []string) (sessions.Session, error)
+	CreateIssue(title, text string, issue int, action project.Action, labels []string) (sessions.Session, error)
 }
 
-// Issue is a GitHub issue placed in a lane of the board.
+// Issue is a GitHub issue placed in a section of the queue.
 type Issue struct {
 	Number    int      `json:"number"`
 	Title     string   `json:"title"`
 	Type      string   `json:"type"`
-	Lane      string   `json:"lane"`
+	Section   string   `json:"section"`
+	Actions   []string `json:"actions"` // names of what can start a session for it, the default first
 	URL       string   `json:"url"`
 	SessionID string   `json:"sessionId"`
 	Author    string   `json:"author"`
@@ -182,7 +184,11 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("reading gh issue list: %w", err)
 	}
-	out := make([]Issue, 0, len(raw))
+	type placed struct {
+		section int
+		issue   Issue
+	}
+	list := make([]placed, 0, len(raw))
 	for _, r := range raw {
 		labels := make([]string, len(r.Labels))
 		for k, l := range r.Labels {
@@ -192,13 +198,27 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 		for k, a := range r.Assignees {
 			assignees[k] = a.Login
 		}
-		out = append(out, Issue{
-			Number: r.Number, Title: r.Title, URL: r.URL, Lane: proj.Lane(labels), Type: typeOf(labels),
+		at, section := proj.Section(labels)
+		list = append(list, placed{at, Issue{
+			Number: r.Number, Title: r.Title, URL: r.URL, Section: section.Name, Actions: actionNames(section), Type: typeOf(labels),
 			Author: r.Author.Login, Assignees: assignees, Labels: labels,
 			CreatedAt: util.Millis(r.CreatedAt), UpdatedAt: util.Millis(r.UpdatedAt),
-		})
+		}})
+	}
+	slices.SortStableFunc(list, func(a, b placed) int { return cmp.Compare(a.section, b.section) })
+	out := make([]Issue, len(list))
+	for i, p := range list {
+		out[i] = p.issue
 	}
 	return out, nil
+}
+
+func actionNames(s project.Section) []string {
+	var names []string
+	for _, a := range s.ActionList() {
+		names = append(names, a.Name)
+	}
+	return names
 }
 
 func typeOf(labels []string) string {
@@ -249,9 +269,10 @@ func (i *Issues) Reload(ctx context.Context, proj project.Project) {
 	}
 }
 
-// Start opens a session for the issue. An issue that already has a live
-// session gets that session back instead of a second agent.
-func (i *Issues) Start(ctx context.Context, number int) (sessions.Session, error) {
+// Start opens a session for the issue with the action of its section that has the name given, or the
+// section's default action when action is "". An issue that already has a live session gets that session
+// back instead of a second agent.
+func (i *Issues) Start(ctx context.Context, number int, action string) (sessions.Session, error) {
 	list, err := i.List(ctx, i.sessions.Current(), false)
 	if err != nil {
 		return sessions.Session{}, err
@@ -268,7 +289,25 @@ func (i *Issues) Start(ctx context.Context, number int) (sessions.Session, error
 				}
 			}
 		}
-		return i.sessions.CreateIssue(is.sessionTitle(), i.sessions.Current().IssueCommand(is.Lane, number), number, is.Lane, is.Labels)
+		_, section := i.sessions.Current().Section(is.Labels)
+		act, ok := pickAction(section, action)
+		if !ok {
+			return sessions.Session{}, fmt.Errorf("issue #%d has no action %q", number, action)
+		}
+		return i.sessions.CreateIssue(is.sessionTitle(), act.Render(number, is.Title), number, act, is.Labels)
 	}
 	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
+}
+
+// pickAction is the action of the section with the name given, or its default for "".
+func pickAction(s project.Section, name string) (project.Action, bool) {
+	actions := s.ActionList()
+	if name == "" {
+		return actions[0], true
+	}
+	i := slices.IndexFunc(actions, func(a project.Action) bool { return a.Name == name })
+	if i < 0 {
+		return project.Action{}, false
+	}
+	return actions[i], true
 }

@@ -790,14 +790,14 @@ func (s *Sessions) IssueSessions() map[int]string {
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, "", nil), "")
+	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, project.Action{}, nil), "")
 }
 
-// CreateIssue starts the agent for an issue in the lane with the issue's labels, and sends text to it
-// once it is ready. The lane and the labels pick the model.
-func (s *Sessions) CreateIssue(title, text string, issue int, lane string, labels []string) (Session, error) {
+// CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
+// that is sent. The action and the issue's labels pick the model.
+func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, true, issue, proj.Pick(s.model, lane, labels), "")
+	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, proj.Pick(s.model, action, labels), "")
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.
