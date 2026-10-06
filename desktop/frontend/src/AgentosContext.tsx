@@ -45,7 +45,10 @@ export type Agentos = {
   composing: boolean
   focusRequest: { target: FocusTarget; n: number }
   shellId: string
+  update: string
+  updating: boolean
   openShell(): Promise<void>
+  applyUpdate(): Promise<void>
   select(id: string): void
   detach(): void
   stepSession(delta: number): void
@@ -137,6 +140,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [shellId, setShellId] = useState('')
+  const [update, setUpdate] = useState('')
+  const [updating, setUpdating] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
@@ -244,6 +249,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setProjects(snap.projects)
       setNotes(snap.notes)
       setShellId(snap.shell)
+      setUpdate(snap.update)
       setRawIssues([])
       setIssuesDisabled(false)
       setIssueFilterState(readStored(filterKey(snap.project.name), ''))
@@ -289,6 +295,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('term:exit', ({ id }) => setShellId((shell) => (shell === id ? '' : shell))), [])
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
   useEffect(() => on('issues', ifCurrent(setRawIssues)), [])
+  useEffect(() => on('update', ({ version }) => setUpdate(version)), [])
   useEffect(() => on('evidence', ({ id, items }) => setEvidence((map) => ({ ...map, [id]: items }))), [])
   useEffect(() => on('browser:state', (state) => setBrowserStates((map) => ({ ...map, [state.id]: state }))), [])
   useEffect(
@@ -422,6 +429,17 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       composing,
       focusRequest,
       shellId,
+      update,
+      updating,
+      async applyUpdate() {
+        setUpdating(true)
+        try {
+          await api.update()
+        } catch (err) {
+          setUpdating(false)
+          throw err
+        }
+      },
       async openShell() {
         if (shellId) return
         const shell = await api.shellOpen()
@@ -600,7 +618,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

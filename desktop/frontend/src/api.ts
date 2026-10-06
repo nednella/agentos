@@ -51,6 +51,7 @@ type Backend = {
   RunDigest(): Promise<void>
   DigestToNote(itemId: string): Promise<Note>
   DismissDigestItem(itemId: string): Promise<void>
+  Update(): Promise<void>
 }
 
 type Unsubscribe = () => void
@@ -78,6 +79,7 @@ const namespaces = {
   evidence: ['Evidence', 'DeleteEvidence'],
   browser: ['BrowserOpen', 'BrowserGoto', 'BrowserNav', 'BrowserInput', 'BrowserResize', 'BrowserView', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
+  update: ['Update'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -154,6 +156,7 @@ export const api = {
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),
   dismissDigestItem: (itemId: string) => backend.DismissDigestItem(itemId),
+  update: () => backend.Update(),
 }
 
 // The Go side used to call an idle wait "finished"; accept both.
