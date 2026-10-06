@@ -223,7 +223,6 @@ type Digest = {
 | `RenameSession(id, title)` | | rejects the shell |
 | `TypeInto(id, text)` | | types text into the prompt, not sent; line breaks cannot submit it |
 | `ShellOpen()` | `{ id: string }` | makes sure the current project has a shell session (`$SHELL -l` in the project folder, kept in the hidden tmux, with `AGENTOS_PROJECT` and `AGENTOS_SOCKET` set and no `AGENTOS_SESSION`) and returns its id; attach with `TermOpen` like any session. It is not a session: not in `sessions`, the counts, clean-up or the hook states |
-| `HarnessCheck()` | `Session` | starts a session titled "Harness check" with the review prompt typed in |
 
 ### Terminal (`terminal`)
 
@@ -441,7 +440,7 @@ All files are written by writing a temp file and renaming it into place; folders
 browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
-The texts given to agents (the harness check, the digest run, the browser lines in a session's system prompt, `agentos browser help`, the two
+The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`, the two
 pull request wakes) are Markdown files in `internal/prompts`.
 
 ## Command line
@@ -459,7 +458,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 |---|---|---|
 | Work | `issue <n...>` | starts a session per issue; an issue with a live session is reported as already running |
 | Work | `new [title]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most |
-| Work | `refresh`, `pr [n]`, `cleanup [n]`, `harness` | reload issues and PRs, show PRs, clean up or list what waits, start the harness check |
+| Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
 | From inside a session | `browser <command>`, `show <file> [--caption …] \| --text …`, `note <text>` | `agentos browser help` lists the browser commands |
