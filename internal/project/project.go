@@ -31,7 +31,7 @@ type Project struct {
 	Browser            *bool     `yaml:"browser_enabled,omitempty"`         // give sessions the browser and evidence commands; on unless false
 	Digest             string    `yaml:"digest_schedule,omitempty"`         // weekly (the default) or off
 	PRWatch            string    `yaml:"pr_watch_method,omitempty"`         // webhook or poll; unset tries the webhook and polls when it does not work
-	PRPoll             string    `yaml:"pr_poll_interval,omitempty"`        // how often to poll pull requests, "30s" by default
+	PRPoll             string    `yaml:"pr_poll_interval,omitempty"`        // how often to poll pull requests, "10s" by default
 	KeepAwake          *bool     `yaml:"keep_mac_awake,omitempty"`          // overrides the config's keep_mac_awake for this project
 	OnReview           string    `yaml:"pr_review_command,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
 	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
