@@ -88,7 +88,6 @@ type Project struct {
 type Sessions struct {
 	tmux     *term.Tmux
 	agent    agent.Agent
-	model    project.Model // the config's default, before a project, lane or label changes it
 	stateDir string
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
@@ -161,7 +160,6 @@ type Awake interface {
 type Options struct {
 	Tmux          *term.Tmux
 	Agent         agent.Agent
-	Model         project.Model
 	StateDir      string
 	LocalDir      string // pull-request tracking and the clean-up log: never synced
 	Projects      ProjectList
@@ -201,7 +199,7 @@ func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, model: o.Model, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
+		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -794,15 +792,14 @@ func (s *Sessions) IssueSessions() map[int]string {
 // Create starts the agent in the current project. A non-empty text is typed
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
-	proj := s.Current()
-	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, project.Action{}, nil), "")
+	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "")
 }
 
 // CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
 // that is sent. The action and the issue's labels pick the model.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, proj.Pick(s.model, action, labels), "")
+	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, project.Pick(action, labels), "")
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.

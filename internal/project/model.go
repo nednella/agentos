@@ -34,15 +34,11 @@ func (m Model) Validate() error {
 	return nil
 }
 
-// Default is the model and effort the config sets for every session.
-func (c Config) Default() Model { return Model{Model: c.Model, Effort: c.Effort} }
-
-// Pick chooses the model and effort for a session. From weakest to strongest: base (the config's default),
-// the project's own, the action's, then the issue's `model:<x>` and `effort:<y>` labels. A value that fails
-// Validate is skipped. A session for no issue passes an empty action and no labels.
-func (p Project) Pick(base Model, action Action, labels []string) Model {
-	m := Model{Model: p.Model, Effort: p.Effort}.over(base)
-	m = Model{Model: action.Model, Effort: action.Effort}.over(m)
+// Pick chooses the model and effort for a session. From weakest to strongest: the action's, then the issue's
+// `model:<x>` and `effort:<y>` labels. A value that fails Validate is skipped. A session for no issue passes an
+// empty action and no labels.
+func Pick(action Action, labels []string) Model {
+	m := Model{Model: action.Model, Effort: action.Effort}
 	for _, l := range slices.Backward(labels) {
 		var override Model
 		switch {
@@ -57,5 +53,3 @@ func (p Project) Pick(base Model, action Action, labels []string) Model {
 	}
 	return m
 }
-
-func (p Project) validateModel() error { return Model{Model: p.Model, Effort: p.Effort}.Validate() }

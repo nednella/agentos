@@ -62,7 +62,7 @@ func TestIssueSessionsGetTheirActionsModel(t *testing.T) {
 	}
 }
 
-func TestPlainSessionGetsTheProjectDefault(t *testing.T) {
+func TestPlainSessionGetsNoModelFlags(t *testing.T) {
 	dir := apptest.ClaudeOnPath(t)
 	h := apptest.NewWith(t, apptest.Options{
 		Agent: "claude", TopExtra: "session_model: haiku\nsession_effort: low\n", ProjectExtra: "    session_effort: high\n",
@@ -71,8 +71,8 @@ func TestPlainSessionGetsTheProjectDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if model, effort := flagsOf(t, dir, s.ID); model != "haiku" || effort != "high" || s.Model != "haiku" || s.Effort != "high" {
-		t.Errorf("claude got %q %q, session %q %q, want haiku high", model, effort, s.Model, s.Effort)
+	if model, effort := flagsOf(t, dir, s.ID); model != "" || effort != "" || s.Model != "" || s.Effort != "" {
+		t.Errorf("claude got %q %q, session %q %q, want none", model, effort, s.Model, s.Effort)
 	}
 }
 
