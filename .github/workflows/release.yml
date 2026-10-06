@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   release-please:
+    name: Release PR
     runs-on: ubuntu-latest
     outputs:
       created: ${{ steps.release.outputs.release_created }}
@@ -22,6 +23,7 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
   build:
+    name: Build and upload release
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-latest
