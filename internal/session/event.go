@@ -1,6 +1,7 @@
 package session
 
 import (
+	"cmp"
 	"encoding/json"
 	"io"
 	"strings"
@@ -15,6 +16,7 @@ type Event struct {
 	Detail           string
 	Tool             string // the tool of a PreToolUse or PostToolUse
 	Command          string // that tool's shell command, when it has one
+	Cwd              string // where the agent was working
 }
 
 type payload struct {
@@ -24,6 +26,7 @@ type payload struct {
 	ToolInput            map[string]any `json:"tool_input"`
 	Prompt               string         `json:"prompt"`
 	LastAssistantMessage string         `json:"last_assistant_message"`
+	Cwd                  string         `json:"cwd"`
 }
 
 // ParseEvent reads the hook JSON from r. A body that is not JSON still gives a
@@ -31,7 +34,7 @@ type payload struct {
 func ParseEvent(name string, r io.Reader) Event {
 	var p payload
 	_ = json.NewDecoder(io.LimitReader(r, 1<<20)).Decode(&p)
-	ev := Event{Name: name, NotificationType: p.NotificationType, Message: p.Message}
+	ev := Event{Name: name, NotificationType: p.NotificationType, Message: p.Message, Cwd: p.Cwd}
 	switch name {
 	case "Notification":
 		ev.Detail = p.Message
@@ -112,7 +115,7 @@ func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	} else if isIdleReminder(ev) && prev.State != Working {
 		return prev
 	}
-	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType}
+	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType, Cwd: cmp.Or(ev.Cwd, prev.Cwd)}
 	switch ev.Name {
 	case "PreToolUse", "PostToolUse":
 		rec.Tool, rec.Command = ev.Tool, ev.Command

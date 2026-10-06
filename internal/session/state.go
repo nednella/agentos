@@ -24,6 +24,7 @@ type Record struct {
 	Tool    string    `json:"tool,omitempty"`    // the latest tool call, kept through the prompt it leads to
 	Command string    `json:"command,omitempty"` // that call's shell command
 	Notify  string    `json:"notify,omitempty"`  // notification_type of a Notification
+	Cwd     string    `json:"cwd,omitempty"`     // where the agent was working at the latest event
 
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`
