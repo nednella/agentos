@@ -187,6 +187,22 @@ func TestRemovingAProjectWithLiveIssueSessionsIsRefused(t *testing.T) {
 	}
 }
 
+func TestRemovingAProjectEndsItsSessions(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.Sessions().Create("work", "", false, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := h.RemoveProject("main"); err != nil {
+		t.Fatal(err)
+	}
+	for _, v := range h.Sessions().List() {
+		if v.ID == s.ID && v.State != session.Ended {
+			t.Errorf("session %s survived forgetting its project: %+v", s.ID, v)
+		}
+	}
+}
+
 func TestReusedNumberDoesNotInheritTheLiveFlag(t *testing.T) {
 	h := newHarness(t)
 	// An earlier run left main/1 ended, after it saw its PR open.

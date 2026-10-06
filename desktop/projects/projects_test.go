@@ -135,12 +135,10 @@ func TestProjects(t *testing.T) {
 				t.Error("the removed project is still in the config")
 			}
 		}
-		listed := false
 		for _, p := range snap.Projects {
-			listed = listed || (p.Name == "other" && p.Sessions == 1)
-		}
-		if !listed {
-			t.Errorf("a project with a live session vanished: %+v", snap.Projects)
+			if p.Name == "other" {
+				t.Errorf("the removed project is still listed: %+v", p)
+			}
 		}
 		if _, err := h.RemoveProject("nope"); err == nil {
 			t.Error("removing an unknown project succeeded")
