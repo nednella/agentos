@@ -276,8 +276,8 @@ How the app watches: every 5 minutes it fetches every tracked PR. In between, ea
 the project's `pr_watch_method` says `poll`, the watcher streams the repo's `pull_request`, `pull_request_review`, `issue_comment` and `check_suite` events
 through `gh webhook forward` (needs the extension and admin on the repo; a stream that ends within 10 s never worked, and the project is polled
 instead; one that drops later is retried after 30 s, with a warning when `pr_watch_method: webhook` asked for it). Polling asks GitHub for the repo's
-PR list every `pr_poll_interval` (30 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
-plus those whose checks are still running. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
+PR list every `pr_poll_interval` (10 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
+plus those whose checks are still running. Whatever the watcher says, a session's Stop hook looks its branch's PR up at once, so a PR the agent opened during a turn shows when the turn ends. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
 comment or review, the app types the project's `pr_review_command` into its session and sends it; failing checks on a new commit send
 `pr_checks_command` (`{n}` is the PR number). A key that is not set sends nothing: the row is still flagged and the notice still shows. A session
 waiting on the user gets the text once it is not; an ended session gets a new session for its issue with the text sent, and its row goes. The new session resumes the old one's conversation
@@ -418,7 +418,7 @@ projects:
     digest_schedule: weekly    # weekly or off. The settings panel writes it
     keep_mac_awake: true       # this project's choice; unset follows the top-level one
     pr_watch_method: ""        # webhook or poll; "" tries gh webhook forward and polls when it does not work
-    pr_poll_interval: 30s      # how often to poll the pull requests; at least 1s
+    pr_poll_interval: 10s      # how often to poll the pull requests; at least 1s
     pr_review_command: ""      # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
     pr_checks_command: ""      # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
 ```
