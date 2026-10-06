@@ -377,6 +377,16 @@ projects:
 A label that maps to no lane puts an issue in `idea`; an issue with no labels is in `inbox`. When labels map to several lanes the first of
 ready, plan, you, idea wins. Only the lanes `ready`, `plan`, `inbox` and `idea` have a command.
 
+### How a session picks its model
+
+Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets
+a value, model and effort each on their own: the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored); the
+project's `models` entry for the lane; the built-in choice for the lane (`plan` runs on `opus`); the project's `model` and `effort`; the top-level
+`model` and `effort`; then `sonnet` and `medium`. A session started for an issue uses the issue's lane and labels; a new session or one started
+from a note uses the project's own setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`)
+and in the state file of an ended one, so it outlives a restart. `Session.model` and `Session.effort` show it, and each wait in the tally records
+the model.
+
 ### Where things are stored
 
 Everything is grouped by project (`<key>` is the project name, lower-cased, with other characters as `-`).
