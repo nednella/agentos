@@ -479,6 +479,9 @@ type Options struct {
 	TopExtra     string        // yaml lines added at the top of the config
 	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
 	DigestTick   time.Duration
+	UpdateTick   time.Duration // how often to check the releases; an hour by default, and an hour before the first check
+	Releases     string        // what the releases API answers; "" fails the check
+	Version      string        // the version the app believes it runs; "dev" by default
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -528,7 +531,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_DIR", dir)
 	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
 
-	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
+	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{Releases: o.Releases}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
 	h.App = h.build(t)
 	h.App.Sessions().SetPrefillWait(300 * time.Millisecond)
 	first, tick := o.DigestFirst, o.DigestTick
@@ -536,7 +539,14 @@ func NewWith(t *testing.T, o Options) *Harness {
 		first, tick = time.Hour, time.Hour
 	}
 	h.App.Digests().SetLoop(first, tick) // a test must never start the real claude
-	h.App.Updates().SetLoop(time.Hour, time.Hour)
+	if o.UpdateTick == 0 {
+		h.App.Updates().SetLoop(time.Hour, time.Hour)
+	} else {
+		h.App.Updates().SetLoop(0, o.UpdateTick)
+	}
+	if o.Version != "" {
+		h.App.Updates().SetVersion(o.Version)
+	}
 	h.App.Updates().SetRelaunch(h.Rec.Relaunch)
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := h.App.Start(ctx); err != nil {

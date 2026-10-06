@@ -32,6 +32,7 @@ type Updater struct {
 	emit     func(event string, payload any)
 	relaunch func(bundle string) error
 	quit     func()
+	current  string // the running version
 	first    time.Duration
 	every    time.Duration
 
@@ -41,8 +42,11 @@ type Updater struct {
 
 // New makes an updater for the app at bundle. relaunch opens it again once the app has quit.
 func New(run update.Runner, stateDir, bundle string, emit func(string, any), relaunch func(string) error, quit func()) *Updater {
-	return &Updater{run: run, stateDir: stateDir, bundle: bundle, emit: emit, relaunch: relaunch, quit: quit, every: checkEvery}
+	return &Updater{run: run, stateDir: stateDir, bundle: bundle, emit: emit, relaunch: relaunch, quit: quit, current: version.Version, every: checkEvery}
 }
+
+// SetVersion replaces the running version, for tests: the test binary is always "dev".
+func (u *Updater) SetVersion(v string) { u.current = v }
 
 // SetLoop sets how long to wait before the first check, and between checks.
 func (u *Updater) SetLoop(first, every time.Duration) { u.first, u.every = first, every }
@@ -70,7 +74,7 @@ func (u *Updater) check(ctx context.Context) {
 		log.Printf("agentos: checking for a newer release: %v", err)
 		return
 	}
-	if !update.Newer(version.Version, rel.Version) {
+	if !update.Newer(u.current, rel.Version) {
 		return
 	}
 	u.mu.Lock()
@@ -102,7 +106,7 @@ func (u *Updater) Apply(ctx context.Context) error {
 		if rel, err = update.Latest(ctx, u.run); err != nil {
 			return err
 		}
-		if !update.Newer(version.Version, rel.Version) {
+		if !update.Newer(u.current, rel.Version) {
 			return errors.New("agentos is up to date")
 		}
 	}
