@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.9.0](https://github.com/nednella/agentos/compare/v0.8.0...v0.9.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** open and close shells beyond the first ([796ee47](https://github.com/nednella/agentos/commit/796ee47358df3ae832e556456d927436706d1728))
+* **internal:** name several shells per project ([927d463](https://github.com/nednella/agentos/commit/927d46386944f31c84e706a1576e86d27cb2df34))
+* **ui:** drop live detail line from session rows ([75d1be9](https://github.com/nednella/agentos/commit/75d1be93a59ba08048fee7c79129f103e664c9a8))
+* **ui:** drop live detail line from session top bar ([62198ac](https://github.com/nednella/agentos/commit/62198ac1c9592b505fa21b0d7133e2d1f1d5729e))
+* **ui:** list a project's shells beside the shell terminal ([4a2e164](https://github.com/nednella/agentos/commit/4a2e16417e0983c058732b8cd5ade08355ae9023))
+* **ui:** move PR controls under the timeline, show state word on rows ([93a27dd](https://github.com/nednella/agentos/commit/93a27ddf15c1d2a4a80f0a67864a90d5a1973db5))
+* **ui:** pin a full-width New shell row and close shells with a bin ([d7517b3](https://github.com/nednella/agentos/commit/d7517b3e6e271e667c2c1a716b4256aeeb0c7dd6))
+* **ui:** put state badge beside the title in the top bar ([7cd9953](https://github.com/nednella/agentos/commit/7cd9953abcf09cdbc382ebc0d88c11704a4dbb00))
+* **ui:** put state badge left of the model in the top bar ([3e88768](https://github.com/nednella/agentos/commit/3e887681856c0bd19483546cee136af3db96f62a))
+
+
+### Bug Fixes
+
+* **desktop:** hide configured projects whose folder is missing ([06ce479](https://github.com/nednella/agentos/commit/06ce479fda7b06be494d86e7da4a24a9ee3674d0))
+* **desktop:** store session evidence under data_dir ([abfbb78](https://github.com/nednella/agentos/commit/abfbb789e795e0a7a69d70977cb8a58dc4ec1429))
+
 ## [0.8.0](https://github.com/nednella/agentos/compare/v0.7.1...v0.8.0) (2026-10-06)
 
 
