@@ -28,7 +28,6 @@ type Config struct {
 	LocalDir string // PR tracking and the clean-up log: never synced
 	Tmux     *term.Tmux
 	Agent    agent.Agent
-	Model    project.Model
 }
 
 // Load reads the config file and the environment. The project is the one holding AGENTOS_DIR
@@ -85,7 +84,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, Tmux: tmux, Agent: pickAgent(cfg.Agent), Model: cfg.Default()}, nil
+	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, Tmux: tmux, Agent: pickAgent(cfg.Agent)}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the

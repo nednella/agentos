@@ -20,8 +20,6 @@ type Project struct {
 	Name               string    `yaml:"name"`
 	Dir                string    `yaml:"directory"`
 	QueueSections      []Section `yaml:"queue_sections,omitempty"`          // the groups of the queue, each with the actions that start a session
-	Model              string    `yaml:"session_model,omitempty"`           // overrides the config's model for this project
-	Effort             string    `yaml:"session_effort,omitempty"`          // overrides the config's effort for this project
 	NoteSessionCommand string    `yaml:"note_session_command,omitempty"`    // typed into a session started from a note; {text} is the note, the note itself when unset
 	SessionPromptSend  string    `yaml:"session_prompt_send,omitempty"`     // auto (the default) sends what a session starts with at once; manual waits for Enter
 	Branch             string    `yaml:"session_branch_fallback,omitempty"` // branch of an issue's work when the session reports none; {n} is the number
@@ -47,8 +45,6 @@ func (p Project) Present() bool {
 type Config struct {
 	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
 	Agent     string    `yaml:"agent_command"`
-	Model     string    `yaml:"session_model,omitempty"`  // model of a Claude session; unset leaves it to claude
-	Effort    string    `yaml:"session_effort,omitempty"` // effort of a Claude session; unset leaves it to claude
 	KeepAwake *bool     `yaml:"keep_mac_awake,omitempty"` // hold off idle sleep while a session works; on unless false
 	Theme     string    `yaml:"app_theme,omitempty"`      // light or dark; unset follows the system
 	TextScale float64   `yaml:"app_text_scale,omitempty"` // size of the app's text, between MinTextScale and MaxTextScale; unset is 1
@@ -108,9 +104,6 @@ func Load(path string) (Config, error) {
 	if cfg.DataDir != "" {
 		cfg.DataDir = ExpandHome(cfg.DataDir)
 	}
-	if err := cfg.Default().Validate(); err != nil {
-		return Config{}, fmt.Errorf("%s: %w", path, err)
-	}
 	if cfg.Theme != "" && !slices.Contains(Themes, cfg.Theme) {
 		return Config{}, fmt.Errorf("%s: app_theme must be %s, not %q", path, strings.Join(Themes, " or "), cfg.Theme)
 	}
@@ -128,9 +121,6 @@ func Load(path string) (Config, error) {
 			return Config{}, fmt.Errorf("%s: project %s: pr_watch_method must be webhook or poll, not %q", path, p.Name, p.PRWatch)
 		}
 		if err := p.CleanupMode.validate(); err != nil {
-			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
-		}
-		if err := p.validateModel(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if err := p.validateQueue(); err != nil {
@@ -206,6 +196,7 @@ func encode(path string, c Config) ([]byte, error) {
 		return render(&doc)
 	}
 	root := doc.Content[0]
+	dropRetiredKeys(root)
 	syncScalar(root, "agent_command", c.Agent, nil)
 	syncScalar(root, "data_dir", c.DataDir, ExpandHome)
 	syncScalar(root, "app_theme", c.Theme, nil)
@@ -215,6 +206,20 @@ func encode(path string, c Config) ([]byte, error) {
 		return nil, err
 	}
 	return render(&doc)
+}
+
+// dropRetiredKeys removes the session_model and session_effort keys older configs hold, at the top and in each project.
+func dropRetiredKeys(root *yaml.Node) {
+	nodes := []*yaml.Node{root}
+	if seq := field(root, "projects"); seq != nil && seq.Kind == yaml.SequenceNode {
+		nodes = append(nodes, seq.Content...)
+	}
+	for _, n := range nodes {
+		if n.Kind == yaml.MappingNode {
+			dropField(n, "session_model")
+			dropField(n, "session_effort")
+		}
+	}
 }
 
 func render(doc *yaml.Node) ([]byte, error) {
@@ -325,6 +330,7 @@ func editInPlace(seq *yaml.Node, p Project) int {
 		return -1
 	}
 	syncCleanup(seq.Content[i], p.CleanupMode)
+	syncScalar(seq.Content[i], "session_prompt_send", p.SessionPromptSend, nil)
 	syncScalar(seq.Content[i], "browser_enabled", formatBool(p.Browser), nil)
 	syncScalar(seq.Content[i], "digest_schedule", p.Digest, nil)
 	if !sameProject(seq.Content[i], p) {

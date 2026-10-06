@@ -57,9 +57,9 @@ func TestLoad(t *testing.T) {
 		{name: "unknown pr_watch", path: write("projects:\n  - {name: api, directory: /srv/api, pr_watch_method: push}\n"), wantErr: true},
 		{name: "bad pr_poll", path: write("projects:\n  - {name: api, directory: /srv/api, pr_poll_interval: often}\n"), wantErr: true},
 		{
-			name: "models",
+			name: "retired model keys are ignored",
 			path: write("session_model: haiku\nsession_effort: low\nprojects:\n  - {name: api, directory: /srv/api, session_model: opus}\n"),
-			want: Config{Model: "haiku", Effort: "low", Projects: []Project{{Name: "api", Dir: "/srv/api", Model: "opus"}}},
+			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api"}}},
 		},
 		{
 			name: "queue sections",
@@ -72,8 +72,6 @@ func TestLoad(t *testing.T) {
 		{name: "two actions of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
 		{name: "bad action effort", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
 		{name: "unknown prompt send", path: write("projects:\n  - {name: api, directory: /srv/api, session_prompt_send: later}\n"), wantErr: true},
-		{name: "bad effort", path: write("session_effort: huge\n"), wantErr: true},
-		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, directory: /srv/api, session_model: --x}\n"), wantErr: true},
 		{name: "theme", path: write("app_theme: dark\n"), want: Config{Theme: "dark"}},
 		{name: "unknown theme", path: write("app_theme: sepia\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
@@ -245,6 +243,28 @@ projects:
 			t.Errorf("reload = %+v, %v", reloaded, err)
 		}
 	})
+}
+
+func TestSaveDropsRetiredModelKeys(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	original := "session_model: haiku\nsession_effort: low\n# keep\nagent_command: claude\nprojects:\n  - name: api\n    directory: /srv/api\n    session_model: opus\n    session_effort: high\n    note_session_command: x\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := Save(path, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if strings.Contains(string(got), "session_model") || strings.Contains(string(got), "session_effort") {
+		t.Errorf("the saved file kept a retired key:\n%s", got)
+	}
+	if !strings.Contains(string(got), "# keep") || !strings.Contains(string(got), "note_session_command: x") {
+		t.Errorf("the saved file lost other settings:\n%s", got)
+	}
 }
 
 func TestLoadRejectsAnUnknownCleanupMode(t *testing.T) {
