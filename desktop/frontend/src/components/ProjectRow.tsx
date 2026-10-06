@@ -22,8 +22,12 @@ function ProjectRowView({ project: p, index, current, active, removing, onHover,
       {removing ? (
         <ConfirmRow
           danger
-          message={`Forget ${p.name}? Its sessions keep running.`}
-          confirmLabel="Remove"
+          message={
+            p.sessions > 0
+              ? `Forget ${p.name}? This ends its ${p.sessions} running ${p.sessions === 1 ? 'session' : 'sessions'} and loses unsaved work.`
+              : `Forget ${p.name}?`
+          }
+          confirmLabel={p.sessions > 0 ? 'End sessions and remove' : 'Remove'}
           onCancel={onCancelRemove}
           onConfirm={() => onRemove(p.name)}
         />
