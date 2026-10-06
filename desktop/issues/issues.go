@@ -4,6 +4,7 @@ package issues
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -54,6 +55,9 @@ type Issues struct {
 	repoFailed map[string]time.Time // when gh last failed to name a folder's repo for a reason that may pass
 	lists      map[string][]Issue
 }
+
+// ErrIssuesDisabled is what List fails with when the repo has issues turned off; the front end matches its text.
+var ErrIssuesDisabled = errors.New("issues are disabled for this repo")
 
 // repoRetry is how long a failed lookup of a folder's repo is not repeated.
 const repoRetry = 30 * time.Second
@@ -143,6 +147,9 @@ func (i *Issues) List(ctx context.Context, proj project.Project, refresh bool) (
 	defer cancel()
 	out, err := i.run(ctx, dir, "gh", "issue", "list", "--state", "open", "--limit", "200", "--json", "number,title,labels,url,author,assignees,createdAt,updatedAt")
 	if err != nil {
+		if strings.Contains(err.Error(), "has disabled issues") {
+			return nil, ErrIssuesDisabled
+		}
 		return nil, fmt.Errorf("listing issues: %w", err)
 	}
 	list, err := parseIssues(out, proj)

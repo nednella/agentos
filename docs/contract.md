@@ -233,7 +233,7 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh` |
+| `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
 | `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
 | `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 

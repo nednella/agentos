@@ -106,6 +106,14 @@ func TestIssuesWithoutRepo(t *testing.T) {
 	}
 }
 
+func TestIssuesDisabled(t *testing.T) {
+	gh := &apptest.FakeGH{IssuesErr: errors.New("gh issue list: exit status 1: the 'acme/widgets' repository has disabled issues")}
+	is := issues.New(gh.Run, nil, func(string, any) {})
+	if _, err := is.List(context.Background(), project.Project{Dir: "/x"}, false); err != issues.ErrIssuesDisabled {
+		t.Errorf("List error = %v, want ErrIssuesDisabled", err)
+	}
+}
+
 func TestInboxAndIdeaCommands(t *testing.T) {
 	h := newHarness(t)
 	s, err := h.StartIssue(11) // no labels: the inbox lane

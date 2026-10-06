@@ -251,6 +251,7 @@ type FakeGH struct {
 	Delay     time.Duration // how long gh issue create takes
 	pr        string        // what gh pr list prints
 	PRErr     error         // what gh pr list fails with, if set
+	IssuesErr error         // what gh issue list fails with, if set
 	pulls     string        // the body gh api prints for the repo's pull request list
 	etag      string        // its ETag: a request carrying it gets a 304
 	hooks     []*io.PipeWriter
@@ -305,6 +306,9 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		f.mu.Lock()
 		return []byte(f.Create), f.CreateErr
 	case args[0] == "issue":
+		if f.IssuesErr != nil {
+			return nil, f.IssuesErr
+		}
 		return []byte(`[
 			{"number":7,"title":"Fix the thing","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
 			{"number":8,"title":"Plan it","url":"https://x/8","labels":[{"name":"needs-plan"},{"name":"type:feature"}]},
