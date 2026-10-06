@@ -22,6 +22,8 @@ func issueSession(h *apptest.Harness, t *testing.T, issue int) sessions.Session 
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Text that reaches bash before its prompt shows twice: the terminal echoes it, then readline draws it.
+	eventually(t, "the shell's prompt", func() bool { return strings.HasSuffix(strings.TrimSpace(h.Pane(t, s.ID)), "$") })
 	return s
 }
 
