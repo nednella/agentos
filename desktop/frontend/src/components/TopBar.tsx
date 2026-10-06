@@ -29,7 +29,7 @@ function Count({ state, count, label }: CountProps) {
 
 export function TopBar() {
   const { project, projects, sessions, setOverlay, digestUnseen, awake, report, update, updating, applyUpdate } = useAgentos()
-  const { width, statsOpen, digestOpen, theme } = useLayout()
+  const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
@@ -119,13 +119,8 @@ export function TopBar() {
             </button>
           </>
         )}
-        <button
-          className={iconButton}
-          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          aria-label="Toggle light and dark theme"
-          onClick={() => find('toggle-theme').run([])}
-        >
-          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+        <button className={iconButton} onClick={() => setOverlay('settings')} title={`Settings (${keys('settings')})`} aria-label="Settings">
+          <Icon name="sliders" />
         </button>
         <button className={iconButton} onClick={() => setOverlay('palette')} title={`Command palette (${keys('palette')})`} aria-label="Command palette">
           <Icon name="search" />

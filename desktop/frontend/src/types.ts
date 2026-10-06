@@ -93,6 +93,12 @@ export type Snapshot = {
   shell: string
 }
 
+export type ThemeSetting = 'system' | 'light' | 'dark'
+
+export type Settings = {
+  theme: ThemeSetting
+}
+
 export type WaitKind = 'permission' | 'question' | 'idle'
 
 export type Wait = {

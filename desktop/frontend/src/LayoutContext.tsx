@@ -55,7 +55,6 @@ export type Layout = {
   statsOpen: boolean
   digestOpen: boolean
   zoom(step: -1 | 0 | 1): void
-  toggleTheme(): void
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
   resetWidth(panel: SidePanel): void
@@ -131,14 +130,13 @@ function useSystemTheme(): Theme {
 }
 
 export function LayoutProvider({ children }: LayoutProviderProps) {
-  const { selectedId, sidebarTab, setSidebarTab, focus, pushToast, dismissToast } = useAgentos()
+  const { selectedId, settings, sidebarTab, setSidebarTab, focus, pushToast, dismissToast } = useAgentos()
   const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
   const [scale, setScale] = useState(() => readStored('agentos.scale', DEFAULT_SCALE))
-  const [chosenTheme, setChosenTheme] = useState(() => readStored<Theme | null>('agentos.theme', null))
   const systemTheme = useSystemTheme()
-  const theme = chosenTheme ?? systemTheme
+  const theme = settings.theme === 'system' ? systemTheme : settings.theme
   const [stored, setStored] = useState(() => readStored<Partial<AllPrefs>>(LAYOUT_KEY, {}))
   const [peek, setPeek] = useState<SidePanel | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
@@ -255,11 +253,6 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         writeStored('agentos.scale', next)
         if (zoomToast.current !== null) dismissToast(zoomToast.current)
         zoomToast.current = pushToast({ tone: 'info', text: `Text size ${Math.round(next * 100)}%` })
-      },
-      toggleTheme() {
-        const next = theme === 'dark' ? 'light' : 'dark'
-        setChosenTheme(next)
-        writeStored('agentos.theme', next)
       },
       setMobilePanel,
       setWidth(panel, rem, commit) {
