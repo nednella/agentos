@@ -94,7 +94,7 @@ type Sessions struct {
 	warn     *warn.Warnings
 
 	createMu sync.Mutex // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
-	shellMu  sync.Mutex // one shell check-and-create at a time: two callers at once would both find no shell and tmux refuses the second
+	shellMu  sync.Mutex // one shell check-and-create at a time: two callers at once would both find no shell and start two
 
 	mu         sync.Mutex
 	ctx        context.Context
@@ -107,7 +107,7 @@ type Sessions struct {
 	awake      Awake
 	keepAwake  func(projectKey string) bool
 	info       []term.Info
-	shells     []string                 // projects that have a shell session
+	shells     []session.Name           // every project's shell sessions
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
 	dismissed  map[string]bool          // ended sessions the user dismissed: the poll must not bring them back
@@ -1217,45 +1217,90 @@ func (s *Sessions) closeBrowser(id string) {
 	s.browsers.Close(ctx, id)
 }
 
-// ShellID is the current project's shell session, or "" until it is opened.
-func (s *Sessions) ShellID() string {
+// ShellIDs are the current project's shell sessions in tab order, empty until one is opened.
+func (s *Sessions) ShellIDs() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := s.project.Key()
-	if slices.Contains(s.shells, key) {
-		return session.Name{Project: key}.String()
+	var mine []session.Name
+	for _, n := range s.shells {
+		if n.Project == key {
+			mine = append(mine, n)
+		}
 	}
-	return ""
+	slices.SortFunc(mine, func(a, b session.Name) int { return a.Shell - b.Shell })
+	ids := make([]string, len(mine))
+	for i, n := range mine {
+		ids[i] = n.String()
+	}
+	return ids
 }
 
-// OpenShell makes sure the current project has a shell session, a login shell
-// in the project folder, and returns its id. The shell reports nothing: it is
-// not an agent, so it gets no hooks and no session number.
+// OpenShell makes sure the current project has a shell session and returns the
+// first one's id. A shell is a login shell in the project folder; it reports
+// nothing: it is not an agent, so it gets no hooks and no session number.
 func (s *Sessions) OpenShell() (string, error) {
 	s.shellMu.Lock()
 	defer s.shellMu.Unlock()
+	if ids := s.ShellIDs(); len(ids) > 0 {
+		return ids[0], nil
+	}
+	return s.startShell()
+}
+
+// NewShell starts another shell in the current project, numbered after the shells it has.
+func (s *Sessions) NewShell() (string, error) {
+	s.shellMu.Lock()
+	defer s.shellMu.Unlock()
+	return s.startShell()
+}
+
+func (s *Sessions) startShell() (string, error) {
 	s.mu.Lock()
 	ctx, proj := s.ctx, s.project
+	var used []int
+	for _, n := range s.shells {
+		if n.Project == proj.Key() {
+			used = append(used, n.Shell)
+		}
+	}
 	s.mu.Unlock()
-	name := session.Name{Project: proj.Key()}
+	name := session.Name{Project: proj.Key(), Shell: session.NextN(used)}
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if !s.tmux.Has(tctx, name) {
-		login := cmp.Or(os.Getenv("SHELL"), "/bin/zsh")
-		env := []string{
-			"AGENTOS_PROJECT=" + proj.Key(),
-			"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
-		}
-		if err := s.tmux.NewSession(tctx, name, "shell", proj.Dir, env, []string{login, "-l"}, startCols, startRows); err != nil {
-			return "", err
-		}
+	login := cmp.Or(os.Getenv("SHELL"), "/bin/zsh")
+	env := []string{
+		"AGENTOS_PROJECT=" + proj.Key(),
+		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
+	}
+	if err := s.tmux.NewSession(tctx, name, "shell", proj.Dir, env, []string{login, "-l"}, startCols, startRows); err != nil {
+		return "", err
 	}
 	s.mu.Lock()
-	if !slices.Contains(s.shells, proj.Key()) {
-		s.shells = append(s.shells, proj.Key())
-	}
+	s.shells = append(s.shells, name)
 	s.mu.Unlock()
 	return name.String(), nil
+}
+
+// CloseShell stops one shell of the current project.
+func (s *Sessions) CloseShell(id string) error {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return err
+	}
+	if !name.IsShell() {
+		return fmt.Errorf("%s is not a shell", id)
+	}
+	s.closeTerm(id)
+	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
+	defer cancel()
+	if err := s.tmux.Kill(ctx, name); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.shells = slices.DeleteFunc(s.shells, func(n session.Name) bool { return n == name })
+	return nil
 }
 
 // commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.

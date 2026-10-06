@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"os/exec"
+	"slices"
 	"testing"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
@@ -22,15 +23,15 @@ func tmuxHas(h *apptest.Harness, name string) bool {
 
 func TestShellSession(t *testing.T) {
 	h := shellHarness(t)
-	if got := h.Snapshot().Shell; got != "" {
-		t.Fatalf("shell before it is opened = %q", got)
+	if got := h.Snapshot().Shells; len(got) != 0 {
+		t.Fatalf("shells before one is opened = %q", got)
 	}
 	shell, err := h.ShellOpen()
 	if err != nil || shell.ID != "main/shell" {
 		t.Fatalf("ShellOpen = %+v, %v", shell, err)
 	}
-	if got := h.Snapshot().Shell; got != shell.ID {
-		t.Errorf("Snapshot.Shell = %q", got)
+	if got := h.Snapshot().Shells; !slices.Equal(got, []string{shell.ID}) {
+		t.Errorf("Snapshot.Shells = %q", got)
 	}
 	if again, err := h.ShellOpen(); err != nil || again != shell {
 		t.Errorf("second ShellOpen = %+v, %v", again, err)
@@ -86,14 +87,14 @@ func TestShellFollowsTheProject(t *testing.T) {
 	if _, err := h.SwitchProject(other); err != nil {
 		t.Fatal(err)
 	}
-	if got := h.Snapshot().Shell; got != "" {
-		t.Errorf("the other project shows the shell %q", got)
+	if got := h.Snapshot().Shells; len(got) != 0 {
+		t.Errorf("the other project shows the shells %q", got)
 	}
 	if _, err := h.SwitchProject("main"); err != nil {
 		t.Fatal(err)
 	}
-	if got := h.Snapshot().Shell; got != shell.ID {
-		t.Errorf("shell after switching back = %q", got)
+	if got := h.Snapshot().Shells; !slices.Equal(got, []string{shell.ID}) {
+		t.Errorf("shells after switching back = %q", got)
 	}
 }
 
@@ -104,8 +105,8 @@ func TestShellSurvivesARestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	second := h.Restart(t)
-	if got := second.Snapshot().Shell; got != shell.ID {
-		t.Errorf("shell after a restart = %q", got)
+	if got := second.Snapshot().Shells; !slices.Equal(got, []string{shell.ID}) {
+		t.Errorf("shells after a restart = %q", got)
 	}
 	if list := second.Sessions().List(); len(list) != 0 {
 		t.Errorf("the shell came back as a row: %+v", list)
@@ -131,5 +132,49 @@ func TestConcurrentShellOpensShareOneShell(t *testing.T) {
 		if id := <-ids; id != "main/shell" {
 			t.Errorf("ShellOpen = %q", id)
 		}
+	}
+}
+
+func TestShellTabs(t *testing.T) {
+	h := shellHarness(t)
+	first, err := h.ShellOpen()
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := h.ShellNew()
+	if err != nil || second.ID != "main/shell-2" {
+		t.Fatalf("ShellNew = %+v, %v", second, err)
+	}
+	third, err := h.ShellNew()
+	if err != nil || third.ID != "main/shell-3" {
+		t.Fatalf("ShellNew = %+v, %v", third, err)
+	}
+	want := []string{first.ID, second.ID, third.ID}
+	if got := h.Snapshot().Shells; !slices.Equal(got, want) {
+		t.Errorf("Shells = %q, want %q", got, want)
+	}
+	if again, err := h.ShellOpen(); err != nil || again != first {
+		t.Errorf("ShellOpen with shells = %+v, %v", again, err)
+	}
+
+	if err := h.ShellClose(second.ID); err != nil {
+		t.Fatal(err)
+	}
+	if tmuxHas(h, second.ID) {
+		t.Error("the closed shell still runs")
+	}
+	if got := h.Snapshot().Shells; !slices.Equal(got, []string{first.ID, third.ID}) {
+		t.Errorf("Shells after close = %q", got)
+	}
+	if again, err := h.ShellNew(); err != nil || again != second {
+		t.Errorf("ShellNew reuses the free number: %+v, %v", again, err)
+	}
+
+	agent, err := h.NewSession("agent", "")
+	if err != nil || agent.N != 1 {
+		t.Errorf("an agent after shells = %+v, %v", agent, err)
+	}
+	if err := h.ShellClose(agent.ID); err == nil {
+		t.Error("ShellClose stopped an agent")
 	}
 }

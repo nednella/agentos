@@ -761,6 +761,8 @@ func (h *Harness) NewSession(title, prefill string) (sessions.Session, error) {
 	return h.sessions.NewSession(title, prefill)
 }
 func (h *Harness) ShellOpen() (sessions.ShellInfo, error) { return h.sessions.ShellOpen() }
+func (h *Harness) ShellNew() (sessions.ShellInfo, error)  { return h.sessions.ShellNew() }
+func (h *Harness) ShellClose(id string) error             { return h.sessions.ShellClose(id) }
 func (h *Harness) KillSession(id string) error            { return h.sessions.KillSession(id) }
 func (h *Harness) DismissSession(id string) error         { return h.sessions.DismissSession(id) }
 func (h *Harness) RenameSession(id, title string) error   { return h.sessions.RenameSession(id, title) }
