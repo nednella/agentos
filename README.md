@@ -136,8 +136,8 @@ core through the methods and events in `docs/contract.md`.
 ## Developing
 
 ```sh
-make desktop-app     # builds the front end and bin/agentos.app
-open bin/agentos.app
+make desktop-app     # builds the front end and bin/agentos-dev.app
+open bin/agentos-dev.app
 make desktop-install # copies it to ~/Applications and links ~/.local/bin/agentos into it
 go test -race ./... && go vet ./...
 ```

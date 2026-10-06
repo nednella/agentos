@@ -51,7 +51,7 @@ own listen address (`127.0.0.1:PORT`, not `localhost`) and refuses a foreign `Or
 
 ```sh
 make -o desktop-frontend desktop-app          # or: make desktop-app (rebuilds the front end)
-(cd / && AGENTOS_HTTP=127.0.0.1:18772 bin/agentos.app/Contents/MacOS/agentos) &
+(cd / && AGENTOS_HTTP=127.0.0.1:18772 bin/agentos-dev.app/Contents/MacOS/agentos) &
 curl -s -XPOST -H 'X-Agentos: 1' 127.0.0.1:18772/__call/projects.Service/Snapshot -d '[]'
 ```
 

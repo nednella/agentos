@@ -34,10 +34,10 @@ Go is the reference when they disagree.
 |---|---|
 | Go tests, vet | `go test -race ./...` · `go vet ./...` |
 | Front end typecheck + build | `cd desktop/frontend && npm run build` |
-| Build the app | `make desktop-app` → `bin/agentos.app` (`VERSION=v1.2.3` stamps a version) |
+| Build the app | `make desktop-app` → `bin/agentos-dev.app` (`VERSION=v1.2.3` stamps a version) |
 | Build a release zip | `make release` → `bin/agentos-darwin-arm64.zip` and its `.sha256` |
-| Open the app | `open bin/agentos.app` |
-| Run the real app in a browser for checks | `AGENTOS_HTTP=127.0.0.1:34777 bin/agentos.app/Contents/MacOS/agentos` (with the isolation env above) |
+| Open the app | `open bin/agentos-dev.app` |
+| Run the real app in a browser for checks | `AGENTOS_HTTP=127.0.0.1:34777 bin/agentos-dev.app/Contents/MacOS/agentos` (with the isolation env above) |
 | Drive that browser | `node scripts/cdp.mjs http://127.0.0.1:34777/ 1512 945 '<steps>'` |
 
 The window itself cannot be screenshotted by a session (macOS blocks it); `docs/testing.md`
