@@ -140,6 +140,12 @@ func TestProjects(t *testing.T) {
 				t.Errorf("the removed project is still listed: %+v", p)
 			}
 		}
+		if _, err := h.SwitchProject("other"); err != nil {
+			t.Fatal(err)
+		}
+		if snap, err = h.RemoveProject("other"); err != nil || snap.Project.Name == "other" {
+			t.Errorf("removing the current project that is not in the config = %+v, %v", snap.Project, err)
+		}
 		if _, err := h.RemoveProject("nope"); err == nil {
 			t.Error("removing an unknown project succeeded")
 		}

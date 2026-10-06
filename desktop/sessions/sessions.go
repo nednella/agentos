@@ -703,7 +703,12 @@ func (s *Sessions) Forget(name string) (project.Project, error) {
 	if err != nil {
 		return project.Project{}, err
 	}
-	if !removed {
+	s.mu.Lock()
+	current := s.project.Name == name
+	s.mu.Unlock()
+	// The current project can be missing from the config (the folder the app started in); removing
+	// it still means moving away.
+	if !removed && !current {
 		return project.Project{}, fmt.Errorf("%q is not in the config", name)
 	}
 	if err := s.killProject(project.Project{Name: name}.Key()); err != nil {
