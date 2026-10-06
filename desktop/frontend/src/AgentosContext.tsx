@@ -61,6 +61,7 @@ export type Agentos = {
   startIssue(number: number, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
   addProject(dir?: string): Promise<void>
+  newProject(name: string): Promise<void>
   removeProject(name: string): Promise<void>
   refreshIssues(): Promise<void>
   addNote(text: string, images?: PendingImage[]): Promise<void>
@@ -498,6 +499,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async addProject(dir) {
         await enterFrom(dir ? api.addProjectDir(dir) : api.addProject())
+      },
+      async newProject(name) {
+        await enterFrom(api.newProject(name))
       },
       async removeProject(name) {
         const epoch = projectEpoch.current
