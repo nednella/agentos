@@ -210,7 +210,7 @@ type Digest = {
 | `SwitchProject(name)` | `Snapshot` | makes the project current; remembered for the next start |
 | `AddProject()` | `Snapshot` | opens the folder picker, adds the folder (named after it, `-2` on a clash), saves the config, switches to it; unchanged snapshot on cancel |
 | `AddProjectDir(dir)` | `Snapshot` | the same without the picker; `~` is expanded; rejects a folder that does not exist |
-| `RemoveProject(name)` | `Snapshot` | forgets a configured project, keeps its sessions; switches away if it was current. Rejects while the project has live issue sessions (the message names them): their branch pattern and clean-up command come from the project. Editing the config file keeps its comments and `~` paths |
+| `RemoveProject(name)` | `Snapshot` | forgets a configured project and ends its sessions; switches away if it was current. Rejects while the project has live issue sessions (the message names them): their branch pattern and clean-up command come from the project. Editing the config file keeps its comments and `~` paths |
 
 ### Sessions (`sessions`)
 

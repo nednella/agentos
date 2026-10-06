@@ -694,7 +694,7 @@ func (s *Sessions) SwitchProject(name string) (project.Project, error) {
 	return project.Project{}, fmt.Errorf("no project %q", name)
 }
 
-// Forget removes a configured project, moving to another one if it was current.
+// Forget removes a configured project and ends its sessions, moving to another one if it was current.
 func (s *Sessions) Forget(name string) (project.Project, error) {
 	if live := s.liveIssueSessions(project.Project{Name: name}.Key()); len(live) > 0 {
 		return project.Project{}, fmt.Errorf("cannot remove %q: it has live issue sessions (%s), which need its branch pattern and clean-up command; end them first", name, strings.Join(live, ", "))
@@ -705,6 +705,9 @@ func (s *Sessions) Forget(name string) (project.Project, error) {
 	}
 	if !removed {
 		return project.Project{}, fmt.Errorf("%q is not in the config", name)
+	}
+	if err := s.killProject(project.Project{Name: name}.Key()); err != nil {
+		return project.Project{}, err
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -718,6 +721,23 @@ func (s *Sessions) Forget(name string) (project.Project, error) {
 	}
 	s.sync()
 	return s.project, nil
+}
+
+// killProject ends every running session of the project. It takes mu.
+func (s *Sessions) killProject(key string) error {
+	s.mu.Lock()
+	var ids []string
+	for _, in := range s.info {
+		if in.Name.Project == key {
+			ids = append(ids, in.Name.String())
+		}
+	}
+	s.mu.Unlock()
+	var errs []error
+	for _, id := range ids {
+		errs = append(errs, s.Kill(id))
+	}
+	return errors.Join(errs...)
 }
 
 // liveIssueSessions names the running sessions of the project that work on an issue. It takes mu.
