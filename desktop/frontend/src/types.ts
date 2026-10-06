@@ -55,13 +55,12 @@ export type Note = {
 
 export type IssueType = 'bug' | 'feature' | 'refactor' | 'chore' | ''
 
-export type Lane = 'ready' | 'plan' | 'you' | 'idea' | 'inbox'
-
 export type Issue = {
   number: number
   title: string
   type: IssueType
-  lane: Lane
+  section: string
+  actions: string[]
   url: string
   sessionId: string
   author: string

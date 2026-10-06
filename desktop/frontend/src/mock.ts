@@ -271,7 +271,7 @@ export function createMock(params: URLSearchParams) {
     const found = owner.issues.find((i) => i.number === issue)
     const labelled = (key: string) => found?.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1)
     return {
-      model: labelled('model') ?? (found?.lane === 'plan' ? 'opus' : 'sonnet'),
+      model: labelled('model') ?? (found?.section === 'Needs plan' ? 'opus' : 'sonnet'),
       effort: labelled('effort') ?? 'medium',
     }
   }
@@ -764,7 +764,8 @@ export function createMock(params: URLSearchParams) {
         number,
         title: note.text.split('\n')[0].slice(0, 90),
         type: '',
-        lane: 'inbox',
+        section: 'Inbox',
+        actions: ['Plan', 'Investigate', 'Work'],
         url: `https://github.com/${current.repo}/issues/${number}`,
         sessionId: '',
         author: 'nednella',
@@ -782,12 +783,13 @@ export function createMock(params: URLSearchParams) {
       return startSessionFor(note.text.split('\n')[0], 0, note.text)
     },
     Issues: async (refresh: boolean) => delay(currentIssues(), refresh ? 700 : 220),
-    StartIssue: async (number: number) => {
+    StartIssue: async (number: number, action: string) => {
       const issue = current.issues.find((i) => i.number === number)
       if (!issue) throw 'No such issue'
       const existing = sessions.find((s) => s.project === current.name && s.issue === number)
       if (existing) return view(existing)
-      const command = { ready: `/work ${number}`, plan: `/investigate ${number}` }[issue.lane as 'ready' | 'plan'] ?? ''
+      if (action && !issue.actions.includes(action)) throw `issue #${number} has no action "${action}"`
+      const command = { Work: `/work ${number}`, Plan: `/plan ${number}`, Investigate: `/investigate ${number}` }[action || issue.actions[0]] ?? `Work on issue #${number}: ${issue.title}`
       const short = issue.title.split(' ').slice(0, 3).join(' ')
       const session = startSessionFor(`#${number} ${short}`, number, command)
       emit('issues', { project: current.name, items: currentIssues() })

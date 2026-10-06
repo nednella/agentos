@@ -12,7 +12,7 @@ export const queueActions = ({ a, layout }: ActionContext): Action[] => [
       if (numbers.length === 0 || numbers.some((n) => !Number.isInteger(n))) throw 'Give issue numbers: issue 394 393'
       for (const [i, number] of numbers.entries()) {
         try {
-          await a.startIssue(number, i < numbers.length - 1)
+          await a.startIssue(number, '', i < numbers.length - 1)
         } catch (err) {
           throw `Issue #${number}: ${typeof err === 'string' ? err : 'could not start'}`
         }

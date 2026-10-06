@@ -2,21 +2,20 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import { filterIssues, isFiltering } from '../issueFilter'
-import { LANES } from '../lanes'
 import { readStored, writeStored } from '../storage'
-import type { Issue, Lane } from '../types'
+import type { Issue } from '../types'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
 import { IssueRow } from './IssueRow'
 import { Notice } from './Notice'
-import { QueueLaneHeader } from './QueueLaneHeader'
+import { QueueSectionHeader } from './QueueSectionHeader'
 import { QueueSearch } from './QueueSearch'
 import type { NavRef } from './Sidebar'
 
-type Item = { kind: 'lane'; lane: Lane; count: number } | { kind: 'issue'; issue: Issue }
+type Item = { kind: 'section'; name: string; count: number } | { kind: 'issue'; issue: Issue }
 
-const itemKey = (item: Item) => (item.kind === 'lane' ? `lane:${item.lane}` : `issue:${item.issue.number}`)
+const itemKey = (item: Item) => (item.kind === 'section' ? `section:${item.name}` : `issue:${item.issue.number}`)
 
 const CLOSED_KEY = 'agentos.queue.closed'
 
@@ -50,33 +49,34 @@ type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 
 function QueueList({ nav, shown, filtering }: QueueListProps) {
   const { issues, issuesLoading, setOverlay } = useAgentos()
-  const [closed, setClosed] = useState<Set<Lane>>(() => new Set(readStored<Lane[]>(CLOSED_KEY, ['idea'])))
+  const [closed, setClosed] = useState<Set<string>>(() => new Set(readStored<string[]>(CLOSED_KEY, [])))
   const list = useRef<HTMLDivElement>(null)
 
-  const sections = useMemo(
-    () =>
-      LANES.flatMap(({ id }) => {
-        const inLane = shown.filter((i) => i.lane === id)
-        if (filtering && inLane.length === 0) return []
-        return [{ lane: id, issues: inLane, open: filtering || !closed.has(id) }]
-      }),
-    [shown, filtering, closed],
-  )
+  // The core lists issues section by section; a project with no sections has one nameless group.
+  const sections = useMemo(() => {
+    const groups: { name: string; issues: Issue[]; open: boolean }[] = []
+    for (const issue of shown) {
+      const group = groups.find((g) => g.name === issue.section)
+      if (group) group.issues.push(issue)
+      else groups.push({ name: issue.section, issues: [issue], open: filtering || !closed.has(issue.section) })
+    }
+    return groups
+  }, [shown, filtering, closed])
 
   const items = useMemo<Item[]>(
     () =>
       sections.flatMap((section) => [
-        { kind: 'lane' as const, lane: section.lane, count: section.issues.length },
+        ...(section.name ? [{ kind: 'section' as const, name: section.name, count: section.issues.length }] : []),
         ...(section.open ? section.issues.map((issue) => ({ kind: 'issue' as const, issue })) : []),
       ]),
     [sections],
   )
 
-  const toggle = (lane: Lane, open: boolean) =>
+  const toggle = (name: string, open: boolean) =>
     setClosed((set) => {
       const next = new Set(set)
-      if (open) next.delete(lane)
-      else next.add(lane)
+      if (open) next.delete(name)
+      else next.add(name)
       writeStored(CLOSED_KEY, [...next])
       return next
     })
@@ -85,28 +85,28 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
     onEnter(index) {
       const item = items[index]
       if (!item) return
-      if (item.kind === 'lane') {
-        toggle(item.lane, closed.has(item.lane))
+      if (item.kind === 'section') {
+        toggle(item.name, closed.has(item.name))
         return
       }
       setOverlay({ issue: item.issue.number })
     },
     onSpace(index) {
       const item = items[index]
-      if (item?.kind !== 'lane' || filtering) return false
-      toggle(item.lane, closed.has(item.lane))
+      if (item?.kind !== 'section' || filtering) return false
+      toggle(item.name, closed.has(item.name))
       return true
     },
     onLeft(index) {
       const item = items[index]
-      if (item?.kind !== 'lane' || filtering || closed.has(item.lane)) return false
-      toggle(item.lane, false)
+      if (item?.kind !== 'section' || filtering || closed.has(item.name)) return false
+      toggle(item.name, false)
       return true
     },
     onRight(index) {
       const item = items[index]
-      if (item?.kind !== 'lane' || filtering || !closed.has(item.lane)) return false
-      toggle(item.lane, true)
+      if (item?.kind !== 'section' || filtering || !closed.has(item.name)) return false
+      toggle(item.name, true)
       return true
     },
   })
@@ -127,15 +127,17 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
   return (
     <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-2">
       {sections.map((section) => (
-        <section key={section.lane}>
-          <QueueLaneHeader
-            lane={section.lane}
-            count={section.issues.length}
-            open={section.open}
-            cursor={listNav.cursorKey === `lane:${section.lane}`}
-            locked={filtering}
-            onToggle={() => toggle(section.lane, closed.has(section.lane))}
-          />
+        <section key={section.name}>
+          {section.name && (
+            <QueueSectionHeader
+              name={section.name}
+              count={section.issues.length}
+              open={section.open}
+              cursor={listNav.cursorKey === `section:${section.name}`}
+              locked={filtering}
+              onToggle={() => toggle(section.name, closed.has(section.name))}
+            />
+          )}
           <Collapse open={section.open}>
             {section.issues.map((issue) => (
               <IssueRow key={issue.number} issue={issue} cursor={section.open && listNav.cursorKey === `issue:${issue.number}`} />

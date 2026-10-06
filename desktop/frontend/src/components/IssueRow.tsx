@@ -2,6 +2,7 @@ import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
+import { ActionMenu } from './ActionMenu'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
 import { PRMark } from './PRMark'
@@ -40,13 +41,18 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
           <Icon name="external" size={12} />
         </button>
         {!session && (
-          <button
-            className="btn btn-accent h-6 w-12 flex-none justify-center px-0"
-            title="Start a session (hold ⌥ to keep your place)"
-            onClick={(e) => report(() => startIssue(issue.number, e.altKey))}
-          >
-            Start
-          </button>
+          <>
+            <button
+              className="btn btn-accent h-6 flex-none justify-center px-2"
+              title={`${issue.actions[0]} (hold ⌥ to keep your place)`}
+              onClick={(e) => report(() => startIssue(issue.number, issue.actions[0], e.altKey))}
+            >
+              {issue.actions[0]}
+            </button>
+            {issue.actions.length > 1 && (
+              <ActionMenu issue={issue.number} actions={issue.actions.slice(1)} onPick={(action, e) => report(() => startIssue(issue.number, action, e.altKey))} />
+            )}
+          </>
         )}
       </span>
       {session && (
