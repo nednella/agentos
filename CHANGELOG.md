@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/nednella/agentos/compare/v0.7.0...v0.7.1) (2026-10-06)
+
+
+### Bug Fixes
+
+* **internal:** keep a linked file linked when saving it ([5bc658c](https://github.com/nednella/agentos/commit/5bc658cd3c84643067fc748f5fd1cb0700016c0c))
+
 ## [0.7.0](https://github.com/nednella/agentos/compare/v0.6.0...v0.7.0) (2026-10-06)
 
 
