@@ -23,6 +23,8 @@ Go is the reference when they disagree.
 - Never install the app to `/Applications` or `~/Applications`, never run
   `make desktop-install`, `install.sh` or `agentos update` against the real home, unless Ned asks.
   Live sessions' hooks call the installed `agentos`, a link into the installed bundle.
+- Stop only the processes you started, by their PID. Never `pkill`, `killall` or kill by a
+  name pattern: one matched the installed app and closed Ned's window.
 - Draft PRs only; never merge, mark ready or request reviewers. Ned's own Claude settings enforce this.
 - Clean-up code deletes worktrees and branches. Any change to it ships with tests against
   throwaway git repos, never a real one.
@@ -34,10 +36,10 @@ Go is the reference when they disagree.
 |---|---|
 | Go tests, vet | `go test -race ./...` · `go vet ./...` |
 | Front end typecheck + build | `cd desktop/frontend && npm run build` |
-| Build the app | `make desktop-app` → `bin/agentos.app` (`VERSION=v1.2.3` stamps a version) |
+| Build the app | `make desktop-app` → `bin/agentos-dev.app` (`VERSION=v1.2.3` stamps a version) |
 | Build a release zip | `make release` → `bin/agentos-darwin-arm64.zip` and its `.sha256` |
-| Open the app | `open bin/agentos.app` |
-| Run the real app in a browser for checks | `AGENTOS_HTTP=127.0.0.1:34777 bin/agentos.app/Contents/MacOS/agentos` (with the isolation env above) |
+| Open the app | `open bin/agentos-dev.app` |
+| Run the real app in a browser for checks | `AGENTOS_HTTP=127.0.0.1:34777 bin/agentos-dev.app/Contents/MacOS/agentos` (with the isolation env above) |
 | Drive that browser | `node scripts/cdp.mjs http://127.0.0.1:34777/ 1512 945 '<steps>'` |
 
 The window itself cannot be screenshotted by a session (macOS blocks it); `docs/testing.md`
