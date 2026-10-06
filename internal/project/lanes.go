@@ -1,11 +1,15 @@
 package project
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // DefaultPRPoll is how often pull requests are polled when pr_poll is not set.
@@ -77,6 +81,60 @@ func (p Project) ChecksCommand(pr int) string {
 // BranchFor is the branch the work on an issue happens on, or "" when the project names none.
 func (p Project) BranchFor(number int) string {
 	return strings.ReplaceAll(p.Branch, "{n}", strconv.Itoa(number))
+}
+
+// Cleanup says, per event, whether the app cleans up after a session by itself. An empty
+// field takes the default: auto after a merge, manual after a close.
+type Cleanup struct {
+	Merge string `yaml:"merge,omitempty" json:"merge"`
+	Close string `yaml:"close,omitempty" json:"close"`
+}
+
+// Modes are the values of Cleanup.Merge and Cleanup.Close.
+var Modes = []string{"auto", "manual"}
+
+// UnmarshalYAML turns the old cleanup command into an error that says where it went.
+func (c *Cleanup) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind == yaml.ScalarNode {
+		return errors.New("cleanup is now a map of merge and close; the command that removes a worktree is remove_worktree")
+	}
+	type plain Cleanup
+	return n.Decode((*plain)(c))
+}
+
+func (c Cleanup) validate() error {
+	if c.Merge != "" && !slices.Contains(Modes, c.Merge) {
+		return fmt.Errorf("cleanup merge must be auto or manual, not %q", c.Merge)
+	}
+	if c.Close != "" && !slices.Contains(Modes, c.Close) {
+		return fmt.Errorf("cleanup close must be auto or manual, not %q", c.Close)
+	}
+	return nil
+}
+
+// OnMerge is the mode after a merge.
+func (c Cleanup) OnMerge() string { return cmp.Or(c.Merge, "auto") }
+
+// OnClose is the mode after a close.
+func (c Cleanup) OnClose() string { return cmp.Or(c.Close, "manual") }
+
+// Resolved is c with the defaults filled in.
+func (c Cleanup) Resolved() Cleanup { return Cleanup{Merge: c.OnMerge(), Close: c.OnClose()} }
+
+// Set changes the mode of an event, "merge" or "close".
+func (c *Cleanup) Set(event, mode string) error {
+	if !slices.Contains(Modes, mode) {
+		return fmt.Errorf("cleanup mode must be auto or manual, not %q", mode)
+	}
+	switch event {
+	case "merge":
+		c.Merge = mode
+	case "close":
+		c.Close = mode
+	default:
+		return fmt.Errorf("cleanup event must be merge or close, not %q", event)
+	}
+	return nil
 }
 
 // BrowserOn says whether sessions get the browser and evidence commands.

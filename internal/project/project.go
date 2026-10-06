@@ -16,23 +16,24 @@ import (
 
 // Project is the unit agentos is scoped to: a name and the folder agents start in.
 type Project struct {
-	Name      string            `yaml:"name"`
-	Dir       string            `yaml:"dir"`
-	Commands  map[string]string `yaml:"commands,omitempty"`   // keys: ready, plan, inbox, idea, note
-	Lanes     map[string]string `yaml:"lanes,omitempty"`      // GitHub label -> lane
-	Model     string            `yaml:"model,omitempty"`      // overrides the config's model for this project
-	Effort    string            `yaml:"effort,omitempty"`     // overrides the config's effort for this project
-	Models    map[string]Model  `yaml:"models,omitempty"`     // lane -> model and effort of the sessions started there
-	Branch    string            `yaml:"branch,omitempty"`     // branch of an issue's work when the session reports none; {n} is the number
-	Cleanup   string            `yaml:"cleanup,omitempty"`    // shell command that removes a worktree; {branch} and {worktree}
-	URL       string            `yaml:"url,omitempty"`        // the page a session's browser opens first
-	Browser   *bool             `yaml:"browser,omitempty"`    // give sessions the browser and evidence commands; on unless false
-	Digest    string            `yaml:"digest,omitempty"`     // weekly (the default) or off
-	PRWatch   string            `yaml:"pr_watch,omitempty"`   // webhook or poll; unset tries the webhook and polls when it does not work
-	PRPoll    string            `yaml:"pr_poll,omitempty"`    // how often to poll pull requests, "30s" by default
-	KeepAwake *bool             `yaml:"keep_awake,omitempty"` // overrides the config's keep_awake for this project
-	OnReview  string            `yaml:"on_review,omitempty"`  // typed into a session whose PR got a review or comment; {n} is the PR number
-	OnChecks  string            `yaml:"on_checks,omitempty"`  // typed into a session whose PR has failing checks; {n} is the PR number
+	Name           string            `yaml:"name"`
+	Dir            string            `yaml:"dir"`
+	Commands       map[string]string `yaml:"commands,omitempty"`        // keys: ready, plan, inbox, idea, note
+	Lanes          map[string]string `yaml:"lanes,omitempty"`           // GitHub label -> lane
+	Model          string            `yaml:"model,omitempty"`           // overrides the config's model for this project
+	Effort         string            `yaml:"effort,omitempty"`          // overrides the config's effort for this project
+	Models         map[string]Model  `yaml:"models,omitempty"`          // lane -> model and effort of the sessions started there
+	Branch         string            `yaml:"branch,omitempty"`          // branch of an issue's work when the session reports none; {n} is the number
+	RemoveWorktree string            `yaml:"remove_worktree,omitempty"` // shell command that removes a worktree; {branch} and {worktree}
+	Cleanup        Cleanup           `yaml:"cleanup,omitempty"`         // whether the app cleans up by itself, per event
+	URL            string            `yaml:"url,omitempty"`             // the page a session's browser opens first
+	Browser        *bool             `yaml:"browser,omitempty"`         // give sessions the browser and evidence commands; on unless false
+	Digest         string            `yaml:"digest,omitempty"`          // weekly (the default) or off
+	PRWatch        string            `yaml:"pr_watch,omitempty"`        // webhook or poll; unset tries the webhook and polls when it does not work
+	PRPoll         string            `yaml:"pr_poll,omitempty"`         // how often to poll pull requests, "30s" by default
+	KeepAwake      *bool             `yaml:"keep_awake,omitempty"`      // overrides the config's keep_awake for this project
+	OnReview       string            `yaml:"on_review,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
+	OnChecks       string            `yaml:"on_checks,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.
@@ -98,6 +99,9 @@ func Load(path string) (Config, error) {
 		cfg.Projects[i].Dir = ExpandHome(p.Dir)
 		if p.PRWatch != "" && p.PRWatch != "webhook" && p.PRWatch != "poll" {
 			return Config{}, fmt.Errorf("%s: project %s: pr_watch must be webhook or poll, not %q", path, p.Name, p.PRWatch)
+		}
+		if err := p.Cleanup.validate(); err != nil {
+			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if err := p.validateModels(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
@@ -204,6 +208,15 @@ func field(m *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
+func dropField(m *yaml.Node, key string) {
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value == key {
+			m.Content = slices.Delete(m.Content, i, i+2)
+			return
+		}
+	}
+}
+
 // syncScalar makes the key hold want. A value that already means want, once norm has run on it, stays as written.
 func syncScalar(m *yaml.Node, key, want string, norm func(string) string) {
 	node := field(m, key)
@@ -212,12 +225,7 @@ func syncScalar(m *yaml.Node, key, want string, norm func(string) string) {
 		m.Content = append(m.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, &yaml.Node{Kind: yaml.ScalarNode, Value: want})
 	case node == nil:
 	case want == "":
-		for i := 0; i+1 < len(m.Content); i += 2 {
-			if m.Content[i].Value == key {
-				m.Content = slices.Delete(m.Content, i, i+2)
-				return
-			}
-		}
+		dropField(m, key)
 	default:
 		have := node.Value
 		if norm != nil {
@@ -246,6 +254,9 @@ func syncProjects(root *yaml.Node, want []Project) error {
 	var next []*yaml.Node
 	for _, p := range want {
 		i := slices.IndexFunc(seq.Content, func(n *yaml.Node) bool { return sameProject(n, p) })
+		if i < 0 {
+			i = editInPlace(seq, p)
+		}
 		if i >= 0 {
 			next = append(next, seq.Content[i])
 			continue
@@ -258,6 +269,37 @@ func syncProjects(root *yaml.Node, want []Project) error {
 	}
 	seq.Content = next
 	return nil
+}
+
+// editInPlace updates the entry of p when only its cleanup settings changed, so the rest of the entry keeps
+// its comments and layout. It returns the entry's index, or -1 when there is no such entry.
+func editInPlace(seq *yaml.Node, p Project) int {
+	i := slices.IndexFunc(seq.Content, func(n *yaml.Node) bool { f := field(n, "name"); return f != nil && f.Value == p.Name })
+	if i < 0 {
+		return -1
+	}
+	syncCleanup(seq.Content[i], p.Cleanup)
+	if !sameProject(seq.Content[i], p) {
+		return -1
+	}
+	return i
+}
+
+func syncCleanup(project *yaml.Node, want Cleanup) {
+	node := field(project, "cleanup")
+	if node == nil || node.Kind != yaml.MappingNode {
+		if want == (Cleanup{}) {
+			return
+		}
+		dropField(project, "cleanup")
+		node = &yaml.Node{Kind: yaml.MappingNode}
+		project.Content = append(project.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "cleanup"}, node)
+	}
+	syncScalar(node, "merge", want.Merge, nil)
+	syncScalar(node, "close", want.Close, nil)
+	if len(node.Content) == 0 {
+		dropField(project, "cleanup")
+	}
 }
 
 func sameProject(n *yaml.Node, p Project) bool {
