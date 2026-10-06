@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.10.0](https://github.com/nednella/agentos/compare/v0.9.0...v0.10.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** look up the PR when an agent's turn ends ([fd6bffd](https://github.com/nednella/agentos/commit/fd6bffd93bcc21003307e368f35b6bcacbef1d64))
+* **internal:** poll pull requests every 10s by default ([6013f46](https://github.com/nednella/agentos/commit/6013f46fc1415013d8ef8552e929ced8cb12eab3))
+* **ui:** collapse the shell list into the shell header ([9d05432](https://github.com/nednella/agentos/commit/9d05432352a423345b6edb7990ff28d7d9f02148))
+* **ui:** pad settings rows and sections ([3c4dd33](https://github.com/nednella/agentos/commit/3c4dd33f957033c7c1571ba019edba86625c12cd))
+* **ui:** read the queue again on a project switch ([942bc1b](https://github.com/nednella/agentos/commit/942bc1b5dde7ef34f906b4e8eb0443046a42f91f))
+* **ui:** read the queue again when it is shown or the window regains focus ([cfb44f5](https://github.com/nednella/agentos/commit/cfb44f5d5e97dd4a7c48ba0b5d01c3c384426163))
+* **ui:** widen settings panel so every row shows ([d977955](https://github.com/nednella/agentos/commit/d977955fc0657ee4d970882f30aa6fa34bc0e598))
+
+
+### Reverts
+
+* widen settings panel so every row shows ([29a0500](https://github.com/nednella/agentos/commit/29a05008e9bca90fafc17991a02e3e7865cfcce1))
+
 ## [0.9.0](https://github.com/nednella/agentos/compare/v0.8.0...v0.9.0) (2026-10-06)
 
 
