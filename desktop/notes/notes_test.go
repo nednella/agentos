@@ -155,7 +155,7 @@ func TestNoteToSession(t *testing.T) {
 }
 
 func TestNoteToSessionKeepsLineBreaksUnsent(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_prompt_send: manual\n"})
 	// Pasted before bash's prompt, the line breaks would run: type only once the session reports ready.
 	h.App.Sessions().SetPrefillWait(time.Minute)
 	n, _ := h.AddNote("first line\nsecond line")
