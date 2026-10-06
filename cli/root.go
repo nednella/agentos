@@ -34,13 +34,14 @@ func newRootCmd() *cobra.Command {
 
 func newRootCmdWith(l launcher) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "agentos",
-		Short:         "One screen for all your coding agents",
-		Long:          "One screen for all your coding agents.\n\nWith no command, agentos opens the app.",
-		Args:          cobra.NoArgs,
-		RunE:          openApp(l),
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:               "agentos",
+		Short:             "One screen for all your coding agents",
+		Long:              "One screen for all your coding agents.\n\nWith no command, agentos opens the app.",
+		Args:              cobra.NoArgs,
+		RunE:              openApp(l),
+		PersistentPostRun: func(cmd *cobra.Command, _ []string) { notice(cmd, l) },
+		SilenceUsage:      true,
+		SilenceErrors:     true,
 	}
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddGroup(
@@ -49,7 +50,7 @@ func newRootCmdWith(l launcher) *cobra.Command {
 		&cobra.Group{ID: groupProject, Title: "Projects:"},
 		&cobra.Group{ID: groupSession, Title: "From inside a session:"},
 	)
-	root.AddCommand(newBrowserCmd(), newDigestCmd(), newHookCmd(), newKillCmd(), newNoteCmd(), newShowCmd(), newStatsCmd(), newVersionCmd())
+	root.AddCommand(newBrowserCmd(), newDigestCmd(), newHookCmd(), newKillCmd(), newNoteCmd(), newShowCmd(), newStatsCmd(), newUpdateCmd(l), newVersionCmd())
 	root.AddCommand(newAppCmds()...)
 	return root
 }
