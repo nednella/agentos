@@ -1,6 +1,5 @@
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
-import { STATE_LABEL } from '../stateMeta'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { CleanupControls } from './CleanupControls'
@@ -15,7 +14,6 @@ type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; c
 export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
   const { select, focus, setSessionView, dismissSession, report, issues } = useAgentos()
   const now = useNow()
-  const waiting = session.state === 'waiting'
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
   const showPR = session.pr !== null && !dense
@@ -42,11 +40,8 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           <span className="min-w-0 flex-1 truncate text-body font-medium">{session.title}</span>
           <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
         </span>
-        {!compact && !dense && (
-          <span className="flex w-full items-center gap-2 pl-[1.625rem]">
-            <span className="mono min-w-0 flex-1 truncate text-small" style={{ color: waiting ? 'var(--waiting)' : 'var(--text-dim)' }}>
-              {session.detail || STATE_LABEL[session.state]}
-            </span>
+        {!compact && !dense && session.model && (
+          <span className="w-full pl-[1.625rem]">
             <ModelTag model={session.model} effort={session.effort} />
           </span>
         )}
