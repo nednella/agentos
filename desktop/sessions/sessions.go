@@ -790,18 +790,19 @@ func (s *Sessions) IssueSessions() map[int]string {
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, "", nil))
+	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, "", nil), "")
 }
 
 // CreateIssue starts the agent for an issue in the lane with the issue's labels, and sends text to it
 // once it is ready. The lane and the labels pick the model.
 func (s *Sessions) CreateIssue(title, text string, issue int, lane string, labels []string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, true, issue, proj.Pick(s.model, lane, labels))
+	return s.createIn(proj, title, text, true, issue, proj.Pick(s.model, lane, labels), "")
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model) (Session, error) {
+// A conversation continues that of an earlier session.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation string) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -809,7 +810,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue, model); err != nil {
+	if err := s.launch(tctx, name, title, proj, issue, model, conversation); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
@@ -852,7 +853,7 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model) error {
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation string) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
@@ -863,7 +864,7 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model), issue, model)
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation), issue, model)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
@@ -960,13 +961,14 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 
 // wake sends the prompt to the session, once it is not waiting on the user: typed into a
 // permission prompt, the text could answer it. A session that has ended gets a new one for
-// its issue, with the prompt sent, and its row goes.
+// its issue, with the prompt sent, and its row goes. The new one continues the old's conversation
+// when the agent can.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	if t.ended && t.issue == 0 {
 		return
 	}
 	if t.ended {
-		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model); err != nil {
+		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model, t.conversation); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 			return
 		}
@@ -1130,7 +1132,15 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id)}, true
+}
+
+// conversationOf is the agent's conversation id of a session, running or ended. It needs mu.
+func (s *Sessions) conversationOf(id string) string {
+	if e, ok := s.ended[id]; ok {
+		return e.rec.Conversation
+	}
+	return s.records[id].Conversation
 }
 
 // projectOf needs mu.
@@ -1244,8 +1254,8 @@ func (s *Sessions) OpenShell() (string, error) {
 }
 
 // commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
-func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model) []string {
-	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort})
+func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation string) []string {
+	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
 	if _, ok := s.agent.(agent.Claude); ok && proj.BrowserOn() && s.browsers.Available() {
 		argv = append(argv, "--append-system-prompt", prompts.BrowserSession())
 	}
