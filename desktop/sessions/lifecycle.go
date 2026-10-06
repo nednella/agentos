@@ -405,7 +405,7 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 			tr.cleanup = ""
 		}
 	case tr.cleanup != "":
-	case !tr.sawLive || !wantsAuto(t.proj.Cleanup, pr.State):
+	case !tr.sawLive || !wantsAuto(t.proj.CleanupMode, pr.State):
 		// Without sight of the PR open, the branch may be old: the user decides.
 		tr.cleanup = "ask"
 	case !tr.autoTried:
@@ -874,8 +874,8 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 }
 
 func (l *Lifecycle) removeWorktree(ctx context.Context, proj project.Project, branch, worktree string, force bool) error {
-	if proj.RemoveWorktree != "" {
-		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.RemoveWorktree)
+	if proj.CleanupCommand != "" {
+		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.CleanupCommand)
 		ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
 		defer cancel()
 		_, err := l.run(ctx, proj.Dir, "sh", "-c", cmd)

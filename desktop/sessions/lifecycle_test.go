@@ -321,7 +321,7 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 }
 
 func TestCleanupCustomCommand(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    remove_worktree: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_command: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -516,7 +516,7 @@ func openThenClose(h *apptest.Harness) {
 }
 
 func TestCleanupMergeManualAsks(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {merge: manual}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {merge: manual}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -530,7 +530,7 @@ func TestCleanupMergeManualAsks(t *testing.T) {
 }
 
 func TestCleanupCloseAuto(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -543,7 +543,7 @@ func TestCleanupCloseAuto(t *testing.T) {
 }
 
 func TestCleanupCloseAutoKeepsSafetyChecks(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -559,7 +559,7 @@ func TestCleanupCloseAutoKeepsSafetyChecks(t *testing.T) {
 }
 
 func TestCleanupCloseAutoAsksForAPRNeverSeenOpen(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    cleanup: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)

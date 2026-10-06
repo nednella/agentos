@@ -176,7 +176,7 @@ func TestDigestAutomaticRuns(t *testing.T) {
 		t.Error("no next run time")
 	}
 
-	off := apptest.NewWith(t, apptest.Options{ProjectExtra: "    digest: off\n", DigestFirst: 50 * time.Millisecond, DigestTick: 50 * time.Millisecond})
+	off := apptest.NewWith(t, apptest.Options{ProjectExtra: "    digest_schedule: off\n", DigestFirst: 50 * time.Millisecond, DigestTick: 50 * time.Millisecond})
 	time.Sleep(400 * time.Millisecond)
 	if n := len(off.Claude.Calls()); n != 0 || off.Digest().NextRunAt != 0 {
 		t.Errorf("a project with the digest off ran %d times, next run %d", n, off.Digest().NextRunAt)

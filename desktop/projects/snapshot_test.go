@@ -35,7 +35,7 @@ func TestSnapshotListsTheProjectsOnce(t *testing.T) {
 	if err := os.MkdirAll(api, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	useConfig(t, "projects:\n  - {name: api, dir: "+api+"}\n")
+	useConfig(t, "projects:\n  - {name: api, directory: "+api+"}\n")
 
 	t.Run("a configured project is current", func(t *testing.T) {
 		t.Setenv("AGENTOS_DIR", api)

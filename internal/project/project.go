@@ -17,33 +17,33 @@ import (
 // Project is the unit agentos is scoped to: a name and the folder agents start in.
 type Project struct {
 	Name               string    `yaml:"name"`
-	Dir                string    `yaml:"dir"`
-	QueueSections      []Section `yaml:"queue_sections,omitempty"`       // the groups of the queue, each with the actions that start a session
-	Model              string    `yaml:"session_model,omitempty"`        // overrides the config's model for this project
-	Effort             string    `yaml:"session_effort,omitempty"`       // overrides the config's effort for this project
-	NoteSessionCommand string    `yaml:"note_session_command,omitempty"` // typed into a session started from a note; {text} is the note, the note itself when unset
-	SessionPromptSend  string    `yaml:"session_prompt_send,omitempty"`  // auto (the default) sends what a session starts with at once; manual waits for Enter
-	Branch             string    `yaml:"branch,omitempty"`               // branch of an issue's work when the session reports none; {n} is the number
-	RemoveWorktree     string    `yaml:"remove_worktree,omitempty"`      // shell command that removes a worktree; {branch} and {worktree}
-	Cleanup            Cleanup   `yaml:"cleanup,omitempty"`              // whether the app cleans up by itself, per event
-	URL                string    `yaml:"url,omitempty"`                  // the page a session's browser opens first
-	Browser            *bool     `yaml:"browser,omitempty"`              // give sessions the browser and evidence commands; on unless false
-	Digest             string    `yaml:"digest,omitempty"`               // weekly (the default) or off
-	PRWatch            string    `yaml:"pr_watch,omitempty"`             // webhook or poll; unset tries the webhook and polls when it does not work
-	PRPoll             string    `yaml:"pr_poll,omitempty"`              // how often to poll pull requests, "30s" by default
-	KeepAwake          *bool     `yaml:"keep_awake,omitempty"`           // overrides the config's keep_awake for this project
-	OnReview           string    `yaml:"on_review,omitempty"`            // typed into a session whose PR got a review or comment; {n} is the PR number
-	OnChecks           string    `yaml:"on_checks,omitempty"`            // typed into a session whose PR has failing checks; {n} is the PR number
+	Dir                string    `yaml:"directory"`
+	QueueSections      []Section `yaml:"queue_sections,omitempty"`          // the groups of the queue, each with the actions that start a session
+	Model              string    `yaml:"session_model,omitempty"`           // overrides the config's model for this project
+	Effort             string    `yaml:"session_effort,omitempty"`          // overrides the config's effort for this project
+	NoteSessionCommand string    `yaml:"note_session_command,omitempty"`    // typed into a session started from a note; {text} is the note, the note itself when unset
+	SessionPromptSend  string    `yaml:"session_prompt_send,omitempty"`     // auto (the default) sends what a session starts with at once; manual waits for Enter
+	Branch             string    `yaml:"session_branch_fallback,omitempty"` // branch of an issue's work when the session reports none; {n} is the number
+	CleanupCommand     string    `yaml:"session_cleanup_command,omitempty"` // shell command that cleans up the git side of a session; {branch}, {worktree} and {dir}
+	CleanupMode        Cleanup   `yaml:"session_cleanup_mode,omitempty"`    // whether the app cleans up by itself, per event
+	URL                string    `yaml:"browser_start_url,omitempty"`       // the page a session's browser opens first
+	Browser            *bool     `yaml:"browser_enabled,omitempty"`         // give sessions the browser and evidence commands; on unless false
+	Digest             string    `yaml:"digest_schedule,omitempty"`         // weekly (the default) or off
+	PRWatch            string    `yaml:"pr_watch_method,omitempty"`         // webhook or poll; unset tries the webhook and polls when it does not work
+	PRPoll             string    `yaml:"pr_poll_interval,omitempty"`        // how often to poll pull requests, "30s" by default
+	KeepAwake          *bool     `yaml:"keep_mac_awake,omitempty"`          // overrides the config's keep_mac_awake for this project
+	OnReview           string    `yaml:"pr_review_command,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
+	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.
 type Config struct {
 	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
-	Agent     string    `yaml:"agent"`
+	Agent     string    `yaml:"agent_command"`
 	Model     string    `yaml:"session_model,omitempty"`  // model of a Claude session; unset leaves it to claude
 	Effort    string    `yaml:"session_effort,omitempty"` // effort of a Claude session; unset leaves it to claude
-	KeepAwake *bool     `yaml:"keep_awake,omitempty"`     // hold off idle sleep while a session works; on unless false
-	Theme     string    `yaml:"theme,omitempty"`          // light or dark; unset follows the system
+	KeepAwake *bool     `yaml:"keep_mac_awake,omitempty"` // hold off idle sleep while a session works; on unless false
+	Theme     string    `yaml:"app_theme,omitempty"`      // light or dark; unset follows the system
 	Projects  []Project `yaml:"projects"`
 }
 
@@ -90,17 +90,17 @@ func Load(path string) (Config, error) {
 		return Config{}, fmt.Errorf("%s: %w", path, err)
 	}
 	if cfg.Theme != "" && !slices.Contains(Themes, cfg.Theme) {
-		return Config{}, fmt.Errorf("%s: theme must be %s, not %q", path, strings.Join(Themes, " or "), cfg.Theme)
+		return Config{}, fmt.Errorf("%s: app_theme must be %s, not %q", path, strings.Join(Themes, " or "), cfg.Theme)
 	}
 	for i, p := range cfg.Projects {
 		if p.Name == "" || p.Dir == "" {
-			return Config{}, fmt.Errorf("%s: project %d needs a name and a dir", path, i+1)
+			return Config{}, fmt.Errorf("%s: project %d needs a name and a directory", path, i+1)
 		}
 		cfg.Projects[i].Dir = ExpandHome(p.Dir)
 		if p.PRWatch != "" && p.PRWatch != "webhook" && p.PRWatch != "poll" {
-			return Config{}, fmt.Errorf("%s: project %s: pr_watch must be webhook or poll, not %q", path, p.Name, p.PRWatch)
+			return Config{}, fmt.Errorf("%s: project %s: pr_watch_method must be webhook or poll, not %q", path, p.Name, p.PRWatch)
 		}
-		if err := p.Cleanup.validate(); err != nil {
+		if err := p.CleanupMode.validate(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if err := p.validateModel(); err != nil {
@@ -179,9 +179,9 @@ func encode(path string, c Config) ([]byte, error) {
 		return render(&doc)
 	}
 	root := doc.Content[0]
-	syncScalar(root, "agent", c.Agent, nil)
+	syncScalar(root, "agent_command", c.Agent, nil)
 	syncScalar(root, "data_dir", c.DataDir, ExpandHome)
-	syncScalar(root, "theme", c.Theme, nil)
+	syncScalar(root, "app_theme", c.Theme, nil)
 	if err := syncProjects(root, c.Projects); err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func editInPlace(seq *yaml.Node, p Project) int {
 	if i < 0 {
 		return -1
 	}
-	syncCleanup(seq.Content[i], p.Cleanup)
+	syncCleanup(seq.Content[i], p.CleanupMode)
 	if !sameProject(seq.Content[i], p) {
 		return -1
 	}
@@ -289,19 +289,19 @@ func editInPlace(seq *yaml.Node, p Project) int {
 }
 
 func syncCleanup(project *yaml.Node, want Cleanup) {
-	node := field(project, "cleanup")
+	node := field(project, "session_cleanup_mode")
 	if node == nil || node.Kind != yaml.MappingNode {
 		if want == (Cleanup{}) {
 			return
 		}
-		dropField(project, "cleanup")
+		dropField(project, "session_cleanup_mode")
 		node = &yaml.Node{Kind: yaml.MappingNode}
-		project.Content = append(project.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "cleanup"}, node)
+		project.Content = append(project.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "session_cleanup_mode"}, node)
 	}
 	syncScalar(node, "merge", want.Merge, nil)
 	syncScalar(node, "close", want.Close, nil)
 	if len(node.Content) == 0 {
-		dropField(project, "cleanup")
+		dropField(project, "session_cleanup_mode")
 	}
 }
 

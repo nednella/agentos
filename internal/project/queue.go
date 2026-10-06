@@ -9,12 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/yaml.v3"
-
 	"github.com/nednella/agentos/internal/prompts"
 )
 
-// DefaultPRPoll is how often pull requests are polled when pr_poll is not set.
+// DefaultPRPoll is how often pull requests are polled when pr_poll_interval is not set.
 const DefaultPRPoll = 30 * time.Second
 
 // OtherSection holds the issues no queue section matches.
@@ -137,21 +135,12 @@ type Cleanup struct {
 // Modes are the values of Cleanup.Merge and Cleanup.Close.
 var Modes = []string{"auto", "manual"}
 
-// UnmarshalYAML turns the old cleanup command into an error that says where it went.
-func (c *Cleanup) UnmarshalYAML(n *yaml.Node) error {
-	if n.Kind == yaml.ScalarNode {
-		return errors.New("cleanup is now a map of merge and close; the command that removes a worktree is remove_worktree")
-	}
-	type plain Cleanup
-	return n.Decode((*plain)(c))
-}
-
 func (c Cleanup) validate() error {
 	if c.Merge != "" && !slices.Contains(Modes, c.Merge) {
-		return fmt.Errorf("cleanup merge must be auto or manual, not %q", c.Merge)
+		return fmt.Errorf("session_cleanup_mode merge must be auto or manual, not %q", c.Merge)
 	}
 	if c.Close != "" && !slices.Contains(Modes, c.Close) {
-		return fmt.Errorf("cleanup close must be auto or manual, not %q", c.Close)
+		return fmt.Errorf("session_cleanup_mode close must be auto or manual, not %q", c.Close)
 	}
 	return nil
 }
@@ -206,7 +195,7 @@ func (p Project) PRPollEvery() (time.Duration, error) {
 	}
 	d, err := time.ParseDuration(p.PRPoll)
 	if err != nil || d < time.Second {
-		return 0, fmt.Errorf("pr_poll must be a duration of at least 1s, like 30s, not %q", p.PRPoll)
+		return 0, fmt.Errorf("pr_poll_interval must be a duration of at least 1s, like 30s, not %q", p.PRPoll)
 	}
 	return d, nil
 }

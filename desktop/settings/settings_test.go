@@ -25,7 +25,7 @@ func TestTheme(t *testing.T) {
 			t.Errorf("config after %s = %+v, %v", theme, cfg, err)
 		}
 	}
-	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# mine") || !strings.Contains(string(data), "theme: light") {
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# mine") || !strings.Contains(string(data), "app_theme: light") {
 		t.Errorf("config lost its comment or the theme:\n%s", data)
 	}
 
@@ -55,7 +55,7 @@ func TestThemeSurvivesRestart(t *testing.T) {
 }
 
 func TestCleanup(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    url: http://localhost\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    browser_start_url: http://localhost\n"})
 	if got := h.Settings().Cleanup; got != (project.Cleanup{Merge: "auto", Close: "manual"}) {
 		t.Fatalf("default cleanup = %+v", got)
 	}
@@ -66,7 +66,7 @@ func TestCleanup(t *testing.T) {
 		t.Fatalf("SetCleanup(merge, manual) = %+v, %v", got, err)
 	}
 	cfg, err := project.Load(h.Conf)
-	if err != nil || cfg.Projects[0].Cleanup != (project.Cleanup{Merge: "manual", Close: "auto"}) {
+	if err != nil || cfg.Projects[0].CleanupMode != (project.Cleanup{Merge: "manual", Close: "auto"}) {
 		t.Errorf("config = %+v, %v", cfg.Projects, err)
 	}
 	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# keep me") {

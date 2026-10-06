@@ -343,7 +343,7 @@ func TestNotesLiveInTheDataDir(t *testing.T) {
 	t.Setenv("HOME", filepath.Join(root, "home"))
 	t.Setenv("AGENTOS_DATA_DIR", "")
 	conf := filepath.Join(root, "config.yaml")
-	if err := os.WriteFile(conf, []byte("data_dir: "+synced+"\nprojects:\n  - {name: p, dir: "+root+"}\n"), 0o600); err != nil {
+	if err := os.WriteFile(conf, []byte("data_dir: "+synced+"\nprojects:\n  - {name: p, directory: "+root+"}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("AGENTOS_CONFIG", conf)
