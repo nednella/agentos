@@ -793,6 +793,10 @@ func (h *Harness) SetTheme(theme string) (settings.Settings, error) {
 	return h.settings.SetTheme(theme)
 }
 
+func (h *Harness) SetCleanup(event, mode string) (settings.Settings, error) {
+	return h.settings.SetCleanup(event, mode)
+}
+
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
 
 // PRJSON is what gh pr list prints for one pull request.

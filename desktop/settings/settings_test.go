@@ -53,3 +53,28 @@ func TestThemeSurvivesRestart(t *testing.T) {
 		t.Errorf("theme after restart = %q", got)
 	}
 }
+
+func TestCleanup(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    url: http://localhost\n"})
+	if got := h.Settings().Cleanup; got != (project.Cleanup{Merge: "auto", Close: "manual"}) {
+		t.Fatalf("default cleanup = %+v", got)
+	}
+	if got, err := h.SetCleanup("close", "auto"); err != nil || got.Cleanup != (project.Cleanup{Merge: "auto", Close: "auto"}) {
+		t.Fatalf("SetCleanup(close, auto) = %+v, %v", got, err)
+	}
+	if got, err := h.SetCleanup("merge", "manual"); err != nil || got.Cleanup != (project.Cleanup{Merge: "manual", Close: "auto"}) {
+		t.Fatalf("SetCleanup(merge, manual) = %+v, %v", got, err)
+	}
+	cfg, err := project.Load(h.Conf)
+	if err != nil || cfg.Projects[0].Cleanup != (project.Cleanup{Merge: "manual", Close: "auto"}) {
+		t.Errorf("config = %+v, %v", cfg.Projects, err)
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# keep me") {
+		t.Errorf("config lost the project's comment:\n%s", data)
+	}
+	for _, bad := range [][2]string{{"merge", "sometimes"}, {"open", "auto"}} {
+		if _, err := h.SetCleanup(bad[0], bad[1]); err == nil {
+			t.Errorf("SetCleanup(%s, %s) was accepted", bad[0], bad[1])
+		}
+	}
+}
