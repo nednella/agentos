@@ -46,7 +46,7 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
     group: 'Sessions',
     shortcut: { key: 'w' },
     run() {
-      if (!current) throw 'No session selected'
+      if (!current) return
       a.detach()
       return `Detached ${describe(current)}`
     },
