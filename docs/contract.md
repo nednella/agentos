@@ -240,7 +240,7 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Issues(refresh)` | `Issue[]` | the current project's open issues, section by section in the order the project lists them (the order GitHub gave inside a section), cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
+| `Issues(refresh)` | `Issue[]` | the current project's open issues, section by section in the order the project lists them (the order GitHub gave inside a section), cached unless `refresh`, which the front end passes when the queue is shown and when the window regains focus while it is; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
 | `StartIssue(number, action)` | `Session` | opens a session titled `#<n> <short title>` and starts the agent with the model and effort the action and the issue's labels pick (see config), then types the action's command once the agent is ready, and sends it unless `session_prompt_send` is `manual`. `action` is one of the issue's `actions`; `""` is the first. Rejects an action the issue does not have. An issue that has a live session gets that session back |
 | `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 
