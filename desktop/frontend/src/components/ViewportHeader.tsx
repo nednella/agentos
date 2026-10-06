@@ -30,8 +30,8 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
   return (
     <header className="panel-head flex flex-none flex-col gap-1 px-4 py-2.5 short:py-1.5">
       <div className="flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <span className="mono text-title font-semibold text-soft">{session.n}</span>
+        <span className="mono text-title font-semibold text-soft">{session.n}</span>
+        <div className="min-w-0 flex-1">
           {renaming ? (
             <InlineInput
               initial={session.title}
@@ -52,26 +52,6 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
               {session.title}
             </h2>
           )}
-          <ModelTag model={session.model} effort={session.effort} />
-          <span className="contents short:hidden">
-            <StateBadge state={session.state} />
-            <PRBadge session={session} />
-            {action && session.pr && (
-              <button
-                className="btn btn-accent"
-                onClick={() => {
-                  const number = session.pr?.number ?? 0
-                  report(async () => {
-                    await typeInto(session.id, action.sentence(number))
-                    await ackPR(session.id)
-                  })
-                  focus('terminal')
-                }}
-              >
-                {action.label}
-              </button>
-            )}
-          </span>
         </div>
         <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
         {kill.armed ? (
@@ -105,19 +85,31 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </button>
         )}
       </div>
+      <div className="short:hidden flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.625rem]">
+        <StateBadge state={session.state} />
+        <PRBadge session={session} />
+        {action && session.pr && (
+          <button
+            className="btn btn-accent"
+            onClick={() => {
+              const number = session.pr?.number ?? 0
+              report(async () => {
+                await typeInto(session.id, action.sentence(number))
+                await ackPR(session.id)
+              })
+              focus('terminal')
+            }}
+          >
+            {action.label}
+          </button>
+        )}
+        <ModelTag model={session.model} effort={session.effort} />
+      </div>
       {kill.armed && (
         <p className="pt-1.5 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
           Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
           <code className="mono">claude --resume</code>.
         </p>
-      )}
-      {session.detail && (
-        <span
-          className="mono short:hidden truncate text-small"
-          style={{ color: session.state === 'waiting' ? 'var(--waiting)' : 'var(--text-soft)' }}
-        >
-          {session.detail}
-        </span>
       )}
     </header>
   )
