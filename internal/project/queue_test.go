@@ -133,7 +133,7 @@ func TestPRPollEvery(t *testing.T) {
 		want    time.Duration
 		wantErr bool
 	}{
-		{"", 30 * time.Second, false},
+		{"", 10 * time.Second, false},
 		{"45s", 45 * time.Second, false},
 		{"2m", 2 * time.Minute, false},
 		{"500ms", 0, true},

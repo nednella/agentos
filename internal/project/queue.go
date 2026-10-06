@@ -13,7 +13,7 @@ import (
 )
 
 // DefaultPRPoll is how often pull requests are polled when pr_poll_interval is not set.
-const DefaultPRPoll = 30 * time.Second
+const DefaultPRPoll = 10 * time.Second
 
 // OtherSection holds the issues no queue section matches.
 const OtherSection = "Other"
