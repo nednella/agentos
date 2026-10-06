@@ -61,6 +61,9 @@ func (r *Recorder) Picker() (string, error) {
 	return r.pick, nil
 }
 
+// Awake takes no assertion: a test must not keep the machine awake.
+func (r *Recorder) Awake() (func(), error) { return func() {}, nil }
+
 func (r *Recorder) Clip(text string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -510,7 +513,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
+	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker, Awake: h.Rec.Awake}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
 	for _, svc := range a.Services() {
 		switch s := svc.(type) {
 		case *projects.Service:
