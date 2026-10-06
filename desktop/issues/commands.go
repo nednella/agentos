@@ -35,7 +35,7 @@ func (c *Commands) Issue(ctx context.Context, req ctl.Request) (string, error) {
 			continue
 		}
 		had := c.hasSession(ctx, n)
-		s, err := c.issues.Start(ctx, n)
+		s, err := c.issues.Start(ctx, n, "")
 		switch {
 		case err != nil:
 			failed = append(failed, fmt.Sprintf("#%d (%v)", n, err))

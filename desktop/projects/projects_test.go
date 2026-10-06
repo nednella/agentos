@@ -38,7 +38,7 @@ func TestProjects(t *testing.T) {
 	}
 
 	cfg, err := project.Load(h.Conf)
-	if err != nil || cfg.Agent != "bash" || len(cfg.Projects) != 3 || cfg.Projects[0].Commands["ready"] != "/ship {n}" {
+	if err != nil || cfg.Agent != "bash" || len(cfg.Projects) != 3 || len(cfg.Projects[0].QueueSections) != 3 {
 		t.Fatalf("saved config = %+v, %v", cfg, err)
 	}
 	if got := projects.ReadLast(h.State); got != "other-2" {

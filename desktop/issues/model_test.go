@@ -33,22 +33,23 @@ func flagsOf(t *testing.T, dir, id string) (model, effort string) {
 	return model, effort
 }
 
-func TestIssueSessionsGetTheirLanesModel(t *testing.T) {
+func TestIssueSessionsGetTheirActionsModel(t *testing.T) {
 	dir := apptest.ClaudeOnPath(t)
 	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
 
 	tests := []struct {
 		name          string
 		issue         int
+		action        string
 		model, effort string
 	}{
-		{"ready lane", 7, "sonnet", "medium"},
-		{"plan lane", 8, "opus", "medium"},
-		{"inbox lane", 11, "sonnet", "medium"},
-		{"labels win", 12, "haiku", "high"},
+		{"an action with no model passes none", 11, "", "", ""},
+		{"an action's model and effort", 7, "Plan", "opus", "high"},
+		{"the default action", 8, "", "opus", ""},
+		{"labels win", 12, "", "haiku", "high"},
 	}
 	for _, tt := range tests {
-		s, err := h.StartIssue(tt.issue)
+		s, err := h.StartIssueWith(tt.issue, tt.action)
 		if err != nil {
 			t.Fatalf("%s: %v", tt.name, err)
 		}
@@ -64,7 +65,7 @@ func TestIssueSessionsGetTheirLanesModel(t *testing.T) {
 func TestPlainSessionGetsTheProjectDefault(t *testing.T) {
 	dir := apptest.ClaudeOnPath(t)
 	h := apptest.NewWith(t, apptest.Options{
-		Agent: "claude", TopExtra: "model: haiku\neffort: low\n", ProjectExtra: "    effort: high\n",
+		Agent: "claude", TopExtra: "session_model: haiku\nsession_effort: low\n", ProjectExtra: "    session_effort: high\n",
 	})
 	s, err := h.NewSession("plain", "")
 	if err != nil {
@@ -90,7 +91,7 @@ func TestModelSurvivesARestartAndReachesTheTally(t *testing.T) {
 
 	again := h.Restart(t)
 	got, ok := again.Session(s.ID)
-	if !ok || got.Model != "opus" || got.Effort != "medium" {
+	if !ok || got.Model != "opus" || got.Effort != "" {
 		t.Errorf("after a restart: %+v, found %v", got, ok)
 	}
 

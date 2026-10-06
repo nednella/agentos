@@ -24,13 +24,13 @@ func TestIssues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var lanes []string
+	var placed []string
 	for _, is := range got {
-		lanes = append(lanes, fmt.Sprintf("%d:%s:%s", is.Number, is.Lane, is.Type))
+		placed = append(placed, fmt.Sprintf("%d:%s:%s:%s", is.Number, is.Section, strings.Join(is.Actions, "+"), is.Type))
 	}
-	want := []string{"7:ready:bug", "8:plan:feature", "9:you:", "10:idea:chore", "11:inbox:", "12:idea:"}
-	if !slices.Equal(lanes, want) {
-		t.Errorf("issues = %v, want %v", lanes, want)
+	want := []string{"7:Ready:Work+Plan:bug", "8:Plan:Investigate:feature", "11:Inbox:Investigate:", "9:Other:Start:", "10:Other:Start:chore", "12:Other:Start:"}
+	if !slices.Equal(placed, want) {
+		t.Errorf("issues = %v, want %v", placed, want)
 	}
 	first := got[0]
 	if first.Author != "ned" || !slices.Equal(first.Assignees, []string{"ned", "amy"}) || !slices.Equal(first.Labels, []string{"ready", "type:bug"}) ||
@@ -114,20 +114,42 @@ func TestIssuesDisabled(t *testing.T) {
 	}
 }
 
-func TestInboxAndIdeaCommands(t *testing.T) {
+func TestStartTypesTheChosenActionsCommand(t *testing.T) {
 	h := newHarness(t)
-	s, err := h.StartIssue(11) // no labels: the inbox lane
+	inbox, err := h.StartIssue(11)
 	if err != nil {
 		t.Fatal(err)
 	}
-	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "/investigate 11") })
-	idea, err := h.StartIssue(10) // idea lane: no command by default
+	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, inbox.ID), "/investigate 11") })
+	plan, err := h.StartIssueWith(7, "Plan")
 	if err != nil {
 		t.Fatal(err)
 	}
+	eventually(t, "/plan typed", func() bool { return strings.Contains(h.Pane(t, plan.ID), "/plan 7") })
+	if _, err := h.StartIssueWith(8, "Plan"); err == nil || !strings.Contains(err.Error(), `no action "Plan"`) {
+		t.Errorf("an action of another section: %v", err)
+	}
+}
+
+func TestIssueOfNoSectionTypesTheStartLine(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.StartIssue(10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "start line typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "Work on issue #10: Maybe") })
+}
+
+func TestManualPromptSendTypesWithoutSending(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_prompt_send: manual\n"})
+	s, err := h.StartIssue(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "/ship typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "/ship 7") })
 	time.Sleep(600 * time.Millisecond)
-	if pane := h.Pane(t, idea.ID); strings.Contains(pane, "/") && strings.Contains(pane, "investigate") {
-		t.Errorf("an idea got a command:\n%s", pane)
+	if pane := h.Pane(t, s.ID); strings.Contains(pane, "No such file or directory") {
+		t.Errorf("the command was sent:\n%s", pane)
 	}
 }
 

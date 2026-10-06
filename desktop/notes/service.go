@@ -179,7 +179,7 @@ func (s *Service) NoteToSession(id string) (sessions.Session, error) {
 	if err != nil {
 		return sessions.Session{}, err
 	}
-	return s.sessions.Create(n.title(), cur.NoteCommand(n.Text), false, 0)
+	return s.sessions.Create(n.title(), cur.NoteCommand(n.Text), cur.SendsPrompt(), 0)
 }
 
 // issueBody is the issue template filled with the note's text; gh appends the pictures.

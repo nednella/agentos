@@ -22,9 +22,10 @@ func (s *Service) Issues(refresh bool) ([]Issue, error) {
 	return s.issues.WithSessions(list), nil
 }
 
-// StartIssue opens a session for the issue and sends the lane's command; an issue that has a live session gets it back.
-func (s *Service) StartIssue(number int) (sessions.Session, error) {
-	return s.issues.Start(s.ctx(), number)
+// StartIssue opens a session for the issue and types the command of the action with that name, the section's
+// default for ""; an issue that has a live session gets it back.
+func (s *Service) StartIssue(number int, action string) (sessions.Session, error) {
+	return s.issues.Start(s.ctx(), number, action)
 }
 
 // IssueDetail is the issue's body and comments as GitHub renders them.
