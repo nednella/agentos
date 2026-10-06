@@ -152,6 +152,7 @@ type Cleanup = {
   sessionTitle: string
   issue: number
   pr: number
+  merged: boolean       // the PR was merged when the clean-up ran
   status: 'done' | 'blocked'
   removed: string[]     // "worktree trees/issue-394", "branch issue-394", "temp files", "evidence", "session"
   reason: string        // when blocked

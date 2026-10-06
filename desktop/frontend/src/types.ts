@@ -116,6 +116,7 @@ export type Cleanup = {
   sessionTitle: string
   issue: number
   pr: number
+  merged: boolean
   status: 'done' | 'blocked'
   removed: string[]
   reason: string

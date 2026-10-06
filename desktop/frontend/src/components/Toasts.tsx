@@ -11,6 +11,7 @@ const EDGE: Record<Toast['tone'], string> = {
   opened: 'border-l-idle',
   info: 'border-l-accent',
   evidence: 'border-l-accent',
+  done: 'border-l-finished',
 }
 
 const ACTION_LABEL: Partial<Record<string, string>> = { replied: 'Open', opened: 'Open', evidence: 'View' }
@@ -24,6 +25,7 @@ export function Toasts() {
       aria-live="polite"
     >
       {toasts.map((toast) => {
+        if (toast.tone === 'done') return <DoneToast key={toast.key} toast={toast} dismiss={() => dismissToast(toast.key)} />
         const { sessionId } = toast
         const { tone } = toast
         return (
@@ -47,12 +49,42 @@ export function Toasts() {
                 {ACTION_LABEL[toast.tone] ?? 'Jump'}
               </button>
             )}
-            <button className="btn btn-ghost w-7 justify-center px-0" aria-label="Dismiss" onClick={() => dismissToast(toast.key)}>
-              <Icon name="close" size={12} />
-            </button>
+            <DismissButton onClick={() => dismissToast(toast.key)} />
           </div>
         )
       })}
     </div>
+  )
+}
+
+type DoneToastProps = { toast: Toast; dismiss: () => void }
+
+function DoneToast({ toast, dismiss }: DoneToastProps) {
+  return (
+    <div className="toast-rise pointer-events-auto relative flex items-center gap-4 overflow-hidden rounded-md border border-finished bg-raised py-3 pr-3 pl-4">
+      <span className="toast-burst absolute top-1/2 left-7 h-0 w-0" aria-hidden="true">
+        {[...Array(8)].map((_, i) => (
+          <i key={i} style={{ ['--i' as string]: i }} />
+        ))}
+      </span>
+      <span className="toast-pop relative flex h-9 w-9 flex-none items-center justify-center rounded-full bg-finished text-app">
+        <Icon name="check" size={20} />
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <span className="text-title font-semibold text-finished">{toast.text}</span>
+        <span className="text-small text-soft">{toast.detail}</span>
+      </span>
+      <DismissButton onClick={dismiss} />
+    </div>
+  )
+}
+
+type DismissButtonProps = { onClick: () => void }
+
+function DismissButton({ onClick }: DismissButtonProps) {
+  return (
+    <button className="btn btn-ghost w-7 justify-center px-0" aria-label="Dismiss" onClick={onClick}>
+      <Icon name="close" size={12} />
+    </button>
   )
 }

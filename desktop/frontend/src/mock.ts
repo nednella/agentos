@@ -126,12 +126,13 @@ export function createMock(params: URLSearchParams) {
     cmd: params.get('cmd') ?? undefined,
     view: params.get('view') ?? undefined,
     toast: params.has('toast'),
+    done: params.has('done'),
     warn: params.has('warn'),
   }
   const handlers = new Map<string, Set<Handler>>()
   const sessions: MockSession[] = []
   const data: ProjectData[] = [
-    { name: 'livedocument', dir: '~/code/upscope/livedocument', repo: 'upscopeio/livedocument', notes: seedNotes(noteTexts), issues: buildIssues('upscopeio/livedocument'), waits: seedWaits([['#454 entry split', 454], ['#444 embed route', 444], ['#326 sendBeacon', 326], ['#389 stripe retries', 389], ['billing tests scratch', 0]]), cleanups: [{ at: Date.now() - 5 * 3_600_000, sessionTitle: '#371 old banner', issue: 371, pr: 440, status: 'done', removed: ['worktree trees/issue-371', 'branch issue-371', 'temp files', 'session'], reason: '' }, { at: Date.now() - 26 * 3_600_000, sessionTitle: '#366 retry copy', issue: 366, pr: 431, status: 'done', removed: ['worktree trees/issue-366', 'branch issue-366', 'session'], reason: '' }] },
+    { name: 'livedocument', dir: '~/code/upscope/livedocument', repo: 'upscopeio/livedocument', notes: seedNotes(noteTexts), issues: buildIssues('upscopeio/livedocument'), waits: seedWaits([['#454 entry split', 454], ['#444 embed route', 444], ['#326 sendBeacon', 326], ['#389 stripe retries', 389], ['billing tests scratch', 0]]), cleanups: [{ at: Date.now() - 5 * 3_600_000, sessionTitle: '#371 old banner', issue: 371, pr: 440, merged: true, status: 'done', removed: ['worktree trees/issue-371', 'branch issue-371', 'temp files', 'session'], reason: '' }, { at: Date.now() - 26 * 3_600_000, sessionTitle: '#366 retry copy', issue: 366, pr: 431, merged: true, status: 'done', removed: ['worktree trees/issue-366', 'branch issue-366', 'session'], reason: '' }] },
     { name: 'agentos', dir: '~/code/agentos', repo: 'nednella/agentos', notes: seedNotes(noteTexts.slice(0, 3)), issues: buildIssues('nednella/agentos'), waits: seedWaits([['#12 session memory', 12]]).slice(0, 12), cleanups: [] },
     { name: 'scratch', dir: '~/scratch', repo: '', notes: [], issues: [], waits: [], cleanups: [] },
   ]
@@ -473,6 +474,7 @@ export function createMock(params: URLSearchParams) {
       sessionTitle: s.title,
       issue: s.issue,
       pr: s.pr?.number ?? 0,
+      merged: s.pr?.state === 'merged',
       status: 'done',
       removed: [`worktree ${s.worktree.replace(`${target.dir}/`, '')}`, `branch ${s.branch}`, 'temp files', 'session'],
       reason: '',
@@ -485,7 +487,7 @@ export function createMock(params: URLSearchParams) {
   }
 
   const merging = sessions.find((s) => s.cleanup === 'pending')
-  if (merging) setTimeout(() => finishCleanup(merging), 9000)
+  if (merging) setTimeout(() => finishCleanup(merging), flags.done ? 1500 : 9000)
 
   const failing = sessions.find((s) => s.issue === 389)
   if (failing) {

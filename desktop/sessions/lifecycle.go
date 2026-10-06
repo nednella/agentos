@@ -53,6 +53,7 @@ type Cleanup struct {
 	SessionTitle string   `json:"sessionTitle"`
 	Issue        int      `json:"issue"`
 	PR           int      `json:"pr"`
+	Merged       bool     `json:"merged"`
 	Status       string   `json:"status"`
 	Removed      []string `json:"removed"`
 	Reason       string   `json:"reason"`
@@ -648,7 +649,7 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 	}
 	entry := Cleanup{At: time.Now().UnixMilli(), SessionTitle: t.title, Issue: t.issue, Status: "done", Removed: removed, Reason: reason}
 	if pr != nil {
-		entry.PR = pr.Number
+		entry.PR, entry.Merged = pr.Number, pr.State == "merged"
 	}
 	if reason != "" {
 		entry.Status = "blocked"
