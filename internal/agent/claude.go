@@ -24,7 +24,7 @@ type hookGroup struct {
 	Hooks []hookCommand `json:"hooks"`
 }
 
-func (c Claude) Command(string) []string {
+func (c Claude) Command(_ string, l Launch) []string {
 	hooks := make(map[string][]hookGroup, len(claudeEvents))
 	for _, ev := range claudeEvents {
 		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: util.ShellQuote(c.Exe) + " hook " + ev}}}}
@@ -32,5 +32,12 @@ func (c Claude) Command(string) []string {
 	settings, _ := json.Marshal(struct {
 		Hooks map[string][]hookGroup `json:"hooks"`
 	}{hooks})
-	return []string{"claude", "--settings", string(settings)}
+	argv := []string{"claude", "--settings", string(settings)}
+	if l.Model != "" {
+		argv = append(argv, "--model", l.Model)
+	}
+	if l.Effort != "" {
+		argv = append(argv, "--effort", l.Effort)
+	}
+	return argv
 }

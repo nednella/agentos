@@ -24,7 +24,7 @@ type Sessions interface {
 	Current() project.Project
 	IssueSessions() map[int]string
 	List() []sessions.Session
-	Create(title, text string, send bool, issue int) (sessions.Session, error)
+	CreateIssue(title, text string, issue int, lane string, labels []string) (sessions.Session, error)
 }
 
 // Issue is a GitHub issue placed in a lane of the board.
@@ -268,7 +268,7 @@ func (i *Issues) Start(ctx context.Context, number int) (sessions.Session, error
 				}
 			}
 		}
-		return i.sessions.Create(is.sessionTitle(), i.sessions.Current().IssueCommand(is.Lane, number), true, number)
+		return i.sessions.CreateIssue(is.sessionTitle(), i.sessions.Current().IssueCommand(is.Lane, number), number, is.Lane, is.Labels)
 	}
 	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
 }

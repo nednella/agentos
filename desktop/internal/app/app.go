@@ -56,7 +56,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	sess := sessions.New(sessions.Options{
-		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
+		Tmux: c.Tmux, Agent: c.Agent, Model: c.Model, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
 		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
 	})
 	iss := issues.New(runner, sess, h.Emit)

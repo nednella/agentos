@@ -57,6 +57,8 @@ type Session struct {
 	LastEventAt int64         `json:"lastEventAt"`
 	CreatedAt   int64         `json:"createdAt"`
 	Issue       int           `json:"issue"`
+	Model       string        `json:"model"`  // the model the agent was started with, "" when unknown
+	Effort      string        `json:"effort"` // the effort the agent was started with, "" when unknown
 	History     []Change      `json:"history"`
 	Evidence    int           `json:"evidence"`
 	Browser     bool          `json:"browser"`
@@ -86,6 +88,7 @@ type Project struct {
 type Sessions struct {
 	tmux     *term.Tmux
 	agent    agent.Agent
+	model    project.Model // the config's default, before a project, lane or label changes it
 	stateDir string
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
@@ -129,7 +132,7 @@ type ProjectList interface {
 
 // Tally records when a session waits on the user.
 type Tally interface {
-	Opened(id, title string, issue int, rec session.Record, at time.Time)
+	Opened(id, title string, issue int, model string, rec session.Record, at time.Time)
 	Closed(id string, at time.Time) bool
 }
 
@@ -150,6 +153,7 @@ type Browsers interface {
 type Options struct {
 	Tmux          *term.Tmux
 	Agent         agent.Agent
+	Model         project.Model
 	StateDir      string
 	LocalDir      string // pull-request tracking and the clean-up log: never synced
 	Projects      ProjectList
@@ -192,7 +196,7 @@ func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
+		tmux: o.Tmux, agent: o.Agent, model: o.Model, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -297,6 +301,7 @@ func (e *endedSession) record() session.Record {
 	rec.State = session.Ended
 	rec.Title, rec.Path, rec.EndedAt = e.info.Title, e.info.Path, e.at.UnixMilli()
 	rec.Issue, _ = strconv.Atoi(e.info.Issue)
+	rec.Model, rec.Effort = e.info.Model, e.info.Effort
 	if !e.info.Created.IsZero() {
 		rec.Created = e.info.Created.UnixMilli()
 	}
@@ -330,7 +335,7 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 		_ = bus.RemoveState(s.stateDir, name)
 		return
 	}
-	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path}
+	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort}
 	if rec.Issue > 0 {
 		info.Issue = strconv.Itoa(rec.Issue)
 	}
@@ -474,7 +479,7 @@ func (s *Sessions) sync() {
 			opens := state == session.Waiting || replied
 			if opens {
 				issue, _ := strconv.Atoi(in.Issue)
-				s.tally.Opened(id, cmp.Or(in.Title, defaultTitle), issue, rec, at)
+				s.tally.Opened(id, cmp.Or(in.Title, defaultTitle), issue, in.Model, rec, at)
 			}
 			if ended || opens {
 				waitsChanged = true
@@ -600,7 +605,7 @@ func (s *Sessions) list() []Session {
 		view := Session{
 			ID: id, N: ss.Name.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(), Issue: issue, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
+			CreatedAt: in.Created.UnixMilli(), Issue: issue, Model: in.Model, Effort: in.Effort, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {
@@ -721,11 +726,19 @@ func (s *Sessions) IssueSessions() map[int]string {
 // Create starts the agent in the current project. A non-empty text is typed
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
-	return s.createIn(s.Current(), title, text, send, issue)
+	proj := s.Current()
+	return s.createIn(proj, title, text, send, issue, proj.Pick(s.model, "", nil))
 }
 
-// createIn is Create in the project given, which need not be the current one.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int) (Session, error) {
+// CreateIssue starts the agent for an issue in the lane with the issue's labels, and sends text to it
+// once it is ready. The lane and the labels pick the model.
+func (s *Sessions) CreateIssue(title, text string, issue int, lane string, labels []string) (Session, error) {
+	proj := s.Current()
+	return s.createIn(proj, title, text, true, issue, proj.Pick(s.model, lane, labels))
+}
+
+// createIn is Create in the project given, which need not be the current one, with the model given.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -733,13 +746,13 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue); err != nil {
+	if err := s.launch(tctx, name, title, proj, issue, model); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
 		return Session{}, err
 	}
-	view := s.register(name, title, proj, issue)
+	view := s.register(name, title, proj, issue, model)
 	if ready != nil {
 		go s.typeWhenReady(name, ready, text, send)
 	}
@@ -776,19 +789,25 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int) error {
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj), issue)
+	if _, ok := s.agent.(agent.Claude); !ok {
+		model = project.Model{} // another agent takes no model flags, so none was chosen
+	}
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model), issue, model)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int) Session {
+func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Created: time.Now()}
+	if _, ok := s.agent.(agent.Claude); ok {
+		in.Model, in.Effort = model.Model, model.Effort
+	}
 	if issue > 0 {
 		in.Issue = strconv.Itoa(issue)
 	}
@@ -804,7 +823,7 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 	return Session{}
 }
 
-func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int) error {
+func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model) error {
 	// A number is reused, so a leftover file must not leak its old state into the new session.
 	if err := bus.RemoveState(s.stateDir, name.String()); err != nil {
 		return err
@@ -812,14 +831,23 @@ func (s *Sessions) start(ctx context.Context, name session.Name, title, dir stri
 	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
 		return err
 	}
+	tag := func(err error) error {
+		if err == nil {
+			return nil
+		}
+		// Without its tags the session would be a stray: untracked, and tmux would still run it.
+		killCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxTimeout)
+		defer cancel()
+		_ = s.tmux.Kill(killCtx, name)
+		return err
+	}
 	if issue > 0 {
-		if err := s.tmux.SetIssue(ctx, name, issue); err != nil {
-			// Without the issue tag the session would be a stray: untracked, and tmux would still run it.
-			killCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tmuxTimeout)
-			defer cancel()
-			_ = s.tmux.Kill(killCtx, name)
+		if err := tag(s.tmux.SetIssue(ctx, name, issue)); err != nil {
 			return err
 		}
+	}
+	if model != (project.Model{}) {
+		return tag(s.tmux.SetModel(ctx, name, model.Model, model.Effort))
 	}
 	return nil
 }
@@ -869,7 +897,7 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 // its issue, with the prompt sent, and its row goes.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	if t.ended {
-		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue); err != nil {
+		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 			return
 		}
@@ -1026,7 +1054,7 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	}
 	for _, p := range s.projects() {
 		if p.Key() == in.Name.Project {
-			return target{id: in.Name.String(), title: cmp.Or(in.Title, defaultTitle), issue: issue, proj: p}, true
+			return target{id: in.Name.String(), title: cmp.Or(in.Title, defaultTitle), issue: issue, proj: p, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
 		}
 	}
 	return target{}, false
@@ -1114,8 +1142,8 @@ func (s *Sessions) OpenShell() (string, error) {
 }
 
 // commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
-func (s *Sessions) commandFor(name session.Name, proj project.Project) []string {
-	argv := s.agent.Command(name.String())
+func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model) []string {
+	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort})
 	if _, ok := s.agent.(agent.Claude); ok && proj.BrowserOn() && s.browsers.Available() {
 		argv = append(argv, "--append-system-prompt", prompts.BrowserSession())
 	}

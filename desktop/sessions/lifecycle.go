@@ -64,6 +64,7 @@ type target struct {
 	id, title string
 	issue     int
 	proj      project.Project
+	model     project.Model // what the session ran, so a replacement for an ended one runs the same
 	ended     bool
 }
 

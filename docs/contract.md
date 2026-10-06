@@ -34,6 +34,8 @@ type Session = {
   lastEventAt: number   // unix ms; 0 if none
   createdAt: number     // unix ms
   issue: number         // GitHub issue the session was started for; 0 if none
+  model: string         // model the agent was started with ("sonnet"); "" for an agent other than claude or a session from before the field
+  effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
   branch: string        // branch of the issue's work (from the project's `branch` pattern); "" without an issue
   worktree: string      // path of the git worktree on that branch; "" if none
@@ -131,6 +133,7 @@ type Evidence = {
 type Wait = {           // one time a session waited on the user
   sessionTitle: string
   issue: number
+  model: string         // the session's model, "" when unknown
   kind: 'permission' | 'question' | 'idle'
   label: string         // "Bash: yarn test", "Edit", "Question", "Reply landed"
   startedAt: number
@@ -212,7 +215,7 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder; a non-empty `prefill` is typed in, not sent, once the agent is ready |
+| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder with the project's model and effort; a non-empty `prefill` is typed in, not sent, once the agent is ready |
 | `KillSession(id)` | | stops the agent; the row stays as `ended`; rejects the shell |
 | `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | rejects the shell |
@@ -234,7 +237,7 @@ type Digest = {
 | Method | Returns | What it does |
 |---|---|---|
 | `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
-| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
+| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and starts the agent with the model and effort of the issue's lane, or of its `model:` and `effort:` labels, and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
 | `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 
 ### Pull requests and clean-up (`sessions`)

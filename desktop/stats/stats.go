@@ -19,9 +19,9 @@ import (
 )
 
 // Opened starts a wait for a session that now needs the user: the reason comes from its record.
-func (w *Waits) Opened(id, title string, issue int, rec session.Record, at time.Time) {
+func (w *Waits) Opened(id, title string, issue int, model string, rec session.Record, at time.Time) {
 	kind, label := CauseOf(rec)
-	w.Begin(id, Wait{SessionTitle: title, Issue: issue, Kind: kind, Label: label, StartedAt: at.UnixMilli()})
+	w.Begin(id, Wait{SessionTitle: title, Issue: issue, Model: model, Kind: kind, Label: label, StartedAt: at.UnixMilli()})
 }
 
 // Closed ends the session's open wait, if any, and reports whether there was one.
@@ -31,7 +31,8 @@ func (w *Waits) Closed(id string, at time.Time) bool { return w.End(id, at) }
 type Wait struct {
 	SessionTitle string `json:"sessionTitle"`
 	Issue        int    `json:"issue"`
-	Kind         string `json:"kind"` // permission, question or idle
+	Model        string `json:"model"` // the model the session ran, "" when it was not set
+	Kind         string `json:"kind"`  // permission, question or idle
 	Label        string `json:"label"`
 	StartedAt    int64  `json:"startedAt"`
 	WaitedMs     int64  `json:"waitedMs"`

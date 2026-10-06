@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -9,7 +10,7 @@ import (
 )
 
 func TestClaudeCommand(t *testing.T) {
-	argv := Claude{Exe: "/opt/it's here/agentos"}.Command("p/1")
+	argv := Claude{Exe: "/opt/it's here/agentos"}.Command("p/1", Launch{})
 	if len(argv) != 3 || argv[0] != "claude" || argv[1] != "--settings" {
 		t.Fatalf("argv = %q", argv)
 	}
@@ -30,13 +31,39 @@ func TestClaudeCommand(t *testing.T) {
 	}
 }
 
+func TestClaudeLaunch(t *testing.T) {
+	tests := []struct {
+		name string
+		l    Launch
+		want []string
+	}{
+		{"none", Launch{}, nil},
+		{"model", Launch{Model: "opus"}, []string{"--model", "opus"}},
+		{"effort", Launch{Effort: "high"}, []string{"--effort", "high"}},
+		{"both", Launch{Model: "sonnet", Effort: "medium"}, []string{"--model", "sonnet", "--effort", "medium"}},
+	}
+	for _, tt := range tests {
+		argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
+		if got := argv[3:]; !slices.Equal(got, tt.want) && (len(got) != 0 || len(tt.want) != 0) {
+			t.Errorf("%s: flags = %q, want %q", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestPlainIgnoresLaunch(t *testing.T) {
+	argv := Plain{Argv: []string{"bash"}}.Command("p/1", Launch{Model: "opus", Effort: "high"})
+	if !slices.Equal(argv, []string{"bash"}) {
+		t.Errorf("argv = %q", argv)
+	}
+}
+
 func TestNew(t *testing.T) {
 	tests := []struct {
 		name string
 		want string
 	}{{"", "claude"}, {"claude", "claude"}, {"bash", "bash"}, {"bash -l", "bash"}}
 	for _, tt := range tests {
-		if got := New(tt.name, "/x").Command("p/1")[0]; got != tt.want {
+		if got := New(tt.name, "/x").Command("p/1", Launch{})[0]; got != tt.want {
 			t.Errorf("New(%q) runs %q, want %q", tt.name, got, tt.want)
 		}
 	}
