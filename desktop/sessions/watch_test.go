@@ -72,7 +72,7 @@ func TestQueueIsReadAgainWhenAPRMergesOrCloses(t *testing.T) {
 }
 
 func TestReviewWakesTheSession(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
 	h.Hook(t, s.ID, "Stop", `{}`)
@@ -103,7 +103,7 @@ func TestReviewWakesTheSession(t *testing.T) {
 }
 
 func TestFailingChecksWakeOncePerCommit(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	failing := `[{"status":"COMPLETED","conclusion":"FAILURE"}]`
 	h.GH.SetPR(apptest.WithHead(prJSON("OPEN", false, failing, 0, 0), "aaa"))
@@ -123,7 +123,7 @@ func TestFailingChecksWakeOncePerCommit(t *testing.T) {
 }
 
 func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n    on_checks: \"/fix-checks {n}\"\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
@@ -141,7 +141,7 @@ func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
 }
 
 func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    on_review: \"/address-review {n}\"\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
@@ -168,7 +168,7 @@ func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
 }
 
 func TestPollWatcherFetchesOnlyWhatMoved(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch: poll\n    pr_poll: 1s\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
 	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 	s := issueSession(h, t, 12)
@@ -188,7 +188,7 @@ func TestPollWatcherFetchesOnlyWhatMoved(t *testing.T) {
 }
 
 func TestPollWatcherKeepsLookingWhileChecksRun(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch: poll\n    pr_poll: 1s\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
 	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
 	h.GH.SetPR(prJSON("OPEN", false, `[{"status":"IN_PROGRESS"}]`, 0, 0))
 	s := issueSession(h, t, 12)
@@ -220,7 +220,7 @@ func TestWebhookWatcherRefreshesThePRAnEventNames(t *testing.T) {
 }
 
 func TestWebhookAskedForButDownIsWarnedAbout(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch: webhook\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: webhook\n"})
 	issueSession(h, t, 12)
 	eventually(t, "a warning that the stream is down", func() bool {
 		for _, w := range h.Rec.Warnings() {
@@ -236,7 +236,7 @@ func TestWebhookAskedForButDownIsWarnedAbout(t *testing.T) {
 }
 
 func TestWebhookThatDoesNotWorkLeavesThePoll(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_poll: 1s\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_poll_interval: 1s\n"})
 	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 	s := issueSession(h, t, 12)

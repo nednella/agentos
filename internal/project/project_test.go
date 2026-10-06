@@ -45,37 +45,37 @@ func TestLoad(t *testing.T) {
 		{name: "missing file", path: filepath.Join(dir, "nope.yaml")},
 		{
 			name: "full",
-			path: write("agent: bash\nprojects:\n  - {name: api, dir: /srv/api}\n"),
+			path: write("agent_command: bash\nprojects:\n  - {name: api, directory: /srv/api}\n"),
 			want: Config{Agent: "bash", Projects: []Project{{Name: "api", Dir: "/srv/api"}}},
 		},
 		{name: "project without dir", path: write("projects:\n  - {name: api}\n"), wantErr: true},
 		{
 			name: "pull request watch",
-			path: write("projects:\n  - {name: api, dir: /srv/api, pr_watch: poll, pr_poll: 1m}\n"),
+			path: write("projects:\n  - {name: api, directory: /srv/api, pr_watch_method: poll, pr_poll_interval: 1m}\n"),
 			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", PRWatch: "poll", PRPoll: "1m"}}},
 		},
-		{name: "unknown pr_watch", path: write("projects:\n  - {name: api, dir: /srv/api, pr_watch: push}\n"), wantErr: true},
-		{name: "bad pr_poll", path: write("projects:\n  - {name: api, dir: /srv/api, pr_poll: often}\n"), wantErr: true},
+		{name: "unknown pr_watch", path: write("projects:\n  - {name: api, directory: /srv/api, pr_watch_method: push}\n"), wantErr: true},
+		{name: "bad pr_poll", path: write("projects:\n  - {name: api, directory: /srv/api, pr_poll_interval: often}\n"), wantErr: true},
 		{
 			name: "models",
-			path: write("session_model: haiku\nsession_effort: low\nprojects:\n  - {name: api, dir: /srv/api, session_model: opus}\n"),
+			path: write("session_model: haiku\nsession_effort: low\nprojects:\n  - {name: api, directory: /srv/api, session_model: opus}\n"),
 			want: Config{Model: "haiku", Effort: "low", Projects: []Project{{Name: "api", Dir: "/srv/api", Model: "opus"}}},
 		},
 		{
 			name: "queue sections",
-			path: write("projects:\n  - name: api\n    dir: /srv/api\n    session_prompt_send: manual\n    queue_sections:\n      - {name: Ready, labels: [ready], actions: [{name: Work, command: \"/work {n}\", model: opus, effort: high}]}\n"),
+			path: write("projects:\n  - name: api\n    directory: /srv/api\n    session_prompt_send: manual\n    queue_sections:\n      - {name: Ready, labels: [ready], actions: [{name: Work, command: \"/work {n}\", model: opus, effort: high}]}\n"),
 			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", SessionPromptSend: "manual", QueueSections: []Section{{Name: "Ready", Labels: []string{"ready"}, Actions: []Action{{Name: "Work", Command: "/work {n}", Model: "opus", Effort: "high"}}}}}}},
 		},
-		{name: "section without a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{labels: [x]}]}\n"), wantErr: true},
-		{name: "two sections of a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A}, {name: A}]}\n"), wantErr: true},
-		{name: "action without a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{command: x}]}]}\n"), wantErr: true},
-		{name: "two actions of a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
-		{name: "bad action effort", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
-		{name: "unknown prompt send", path: write("projects:\n  - {name: api, dir: /srv/api, session_prompt_send: later}\n"), wantErr: true},
+		{name: "section without a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{labels: [x]}]}\n"), wantErr: true},
+		{name: "two sections of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A}, {name: A}]}\n"), wantErr: true},
+		{name: "action without a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{command: x}]}]}\n"), wantErr: true},
+		{name: "two actions of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
+		{name: "bad action effort", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
+		{name: "unknown prompt send", path: write("projects:\n  - {name: api, directory: /srv/api, session_prompt_send: later}\n"), wantErr: true},
 		{name: "bad effort", path: write("session_effort: huge\n"), wantErr: true},
-		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, dir: /srv/api, session_model: --x}\n"), wantErr: true},
-		{name: "theme", path: write("theme: dark\n"), want: Config{Theme: "dark"}},
-		{name: "unknown theme", path: write("theme: sepia\n"), wantErr: true},
+		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, directory: /srv/api, session_model: --x}\n"), wantErr: true},
+		{name: "theme", path: write("app_theme: dark\n"), want: Config{Theme: "dark"}},
+		{name: "unknown theme", path: write("app_theme: sepia\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
 	}
 	for _, tt := range tests {
@@ -102,7 +102,7 @@ func TestLoadExpandsHome(t *testing.T) {
 		t.Skip("no home dir")
 	}
 	path := filepath.Join(t.TempDir(), "c.yaml")
-	if err := os.WriteFile(path, []byte("projects:\n  - {name: a, dir: ~/code/a}\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("projects:\n  - {name: a, directory: ~/code/a}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -184,13 +184,13 @@ func TestSaveKeepsCommentsAndTildePaths(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	original := `# my agentos setup
 data_dir: ~/Notes/agentos # synced
-agent: claude
+agent_command: claude
 projects:
   # the main one
   - name: api
-    dir: ~/code/api   # work
+    directory: ~/code/api   # work
     note_session_command: "/plan {text}"
-  - {name: web, dir: ~/code/web}
+  - {name: web, directory: ~/code/web}
 `
 	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
 		t.Fatal(err)
@@ -206,7 +206,7 @@ projects:
 			t.Fatal(err)
 		}
 		got, _ := os.ReadFile(path)
-		for _, want := range []string{"# my agentos setup", "~/Notes/agentos # synced", "# the main one", "~/code/api", "# work", "{name: web, dir: ~/code/web}", "/srv/new"} {
+		for _, want := range []string{"# my agentos setup", "~/Notes/agentos # synced", "# the main one", "~/code/api", "# work", "{name: web, directory: ~/code/web}", "/srv/new"} {
 			if !strings.Contains(string(got), want) {
 				t.Errorf("the saved file lost %q:\n%s", want, got)
 			}
@@ -247,19 +247,9 @@ projects:
 	})
 }
 
-func TestLoadRejectsTheOldCleanupCommand(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("projects:\n  - name: a\n    dir: /a\n    cleanup: make clean\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "remove_worktree") {
-		t.Errorf("Load = %v, want an error naming remove_worktree", err)
-	}
-}
-
 func TestLoadRejectsAnUnknownCleanupMode(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
-	if err := os.WriteFile(path, []byte("projects:\n  - name: a\n    dir: /a\n    cleanup: {merge: now}\n"), 0o600); err != nil {
+	if err := os.WriteFile(path, []byte("projects:\n  - name: a\n    directory: /a\n    session_cleanup_mode: {merge: now}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "auto or manual") {

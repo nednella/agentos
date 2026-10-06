@@ -72,7 +72,7 @@ func (r *Registry) Cleanup(key string) project.Cleanup {
 	if i < 0 {
 		return project.Cleanup{}.Resolved()
 	}
-	return r.cfg.Projects[i].Cleanup.Resolved()
+	return r.cfg.Projects[i].CleanupMode.Resolved()
 }
 
 // SetCleanup saves how the project cleans up after an event, "merge" or "close", to "auto" or "manual".
@@ -85,7 +85,7 @@ func (r *Registry) SetCleanup(key, event, mode string) error {
 	}
 	next := r.cfg
 	next.Projects = slices.Clone(r.cfg.Projects)
-	if err := next.Projects[i].Cleanup.Set(event, mode); err != nil {
+	if err := next.Projects[i].CleanupMode.Set(event, mode); err != nil {
 		return err
 	}
 	if err := project.Save(r.path, next); err != nil {

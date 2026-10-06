@@ -33,7 +33,7 @@ func killSetup(t *testing.T) (*term.Tmux, string) {
 	})
 	demo, other := t.TempDir(), t.TempDir()
 	config := filepath.Join(state, "config.yaml")
-	body := fmt.Sprintf("projects:\n  - {name: demo, dir: %s}\n  - {name: other, dir: %s}\n", demo, other)
+	body := fmt.Sprintf("projects:\n  - {name: demo, directory: %s}\n  - {name: other, directory: %s}\n", demo, other)
 	if err := os.WriteFile(config, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
