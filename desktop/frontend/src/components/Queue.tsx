@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
+import { api } from '../api'
 import { filterIssues, isFiltering } from '../issueFilter'
 import { LANES } from '../lanes'
 import { readStored, writeStored } from '../storage'
@@ -22,12 +23,17 @@ const CLOSED_KEY = 'agentos.queue.closed'
 type QueueProps = { nav: NavRef }
 
 export function Queue({ nav }: QueueProps) {
-  const { project, issues, issuesDisabled, issueFilter } = useAgentos()
+  const { project, issues, issuesDisabled, issueFilter, report } = useAgentos()
   if (project && !project.repo) {
-    return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} />
+    return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} centered />
   }
   if (project && issuesDisabled) {
-    return <Notice title="Issues are off" hint={`Turn on issues for ${project.repo} on GitHub to use the queue.`} />
+    const repo = (
+      <button className="link" onClick={() => report(() => api.openURL(`https://github.com/${project.repo}`))}>
+        {project.repo}
+      </button>
+    )
+    return <Notice title="Issues are disabled" hint={<>{repo} has issues disabled, enable them to use the queue feature</>} centered />
   }
   const filtering = isFiltering(issueFilter)
   const shown = filtering ? filterIssues(issues, issueFilter) : issues
