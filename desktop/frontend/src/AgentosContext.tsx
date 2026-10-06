@@ -276,6 +276,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     }
 
   useEffect(() => on('sessions', ifCurrent(applySessions)), [applySessions])
+  useEffect(() => on('term:exit', ({ id }) => setShellId((shell) => (shell === id ? '' : shell))), [])
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
   useEffect(() => on('issues', ifCurrent(setRawIssues)), [])
   useEffect(() => on('evidence', ({ id, items }) => setEvidence((map) => ({ ...map, [id]: items }))), [])
