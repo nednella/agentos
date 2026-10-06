@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { api, devFlags, errorMessage, on } from './api'
+import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
 import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session, Snapshot, Warning, ProjectList } from './types'
 
@@ -30,6 +30,7 @@ export type Agentos = {
   openedIds: string[]
   issues: Issue[]
   issuesLoading: boolean
+  issuesDisabled: boolean
   issueFilter: string
   notes: Note[]
   cleanups: Cleanup[]
@@ -126,6 +127,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [openedIds, setOpenedIds] = useState<string[]>([])
   const [rawIssues, setRawIssues] = useState<Issue[]>([])
   const [issuesLoading, setIssuesLoading] = useState(true)
+  const [issuesDisabled, setIssuesDisabled] = useState(false)
   const [issueFilter, setIssueFilterState] = useState('')
   const [notes, setNotes] = useState<Note[]>([])
   const [cleanups, setCleanups] = useState<Cleanup[]>([])
@@ -218,7 +220,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     setIssuesLoading(true)
     try {
       const list = await api.issues(refresh)
-      if (epoch === projectEpoch.current) setRawIssues(list)
+      if (epoch !== projectEpoch.current) return
+      setRawIssues(list)
+      setIssuesDisabled(false)
+    } catch (err) {
+      if (errorMessage(err) !== ISSUES_DISABLED) throw err
+      if (epoch !== projectEpoch.current) return
+      setRawIssues([])
+      setIssuesDisabled(true)
     } finally {
       if (epoch === projectEpoch.current) setIssuesLoading(false)
     }
@@ -236,6 +245,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setNotes(snap.notes)
       setShellId(snap.shell)
       setRawIssues([])
+      setIssuesDisabled(false)
       setIssueFilterState(readStored(filterKey(snap.project.name), ''))
       report(async () => {
         const list = await api.cleanups()
@@ -397,6 +407,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       openedIds,
       issues,
       issuesLoading,
+      issuesDisabled,
       issueFilter,
       notes,
       cleanups,
@@ -589,7 +600,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

@@ -177,6 +177,9 @@ export function on<K extends keyof EventMap>(
   return off ?? (() => undefined)
 }
 
+// What `Issues` rejects with when the repo has issues turned off (desktop/issues.ErrIssuesDisabled).
+export const ISSUES_DISABLED = 'issues are disabled for this repo'
+
 export function errorMessage(err: unknown): string {
   if (typeof err === 'string') return err
   if (err instanceof Error) return err.message
