@@ -32,6 +32,18 @@ func (r *Registry) List() []project.Project {
 	return slices.Clone(r.cfg.Projects)
 }
 
+// KeepAwake says whether a working session of the project holds off idle sleep. A project that is
+// not configured follows the config.
+func (r *Registry) KeepAwake(key string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	i := slices.IndexFunc(r.cfg.Projects, func(p project.Project) bool { return p.Key() == key })
+	if i < 0 {
+		return r.cfg.KeepsAwake(project.Project{})
+	}
+	return r.cfg.KeepsAwake(r.cfg.Projects[i])
+}
+
 // Add registers a folder under its own name, or under name-2, name-3 when another
 // folder already has that name. A folder that is registered already comes back as is.
 func (r *Registry) Add(dir string) (project.Project, error) {

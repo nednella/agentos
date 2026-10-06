@@ -21,6 +21,7 @@ type IconName =
   | 'x'
   | 'image'
   | 'digest'
+  | 'moon'
   | 'back'
   | 'forward'
   | 'reload'
@@ -63,6 +64,7 @@ function IconShape({ name }: IconShapeProps) {
   if (name === 'trash') return <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.5 8.5h6l.5-8.5" />
   if (name === 'panel-left') return <path d="M2.5 3h11v10h-11ZM6.5 3v10" />
   if (name === 'panel-right') return <path d="M2.5 3h11v10h-11ZM9.5 3v10" />
+  if (name === 'moon') return <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" />
   if (name === 'chart') return <path d="M3 13V8M7 13V3M11 13V6M14 13H2" />
   if (name === 'pin') return <path d="M9.5 2.5 13.5 6.5 11 7l-2 3-.5 3-5-5 3-.5 3-2ZM5.5 10.5 2.5 13.5" />
   if (name === 'archive') return <path d="M2 3.5h12v3H2ZM3 6.5V13h10V6.5M6.5 9h3" />

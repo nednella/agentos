@@ -51,6 +51,7 @@ type Backend = {
   RunDigest(): Promise<void>
   DigestToNote(itemId: string): Promise<Note>
   DismissDigestItem(itemId: string): Promise<void>
+  Awake(): Promise<boolean>
 }
 
 type Unsubscribe = () => void
@@ -78,6 +79,7 @@ const namespaces = {
   evidence: ['Evidence', 'DeleteEvidence'],
   browser: ['BrowserOpen', 'BrowserGoto', 'BrowserNav', 'BrowserInput', 'BrowserResize', 'BrowserView', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
+  awake: ['Awake'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -150,6 +152,7 @@ export const api = {
   evidence: (id: string) => backend.Evidence(id),
   deleteEvidence: (id: string, evidenceId: string) => backend.DeleteEvidence(id, evidenceId),
   harnessCheck: () => backend.HarnessCheck(),
+  awake: () => backend.Awake(),
   digest: () => backend.Digest(),
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),

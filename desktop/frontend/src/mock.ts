@@ -649,6 +649,7 @@ export function createMock(params: URLSearchParams) {
 
   const backend = {
     Snapshot: async () => snapshot(),
+    Awake: async () => data.some((p) => projectView(p).working > 0),
     NewSession: async (title: string, prefill: string) => startSessionFor(title || `session ${nextN}`, 0, prefill),
     DismissSession: async (id: string) => {
       const s = find(id)

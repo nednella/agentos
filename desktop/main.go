@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/nednella/agentos/desktop/awake"
 	"github.com/nednella/agentos/desktop/devhttp"
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/run"
@@ -45,7 +46,7 @@ func launch() error {
 	}
 	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
 		hub := devhttp.NewHub()
-		a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil }}, run.Exec, run.Stream, run.ExecEnv)
+		a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil }, Awake: awake.Caffeinate}, run.Exec, run.Stream, run.ExecEnv)
 		quitOnSignal(a)
 		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: a.Stop, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
 	}
@@ -65,6 +66,7 @@ func launch() error {
 		PickDir: func() (string, error) {
 			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Add a project folder", CanCreateDirectories: true})
 		},
+		Awake: awake.Caffeinate,
 	}, run.Exec, run.Stream, run.ExecEnv)
 	quitOnSignal(a)
 

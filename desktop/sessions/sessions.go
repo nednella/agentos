@@ -104,6 +104,8 @@ type Sessions struct {
 	closeTerm  func(id string)
 	evidence   Evidence
 	browsers   Browsers
+	awake      Awake
+	keepAwake  func(projectKey string) bool
 	info       []term.Info
 	shells     []string                 // projects that have a shell session
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
@@ -149,6 +151,11 @@ type Browsers interface {
 	Close(ctx context.Context, id string)
 }
 
+// Awake holds off idle sleep.
+type Awake interface {
+	Hold(on bool)
+}
+
 // Options is what a Sessions needs from outside.
 type Options struct {
 	Tmux          *term.Tmux
@@ -165,6 +172,8 @@ type Options struct {
 	CloseTerminal func(id string)
 	Evidence      Evidence
 	Browsers      Browsers
+	Awake         Awake
+	KeepAwake     func(projectKey string) bool
 }
 
 // New tracks the sessions of o.Tmux, and follows their pull requests.
@@ -197,7 +206,7 @@ func (s *Sessions) Touch() { s.changed() }
 func newSessions(o Options) *Sessions {
 	return &Sessions{
 		tmux: o.Tmux, agent: o.Agent, model: o.Model, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
-		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers,
+		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		records:    map[string]session.Record{},
@@ -501,6 +510,7 @@ func (s *Sessions) sync() {
 		s.emit("stats", nil)
 	}
 	s.deliverWakes()
+	s.holdAwake()
 
 	s.announceProjects()
 	s.announceIssues()
@@ -514,6 +524,17 @@ func (s *Sessions) sync() {
 	for _, a := range attention {
 		s.emit("attention", map[string]string{"id": a[0], "state": a[1]})
 	}
+}
+
+// holdAwake keeps the Mac awake while a session of a project that keeps awake is working. It needs mu.
+func (s *Sessions) holdAwake() {
+	if s.awake == nil {
+		return
+	}
+	working := slices.ContainsFunc(s.info, func(in term.Info) bool {
+		return s.records[in.Name.String()].State == session.Working && s.keepAwake(in.Name.Project)
+	})
+	s.awake.Hold(working)
 }
 
 // announceProjects tells the front end when a project appears, goes, or its counts move. It needs mu.

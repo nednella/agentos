@@ -76,6 +76,18 @@ func (p Project) BranchFor(number int) string {
 // BrowserOn says whether sessions get the browser and evidence commands.
 func (p Project) BrowserOn() bool { return p.Browser == nil || *p.Browser }
 
+// KeepsAwake says whether a working session of the project holds off idle sleep: the project's own
+// setting, else the config's, else on.
+func (c Config) KeepsAwake(p Project) bool {
+	switch {
+	case p.KeepAwake != nil:
+		return *p.KeepAwake
+	case c.KeepAwake != nil:
+		return *c.KeepAwake
+	}
+	return true
+}
+
 // DigestOn says whether the weekly digest runs by itself.
 func (p Project) DigestOn() bool { return p.Digest != "off" }
 
