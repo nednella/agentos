@@ -10,7 +10,6 @@ import (
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/control"
 	"github.com/nednella/agentos/internal/project"
-	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
 )
 
@@ -90,8 +89,7 @@ func newKillCmd() *cobra.Command {
 				stopped++
 			}
 			if all { // a shell is only stopped when everything is
-				for _, key := range shells {
-					name := session.Name{Project: key}
+				for _, name := range shells {
 					fmt.Fprintf(out, "stopping %s\n", name)
 					if err := e.tmux.Kill(cmd.Context(), name); err != nil {
 						return err

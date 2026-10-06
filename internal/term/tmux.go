@@ -97,10 +97,10 @@ func cleanEnv() []string {
 	return out
 }
 
-// ListAll returns the agent sessions and the projects that have a shell session.
+// ListAll returns the agent sessions and the shell sessions.
 // No running server means no sessions; any other failure is an error, because
 // callers must not read it as "everything ended".
-func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
+func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
 	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{"+modelOption+"}\t#{"+effortOption+"}\t#{session_created}")
 	if err != nil {
 		var exit *exec.ExitError
@@ -110,7 +110,7 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
 		return nil, nil, err
 	}
 	var infos []Info
-	var shells []string
+	var shells []session.Name
 	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.Split(line, "\t")
 		if len(f) != 7 {
@@ -121,7 +121,7 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []string, error) {
 			continue
 		}
 		if name.IsShell() {
-			shells = append(shells, name.Project)
+			shells = append(shells, name)
 			continue
 		}
 		info := Info{Name: name, Title: f[1], Path: f[2], Issue: f[3], Model: f[4], Effort: f[5]}
