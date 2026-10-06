@@ -162,7 +162,7 @@ func TestCleanupMerged(t *testing.T) {
 	if len(log) != 1 || log[0].Status != "done" || log[0].Issue != 7 || log[0].PR != 12 || !log[0].Merged || log[0].SessionTitle != "#7 work" {
 		t.Fatalf("log = %+v", log)
 	}
-	if want := []string{"worktree trees/issue-7", "branch issue-7", "temp files", "evidence", "session"}; !slices.Equal(log[0].Removed, want) {
+	if want := []string{"clean-up command for issue-7", "temp files", "evidence", "session"}; !slices.Equal(log[0].Removed, want) {
 		t.Errorf("removed = %q, want %q", log[0].Removed, want)
 	}
 	if got := h.Rec.ProjectOf("cleanups"); got != "main" || len(h.Rec.LastCleanups()) != 1 {
@@ -321,7 +321,7 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 }
 
 func TestCleanupCustomCommand(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_command: git worktree remove --force {worktree} && touch cleaned-{branch}\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git worktree remove --force {worktree} && git branch -D {branch} && touch {dir}/cleaned-{branch}"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -336,20 +336,47 @@ func TestCleanupCustomCommand(t *testing.T) {
 	}
 }
 
-func TestCleanupLeavesBranchOfMainTree(t *testing.T) {
-	h := newHarness(t)
+func TestCleanupCommandMayWorkInTheMainTree(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git checkout main && git branch -D {branch}"})
 	repoFixture(t, h)
 	gitIn(t, h.Dir, "checkout", "-b", "issue-7")
+	gitIn(t, h.Dir, "push", "-u", "origin", "issue-7")
 	s := issueSession(h, t, 7)
 
 	openThenMerge(h)
 	eventually(t, "clean-up", func() bool { _, ok := h.Session(s.ID); return !ok })
-	if branches(t, h.Dir) == "" || !exists(filepath.Join(h.Dir, "README")) {
-		t.Error("the main working tree's branch was removed")
+	if branches(t, h.Dir) != "" || gitIn(t, h.Dir, "branch", "--show-current") != "main" {
+		t.Errorf("branches %q, folder on %q", branches(t, h.Dir), gitIn(t, h.Dir, "branch", "--show-current"))
+	}
+}
+
+func TestCleanupWithoutCommandRemovesOnlyTheSession(t *testing.T) {
+	h := apptest.New(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if !exists(wt) || branches(t, h.Dir) == "" {
+		t.Errorf("worktree exists: %v, branches: %q", exists(wt), branches(t, h.Dir))
 	}
 	log := h.Cleanups()
-	if len(log) != 1 || log[0].Status != "done" || !strings.Contains(strings.Join(log[0].Removed, "|"), "kept") {
+	if len(log) != 1 || log[0].Status != "done" || !slices.Equal(log[0].Removed, []string{"session"}) {
 		t.Errorf("log = %+v", log)
+	}
+}
+
+func TestCleanupCommandFailureStopsBeforeTheSession(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "false"})
+	repoFixture(t, h)
+	issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if got, _ := h.Session(s.ID); !strings.Contains(got.CleanupReason, "the clean-up command failed for issue-7") {
+		t.Errorf("reason = %q", got.CleanupReason)
 	}
 }
 
@@ -516,7 +543,7 @@ func openThenClose(h *apptest.Harness) {
 }
 
 func TestCleanupMergeManualAsks(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {merge: manual}\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch, ProjectExtra: "    session_cleanup_mode: {merge: manual}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -530,7 +557,7 @@ func TestCleanupMergeManualAsks(t *testing.T) {
 }
 
 func TestCleanupCloseAuto(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch, ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -543,7 +570,7 @@ func TestCleanupCloseAuto(t *testing.T) {
 }
 
 func TestCleanupCloseAutoKeepsSafetyChecks(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch, ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)
@@ -559,7 +586,7 @@ func TestCleanupCloseAutoKeepsSafetyChecks(t *testing.T) {
 }
 
 func TestCleanupCloseAutoAsksForAPRNeverSeenOpen(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch, ProjectExtra: "    session_cleanup_mode: {close: auto}\n"})
 	repoFixture(t, h)
 	wt := issueWorktree(t, h)
 	s := issueSession(h, t, 7)

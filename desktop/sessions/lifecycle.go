@@ -707,7 +707,7 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 // A step that finds the context cancelled stops with closedReason.
 func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, prBranch string, force bool) (removed []string, reason string) {
 	removed = []string{}
-	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.removeWorktreeAndBranch, l.removeSession}
+	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.runCleanupCommand, l.removeSession}
 	plan, reason := l.plan(ctx, t, pr, prBranch, force)
 	for _, step := range steps {
 		if reason != "" {
@@ -723,39 +723,32 @@ func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, prBranch st
 	return removed, reason
 }
 
-// cleanupPlan is what a clean-up found out before it removes anything.
+// cleanupPlan is what a clean-up found out before it runs the project's command.
 type cleanupPlan struct {
 	branches []branchPlan
-	main     string // the branch a project folder goes back to; only for sessions with no issue
-	force    bool
 }
 
 type branchPlan struct {
 	branch       string
-	worktree     string
-	inMain       bool // the branch is checked out in the project folder itself
+	worktree     string // the folder the branch is checked out in, or ""
 	branchExists bool
 }
 
 // plan looks at the worktree and branch of each branch the session worked on, and unless forced,
-// says why removing them could lose work. The PR counts only for the branch it was found on.
+// says why cleaning them up could lose work. The PR counts only for the branch it was found on.
 func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string, force bool) (cleanupPlan, string) {
 	dir := t.proj.Dir
 	trees, err := l.worktrees(ctx, dir)
 	if err != nil {
 		return cleanupPlan{}, fmt.Sprintf("git could not list the worktrees: %v", err)
 	}
-	p := cleanupPlan{force: force}
-	if t.issue == 0 {
-		p.main = l.mainBranch(ctx, dir)
-	}
+	var p cleanupPlan
 	for _, branch := range t.branches {
 		b := branchPlan{branch: branch, worktree: trees.byBranch[branch]}
-		b.inMain = b.worktree != "" && samePath(b.worktree, trees.main)
 		_, rerr := l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
 		b.branchExists = rerr == nil
 		p.branches = append(p.branches, b)
-		if force || (b.inMain && t.issue > 0) {
+		if force {
 			continue
 		}
 		branchPR := pr
@@ -769,31 +762,20 @@ func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string,
 	return p, ""
 }
 
-func (l *Lifecycle) removeWorktreeAndBranch(ctx context.Context, t target, p *cleanupPlan) (removed []string, reason string) {
-	dir := t.proj.Dir
+// runCleanupCommand hands each branch the session worked on to the project's clean-up command.
+// With no command the git side stays as it is.
+func (l *Lifecycle) runCleanupCommand(ctx context.Context, t target, p *cleanupPlan) (removed []string, reason string) {
+	if t.proj.CleanupCommand == "" {
+		return nil, ""
+	}
 	for _, b := range p.branches {
-		keep := b.inMain && t.issue > 0
-		if b.worktree != "" && !b.inMain {
-			if err := l.removeWorktree(ctx, t.proj, b.branch, b.worktree, p.force); err != nil {
-				return removed, fmt.Sprintf("removing the worktree failed: %v", err)
-			}
-			removed = append(removed, "worktree "+display(dir, b.worktree))
+		if b.worktree == "" && !b.branchExists {
+			continue
 		}
-		if b.inMain && !keep {
-			if _, err := l.git(ctx, b.worktree, "switch", p.main); err != nil {
-				return removed, fmt.Sprintf("switching the project folder to %s failed: %v", p.main, err)
-			}
-			removed = append(removed, "project folder back on "+p.main)
+		if err := l.runProjectCommand(ctx, t.proj, b); err != nil {
+			return removed, fmt.Sprintf("the clean-up command failed for %s: %v", b.branch, err)
 		}
-		switch {
-		case keep:
-			removed = append(removed, "branch "+b.branch+" kept: it is checked out in the main working tree")
-		case b.branchExists:
-			if _, err := l.git(ctx, dir, "branch", "-D", b.branch); err != nil {
-				return removed, fmt.Sprintf("deleting the branch failed: %v", err)
-			}
-			removed = append(removed, "branch "+b.branch)
-		}
+		removed = append(removed, "clean-up command for "+b.branch)
 	}
 	return removed, ""
 }
@@ -873,32 +855,16 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 	return fmt.Sprintf("git could not compare the branch with the merged pull request: %v", err)
 }
 
-func (l *Lifecycle) removeWorktree(ctx context.Context, proj project.Project, branch, worktree string, force bool) error {
-	if proj.CleanupCommand != "" {
-		cmd := strings.NewReplacer("{branch}", util.ShellQuote(branch), "{worktree}", util.ShellQuote(worktree)).Replace(proj.CleanupCommand)
-		ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
-		defer cancel()
-		_, err := l.run(ctx, proj.Dir, "sh", "-c", cmd)
-		return err
-	}
-	args := []string{"worktree", "remove"}
-	if force {
-		args = append(args, "--force")
-	}
-	_, err := l.git(ctx, proj.Dir, append(args, worktree)...)
+func (l *Lifecycle) runProjectCommand(ctx context.Context, proj project.Project, b branchPlan) error {
+	cmd := strings.NewReplacer(
+		"{branch}", util.ShellQuote(b.branch),
+		"{worktree}", util.ShellQuote(b.worktree),
+		"{dir}", util.ShellQuote(proj.Dir),
+	).Replace(proj.CleanupCommand)
+	ctx, cancel := context.WithTimeout(ctx, 2*gitTimeout)
+	defer cancel()
+	_, err := l.run(ctx, proj.Dir, "sh", "-c", cmd)
 	return err
-}
-
-// display shows path relative to dir when it lies inside it. Git prints real
-// paths, so symlinks in dir are resolved first.
-func display(dir, path string) string {
-	if real, err := filepath.EvalSymlinks(dir); err == nil {
-		dir = real
-	}
-	if rel, err := filepath.Rel(dir, path); err == nil && !strings.HasPrefix(rel, "..") {
-		return rel
-	}
-	return path
 }
 
 func (l *Lifecycle) cleanupPath(key string) string {

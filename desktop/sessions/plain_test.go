@@ -88,8 +88,8 @@ func TestPlainSessionOnMainHasNoPR(t *testing.T) {
 	}
 }
 
-func TestPlainSessionCleanupSwitchesTheProjectFolderBack(t *testing.T) {
-	h := newHarness(t)
+func TestPlainSessionCleanupCommandRunsInTheProjectFolder(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git -C {dir} switch main && git branch -D {branch}"})
 	repoFixture(t, h)
 	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
@@ -111,7 +111,7 @@ func TestPlainSessionCleanupSwitchesTheProjectFolderBack(t *testing.T) {
 	if len(log) != 1 || log[0].Status != "done" || log[0].Issue != 0 || log[0].PR != 12 {
 		t.Fatalf("log = %+v", log)
 	}
-	if want := []string{"project folder back on main", "branch my-fix", "temp files", "session"}; !slices.Equal(log[0].Removed, want) {
+	if want := []string{"clean-up command for my-fix", "temp files", "session"}; !slices.Equal(log[0].Removed, want) {
 		t.Errorf("removed = %q, want %q", log[0].Removed, want)
 	}
 }
