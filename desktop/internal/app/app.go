@@ -60,7 +60,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		return context.Background()
 	}
 	waits := stats.New(c.DataDir)
-	proofs := evidence.New(c.LocalDir)
+	proofs := evidence.New(c.DataDir)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	stayAwake := awake.New(h.Awake, h.Emit)
@@ -74,7 +74,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
 	a.browsers, a.awake = browsers, stayAwake
-	a.media = media.Handler(c.DataDir, c.LocalDir)
+	a.media = media.Handler(c.DataDir)
 	browsers.Hook(func(id string) string {
 		name, err := session.ParseName(id)
 		if err != nil {

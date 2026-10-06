@@ -7,8 +7,8 @@ import (
 	"testing"
 )
 
-func TestHandlerServesBothKindsFromTheirOwnRoots(t *testing.T) {
-	notes, proofs := t.TempDir(), t.TempDir()
+func TestHandlerServesBothKinds(t *testing.T) {
+	dir := t.TempDir()
 	write := func(path, body string) {
 		t.Helper()
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
@@ -18,15 +18,13 @@ func TestHandlerServesBothKindsFromTheirOwnRoots(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(filepath.Join(notes, "main", "notes-media", "a.png"), "note picture")
-	write(filepath.Join(proofs, "main", "evidence", "3", "b.JPG"), "evidence picture")
-	write(filepath.Join(notes, "main", "notes.json"), "secret")
-	write(filepath.Join(notes, "main", "notes-media", "page.html"), "<script>")
-	write(filepath.Join(proofs, "main", "evidence", "3", "index.json"), "secret")
-	write(filepath.Join(notes, "main", "evidence", "3", "c.png"), "evidence in the wrong root")
-	write(filepath.Join(proofs, "main", "notes-media", "d.png"), "note picture in the wrong root")
+	write(filepath.Join(dir, "main", "notes-media", "a.png"), "note picture")
+	write(filepath.Join(dir, "main", "evidence", "3", "b.JPG"), "evidence picture")
+	write(filepath.Join(dir, "main", "notes.json"), "secret")
+	write(filepath.Join(dir, "main", "notes-media", "page.html"), "<script>")
+	write(filepath.Join(dir, "main", "evidence", "3", "index.json"), "secret")
 
-	h := Handler(notes, proofs)
+	h := Handler(dir)
 	tests := []struct {
 		url  string
 		want int
@@ -42,8 +40,6 @@ func TestHandlerServesBothKindsFromTheirOwnRoots(t *testing.T) {
 		{"/media/../../../etc/passwd", 404, ""},
 		{"/media/main/notes-media/", 404, ""},
 		{"/media/main/notes-media/missing.png", 404, ""},
-		{"/media/main/evidence/3/c.png", 404, ""},
-		{"/media/main/notes-media/d.png", 404, ""},
 		{"/other", 404, ""},
 	}
 	for _, tt := range tests {
