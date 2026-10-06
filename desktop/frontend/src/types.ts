@@ -185,6 +185,7 @@ export type EventMap = {
   issues: ProjectList<Issue>
   cleanups: ProjectList<Cleanup>
   warnings: Warning
+  awake: boolean
   stats: undefined
   'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }

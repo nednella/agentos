@@ -31,7 +31,7 @@ function Count({ state, count, label, condensed }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseen, report } = useAgentos()
+  const { project, projects, sessions, setOverlay, digestUnseen, awake, report } = useAgentos()
   const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
@@ -86,6 +86,15 @@ export function TopBar() {
         )}
       </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
+        {awake && (
+          <span
+            className="grid h-8 w-8 place-items-center text-soft"
+            title="Keeping this Mac awake while a session works"
+            aria-label="Keeping this Mac awake while a session works"
+          >
+            <Icon name="moon" />
+          </span>
+        )}
         {width >= NEXT_FULL_MIN ? (
           <button className="btn" onClick={() => find('next-attention').run([])}>
             Next
