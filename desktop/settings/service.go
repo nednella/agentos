@@ -8,14 +8,25 @@ import (
 	"github.com/nednella/agentos/internal/project"
 )
 
-const system = "system"
+const (
+	system       = "system"
+	defaultScale = 1.0
+)
 
 // Store is where the settings live.
 type Store interface {
 	Theme() string
 	SetTheme(theme string) error
+	TextScale() float64
+	SetTextScale(scale float64) error
+	KeepsAwake() bool
+	SetKeepAwake(on bool) error
 	Cleanup(projectKey string) project.Cleanup
 	SetCleanup(projectKey, event, mode string) error
+	BrowserEnabled(projectKey string) bool
+	SetBrowserEnabled(projectKey string, on bool) error
+	DigestSchedule(projectKey string) string
+	SetDigestSchedule(projectKey, schedule string) error
 }
 
 // Current names the project the panel edits.
@@ -25,8 +36,12 @@ type Current interface {
 
 // Settings is what the settings panel shows.
 type Settings struct {
-	Theme   string          `json:"theme"`   // system, light or dark
-	Cleanup project.Cleanup `json:"cleanup"` // the current project's: auto or manual, for merge and close
+	Theme     string          `json:"theme"`          // system, light or dark
+	TextScale float64         `json:"textScale"`      // a multiple of the default text size
+	KeepAwake bool            `json:"keepAwake"`      // hold off idle sleep while a session works, for projects that do not say otherwise
+	Cleanup   project.Cleanup `json:"cleanup"`        // the current project's: auto or manual, for merge and close
+	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
+	Digest    string          `json:"digestSchedule"` // the current project's: weekly or off
 }
 
 // Service is bound to the front end.
@@ -45,7 +60,19 @@ func (s *Service) Settings() Settings {
 	if theme == "" {
 		theme = system
 	}
-	return Settings{Theme: theme, Cleanup: s.store.Cleanup(s.project.Current().Key())}
+	scale := s.store.TextScale()
+	if scale == 0 {
+		scale = defaultScale
+	}
+	key := s.project.Current().Key()
+	return Settings{
+		Theme:     theme,
+		TextScale: scale,
+		KeepAwake: s.store.KeepsAwake(),
+		Cleanup:   s.store.Cleanup(key),
+		Browser:   s.store.BrowserEnabled(key),
+		Digest:    s.store.DigestSchedule(key),
+	}
 }
 
 // SetTheme saves the theme: system, light or dark.
@@ -56,15 +83,42 @@ func (s *Service) SetTheme(theme string) (Settings, error) {
 	if theme == system {
 		theme = ""
 	}
-	if err := s.store.SetTheme(theme); err != nil {
-		return Settings{}, err
-	}
-	return s.Settings(), nil
+	return s.saved(s.store.SetTheme(theme))
 }
 
 // SetCleanup saves how the current project cleans up after an event, "merge" or "close": "auto" or "manual".
 func (s *Service) SetCleanup(event, mode string) (Settings, error) {
-	if err := s.store.SetCleanup(s.project.Current().Key(), event, mode); err != nil {
+	return s.saved(s.store.SetCleanup(s.project.Current().Key(), event, mode))
+}
+
+// SetTextScale saves the text size as a multiple of the default, from 0.85 to 1.5.
+func (s *Service) SetTextScale(scale float64) (Settings, error) {
+	if err := project.CheckTextScale(scale); err != nil {
+		return Settings{}, err
+	}
+	if scale == defaultScale {
+		scale = 0
+	}
+	return s.saved(s.store.SetTextScale(scale))
+}
+
+// SetKeepAwake saves whether a working session holds off idle sleep. A project's own setting still wins.
+func (s *Service) SetKeepAwake(on bool) (Settings, error) {
+	return s.saved(s.store.SetKeepAwake(on))
+}
+
+// SetBrowserEnabled saves whether the current project's sessions get the browser and evidence commands.
+func (s *Service) SetBrowserEnabled(on bool) (Settings, error) {
+	return s.saved(s.store.SetBrowserEnabled(s.project.Current().Key(), on))
+}
+
+// SetDigestSchedule saves how the current project runs its digest: "weekly" or "off".
+func (s *Service) SetDigestSchedule(schedule string) (Settings, error) {
+	return s.saved(s.store.SetDigestSchedule(s.project.Current().Key(), schedule))
+}
+
+func (s *Service) saved(err error) (Settings, error) {
+	if err != nil {
 		return Settings{}, err
 	}
 	return s.Settings(), nil

@@ -78,3 +78,93 @@ func TestCleanup(t *testing.T) {
 		}
 	}
 }
+
+func TestTextScale(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{TopExtra: "# mine\n"})
+	if got := h.Settings().TextScale; got != 1 {
+		t.Fatalf("default text scale = %v", got)
+	}
+	if got, err := h.SetTextScale(1.2); err != nil || got.TextScale != 1.2 {
+		t.Fatalf("SetTextScale(1.2) = %+v, %v", got, err)
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# mine") || !strings.Contains(string(data), "app_text_scale: 1.2") {
+		t.Errorf("config lost its comment or the scale:\n%s", data)
+	}
+	if got := h.Restart(t).Settings().TextScale; got != 1.2 {
+		t.Errorf("scale after restart = %v", got)
+	}
+	if got, err := h.SetTextScale(1); err != nil || got.TextScale != 1 {
+		t.Fatalf("SetTextScale(1) = %+v, %v", got, err)
+	}
+	if data, _ := os.ReadFile(h.Conf); strings.Contains(string(data), "app_text_scale") {
+		t.Errorf("the default left the key in the file:\n%s", data)
+	}
+	for _, bad := range []float64{0, 0.5, 2, -1} {
+		if _, err := h.SetTextScale(bad); err == nil {
+			t.Errorf("SetTextScale(%v) was accepted", bad)
+		}
+	}
+}
+
+func TestKeepAwake(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{TopExtra: "keep_mac_awake: true # mine\n"})
+	if !h.Settings().KeepAwake {
+		t.Fatal("keep awake is off by default")
+	}
+	if got, err := h.SetKeepAwake(false); err != nil || got.KeepAwake {
+		t.Fatalf("SetKeepAwake(false) = %+v, %v", got, err)
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "keep_mac_awake: false # mine") {
+		t.Errorf("config lost its comment or the value:\n%s", data)
+	}
+	if cfg, err := project.Load(h.Conf); err != nil || cfg.KeepAwake == nil || *cfg.KeepAwake {
+		t.Errorf("config = %+v, %v", cfg, err)
+	}
+	if h.Restart(t).Settings().KeepAwake {
+		t.Error("keep awake came back on after a restart")
+	}
+}
+
+func TestBrowserEnabled(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    browser_start_url: http://localhost\n"})
+	if !h.Settings().Browser {
+		t.Fatal("the browser is off by default")
+	}
+	if got, err := h.SetBrowserEnabled(false); err != nil || got.Browser {
+		t.Fatalf("SetBrowserEnabled(false) = %+v, %v", got, err)
+	}
+	if h.App.Sessions().Current().BrowserOn() {
+		t.Error("the current project still has the browser on")
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# keep me") || !strings.Contains(string(data), "browser_enabled: false") {
+		t.Errorf("config lost the comment or the value:\n%s", data)
+	}
+	if h.Restart(t).Settings().Browser {
+		t.Error("the browser came back on after a restart")
+	}
+}
+
+func TestDigestSchedule(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    browser_start_url: http://localhost\n"})
+	if got := h.Settings().Digest; got != "weekly" {
+		t.Fatalf("default digest schedule = %q", got)
+	}
+	if got, err := h.SetDigestSchedule("off"); err != nil || got.Digest != "off" {
+		t.Fatalf("SetDigestSchedule(off) = %+v, %v", got, err)
+	}
+	if h.App.Sessions().Current().DigestOn() {
+		t.Error("the current project still runs its digest")
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# keep me") || !strings.Contains(string(data), "digest_schedule: off") {
+		t.Errorf("config lost the comment or the value:\n%s", data)
+	}
+	if got, err := h.SetDigestSchedule("weekly"); err != nil || got.Digest != "weekly" {
+		t.Fatalf("SetDigestSchedule(weekly) = %+v, %v", got, err)
+	}
+	if _, err := h.SetDigestSchedule("daily"); err == nil {
+		t.Error("an unknown schedule was accepted")
+	}
+	if got := h.Settings().Digest; got != "weekly" {
+		t.Errorf("a rejected schedule changed the setting to %q", got)
+	}
+}
