@@ -271,7 +271,9 @@ PR list every `pr_poll` (30 s) with `If-None-Match`, so an unchanged list costs 
 plus those whose checks are still running. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
 comment or review, the app types the project's `on_review` command into its session and sends it; failing checks on a new commit send
 `on_checks` (`{n}` is the PR number). A key that is not set sends nothing: the row is still flagged and the notice still shows. A session
-waiting on the user gets the text once it is not; an ended session gets a new session for its issue with the text sent, and its row goes.
+waiting on the user gets the text once it is not; an ended session gets a new session for its issue with the text sent, and its row goes. The new session resumes the old one's conversation
+(`claude --resume <id>`, the `session_id` of the hook events, kept in the state file) in the project folder. An agent that cannot resume, or a session with no
+recorded id, gets a fresh conversation.
 Each comment count and each failing commit counts once, remembered in `prs.json`, whether or not a command is set.
 
 ### Notes (`notes`)
