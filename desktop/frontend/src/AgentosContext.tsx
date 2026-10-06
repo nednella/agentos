@@ -9,7 +9,6 @@ export type Toast = {
   tone: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' | 'error' | 'info' | 'done'
   text: string
   detail?: string
-  url?: string
   sessionId?: string
   view?: SessionView
   sticky?: boolean
@@ -101,13 +100,12 @@ export function useAgentos(): Agentos {
   return value
 }
 
-const cleanupToast = (entry: Cleanup, repo: string): Omit<Toast, 'key'> => {
+const cleanupToast = (entry: Cleanup): Omit<Toast, 'key'> => {
   if (!entry.merged) return { tone: 'info', text: `${entry.issue > 0 ? `#${entry.issue}` : entry.sessionTitle} cleaned up` }
   return {
     tone: 'done',
-    text: entry.sessionTitle,
-    detail: `Merged in #${entry.pr}, worktree and branch cleaned up`,
-    url: repo ? `https://github.com/${repo}/pull/${entry.pr}` : undefined,
+    text: "It's looking good brev",
+    detail: `Shipped! ${entry.sessionTitle} · PR #${entry.pr} merged · worktree and branch cleaned up`,
   }
 }
 
@@ -293,7 +291,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
           const entry = list[0]
           if (!entry || entry.status !== 'done' || entry.at === lastCleanupToast.current) return
           lastCleanupToast.current = entry.at
-          pushToast(cleanupToast(entry, projectRef.current?.repo ?? ''))
+          pushToast(cleanupToast(entry))
         }),
       ),
     [pushToast],

@@ -35,7 +35,6 @@
   --color-dim: var(--text-dim);
   --color-waiting: var(--waiting);
   --color-finished: var(--finished);
-  --color-finished-tint: var(--finished-tint);
   --color-working: var(--working);
   --color-idle: var(--idle);
   --color-ended: var(--ended);
@@ -204,11 +203,6 @@
   .btn-danger {
     border-color: var(--danger);
     color: var(--danger);
-  }
-
-  .btn-finished {
-    border-color: var(--finished);
-    color: var(--finished);
   }
 
   .field {

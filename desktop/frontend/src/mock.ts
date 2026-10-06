@@ -126,7 +126,7 @@ export function createMock(params: URLSearchParams) {
     cmd: params.get('cmd') ?? undefined,
     view: params.get('view') ?? undefined,
     toast: params.has('toast'),
-    done: params.get('done') ?? undefined,
+    done: params.has('done'),
     warn: params.has('warn'),
   }
   const handlers = new Map<string, Set<Handler>>()
