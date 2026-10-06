@@ -5,14 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"slices"
 	"strings"
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/notes"
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
@@ -41,7 +40,7 @@ type Manager struct {
 	tick     time.Duration // between checks after that
 }
 
-// NewManager runs the digests with run (claude) in the project's folder.
+// NewManager runs the digests with run in the project's folder.
 func NewManager(d *Digests, p Projects, n Notes, runner run.EnvRunner, emit func(string, any), stateDir string, ctx func() context.Context) *Manager {
 	return &Manager{digests: d, project: p, notes: n, run: runner, emit: emit, stateDir: stateDir, ctx: ctx, first: time.Minute, tick: time.Hour}
 }
@@ -78,13 +77,11 @@ func (m *Manager) start(proj project.Project) error {
 	go func() {
 		ctx, cancel := context.WithTimeout(m.ctx(), digestTimeout)
 		defer cancel()
-		_, err := m.claude(ctx, proj, key)
+		err := m.runAgent(ctx, proj, key)
 		failure := ""
 		switch {
 		case ctx.Err() != nil && errors.Is(ctx.Err(), context.DeadlineExceeded):
 			failure = "the run took longer than 10 minutes"
-		case errors.Is(err, exec.ErrNotFound):
-			failure = "claude was not found on PATH"
 		case err != nil:
 			failure = util.FirstLine(err.Error())
 		}
@@ -94,31 +91,36 @@ func (m *Manager) start(proj project.Project) error {
 	return nil
 }
 
-// claude runs the digest prompt in an empty folder, with the few tools the digest needs and
-// only the environment claude needs: the run reads the web, so it must not see the project or its secrets.
-func (m *Manager) claude(ctx context.Context, proj project.Project, key string) ([]byte, error) {
-	dir, err := os.MkdirTemp("", "agentos-digest")
-	if err != nil {
-		return nil, fmt.Errorf("making the digest folder: %w", err)
+// available returns the first agent that is installed and signed in. Checking spends no request.
+func (m *Manager) available(ctx context.Context) (agent.Headless, error) {
+	var tried []string
+	for _, a := range agent.Headlesses {
+		if _, err := m.run(ctx, "", os.Environ(), a.Check[0], a.Check[1:]...); err == nil {
+			return a, nil
+		} else if ctx.Err() != nil {
+			return agent.Headless{}, err
+		}
+		tried = append(tried, a.Name)
 	}
-	defer os.RemoveAll(dir)
-	env := append(claudeEnv(os.Environ()), digestProjects+"="+key, "AGENTOS_SOCKET="+bus.SocketPath(m.stateDir))
-	return m.run(ctx, dir, env, "claude", "-p", prompts.Digest(dependencies(proj.Dir)), "--allowedTools", digestTools)
+	return agent.Headless{}, fmt.Errorf("no agent is installed and signed in (tried %s)", strings.Join(tried, ", "))
 }
 
-// claudeEnv keeps what claude needs to start, find its login and reach its provider.
-func claudeEnv(env []string) []string {
-	exact := []string{"PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS",
-		"HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy", "GOOGLE_APPLICATION_CREDENTIALS"}
-	prefixes := []string{"ANTHROPIC_", "CLAUDE_", "AWS_", "CLOUD_ML_", "VERTEX_"}
-	var out []string
-	for _, kv := range env {
-		name, _, _ := strings.Cut(kv, "=")
-		if slices.Contains(exact, name) || slices.ContainsFunc(prefixes, func(p string) bool { return strings.HasPrefix(name, p) }) {
-			out = append(out, kv)
-		}
+// runAgent runs the digest prompt in an empty folder, with the few tools the digest needs and
+// only the environment the agent needs: the run reads the web, so it must not see the project or its secrets.
+func (m *Manager) runAgent(ctx context.Context, proj project.Project, key string) error {
+	a, err := m.available(ctx)
+	if err != nil {
+		return err
 	}
-	return out
+	dir, err := os.MkdirTemp("", "agentos-digest")
+	if err != nil {
+		return fmt.Errorf("making the digest folder: %w", err)
+	}
+	defer os.RemoveAll(dir)
+	argv := a.Argv(prompts.Digest(dependencies(proj.Dir)))
+	env := append(a.Env(os.Environ()), digestProjects+"="+key, "AGENTOS_SOCKET="+bus.SocketPath(m.stateDir))
+	_, err = m.run(ctx, dir, env, argv[0], argv[1:]...)
+	return err
 }
 
 // Loop starts the current project's digest when it is due, checking first after m.first, then every m.tick, until ctx ends.

@@ -2,6 +2,7 @@ package digest_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -138,22 +139,27 @@ func TestDigestAddOnlyTakesWebLinks(t *testing.T) {
 
 func TestDigestFailures(t *testing.T) {
 	for _, tt := range []struct {
-		name string
-		err  error
-		want string
+		name          string
+		authErr, err  error
+		want          string
+		wantRunCalled bool
 	}{
-		{"claude missing", fmt.Errorf("claude: %w", exec.ErrNotFound), "claude was not found"},
-		{"claude fails", context.Canceled, "context canceled"},
+		{"claude missing", fmt.Errorf("claude: %w", exec.ErrNotFound), nil, "no agent is installed and signed in (tried claude)", false},
+		{"claude signed out", errors.New("exit status 1"), nil, "no agent is installed and signed in (tried claude)", false},
+		{"claude fails", nil, context.Canceled, "context canceled", true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.Claude.Err = tt.err
+			h.Claude.AuthErr, h.Claude.Err = tt.authErr, tt.err
 			if err := h.RunDigest(); err != nil {
 				t.Fatal(err)
 			}
 			eventually(t, "the failure", func() bool { d := lastDigest(h); return !d.Running && d.Error != "" })
 			if d := lastDigest(h); !strings.Contains(d.Error, tt.want) || d.LastRunAt != 0 {
 				t.Errorf("digest = %+v", d)
+			}
+			if got := len(h.Claude.Calls()) > 0; got != tt.wantRunCalled {
+				t.Errorf("claude ran = %v, want %v", got, tt.wantRunCalled)
 			}
 		})
 	}

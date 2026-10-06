@@ -882,17 +882,24 @@ type DigestCall struct {
 	Args []string
 }
 
-// FakeClaude stands in for claude: it records each call and runs Do, if set, as claude would act.
+// FakeClaude stands in for claude: it records each digest run and runs Do, if set, as claude would act.
+// The sign-in check is not a run; AuthErr is what it fails with.
 type FakeClaude struct {
-	mu    sync.Mutex
-	calls []DigestCall
-	Do    func(call DigestCall)
-	Err   error
+	mu      sync.Mutex
+	calls   []DigestCall
+	Do      func(call DigestCall)
+	Err     error
+	AuthErr error
 }
 
 // RunEnv is the run.EnvRunner of the digest.
 func (f *FakeClaude) RunEnv(_ context.Context, dir string, env []string, name string, args ...string) ([]byte, error) {
 	call := DigestCall{Dir: dir, Env: env, Args: append([]string{name}, args...)}
+	if slices.Equal(args, []string{"auth", "status"}) {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		return nil, f.AuthErr
+	}
 	f.mu.Lock()
 	f.calls = append(f.calls, call)
 	do, err := f.Do, f.Err

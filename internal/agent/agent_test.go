@@ -76,3 +76,14 @@ func TestBrowserPromptNamesTheCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestClaudeHeadless(t *testing.T) {
+	argv := ClaudeHeadless.Argv("find things")
+	if want := []string{"claude", "-p", "find things", "--allowedTools", "WebSearch WebFetch Bash(agentos digest add:*)"}; !slices.Equal(argv, want) {
+		t.Errorf("argv = %q, want %q", argv, want)
+	}
+	env := ClaudeHeadless.Env([]string{"PATH=/bin", "ANTHROPIC_API_KEY=k", "DEPLOY_TOKEN=s", "AGENTOS_SESSION=main/9"})
+	if want := []string{"PATH=/bin", "ANTHROPIC_API_KEY=k"}; !slices.Equal(env, want) {
+		t.Errorf("env = %q, want %q", env, want)
+	}
+}
