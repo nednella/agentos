@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.0](https://github.com/nednella/agentos/compare/v0.6.0...v0.7.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** clean up with the project's own command ([f291f9c](https://github.com/nednella/agentos/commit/f291f9c1f6f3c66d18846103218c6b7217dc836f))
+* **desktop:** start issue sessions from a section's action ([85ee372](https://github.com/nednella/agentos/commit/85ee372dd634480ce68ae6390560458c5ca45484))
+* **internal:** name every config key in full ([596fd90](https://github.com/nednella/agentos/commit/596fd90df3aa5c98e0f682f57af2997a74d06e12))
+* **internal:** replace lanes with queue sections and actions ([7291e05](https://github.com/nednella/agentos/commit/7291e056ccac257d048563d1a2203dbeed52cb5e))
+* **ui:** group the queue by section and offer each section's actions ([1cd543c](https://github.com/nednella/agentos/commit/1cd543c2d55a40d80df523885d4f9a3cf7709969))
+
 ## [0.6.0](https://github.com/nednella/agentos/compare/v0.5.0...v0.6.0) (2026-10-06)
 
 
