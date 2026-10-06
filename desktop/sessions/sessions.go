@@ -456,7 +456,7 @@ func (s *Sessions) followBranch(rec session.Record) {
 			continue
 		}
 		if proj, ok := s.projectOf(in); ok {
-			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd)
+			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop")
 		}
 	}
 }
@@ -1201,7 +1201,7 @@ func (s *Sessions) Track(id, branch string) error {
 	if !found {
 		return fmt.Errorf("session %q is not running", id)
 	}
-	s.life.track(s.ctx, id, proj, branch)
+	s.life.track(s.ctx, id, proj, branch, false)
 	return nil
 }
 

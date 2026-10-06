@@ -46,6 +46,19 @@ func hasPR(h *apptest.Harness, id string) func() bool {
 	return func() bool { got, _ := h.Session(id); return got.PR != nil }
 }
 
+func TestPRIsFoundWhenTheTurnEnds(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	s := plainSession(h, t)
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the branch", func() bool { got, _ := h.Session(s.ID); return got.Branch == "my-fix" })
+
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the PR the agent opened during the turn", hasPR(h, s.ID))
+}
+
 func TestPlainSessionFindsItsPR(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
