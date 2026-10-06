@@ -211,7 +211,8 @@ export function createMock(params: URLSearchParams) {
   }
 
   type Shell = { id: string; project: string; buffer: string; line: string; opened: boolean }
-  const shells = new Map<string, Shell>()
+  const shells: Shell[] = []
+  const shellName = (project: string, n: number) => (n === 1 ? `shell-${project}` : `shell-${project}-${n}`)
 
   const prompt = (project: string) => `\x1b[38;2;167;139;250m${project}\x1b[0m \x1b[2m❯\x1b[0m `
 
@@ -235,6 +236,18 @@ export function createMock(params: URLSearchParams) {
     else shellWrite(shell, `\r\nzsh: command not found: ${name}`)
   }
 
+  const shellsOf = (project: string) => shells.filter((x) => x.project === project)
+  const findShell = (id: string) => shells.find((x) => x.id === id)
+
+  function startShell(): Shell {
+    const taken = shellsOf(current.name).map((x) => x.id)
+    let n = 1
+    while (taken.includes(shellName(current.name, n))) n++
+    const shell: Shell = { id: shellName(current.name, n), project: current.name, buffer: `\x1b[2m${current.dir}\x1b[0m\r\n${prompt(current.name)}`, line: '', opened: false }
+    shells.push(shell)
+    return shell
+  }
+
   function isShell(id: string) {
     return id.startsWith('shell-')
   }
@@ -247,7 +260,7 @@ export function createMock(params: URLSearchParams) {
       notes: currentNotes(),
       version: 'mock',
       update: flags.update ? '1.4.0' : '',
-      shell: shells.get(current.name)?.id ?? '',
+      shells: shellsOf(current.name).map((x) => x.id),
     }
   }
 
@@ -800,15 +813,16 @@ export function createMock(params: URLSearchParams) {
       return delay(buildIssueDetail(number), 350)
     },
     ShellOpen: async () => {
-      const existing = shells.get(current.name)
-      if (existing) return { id: existing.id }
-      const shell: Shell = { id: `shell-${current.name}`, project: current.name, buffer: `\x1b[2m${current.dir}\x1b[0m\r\n${prompt(current.name)}`, line: '', opened: false }
-      shells.set(current.name, shell)
-      return { id: shell.id }
+      return { id: (shellsOf(current.name)[0] ?? startShell()).id }
+    },
+    ShellNew: async () => ({ id: startShell().id }),
+    ShellClose: async (id: string) => {
+      const at = shells.findIndex((x) => x.id === id)
+      if (at >= 0) shells.splice(at, 1)
     },
     TermOpen: async (id: string) => {
       if (isShell(id)) {
-        const shell = [...shells.values()].find((x) => x.id === id)
+        const shell = findShell(id)
         if (!shell) throw 'No such shell'
         shell.opened = true
         emit('term:data', { id, data: toBase64(`\x1bc${shell.buffer}`) })
@@ -820,7 +834,7 @@ export function createMock(params: URLSearchParams) {
     },
     TermWrite: async (id: string, data: string) => {
       if (isShell(id)) {
-        const shell = [...shells.values()].find((x) => x.id === id)
+        const shell = findShell(id)
         if (!shell) return
         for (const ch of data) {
           if (ch === '\r') {
@@ -845,7 +859,7 @@ export function createMock(params: URLSearchParams) {
     },
     TermResize: async () => undefined,
     TermClose: async (id: string) => {
-      const shell = [...shells.values()].find((x) => x.id === id)
+      const shell = findShell(id)
       if (shell) shell.opened = false
       const s = sessions.find((x) => x.id === id)
       if (s) s.opened = false

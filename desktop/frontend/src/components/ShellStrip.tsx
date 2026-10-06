@@ -2,6 +2,7 @@ import { useRef } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
+import { ShellList } from './ShellList'
 import { ShellTerminal } from './ShellTerminal'
 
 const HEADER_REM = 1.75
@@ -12,7 +13,7 @@ const cornerPad = { paddingLeft: 'var(--corner-pad)', paddingRight: 'var(--corne
 const terminalInset = { marginLeft: 'calc(var(--corner-pad) - 0.75rem)', marginRight: 'calc(var(--corner-pad) - 0.75rem)', marginBottom: '0.375rem' }
 
 export function ShellStrip() {
-  const { project, focus } = useAgentos()
+  const { project, shellIds, focus } = useAgentos()
   const { shellOpen, shellRem, setShellOpen, setShellHeight, resetShellHeight } = useLayout()
   const drag = useRef<{ y: number; rem: number; root: number } | null>(null)
 
@@ -87,8 +88,11 @@ export function ShellStrip() {
         <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
         <span className="text-small text-dim">Shell</span>
       </button>
-      <div className="relative" style={{ ...terminalInset, height: `${shellRem}rem` }}>
-        <ShellTerminal visible />
+      <div className="flex" style={{ height: `${shellRem}rem`, marginBottom: '0.375rem' }}>
+        <div className="relative min-w-0 flex-1" style={{ marginLeft: terminalInset.marginLeft }}>
+          <ShellTerminal visible />
+        </div>
+        {shellIds.length > 0 && <ShellList />}
       </div>
     </div>
   )

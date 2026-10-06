@@ -89,7 +89,7 @@ export type Snapshot = {
   notes: Note[]
   version: string
   update: string
-  shell: string
+  shells: string[]
 }
 
 export type ThemeSetting = 'system' | 'light' | 'dark'
