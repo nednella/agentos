@@ -58,12 +58,22 @@ func TestLoad(t *testing.T) {
 		{name: "bad pr_poll", path: write("projects:\n  - {name: api, dir: /srv/api, pr_poll: often}\n"), wantErr: true},
 		{
 			name: "models",
-			path: write("model: haiku\neffort: low\nprojects:\n  - {name: api, dir: /srv/api, model: opus, models: {plan: {effort: high}}}\n"),
-			want: Config{Model: "haiku", Effort: "low", Projects: []Project{{Name: "api", Dir: "/srv/api", Model: "opus", Models: map[string]Model{"plan": {Effort: "high"}}}}},
+			path: write("session_model: haiku\nsession_effort: low\nprojects:\n  - {name: api, dir: /srv/api, session_model: opus}\n"),
+			want: Config{Model: "haiku", Effort: "low", Projects: []Project{{Name: "api", Dir: "/srv/api", Model: "opus"}}},
 		},
-		{name: "bad effort", path: write("effort: huge\n"), wantErr: true},
-		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, dir: /srv/api, model: --x}\n"), wantErr: true},
-		{name: "bad lane effort", path: write("projects:\n  - {name: api, dir: /srv/api, models: {plan: {effort: huge}}}\n"), wantErr: true},
+		{
+			name: "queue sections",
+			path: write("projects:\n  - name: api\n    dir: /srv/api\n    session_prompt_send: manual\n    queue_sections:\n      - {name: Ready, labels: [ready], actions: [{name: Work, command: \"/work {n}\", model: opus, effort: high}]}\n"),
+			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", SessionPromptSend: "manual", QueueSections: []Section{{Name: "Ready", Labels: []string{"ready"}, Actions: []Action{{Name: "Work", Command: "/work {n}", Model: "opus", Effort: "high"}}}}}}},
+		},
+		{name: "section without a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{labels: [x]}]}\n"), wantErr: true},
+		{name: "two sections of a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A}, {name: A}]}\n"), wantErr: true},
+		{name: "action without a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{command: x}]}]}\n"), wantErr: true},
+		{name: "two actions of a name", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
+		{name: "bad action effort", path: write("projects:\n  - {name: api, dir: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
+		{name: "unknown prompt send", path: write("projects:\n  - {name: api, dir: /srv/api, session_prompt_send: later}\n"), wantErr: true},
+		{name: "bad effort", path: write("session_effort: huge\n"), wantErr: true},
+		{name: "model that looks like a flag", path: write("projects:\n  - {name: api, dir: /srv/api, session_model: --x}\n"), wantErr: true},
 		{name: "theme", path: write("theme: dark\n"), want: Config{Theme: "dark"}},
 		{name: "unknown theme", path: write("theme: sepia\n"), wantErr: true},
 		{name: "bad yaml", path: write("agent: [\n"), wantErr: true},
@@ -151,7 +161,7 @@ func TestLoadDataDir(t *testing.T) {
 func TestSaveRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "new", "config.yaml")
 	want := Config{Agent: "claude", Projects: []Project{
-		{Name: "a", Dir: "/srv/a", Commands: map[string]string{"ready": "/x {n}"}, Lanes: map[string]string{"go": "ready"}},
+		{Name: "a", Dir: "/srv/a", NoteSessionCommand: "/plan {text}", QueueSections: []Section{{Name: "Go", Labels: []string{"go"}, Actions: []Action{{Name: "Work", Command: "/x {n}"}}}}},
 		{Name: "b", Dir: "/srv/b"},
 	}}
 	if err := Save(path, want); err != nil {
@@ -179,8 +189,7 @@ projects:
   # the main one
   - name: api
     dir: ~/code/api   # work
-    commands:
-      ready: "/work {n}"
+    note_session_command: "/plan {text}"
   - {name: web, dir: ~/code/web}
 `
 	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {

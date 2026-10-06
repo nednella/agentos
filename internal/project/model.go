@@ -8,25 +8,16 @@ import (
 	"strings"
 )
 
-// Model is the model and effort level a session's agent runs at. An empty field means unset.
+// Model is the model and effort level a session's agent runs at. An empty field means unset, which leaves the choice to the agent.
 type Model struct {
 	Model  string `yaml:"model,omitempty"`
 	Effort string `yaml:"effort,omitempty"`
 }
 
-const (
-	DefaultModel  = "sonnet"
-	DefaultEffort = "medium"
-)
-
 var efforts = []string{"low", "medium", "high", "xhigh", "max"}
 
 // modelName keeps a value from being read as a flag when it reaches the agent's command line.
 var modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._\[\]-]*$`)
-
-// defaultLaneModels is what a lane runs at when neither the config nor a label says otherwise.
-// Planning gets the stronger model; every other lane runs at the project's default.
-var defaultLaneModels = map[string]Model{"plan": {Model: "opus"}}
 
 func (m Model) over(base Model) Model {
 	return Model{Model: cmp.Or(m.Model, base.Model), Effort: cmp.Or(m.Effort, base.Effort)}
@@ -43,19 +34,15 @@ func (m Model) Validate() error {
 	return nil
 }
 
-// Default is the model and effort of a config that sets neither.
-func (c Config) Default() Model {
-	return Model{Model: c.Model, Effort: c.Effort}.over(Model{Model: DefaultModel, Effort: DefaultEffort})
-}
+// Default is the model and effort the config sets for every session.
+func (c Config) Default() Model { return Model{Model: c.Model, Effort: c.Effort} }
 
-// Pick chooses the model and effort for a session started for an issue in the lane, or for no issue
-// when the lane is "". From weakest to strongest: base (the config's default), the project's own,
-// the built-in choice of the lane, the project's choice for the lane, then the issue's `model:<x>`
-// and `effort:<y>` labels. A value that fails Validate is skipped.
-func (p Project) Pick(base Model, lane string, labels []string) Model {
+// Pick chooses the model and effort for a session. From weakest to strongest: base (the config's default),
+// the project's own, the action's, then the issue's `model:<x>` and `effort:<y>` labels. A value that fails
+// Validate is skipped. A session for no issue passes an empty action and no labels.
+func (p Project) Pick(base Model, action Action, labels []string) Model {
 	m := Model{Model: p.Model, Effort: p.Effort}.over(base)
-	m = defaultLaneModels[lane].over(m)
-	m = p.Models[lane].over(m)
+	m = Model{Model: action.Model, Effort: action.Effort}.over(m)
 	for _, l := range slices.Backward(labels) {
 		var override Model
 		switch {
@@ -71,14 +58,4 @@ func (p Project) Pick(base Model, lane string, labels []string) Model {
 	return m
 }
 
-func (p Project) validateModels() error {
-	if err := (Model{Model: p.Model, Effort: p.Effort}).Validate(); err != nil {
-		return err
-	}
-	for lane, m := range p.Models {
-		if err := m.Validate(); err != nil {
-			return fmt.Errorf("models.%s: %w", lane, err)
-		}
-	}
-	return nil
-}
+func (p Project) validateModel() error { return Model{Model: p.Model, Effort: p.Effort}.Validate() }

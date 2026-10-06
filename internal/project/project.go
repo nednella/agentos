@@ -16,34 +16,34 @@ import (
 
 // Project is the unit agentos is scoped to: a name and the folder agents start in.
 type Project struct {
-	Name           string            `yaml:"name"`
-	Dir            string            `yaml:"dir"`
-	Commands       map[string]string `yaml:"commands,omitempty"`        // keys: ready, plan, inbox, idea, note
-	Lanes          map[string]string `yaml:"lanes,omitempty"`           // GitHub label -> lane
-	Model          string            `yaml:"model,omitempty"`           // overrides the config's model for this project
-	Effort         string            `yaml:"effort,omitempty"`          // overrides the config's effort for this project
-	Models         map[string]Model  `yaml:"models,omitempty"`          // lane -> model and effort of the sessions started there
-	Branch         string            `yaml:"branch,omitempty"`          // branch of an issue's work when the session reports none; {n} is the number
-	RemoveWorktree string            `yaml:"remove_worktree,omitempty"` // shell command that removes a worktree; {branch} and {worktree}
-	Cleanup        Cleanup           `yaml:"cleanup,omitempty"`         // whether the app cleans up by itself, per event
-	URL            string            `yaml:"url,omitempty"`             // the page a session's browser opens first
-	Browser        *bool             `yaml:"browser,omitempty"`         // give sessions the browser and evidence commands; on unless false
-	Digest         string            `yaml:"digest,omitempty"`          // weekly (the default) or off
-	PRWatch        string            `yaml:"pr_watch,omitempty"`        // webhook or poll; unset tries the webhook and polls when it does not work
-	PRPoll         string            `yaml:"pr_poll,omitempty"`         // how often to poll pull requests, "30s" by default
-	KeepAwake      *bool             `yaml:"keep_awake,omitempty"`      // overrides the config's keep_awake for this project
-	OnReview       string            `yaml:"on_review,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
-	OnChecks       string            `yaml:"on_checks,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
+	Name               string    `yaml:"name"`
+	Dir                string    `yaml:"dir"`
+	QueueSections      []Section `yaml:"queue_sections,omitempty"`       // the groups of the queue, each with the actions that start a session
+	Model              string    `yaml:"session_model,omitempty"`        // overrides the config's model for this project
+	Effort             string    `yaml:"session_effort,omitempty"`       // overrides the config's effort for this project
+	NoteSessionCommand string    `yaml:"note_session_command,omitempty"` // typed into a session started from a note; {text} is the note, the note itself when unset
+	SessionPromptSend  string    `yaml:"session_prompt_send,omitempty"`  // auto (the default) sends what a session starts with at once; manual waits for Enter
+	Branch             string    `yaml:"branch,omitempty"`               // branch of an issue's work when the session reports none; {n} is the number
+	RemoveWorktree     string    `yaml:"remove_worktree,omitempty"`      // shell command that removes a worktree; {branch} and {worktree}
+	Cleanup            Cleanup   `yaml:"cleanup,omitempty"`              // whether the app cleans up by itself, per event
+	URL                string    `yaml:"url,omitempty"`                  // the page a session's browser opens first
+	Browser            *bool     `yaml:"browser,omitempty"`              // give sessions the browser and evidence commands; on unless false
+	Digest             string    `yaml:"digest,omitempty"`               // weekly (the default) or off
+	PRWatch            string    `yaml:"pr_watch,omitempty"`             // webhook or poll; unset tries the webhook and polls when it does not work
+	PRPoll             string    `yaml:"pr_poll,omitempty"`              // how often to poll pull requests, "30s" by default
+	KeepAwake          *bool     `yaml:"keep_awake,omitempty"`           // overrides the config's keep_awake for this project
+	OnReview           string    `yaml:"on_review,omitempty"`            // typed into a session whose PR got a review or comment; {n} is the PR number
+	OnChecks           string    `yaml:"on_checks,omitempty"`            // typed into a session whose PR has failing checks; {n} is the PR number
 }
 
 // Config is the optional ~/.config/agentos/config.yaml.
 type Config struct {
 	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
 	Agent     string    `yaml:"agent"`
-	Model     string    `yaml:"model,omitempty"`      // model of a Claude session, "sonnet" by default
-	Effort    string    `yaml:"effort,omitempty"`     // effort of a Claude session, "medium" by default
-	KeepAwake *bool     `yaml:"keep_awake,omitempty"` // hold off idle sleep while a session works; on unless false
-	Theme     string    `yaml:"theme,omitempty"`      // light or dark; unset follows the system
+	Model     string    `yaml:"session_model,omitempty"`  // model of a Claude session; unset leaves it to claude
+	Effort    string    `yaml:"session_effort,omitempty"` // effort of a Claude session; unset leaves it to claude
+	KeepAwake *bool     `yaml:"keep_awake,omitempty"`     // hold off idle sleep while a session works; on unless false
+	Theme     string    `yaml:"theme,omitempty"`          // light or dark; unset follows the system
 	Projects  []Project `yaml:"projects"`
 }
 
@@ -103,7 +103,10 @@ func Load(path string) (Config, error) {
 		if err := p.Cleanup.validate(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
-		if err := p.validateModels(); err != nil {
+		if err := p.validateModel(); err != nil {
+			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
+		}
+		if err := p.validateQueue(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if _, err := p.PRPollEvery(); err != nil {
