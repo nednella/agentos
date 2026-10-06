@@ -24,7 +24,7 @@ type Project struct {
 	NoteSessionCommand string    `yaml:"note_session_command,omitempty"`    // typed into a session started from a note; {text} is the note, the note itself when unset
 	SessionPromptSend  string    `yaml:"session_prompt_send,omitempty"`     // auto (the default) sends what a session starts with at once; manual waits for Enter
 	Branch             string    `yaml:"session_branch_fallback,omitempty"` // branch of an issue's work when the session reports none; {n} is the number
-	CleanupCommand     string    `yaml:"session_cleanup_command,omitempty"` // shell command that cleans up the git side of a session; {branch}, {worktree} and {dir}
+	CleanupCommand     string    `yaml:"session_cleanup_command,omitempty"` // shell command that cleans up the git side of a session; {branch}, {worktree}, {dir} and {force}
 	CleanupMode        Cleanup   `yaml:"session_cleanup_mode,omitempty"`    // whether the app cleans up by itself, per event
 	URL                string    `yaml:"browser_start_url,omitempty"`       // the page a session's browser opens first
 	Browser            *bool     `yaml:"browser_enabled,omitempty"`         // give sessions the browser and evidence commands; on unless false

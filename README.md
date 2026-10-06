@@ -55,7 +55,7 @@ send the agent a command, set `pr_review_command` or `pr_checks_command` on the 
 
 When a session's pull request merges, the app removes the session. To also clean up git, set
 `session_cleanup_command` on the project, for example
-`session_cleanup_command: "git worktree remove {worktree} && git branch -D {branch}"`. Without it,
+`session_cleanup_command: "git worktree remove {force} {worktree} && git branch -D {branch}"`. Without it,
 branches and folders stay as they are.
 
 `⌘K` opens the command palette and `⌘/` lists every shortcut. `agentos --help` lists the command.
