@@ -8,6 +8,7 @@ import { EvidenceTab } from './EvidenceTab'
 import { Terminal } from './Terminal'
 import { Timeline } from './Timeline'
 import { ViewTabs } from './ViewTabs'
+import { ViewportActions } from './ViewportActions'
 import { ViewportHeader } from './ViewportHeader'
 
 export function Viewport() {
@@ -36,6 +37,7 @@ export function Viewport() {
     >
       <ViewportHeader key={selected.id} session={selected} />
       <Timeline session={selected} size="full" />
+      <ViewportActions session={selected} />
       <ViewTabs session={selected} view={view} />
       <div className="relative min-h-0 flex-1 border-t border-line bg-term">
         <div className={view === 'terminal' ? 'absolute inset-0' : 'hidden'}>

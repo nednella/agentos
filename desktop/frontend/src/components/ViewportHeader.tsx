@@ -5,22 +5,15 @@ import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
 import { ModelTag } from './ModelTag'
-import { PRBadge } from './PRBadge'
 import { StateBadge } from './StateBadge'
 
 type ViewportHeaderProps = { session: Session }
 
-const PR_ACTION = {
-  comments: { label: 'Address review comments', sentence: (n: number) => `Address the review comments on PR #${n}.` },
-  checks: { label: 'Fix failing checks', sentence: (n: number) => `Fix the failing checks on PR #${n}.` },
-}
-
 export function ViewportHeader({ session }: ViewportHeaderProps) {
-  const { renameSession, report, focus, typeInto, ackPR, killSession } = useAgentos()
+  const { renameSession, report, focus, killSession } = useAgentos()
   const now = useNow()
   const [renaming, setRenaming] = useState(false)
   const kill = useArmedConfirm()
-  const action = session.pr && session.prAttention ? PR_ACTION[session.prAttention] : null
 
   const finishRename = () => {
     setRenaming(false)
@@ -87,22 +80,6 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
       </div>
       <div className="short:hidden flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.625rem]">
         <StateBadge state={session.state} />
-        <PRBadge session={session} />
-        {action && session.pr && (
-          <button
-            className="btn btn-accent"
-            onClick={() => {
-              const number = session.pr?.number ?? 0
-              report(async () => {
-                await typeInto(session.id, action.sentence(number))
-                await ackPR(session.id)
-              })
-              focus('terminal')
-            }}
-          >
-            {action.label}
-          </button>
-        )}
         <ModelTag model={session.model} effort={session.effort} />
       </div>
       {kill.armed && (
