@@ -5,6 +5,7 @@ import type { SidebarTab } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { isTyping } from '../useListNav'
 import { useFocusRequest } from '../useFocusRequest'
+import { useRefreshQueueOnShow } from '../useRefreshQueueOnShow'
 import { useToggleAnimation } from '../useToggleAnimation'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
@@ -110,6 +111,7 @@ export function Sidebar() {
 
   useFocusRequest('sidebar', shellPanel, sidebarOpen)
   useFocusRequest('sidebar', peekPanel, sidebarPeek)
+  useRefreshQueueOnShow()
 
   if (mode === 'narrow') return sidebarOpen ? <SidebarPanel panel={shellPanel} nav={shellNav} overlay={false} full widthRem={0} /> : null
 
