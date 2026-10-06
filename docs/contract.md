@@ -37,7 +37,7 @@ type Session = {
   model: string         // model the agent was started with ("sonnet"); "" for an agent other than claude or a session from before the field
   effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
-  branch: string        // branch of the issue's work (from the project's `branch` pattern); "" without an issue
+  branch: string        // branch of the issue's work (from the project's `branch` pattern); for a session with no issue, the branch its PR was found on, else the newest it worked on; "" if none
   worktree: string      // path of the git worktree on that branch; "" if none
   pr: PR | null
   prAttention: '' | 'checks' | 'comments'   // failing checks, or comments newer than the last AckPR
@@ -246,17 +246,25 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `RefreshPRs()` | | fetches the PRs of issue sessions now (the app also watches them, see below); results arrive as `sessions` |
+| `RefreshPRs()` | | fetches the PRs of sessions on a branch now (the app also watches them, see below); results arrive as `sessions` |
 | `AckPR(id)` | | the user has seen the PR's comments and failing checks; clears `prAttention` until something new arrives |
 | `Cleanup(id, force)` | | cleans up after a session now: worktree, branch, temp files, evidence, browser tab, session. Without `force` the safety checks apply |
 | `Cleanups()` | `Cleanup[]` | the current project's log, newest first, at most 100 |
+
+A session with an issue works on the issue's branch. A session without one works on the branches it was seen on: each hook reports the agent's
+working directory (`cwd`), and on a change of directory and at the end of each turn the app reads the branch checked out there. A directory in another
+repo, a detached head and the main branch (origin's default, else `main`) are ignored. The branches are remembered per session in `prs.json`, oldest
+first, and the PR of a session is the one on the newest branch that has one. A session with no such branch has no PR and nothing to clean up. For one
+of these sessions a project folder that holds the branch is not left alone: after the safety checks the clean-up switches it back to main, then deletes
+the branch, and a linked worktree is removed as for an issue; every branch of the session goes. A new comment or failing check wakes a live session
+of this kind; an ended one is not recreated.
 
 A session is cleaned up on its own when its PR is merged after the session saw it draft or open. A PR first seen already merged, or a
 closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
 `Cleanup(id, true)` overrides. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
 agent finished still cleans up, and the row shows the PR merged.
 
-How the app watches: every 5 minutes it fetches every tracked PR. In between, each project with an issue session has a watcher. Unless
+How the app watches: every 5 minutes it fetches every tracked PR. In between, each project with a session on a branch has a watcher. Unless
 the project's `pr_watch` says `poll`, the watcher streams the repo's `pull_request`, `pull_request_review`, `issue_comment` and `check_suite` events
 through `gh webhook forward` (needs the extension and admin on the repo; a stream that ends within 10 s never worked, and the project is polled
 instead; one that drops later is retried after 30 s, with a warning when `pr_watch: webhook` asked for it). Polling asks GitHub for the repo's
