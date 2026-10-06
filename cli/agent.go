@@ -36,6 +36,22 @@ func newNoteCmd() *cobra.Command {
 	}
 }
 
+func newTrackCmd() *cobra.Command {
+	var branch string
+	cmd := &cobra.Command{
+		Use:     "track --branch <name>",
+		Short:   "Tell the app which branch this session works on",
+		GroupID: groupSession,
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return askApp(cmd, control.Request{Cmd: "track", Opts: map[string]string{"branch": branch}})
+		},
+	}
+	cmd.Flags().StringVar(&branch, "branch", "", "the branch name")
+	_ = cmd.MarkFlagRequired("branch")
+	return cmd
+}
+
 func newStatsCmd() *cobra.Command {
 	var days int
 	var asJSON, open bool

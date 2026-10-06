@@ -23,7 +23,7 @@ type Project struct {
 	Model     string            `yaml:"model,omitempty"`      // overrides the config's model for this project
 	Effort    string            `yaml:"effort,omitempty"`     // overrides the config's effort for this project
 	Models    map[string]Model  `yaml:"models,omitempty"`     // lane -> model and effort of the sessions started there
-	Branch    string            `yaml:"branch,omitempty"`     // branch of an issue's work; {n} is the number
+	Branch    string            `yaml:"branch,omitempty"`     // branch of an issue's work when the session reports none; {n} is the number
 	Cleanup   string            `yaml:"cleanup,omitempty"`    // shell command that removes a worktree; {branch} and {worktree}
 	URL       string            `yaml:"url,omitempty"`        // the page a session's browser opens first
 	Browser   *bool             `yaml:"browser,omitempty"`    // give sessions the browser and evidence commands; on unless false
