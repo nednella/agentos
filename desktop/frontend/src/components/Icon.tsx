@@ -22,7 +22,7 @@ type IconName =
   | 'image'
   | 'digest'
   | 'moon'
-  | 'sliders'
+  | 'settings'
   | 'back'
   | 'forward'
   | 'reload'
@@ -66,7 +66,7 @@ function IconShape({ name }: IconShapeProps) {
   if (name === 'panel-left') return <path d="M2.5 3h11v10h-11ZM6.5 3v10" />
   if (name === 'panel-right') return <path d="M2.5 3h11v10h-11ZM9.5 3v10" />
   if (name === 'moon') return <path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5Z" />
-  if (name === 'sliders') return <path d="M2.5 5h11M2.5 11h11M10 3v4M6 9v4" />
+  if (name === 'settings') return <path d="M6.6 3.2 6.9 1.6h2.2l.3 1.6 1 .4 1.3-.9 1.6 1.6-.9 1.3.4 1 1.6.3v2.2l-1.6.3-.4 1 .9 1.3-1.6 1.6-1.3-.9-1 .4-.3 1.6H6.9l-.3-1.6-1-.4-1.3.9-1.6-1.6.9-1.3-.4-1-1.6-.3V6.9l1.6-.3.4-1-.9-1.3 1.6-1.6 1.3.9ZM8 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" />
   if (name === 'chart') return <path d="M3 13V8M7 13V3M11 13V6M14 13H2" />
   if (name === 'pin') return <path d="M9.5 2.5 13.5 6.5 11 7l-2 3-.5 3-5-5 3-.5 3-2ZM5.5 10.5 2.5 13.5" />
   if (name === 'archive') return <path d="M2 3.5h12v3H2ZM3 6.5V13h10V6.5M6.5 9h3" />
