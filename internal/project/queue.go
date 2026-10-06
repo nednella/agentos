@@ -186,7 +186,21 @@ func (c Config) KeepsAwake(p Project) bool {
 }
 
 // DigestOn says whether the weekly digest runs by itself.
-func (p Project) DigestOn() bool { return p.Digest != "off" }
+func (p Project) DigestOn() bool { return p.Digest != DigestOff }
+
+// The values of Project.Digest.
+const (
+	DigestWeekly = "weekly"
+	DigestOff    = "off"
+)
+
+// DigestSchedule is the project's digest schedule, the default filled in.
+func (p Project) DigestSchedule() string {
+	if p.DigestOn() {
+		return DigestWeekly
+	}
+	return DigestOff
+}
 
 // PRPollEvery is how often the project's pull requests are polled.
 func (p Project) PRPollEvery() (time.Duration, error) {

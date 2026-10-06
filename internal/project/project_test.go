@@ -256,3 +256,15 @@ func TestLoadRejectsAnUnknownCleanupMode(t *testing.T) {
 		t.Errorf("Load = %v, want an error naming auto or manual", err)
 	}
 }
+
+func TestLoadTextScale(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	for scale, ok := range map[string]bool{"1.2": true, "0.85": true, "1.5": true, "0.5": false, "3": false, "-1": false} {
+		if err := os.WriteFile(path, []byte("app_text_scale: "+scale+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); (err == nil) != ok {
+			t.Errorf("app_text_scale %s: err = %v, want ok = %v", scale, err, ok)
+		}
+	}
+}
