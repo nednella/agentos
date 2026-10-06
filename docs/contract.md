@@ -258,8 +258,9 @@ of these sessions a project folder that holds the branch is not left alone: afte
 the branch, and a linked worktree is removed as for an issue; every branch of the session goes. A new comment or failing check wakes a live session
 of this kind; an ended one is not recreated.
 
-A session is cleaned up on its own when its PR is merged after the session saw it draft or open. A PR first seen already merged, or a
-closed unmerged one, sets `cleanup: 'ask'`: the user decides. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
+Whether a session is cleaned up on its own is the project's `cleanup` setting, per event: `merge` is `auto` by default, `close` is `manual`.
+An `auto` event cleans up when the PR reached it after the session saw the PR draft or open. A PR first seen already merged or closed, or an event set to
+`manual`, sets `cleanup: 'ask'`: the user decides. The safety checks apply in both modes. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
 `Cleanup(id, true)` overrides. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
 agent finished still cleans up, and the row shows the PR merged.
 
@@ -336,8 +337,9 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Settings()` | `Settings` | the app settings: `{theme: "system" \| "light" \| "dark"}` |
+| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", cleanup: {merge, close}}`. `cleanup` is the current project's, each `"auto"` or `"manual"`, the defaults filled in |
 | `SetTheme(theme)` | `Settings` | saves the theme to the config file; `system` removes the key. Rejects any other value |
+| `SetCleanup(event, mode)` | `Settings` | saves the current project's clean-up mode for `merge` or `close` to `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 
 ## Events
 
@@ -400,7 +402,10 @@ projects:
     models:                    # lane -> model and effort of sessions started for an issue there; either key may be left out
       plan: {model: opus}      # the built-in choice: plan runs on opus, every other lane on the project's model
     branch: ""                 # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
-    cleanup: ""                # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
+    remove_worktree: ""        # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
+    cleanup:                   # does the app clean up by itself? The settings panel writes it
+      merge: auto              # auto or manual: after the pull request merged; auto needs the session to have seen it open
+      close: manual            # auto or manual: after the pull request closed unmerged; auto needs the session to have seen it open
     url: ""                    # page a session's browser opens first
     browser: true              # tell sessions about the browser and evidence commands
     digest: weekly             # weekly or off
