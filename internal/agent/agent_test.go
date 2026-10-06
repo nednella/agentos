@@ -41,6 +41,7 @@ func TestClaudeLaunch(t *testing.T) {
 		{"model", Launch{Model: "opus"}, []string{"--model", "opus"}},
 		{"effort", Launch{Effort: "high"}, []string{"--effort", "high"}},
 		{"both", Launch{Model: "sonnet", Effort: "medium"}, []string{"--model", "sonnet", "--effort", "medium"}},
+		{"resume", Launch{Resume: "abc"}, []string{"--resume", "abc"}},
 	}
 	for _, tt := range tests {
 		argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
@@ -51,7 +52,7 @@ func TestClaudeLaunch(t *testing.T) {
 }
 
 func TestPlainIgnoresLaunch(t *testing.T) {
-	argv := Plain{Argv: []string{"bash"}}.Command("p/1", Launch{Model: "opus", Effort: "high"})
+	argv := Plain{Argv: []string{"bash"}}.Command("p/1", Launch{Model: "opus", Effort: "high", Resume: "abc"})
 	if !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
 	}

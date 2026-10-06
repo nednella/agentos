@@ -16,15 +16,16 @@ const (
 
 // Record is what a hook leaves behind: in a state file and on the bus.
 type Record struct {
-	Session string    `json:"session"`
-	State   State     `json:"state"`
-	Event   string    `json:"event"`
-	At      time.Time `json:"at"`
-	Detail  string    `json:"detail,omitempty"`
-	Tool    string    `json:"tool,omitempty"`    // the latest tool call, kept through the prompt it leads to
-	Command string    `json:"command,omitempty"` // that call's shell command
-	Notify  string    `json:"notify,omitempty"`  // notification_type of a Notification
-	Cwd     string    `json:"cwd,omitempty"`     // where the agent was working at the latest event
+	Session      string    `json:"session"`
+	State        State     `json:"state"`
+	Event        string    `json:"event"`
+	At           time.Time `json:"at"`
+	Detail       string    `json:"detail,omitempty"`
+	Tool         string    `json:"tool,omitempty"`         // the latest tool call, kept through the prompt it leads to
+	Command      string    `json:"command,omitempty"`      // that call's shell command
+	Notify       string    `json:"notify,omitempty"`       // notification_type of a Notification
+	Cwd          string    `json:"cwd,omitempty"`          // where the agent was working at the latest event
+	Conversation string    `json:"conversation,omitempty"` // the agent's id for its conversation, to resume it
 
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`
