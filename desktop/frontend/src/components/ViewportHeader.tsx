@@ -23,8 +23,8 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
   return (
     <header className="panel-head flex flex-none flex-col gap-1 px-4 py-2.5 short:py-1.5">
       <div className="flex items-center gap-3">
-        <span className="mono text-title font-semibold text-soft">{session.n}</span>
-        <div className="min-w-0 flex-1">
+        <span className="mono w-4 flex-none text-title font-semibold text-soft">{session.n}</span>
+        <div className="min-w-0">
           {renaming ? (
             <InlineInput
               initial={session.title}
@@ -46,7 +46,10 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
             </h2>
           )}
         </div>
-        <span className="mono flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
+        <span className="contents short:hidden">
+          <StateBadge state={session.state} />
+        </span>
+        <span className="mono ml-auto flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
         {kill.armed ? (
           <span
             className="contents"
@@ -78,8 +81,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </button>
         )}
       </div>
-      <div className="short:hidden flex flex-wrap items-center gap-x-3 gap-y-1.5 pl-[1.625rem]">
-        <StateBadge state={session.state} />
+      <div className="short:hidden pl-7">
         <ModelTag model={session.model} effort={session.effort} />
       </div>
       {kill.armed && (
