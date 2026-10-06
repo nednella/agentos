@@ -28,7 +28,26 @@ The app checks for updates when it starts and every hour; click `Update` in the 
 ## Use
 
 Open `agentos`, add a project folder with `⌘P` → *Add project* (or run `agentos project add` in the
-folder), then press `⌘N` for a session or `Enter` on an issue to start one from it.
+folder), then press `⌘N` for a session or `Enter` on an issue to read it, then start a session from it.
+
+Out of the box the queue is one list of open issues, and each issue has one action, *Start*, which
+types `Work on issue #<n>: <title>` into a new session. To group the queue by label and choose what
+each group offers, set `queue_sections` on the project, for example:
+
+```yaml
+queue_sections:
+  - name: Inbox
+    labels: []                  # issues with no labels
+    actions:
+      - {name: Plan, command: "/plan {n}", model: opus, effort: high}
+      - {name: Work, command: "/work {n}"}
+  - name: Ready
+    labels: [ready]
+    actions:
+      - {name: Work, command: "/work {n}"}
+```
+
+agentos sets no model, effort or command of its own. `docs/contract.md` has the details.
 
 A session's pull request that gets a review, a comment or failing checks flags its row. To also
 send the agent a command, set `on_review` or `on_checks` on the project, for example

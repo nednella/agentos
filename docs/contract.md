@@ -34,7 +34,7 @@ type Session = {
   lastEventAt: number   // unix ms; 0 if none
   createdAt: number     // unix ms
   issue: number         // GitHub issue the session was started for; 0 if none
-  model: string         // model the agent was started with ("sonnet"); "" for an agent other than claude or a session from before the field
+  model: string         // model the agent was started with ("sonnet"); "" when none was set, for an agent other than claude, or for a session from before the field
   effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
   branch: string        // the branch the session works on: the one it reported with `agentos track`, else the one checked out in its working folder; for an issue session with neither, the project's `branch` pattern. The branch its PR was found on, else the newest; "" if none
@@ -71,7 +71,8 @@ type Issue = {
   number: number
   title: string
   type: 'bug' | 'feature' | 'refactor' | 'chore' | ''   // from a type:<x> label
-  lane: 'ready' | 'plan' | 'you' | 'idea' | 'inbox'
+  section: string       // the queue section it is in (see config); "" when the project defines none
+  actions: string[]     // names of what can start a session for it; the first is the default
   url: string
   sessionId: string     // live session started for this issue, else ""
   author: string        // GitHub login, "" if unknown
@@ -237,8 +238,8 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Issues(refresh)` | `Issue[]` | the current project's open issues, cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
-| `StartIssue(number)` | `Session` | opens a session titled `#<n> <short title>` and starts the agent with the model and effort of the issue's lane, or of its `model:` and `effort:` labels, and sends the lane's command once the agent is ready (see config); an issue that has a live session gets that session back |
+| `Issues(refresh)` | `Issue[]` | the current project's open issues, section by section in the order the project lists them (the order GitHub gave inside a section), cached unless `refresh`; rejects with exactly `issues are disabled for this repo` when the repo has issues turned off, and the front end shows that as a notice, not an error |
+| `StartIssue(number, action)` | `Session` | opens a session titled `#<n> <short title>` and starts the agent with the model and effort the action and the issue's labels pick (see config), then types the action's command once the agent is ready, and sends it unless `session_prompt_send` is `manual`. `action` is one of the issue's `actions`; `""` is the first. Rejects an action the issue does not have. An issue that has a live session gets that session back |
 | `IssueDetail(number)` | `IssueDetail` | the issue's body and comments, rendered by GitHub (`gh api` with `Accept: application/vnd.github.html+json`); not cached; rejects when gh cannot read the issue |
 
 ### Pull requests and clean-up (`sessions`)
@@ -289,7 +290,7 @@ Each comment count and each failing commit counts once, remembered in `prs.json`
 | `AddNoteImage(id, base64, mime)` | `Note` | png, jpeg, gif or webp, at most 10 MB; the type is checked against the bytes |
 | `RemoveNoteImage(id, url)` | `Note` | |
 | `NoteToIssue(id)` | | files a GitHub issue, then deletes the note and its pictures; title is the first line, body is `## Description`, a blank line, and the note text; each picture is uploaded with `gh issue create --attach` (gh 2.99 or later) and appended to the body. When gh files the issue but a picture fails to upload, the note is kept and the error names the issue; rejects without a repo |
-| `NoteToSession(id)` | `Session` | starts a session titled with the first line and the project's `note` command typed in |
+| `NoteToSession(id)` | `Session` | starts a session titled with the first line and the project's `note_session_command` typed in (the note itself when unset), sent unless `session_prompt_send` is `manual` |
 
 ### Browser (`browser`)
 
@@ -380,29 +381,19 @@ folders are served. Use the URL in `<img src>`.
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
 agent: claude                  # claude (the default, with hooks) or any command, which runs plain
-model: sonnet                  # model of every Claude session unless a project, lane or issue label says otherwise
-effort: medium                 # low, medium, high, xhigh or max
+session_model: ""              # model of every Claude session unless a project, action or issue label says otherwise; "" leaves it to claude
+session_effort: ""             # low, medium, high, xhigh or max; "" leaves it to claude
 keep_awake: true               # stop the Mac idle-sleeping while a session works; a project may set its own
 theme: dark                    # light or dark; unset follows the macOS appearance. The settings panel writes it
 projects:
   - name: livedocument
     dir: /Users/me/code/livedocument
     # everything below is optional; the values shown are the defaults
-    commands:
-      ready: "/work {n}"       # sent to a session started from a ready issue; {n} is the issue number
-      plan: "/investigate {n}"
-      inbox: ""                # "" sends nothing
-      idea: ""
-      note: "{text}"           # a session started from a note; {text} is the note
-    lanes:                     # GitHub label -> lane; when set it replaces the defaults
-      ready: ready
-      needs-plan: plan
-      needs-human: you
-      idea: idea
-    model: ""                  # this project's model; "" uses the top-level one
-    effort: ""                 # this project's effort; "" uses the top-level one
-    models:                    # lane -> model and effort of sessions started for an issue there; either key may be left out
-      plan: {model: opus}      # the built-in choice: plan runs on opus, every other lane on the project's model
+    queue_sections: []         # the groups of the queue, in order; see below
+    note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
+    session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter
+    session_model: ""          # this project's model; "" uses the top-level one
+    session_effort: ""         # this project's effort; "" uses the top-level one
     branch: ""                 # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
     remove_worktree: ""        # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
     cleanup:                   # does the app clean up by itself? The settings panel writes it
@@ -418,18 +409,40 @@ projects:
     on_checks: ""              # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
 ```
 
-A label that maps to no lane puts an issue in `idea`; an issue with no labels is in `inbox`. When labels map to several lanes the first of
-ready, plan, you, idea wins. Only the lanes `ready`, `plan`, `inbox` and `idea` have a command.
+### Queue sections and actions
+
+`queue_sections` groups the queue and says what a session can start from each group. Each section matches issues by label and lists actions.
+
+```yaml
+queue_sections:
+  - name: Inbox
+    labels: []                  # issues with no labels
+    actions:
+      - {name: Plan, command: "/plan {n}", model: opus, effort: high}
+      - {name: Investigate, command: "/investigate {n}", model: opus}
+      - {name: Work, command: "/work {n}"}
+  - name: Ready
+    labels: [ready]
+    actions:
+      - {name: Work, command: "/work {n}"}
+```
+
+- An issue goes in the first section it matches: it has any of the section's `labels`, or the section's `labels` is empty and the issue has none.
+- An issue no section matches goes in an `Other` section after the last, so no issue is hidden.
+- In a command, `{n}` is the issue number and `{title}` its title. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
+- The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
+- With no `queue_sections` the queue is one list, `Issue.section` is `""`, and each issue has one action, `Start`, which types `Work on issue #<n>: <title>`. A section with no actions has that same action.
+
+The old `lanes`, `commands` and `models` keys, and the built-in model, effort and commands, are gone. They are not read.
 
 ### How a session picks its model
 
 Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets
 a value, model and effort each on their own: the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored); the
-project's `models` entry for the lane; the built-in choice for the lane (`plan` runs on `opus`); the project's `model` and `effort`; the top-level
-`model` and `effort`; then `sonnet` and `medium`. A session started for an issue uses the issue's lane and labels; a new session or one started
-from a note uses the project's own setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`)
-and in the state file of an ended one, so it outlives a restart. `Session.model` and `Session.effort` show it, and each wait in the tally records
-the model.
+action's `model` and `effort`; the project's `session_model` and `session_effort`; the top-level ones. When none sets a value, no flag is passed and
+claude uses its own default. A session started for an issue uses the action and the labels; a new session or one started from a note uses the
+project's setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`) and in the state file of an
+ended one, so it outlives a restart. `Session.model` and `Session.effort` show it ("" when none was set), and each wait in the tally records the model.
 
 ### Keeping the Mac awake
 
