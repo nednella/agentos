@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/nednella/agentos/compare/v0.7.1...v0.8.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** pass {force} to the clean-up command ([f81633f](https://github.com/nednella/agentos/commit/f81633fc53549bb3ae929f190ab9c61cbc318c1b))
+* **desktop:** save text scale, keep awake, browser and digest settings ([0be0a54](https://github.com/nednella/agentos/commit/0be0a54fd2c3648598a9d452ddc4d5748ff024b5))
+* **internal:** add text scale config key and write browser and digest in place ([4ea9480](https://github.com/nednella/agentos/commit/4ea948009ffdfd8d9622ed7136bef6d0327ee384))
+* **ui:** set text size, keep awake, browser and digest in settings ([83b7b3f](https://github.com/nednella/agentos/commit/83b7b3f915e661e3af636c0c2f21903e8d533498))
+* **ui:** use a cog for settings and move it last in the top bar ([23ea56e](https://github.com/nednella/agentos/commit/23ea56ed70057b44cc3b7d8668e6241bfa386be8))
+
+
+### Bug Fixes
+
+* **desktop:** count a failed clean-up command as done when nothing is left ([e7da1a4](https://github.com/nednella/agentos/commit/e7da1a4f989e2809eca6dd9dcb6c57f67dd44502))
+* **desktop:** read the current project from the config ([5f418c5](https://github.com/nednella/agentos/commit/5f418c5ff1fa02799c3d92c21b75b8cff84f2eb0))
+
 ## [0.7.1](https://github.com/nednella/agentos/compare/v0.7.0...v0.7.1) (2026-10-06)
 
 
