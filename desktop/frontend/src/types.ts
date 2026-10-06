@@ -89,6 +89,7 @@ export type Snapshot = {
   sessions: Session[]
   notes: Note[]
   version: string
+  update: string
   shell: string
 }
 
@@ -195,4 +196,5 @@ export type EventMap = {
   'term:data': { id: string; data: string }
   'term:exit': { id: string }
   attention: { id: string; state: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' }
+  update: { version: string }
 }

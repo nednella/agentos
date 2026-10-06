@@ -1,0 +1,30 @@
+name: ci
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/frontend/package-lock.json
+      # The tests' plain agent is bash; macOS's own 3.2 has no bracketed paste, so pasted line breaks would run.
+      - run: brew install tmux bash
+      - run: make desktop-frontend
+      - run: go vet ./...
+      # -p 1: many packages' tests start a real tmux server, real PTYs or a real headless
+      # browser; -p 2 still let a different one of them miss its budget each run on
+      # macos-latest's few vCPUs. One package at a time trades minutes for reliability.
+      - run: go test -race -p 1 ./...

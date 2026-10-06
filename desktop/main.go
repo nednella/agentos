@@ -1,8 +1,9 @@
-// Command desktop is the agentos window.
+// Command desktop is agentos: the app, and the agentos command its hooks and agents call.
 package main
 
 import (
 	"context"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"sync/atomic"
 	"syscall"
 
+	"github.com/nednella/agentos/cli"
 	"github.com/nednella/agentos/desktop/awake"
 	"github.com/nednella/agentos/desktop/devhttp"
 	"github.com/nednella/agentos/desktop/internal/app"
@@ -23,8 +25,11 @@ import (
 )
 
 func main() {
-	if err := launch(); err != nil {
-		log.Fatalf("agentos: %v", err)
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGHUP)
+	defer stop()
+	if err := cli.Execute(ctx, launch); err != nil {
+		fmt.Fprintln(os.Stderr, "agentos:", err)
+		os.Exit(1)
 	}
 }
 
@@ -46,7 +51,11 @@ func launch() error {
 	}
 	if addr := os.Getenv("AGENTOS_HTTP"); addr != "" {
 		hub := devhttp.NewHub()
-		a := app.New(cfg, app.Host{Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil }, Awake: awake.Caffeinate}, run.Exec, run.Stream, run.ExecEnv)
+		a := app.New(cfg, app.Host{
+			Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil },
+			Quit:  func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) },
+			Awake: awake.Caffeinate,
+		}, run.Exec, run.Stream, run.ExecEnv)
 		quitOnSignal(a)
 		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: a.Stop, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
 	}
@@ -65,6 +74,11 @@ func launch() error {
 		},
 		PickDir: func() (string, error) {
 			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Add a project folder", CanCreateDirectories: true})
+		},
+		Quit: func() {
+			if c := window.Load(); c != nil {
+				runtime.Quit(*c)
+			}
 		},
 		Awake: awake.Caffeinate,
 	}, run.Exec, run.Stream, run.ExecEnv)

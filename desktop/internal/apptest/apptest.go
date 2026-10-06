@@ -42,6 +42,8 @@ type Recorder struct {
 	events []recorded
 	clips  []string
 	pick   string // what the folder picker returns
+	quits  int
+	opened []string // the bundles a relaunch asked to open
 }
 
 type recorded struct {
@@ -59,6 +61,35 @@ func (r *Recorder) Picker() (string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.pick, nil
+}
+
+// Quit is the host's Quit: it counts.
+func (r *Recorder) Quit() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.quits++
+}
+
+// Quits is how many times the app asked to quit.
+func (r *Recorder) Quits() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.quits
+}
+
+// Relaunch stands in for opening the bundle again: it only records the path.
+func (r *Recorder) Relaunch(bundle string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.opened = append(r.opened, bundle)
+	return nil
+}
+
+// Relaunched is the bundles a relaunch asked to open.
+func (r *Recorder) Relaunched() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.opened)
 }
 
 // Awake takes no assertion: a test must not keep the machine awake.
@@ -253,6 +284,7 @@ type FakeGH struct {
 	Create    string        // what gh issue create prints
 	CreateErr error         // what gh issue create fails with, if set; it still prints Create
 	Delay     time.Duration // how long gh issue create takes
+	Releases  string        // what the releases API answers; "" fails the check
 	pr        string        // what gh pr list prints
 	PRErr     error         // what gh pr list fails with, if set
 	IssuesErr error         // what gh issue list fails with, if set
@@ -263,6 +295,9 @@ type FakeGH struct {
 }
 
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
+	if name == "curl" {
+		return f.curl(args)
+	}
 	if name != "gh" {
 		return run.Exec(ctx, dir, name, args...)
 	}
@@ -323,6 +358,17 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		]`), nil
 	}
 	return nil, fmt.Errorf("unexpected %s %v", name, args)
+}
+
+// curl answers the release check with Releases, as GitHub's API would, and refuses anything else.
+func (f *FakeGH) curl(args []string) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, "curl "+strings.Join(args, " "))
+	if f.Releases == "" || !strings.HasSuffix(args[len(args)-1], "/releases/latest") {
+		return nil, fmt.Errorf("curl: no network in tests: %v", args)
+	}
+	return []byte(f.Releases), nil
 }
 
 func (f *FakeGH) IssueCalls() int { return f.Calls("issue list") }
@@ -436,6 +482,9 @@ type Options struct {
 	TopExtra     string        // yaml lines added at the top of the config
 	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
 	DigestTick   time.Duration
+	UpdateTick   time.Duration // how often to check the releases; an hour by default, and an hour before the first check
+	Releases     string        // what the releases API answers; "" fails the check
+	Version      string        // the version the app believes it runs; "dev" by default
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -485,7 +534,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_DIR", dir)
 	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
 
-	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
+	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{Releases: o.Releases}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
 	h.App = h.build(t)
 	h.App.Sessions().SetPrefillWait(300 * time.Millisecond)
 	first, tick := o.DigestFirst, o.DigestTick
@@ -493,6 +542,15 @@ func NewWith(t *testing.T, o Options) *Harness {
 		first, tick = time.Hour, time.Hour
 	}
 	h.App.Digests().SetLoop(first, tick) // a test must never start the real claude
+	if o.UpdateTick == 0 {
+		h.App.Updates().SetLoop(time.Hour, time.Hour)
+	} else {
+		h.App.Updates().SetLoop(0, o.UpdateTick)
+	}
+	if o.Version != "" {
+		h.App.Updates().SetVersion(o.Version)
+	}
+	h.App.Updates().SetRelaunch(h.Rec.Relaunch)
 	ctx, cancel := context.WithCancel(context.Background())
 	if err := h.App.Start(ctx); err != nil {
 		t.Fatal(err)
@@ -513,7 +571,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 	if err != nil {
 		t.Fatal(err)
 	}
-	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker, Awake: h.Rec.Awake}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
+	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker, Quit: h.Rec.Quit, Awake: h.Rec.Awake}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
 	for _, svc := range a.Services() {
 		switch s := svc.(type) {
 		case *projects.Service:
@@ -597,7 +655,8 @@ var (
 	cliErr  error
 )
 
-// CLIPath builds the agentos command from this checkout, so hooks run the code under test.
+// CLIPath builds the agentos command from this checkout, so hooks run the code under test. It is
+// the app's binary with a stub page in place of the front end.
 func CLIPath(t *testing.T) string {
 	t.Helper()
 	cliOnce.Do(func() {
@@ -607,7 +666,7 @@ func CLIPath(t *testing.T) string {
 		cliBin = filepath.Join(cliDir, "agentos")
 		_, file, _, _ := runtime.Caller(0)
 		root := filepath.Join(filepath.Dir(file), "..", "..", "..")
-		cmd := exec.Command("go", "build", "-o", cliBin, ".")
+		cmd := exec.Command("go", "build", "-tags", "stub", "-o", cliBin, "./desktop")
 		cmd.Dir = root
 		if out, err := cmd.CombinedOutput(); err != nil {
 			cliErr = fmt.Errorf("building the agentos command: %w: %s", err, out)

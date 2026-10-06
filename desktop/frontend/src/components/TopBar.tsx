@@ -31,7 +31,7 @@ function Count({ state, count, label, condensed }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseen, awake, report } = useAgentos()
+  const { project, projects, sessions, setOverlay, digestUnseen, awake, report, update, updating, applyUpdate } = useAgentos()
   const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
@@ -86,6 +86,11 @@ export function TopBar() {
         )}
       </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
+        {update && (
+          <button className="btn btn-accent" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
+            {updating ? 'Updating…' : width >= NEXT_FULL_MIN ? `v${update} available · Update` : 'Update'}
+          </button>
+        )}
         {awake && (
           <span
             className="grid h-8 w-8 place-items-center text-soft"

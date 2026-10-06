@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -19,6 +20,7 @@ var snapshotJS string
 const (
 	loadLimit    = 30 * time.Second
 	waitForLimit = 10 * time.Second
+	scrollSettle = 2 * time.Second
 	maxTextOut   = 20000
 )
 
@@ -374,10 +376,25 @@ func (t *tab) scroll(ctx context.Context, args []string) (string, error) {
 		if dir == "up" {
 			pixels = -pixels
 		}
+		before, err := t.eval(ctx, `scrollY`)
+		if err != nil {
+			return "", err
+		}
 		if _, err := t.call(ctx, "Input.dispatchMouseEvent", map[string]any{"type": "mouseWheel", "x": w / 2, "y": h / 2, "deltaX": 0, "deltaY": pixels}); err != nil {
 			return "", err
 		}
-		time.Sleep(150 * time.Millisecond)
+		// The page scrolls after the wheel event returns, later on a busy machine: wait until it has moved and stopped.
+		for last, deadline := before, time.Now().Add(scrollSettle); time.Now().Before(deadline); {
+			time.Sleep(50 * time.Millisecond)
+			now, err := t.eval(ctx, `scrollY`)
+			if err != nil {
+				return "", err
+			}
+			if !bytes.Equal(now, before) && bytes.Equal(now, last) {
+				break
+			}
+			last = now
+		}
 	} else if _, err := t.elementBox(ctx, dir); err != nil {
 		return "", err
 	}

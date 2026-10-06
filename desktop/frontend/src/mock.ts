@@ -129,6 +129,7 @@ export function createMock(params: URLSearchParams) {
     toast: params.has('toast'),
     done: params.has('done'),
     warn: params.has('warn'),
+    update: params.has('update'),
   }
   const handlers = new Map<string, Set<Handler>>()
   const sessions: MockSession[] = []
@@ -245,6 +246,7 @@ export function createMock(params: URLSearchParams) {
       sessions: currentSessions(),
       notes: currentNotes(),
       version: 'mock',
+      update: flags.update ? '1.4.0' : '',
       shell: shells.get(current.name)?.id ?? '',
     }
   }
@@ -936,6 +938,10 @@ export function createMock(params: URLSearchParams) {
     DismissDigestItem: async (itemId: string) => {
       digest = { ...digest, items: digest.items.filter((i) => i.id !== itemId) }
       pushDigest()
+    },
+    Update: async () => {
+      await delay(undefined, 2500)
+      throw 'The mock cannot relaunch'
     },
     OpenURL: async (url: string) => {
       window.open(url, '_blank')
