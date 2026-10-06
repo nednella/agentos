@@ -13,7 +13,7 @@ var repoName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 const readmeTemplate = "<div align=\"center\">\n  <h3><b>%s</b></h3>\n</div>\n"
 
 // NewProject asks where to put a new folder called name, starts a git repository in it with a
-// README, creates the private GitHub repo as its origin, and makes it the current project.
+// README, creates the public GitHub repo as its origin, and makes it the current project.
 func (s *Service) NewProject(name string) (Snapshot, error) {
 	name = strings.TrimSpace(name)
 	if !repoName.MatchString(name) || strings.Trim(name, ".") == "" {
@@ -34,7 +34,7 @@ func (s *Service) NewProject(name string) (Snapshot, error) {
 		_ = os.RemoveAll(dir)
 		return Snapshot{}, err
 	}
-	if _, err := s.run(s.ctx(), dir, "gh", "repo", "create", name, "--private", "--source", ".", "--push"); err != nil {
+	if _, err := s.run(s.ctx(), dir, "gh", "repo", "create", name, "--public", "--source", ".", "--push"); err != nil {
 		return Snapshot{}, fmt.Errorf("%s is ready but its GitHub repo is not: %w", dir, err)
 	}
 	return s.AddProjectDir(dir)

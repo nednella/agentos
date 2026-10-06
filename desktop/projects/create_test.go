@@ -29,7 +29,7 @@ func TestNewProject(t *testing.T) {
 	if !exists(filepath.Join(dir, ".git")) {
 		t.Error("no git repository")
 	}
-	if h.GH.Calls("repo create fresh --private --source . --push") != 1 {
+	if h.GH.Calls("repo create fresh --public --source . --push") != 1 {
 		t.Errorf("gh calls = %q", h.GH.CallLog())
 	}
 
