@@ -100,9 +100,15 @@ export type CleanupSettings = { merge: CleanupMode; close: CleanupMode }
 
 export type CleanupEvent = keyof CleanupSettings
 
+export type DigestSchedule = 'weekly' | 'off'
+
 export type Settings = {
   theme: ThemeSetting
+  textScale: number
+  keepAwake: boolean
   cleanup: CleanupSettings
+  browserEnabled: boolean
+  digestSchedule: DigestSchedule
 }
 
 export type WaitKind = 'permission' | 'question' | 'idle'

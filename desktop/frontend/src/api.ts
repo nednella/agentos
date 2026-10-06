@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, EventMap, Evidence, Issue, IssueDetail, Note, Session, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -56,6 +56,10 @@ type Backend = {
   Settings(): Promise<Settings>
   SetTheme(theme: ThemeSetting): Promise<Settings>
   SetCleanup(event: CleanupEvent, mode: CleanupMode): Promise<Settings>
+  SetTextScale(scale: number): Promise<Settings>
+  SetKeepAwake(on: boolean): Promise<Settings>
+  SetBrowserEnabled(on: boolean): Promise<Settings>
+  SetDigestSchedule(schedule: DigestSchedule): Promise<Settings>
 }
 
 type Unsubscribe = () => void
@@ -85,7 +89,7 @@ const namespaces = {
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   update: ['Update'],
   awake: ['Awake'],
-  settings: ['Settings', 'SetTheme', 'SetCleanup'],
+  settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetBrowserEnabled', 'SetDigestSchedule'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -162,6 +166,10 @@ export const api = {
   settings: () => backend.Settings(),
   setTheme: (theme: ThemeSetting) => backend.SetTheme(theme),
   setCleanup: (event: CleanupEvent, mode: CleanupMode) => backend.SetCleanup(event, mode),
+  setTextScale: (scale: number) => backend.SetTextScale(scale),
+  setKeepAwake: (on: boolean) => backend.SetKeepAwake(on),
+  setBrowserEnabled: (on: boolean) => backend.SetBrowserEnabled(on),
+  setDigestSchedule: (schedule: DigestSchedule) => backend.SetDigestSchedule(schedule),
   digest: () => backend.Digest(),
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),

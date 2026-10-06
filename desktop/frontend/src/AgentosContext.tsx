@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -94,6 +94,10 @@ export type Agentos = {
   setOverlay(overlay: Overlay): void
   setTheme(theme: ThemeSetting): Promise<void>
   setCleanup(event: CleanupEvent, mode: CleanupMode): Promise<void>
+  setTextScale(scale: number): Promise<void>
+  setKeepAwake(on: boolean): Promise<void>
+  setBrowserEnabled(on: boolean): Promise<void>
+  setDigestSchedule(schedule: DigestSchedule): Promise<void>
   setComposing(open: boolean): void
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
@@ -145,7 +149,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
-  const [settings, setSettings] = useState<Settings>({ theme: 'system', cleanup: { merge: 'auto', close: 'manual' } })
+  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, browserEnabled: true, digestSchedule: 'weekly' })
   const [shellId, setShellId] = useState('')
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
@@ -638,6 +642,18 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async setCleanup(event, mode) {
         setSettings(await api.setCleanup(event, mode))
+      },
+      async setTextScale(scale) {
+        setSettings(await api.setTextScale(scale))
+      },
+      async setKeepAwake(on) {
+        setSettings(await api.setKeepAwake(on))
+      },
+      async setBrowserEnabled(on) {
+        setSettings(await api.setBrowserEnabled(on))
+      },
+      async setDigestSchedule(schedule) {
+        setSettings(await api.setDigestSchedule(schedule))
       },
       setComposing,
       setIssueFilter(query) {
