@@ -156,11 +156,15 @@ func TestNoteToSession(t *testing.T) {
 
 func TestNoteToSessionKeepsLineBreaksUnsent(t *testing.T) {
 	h := newHarness(t)
+	// Pasted before bash's prompt, the line breaks would run: type only once the session reports ready.
+	h.App.Sessions().SetPrefillWait(time.Minute)
 	n, _ := h.AddNote("first line\nsecond line")
 	s, err := h.NoteToSession(n.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
+	eventually(t, "the shell's prompt", func() bool { return strings.HasSuffix(strings.TrimSpace(h.Pane(t, s.ID)), "$") })
+	h.Hook(t, s.ID, "SessionStart", `{}`)
 	eventually(t, "both lines typed", func() bool {
 		pane := h.Pane(t, s.ID)
 		return strings.Contains(pane, "first line") && strings.Contains(pane, "second line")
