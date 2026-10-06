@@ -140,16 +140,30 @@ func TestProjects(t *testing.T) {
 				t.Errorf("the removed project is still listed: %+v", p)
 			}
 		}
-		if _, err := h.SwitchProject("other"); err != nil {
-			t.Fatal(err)
-		}
-		if snap, err = h.RemoveProject("other"); err != nil || snap.Project.Name == "other" {
-			t.Errorf("removing the current project that is not in the config = %+v, %v", snap.Project, err)
-		}
 		if _, err := h.RemoveProject("nope"); err == nil {
 			t.Error("removing an unknown project succeeded")
 		}
 	})
+}
+
+func TestRemoveCurrentProjectOutsideTheConfig(t *testing.T) {
+	h := newHarness(t)
+	home := filepath.Join(t.TempDir(), "home")
+	if err := os.Mkdir(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENTOS_DIR", home)
+	h = h.Restart(t)
+	if got := h.Snapshot().Project.Name; got != "home" {
+		t.Fatalf("current project = %q, want the unlisted home", got)
+	}
+	snap, err := h.RemoveProject("home")
+	if err != nil || snap.Project.Name != "main" {
+		t.Errorf("RemoveProject = %+v, %v", snap.Project, err)
+	}
+	if _, err := h.RemoveProject("nope"); err == nil {
+		t.Error("removing an unknown project succeeded")
+	}
 }
 
 func TestRegistryKeepAwake(t *testing.T) {
