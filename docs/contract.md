@@ -104,7 +104,7 @@ type Snapshot = {
   project: Project      // project.key says which project the rest is about; drop events of another key
   projects: Project[]   // every known project: configured, current, and any with live sessions
   sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
-  shell: string         // the current project's shell session id ("<key>/shell"), "" until ShellOpen
+  shells: string[]      // the current project's shell session ids in tab order ("<key>/shell", "<key>/shell-2", ...), empty until ShellOpen
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
   version: string       // the running version: "1.2.3", or "dev" for a local build
   update: string        // the version of a newer release, "" when the app is current
@@ -223,7 +223,9 @@ type Digest = {
 | `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | rejects the shell |
 | `TypeInto(id, text)` | | types text into the prompt, not sent; line breaks cannot submit it |
-| `ShellOpen()` | `{ id: string }` | makes sure the current project has a shell session (`$SHELL -l` in the project folder, kept in the hidden tmux, with `AGENTOS_PROJECT` and `AGENTOS_SOCKET` set and no `AGENTOS_SESSION`) and returns its id; attach with `TermOpen` like any session. It is not a session: not in `sessions`, the counts, clean-up or the hook states |
+| `ShellOpen()` | `{ id: string }` | makes sure the current project has a shell session and returns the first one's id. A shell runs (`$SHELL -l` in the project folder, kept in the hidden tmux, with `AGENTOS_PROJECT` and `AGENTOS_SOCKET` set and no `AGENTOS_SESSION`); attach with `TermOpen` like any session. It is not a session: not in `sessions`, the counts, clean-up or the hook states |
+| `ShellNew()` | `{ id: string }` | starts another shell in the current project, numbered with the lowest free number, and returns its id |
+| `ShellClose(id)` | | stops one shell; rejects an agent session |
 
 ### Terminal (`terminal`)
 
