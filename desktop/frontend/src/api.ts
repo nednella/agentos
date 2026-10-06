@@ -47,7 +47,6 @@ type Backend = {
   BrowserClose(id: string): Promise<void>
   Evidence(id: string): Promise<Evidence[]>
   DeleteEvidence(id: string, evidenceId: string): Promise<void>
-  HarnessCheck(): Promise<Session>
   Digest(): Promise<Digest>
   RunDigest(): Promise<void>
   DigestToNote(itemId: string): Promise<Note>
@@ -73,7 +72,7 @@ declare global {
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'RemoveProject'],
-  sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'HarnessCheck', 'ShellOpen'],
+  sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
@@ -155,7 +154,6 @@ export const api = {
   browserClose: (id: string) => backend.BrowserClose(id),
   evidence: (id: string) => backend.Evidence(id),
   deleteEvidence: (id: string, evidenceId: string) => backend.DeleteEvidence(id, evidenceId),
-  harnessCheck: () => backend.HarnessCheck(),
   awake: () => backend.Awake(),
   digest: () => backend.Digest(),
   runDigest: () => backend.RunDigest(),

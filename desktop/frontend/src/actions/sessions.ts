@@ -108,16 +108,6 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
       return `Cleaned up ${describe(target)}`
     },
   },
-  {
-    id: 'harness',
-    label: "Check this project's harness",
-    group: 'Projects',
-    uiCommand: 'harness',
-    async run() {
-      await a.harnessCheck()
-      return 'Started the harness check'
-    },
-  },
   ...Array.from({ length: 9 }, (_, i): Action => {
     const n = i + 1
     return {

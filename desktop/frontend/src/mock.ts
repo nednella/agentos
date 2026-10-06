@@ -912,8 +912,6 @@ export function createMock(params: URLSearchParams) {
       publish()
       emit('evidence', { id, items })
     },
-    HarnessCheck: async () =>
-      startSessionFor('Harness check', 0, "Review this project's harness (commands, agents, skills, hooks, permission rules) against current Claude Code and the interruption stats."),
     Digest: async () => ({ ...digest, items: digest.items.map((i) => ({ ...i })) }),
     RunDigest: async () => {
       if (digest.running) throw 'A digest run is already in progress'

@@ -1,4 +1,3 @@
-import { useAgentos } from '../AgentosContext'
 import { duration } from '../time'
 import { KIND_COLOR, KIND_LABEL } from '../statsMeta'
 import type { Stats } from '../types'
@@ -7,7 +6,6 @@ import type { Stats } from '../types'
 type StatsBarsProps = { stats: Stats }
 
 export function StatsBars({ stats }: StatsBarsProps) {
-  const { harnessCheck, report } = useAgentos()
   const top = Math.max(...stats.byCause.map((c) => c.count), 1)
   const topDay = Math.max(...stats.byDay.map((d) => d.count), 1)
   const labelEvery = Math.ceil(stats.byDay.length / 7)
@@ -15,12 +13,7 @@ export function StatsBars({ stats }: StatsBarsProps) {
   return (
     <>
       <section>
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
-          <h3 className="label">Causes, most frequent first</h3>
-          <button className="btn h-7" onClick={() => report(harnessCheck)}>
-            See what the harness could fix
-          </button>
-        </div>
+        <h3 className="label pb-2">Causes, most frequent first</h3>
         <ul className="flex flex-col gap-2.5">
           {stats.byCause.map((cause) => (
             <li key={cause.label} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1">
