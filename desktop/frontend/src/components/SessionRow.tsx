@@ -5,6 +5,7 @@ import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { CleanupControls } from './CleanupControls'
 import { Icon } from './Icon'
+import { ModelTag } from './ModelTag'
 import { PRBadge } from './PRBadge'
 import { StateDot } from './StateDot'
 import { Timeline } from './Timeline'
@@ -41,11 +42,11 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
         </span>
         {!compact && !dense && (
-          <span
-            className="mono w-full truncate pl-[1.625rem] text-small"
-            style={{ color: waiting ? 'var(--waiting)' : 'var(--text-dim)' }}
-          >
-            {session.detail || STATE_LABEL[session.state]}
+          <span className="flex w-full items-center gap-2 pl-[1.625rem]">
+            <span className="mono min-w-0 flex-1 truncate text-small" style={{ color: waiting ? 'var(--waiting)' : 'var(--text-dim)' }}>
+              {session.detail || STATE_LABEL[session.state]}
+            </span>
+            <ModelTag model={session.model} effort={session.effort} />
           </span>
         )}
         {!dense && (

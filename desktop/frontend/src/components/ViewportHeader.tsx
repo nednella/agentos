@@ -4,6 +4,7 @@ import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
+import { ModelTag } from './ModelTag'
 import { PRBadge } from './PRBadge'
 import { StateBadge } from './StateBadge'
 
@@ -51,6 +52,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
               {session.title}
             </h2>
           )}
+          <ModelTag model={session.model} effort={session.effort} />
           <span className="contents short:hidden">
             <StateBadge state={session.state} />
             <PRBadge session={session} />

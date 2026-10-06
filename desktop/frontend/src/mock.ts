@@ -77,6 +77,7 @@ function seedWaits(titles: [string, number][]): Wait[] {
       waits.push({
         sessionTitle,
         issue,
+        model: 'sonnet',
         kind: cause.kind,
         label: cause.label,
         startedAt: now - d * 86_400_000 - Math.floor(random() * 9 * 3_600_000),
@@ -161,6 +162,8 @@ export function createMock(params: URLSearchParams) {
       lastEventAt: s.lastEventAt,
       createdAt: s.createdAt,
       issue: s.issue,
+      model: s.model,
+      effort: s.effort,
       history: s.history.map((h) => ({ ...h })),
       branch: s.branch,
       worktree: s.worktree,
@@ -262,6 +265,15 @@ export function createMock(params: URLSearchParams) {
     return found
   }
 
+  function modelFor(owner: ProjectData, issue: number) {
+    const found = owner.issues.find((i) => i.number === issue)
+    const labelled = (key: string) => found?.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1)
+    return {
+      model: labelled('model') ?? (found?.lane === 'plan' ? 'opus' : 'sonnet'),
+      effort: labelled('effort') ?? 'medium',
+    }
+  }
+
   function create(
     title: string,
     issue: number,
@@ -279,6 +291,7 @@ export function createMock(params: URLSearchParams) {
       lastEventAt: history.at(-1)?.at ?? 0,
       createdAt,
       issue,
+      ...modelFor(owner, issue),
       history,
       branch: issue ? `issue-${issue}` : '',
       worktree: issue ? `${owner.dir}/trees/issue-${issue}` : '',
@@ -361,7 +374,7 @@ export function createMock(params: URLSearchParams) {
     const permission = s.detail.includes('permission')
     const kind: WaitKind = s.state === 'idle' ? 'idle' : permission ? 'permission' : 'question'
     const label = { permission: 'Bash: npx tsc --noEmit', question: 'Question', idle: 'Reply landed' }[kind]
-    owner(s).waits.unshift({ sessionTitle: s.title, issue: s.issue, kind, label, startedAt: at, waitedMs: 0 })
+    owner(s).waits.unshift({ sessionTitle: s.title, issue: s.issue, model: s.model, kind, label, startedAt: at, waitedMs: 0 })
   }
 
   function setState(s: MockSession, state: State) {
