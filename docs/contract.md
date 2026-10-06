@@ -445,7 +445,7 @@ All files are written by writing a temp file and renaming it into place; folders
 
 `AGENTOS_CONFIG`, `AGENTOS_STATE_DIR` (state dir), `AGENTOS_DATA_DIR` (replaces both data locations), `AGENTOS_TMUX_SOCKET` (default `agentos`),
 `AGENTOS_DIR` (the project folder to start in instead of the current folder), `AGENTOS_HTTP` (browser mode), `AGENTOS_BROWSER` (path of the
-browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
+browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, and for a session started for an issue `AGENTOS_ISSUE` (its number). In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. It runs on the first agent that is installed and signed in, found without spending a request (`claude auth status` exits 0 when signed in); only `claude` is supported so far. With none, the digest's `error` says so. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
 The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`, the two

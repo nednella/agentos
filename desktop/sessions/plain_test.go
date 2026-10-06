@@ -3,8 +3,10 @@ package sessions_test
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
@@ -205,4 +207,18 @@ func TestIssueSessionWithoutBranchPatternFollowsItsFolder(t *testing.T) {
 	if got, _ := h.Session(s.ID); got.Branch != "my-fix" {
 		t.Errorf("session = %+v", got)
 	}
+}
+
+func TestIssueSessionKnowsItsIssue(t *testing.T) {
+	h := newHarness(t)
+	s := issueSession(h, t, 9)
+	if err := h.TypeInto(s.ID, "echo issue=$AGENTOS_ISSUE"); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("tmux", "-L", h.Socket, "send-keys", "-t", s.ID, "Enter").CombinedOutput(); err != nil {
+		t.Fatalf("pressing Enter: %v: %s", err, out)
+	}
+	eventually(t, "the issue number in the session's environment", func() bool {
+		return strings.Contains(h.Pane(t, s.ID), "issue=9")
+	})
 }
