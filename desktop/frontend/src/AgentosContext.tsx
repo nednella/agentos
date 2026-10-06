@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -93,6 +93,7 @@ export type Agentos = {
   setNoteDraft(text: string): void
   setOverlay(overlay: Overlay): void
   setTheme(theme: ThemeSetting): Promise<void>
+  setCleanup(event: CleanupEvent, mode: CleanupMode): Promise<void>
   setComposing(open: boolean): void
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
@@ -144,7 +145,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
-  const [settings, setSettings] = useState<Settings>({ theme: 'system' })
+  const [settings, setSettings] = useState<Settings>({ theme: 'system', cleanup: { merge: 'auto', close: 'manual' } })
   const [shellId, setShellId] = useState('')
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
@@ -293,6 +294,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     report(async () => setAwake(await api.awake()))
     report(async () => setSettings(await api.settings()))
   }, [enterFrom, report])
+
+  // The project's settings follow the current project, which can change while the panel is shut.
+  useEffect(() => {
+    if (overlay === 'settings') report(async () => setSettings(await api.settings()))
+  }, [overlay, report])
 
   // Events of a project can arrive after a switch to another one.
   const ifCurrent =
@@ -629,6 +635,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setOverlay,
       async setTheme(theme) {
         setSettings(await api.setTheme(theme))
+      },
+      async setCleanup(event, mode) {
+        setSettings(await api.setCleanup(event, mode))
       },
       setComposing,
       setIssueFilter(query) {

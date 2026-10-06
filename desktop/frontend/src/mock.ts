@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues } from './mockIssues'
 import { handleInput, newPage, normalizeUrl, pageRects, pageTitle, renderPage } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserInput, BrowserState, Cleanup, Digest, DigestItem, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -649,7 +649,7 @@ export function createMock(params: URLSearchParams) {
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
-  let settings: Settings = { theme: 'system' }
+  let settings: Settings = { theme: 'system', cleanup: { merge: 'auto', close: 'manual' } }
 
   const backend = {
     Snapshot: async () => snapshot(),
@@ -949,7 +949,11 @@ export function createMock(params: URLSearchParams) {
     },
     Settings: async () => settings,
     SetTheme: async (theme: ThemeSetting) => {
-      settings = { theme }
+      settings = { ...settings, theme }
+      return settings
+    },
+    SetCleanup: async (event: CleanupEvent, mode: CleanupMode) => {
+      settings = { ...settings, cleanup: { ...settings.cleanup, [event]: mode } }
       return settings
     },
     Update: async () => {

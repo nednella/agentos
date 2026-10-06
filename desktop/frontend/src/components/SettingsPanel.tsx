@@ -1,13 +1,19 @@
 import type { ReactNode } from 'react'
 import { useAgentos } from '../AgentosContext'
-import type { ThemeSetting } from '../types'
+import type { CleanupMode, ThemeSetting } from '../types'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
+import { SegmentedControl } from './SegmentedControl'
 
 const THEMES: { value: ThemeSetting; label: string }[] = [
   { value: 'system', label: 'System' },
   { value: 'light', label: 'Light' },
   { value: 'dark', label: 'Dark' },
+]
+
+const MODES: { value: CleanupMode; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'manual', label: 'Manual' },
 ]
 
 type SettingRowProps = { label: string; hint: string; children: ReactNode }
@@ -25,7 +31,7 @@ function SettingRow({ label, hint, children }: SettingRowProps) {
 }
 
 export function SettingsPanel() {
-  const { overlay, setOverlay, settings, setTheme, report } = useAgentos()
+  const { overlay, setOverlay, project, settings, setTheme, setCleanup, report } = useAgentos()
   if (overlay !== 'settings') return null
 
   return (
@@ -37,20 +43,19 @@ export function SettingsPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
         <h3 className="label pb-0.5">App</h3>
         <SettingRow label="Theme" hint="System follows the macOS appearance.">
-          <div role="group" aria-label="Theme" className="flex flex-none overflow-hidden rounded-md border border-line-strong">
-            {THEMES.map(({ value, label }) => (
-              <button
-                key={value}
-                aria-pressed={settings.theme === value}
-                className="h-7 px-3 text-small font-medium"
-                style={{ background: settings.theme === value ? 'var(--bg-hover)' : 'transparent', color: settings.theme === value ? 'var(--text)' : 'var(--text-soft)' }}
-                onClick={() => report(() => setTheme(value))}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl label="Theme" options={THEMES} value={settings.theme} onChange={(value) => report(() => setTheme(value))} />
         </SettingRow>
+        {project && (
+          <>
+          <h3 className="label mt-3 pb-0.5">{project.name}</h3>
+          <SettingRow label="Clean up after a merge" hint="Auto removes the worktree and branch. Manual asks first. Unsaved or unpushed work always blocks.">
+            <SegmentedControl label="Clean up after a merge" options={MODES} value={settings.cleanup.merge} onChange={(value) => report(() => setCleanup('merge', value))} />
+          </SettingRow>
+          <SettingRow label="Clean up after a close" hint="Auto cleans up when you close the pull request. Manual asks first.">
+            <SegmentedControl label="Clean up after a close" options={MODES} value={settings.cleanup.close} onChange={(value) => report(() => setCleanup('close', value))} />
+          </SettingRow>
+          </>
+        )}
       </div>
     </Overlay>
   )
