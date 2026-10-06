@@ -53,39 +53,93 @@ func (r *Registry) Theme() string {
 
 // SetTheme saves the theme; "" makes the app follow the system.
 func (r *Registry) SetTheme(theme string) error {
+	return r.edit(func(c *project.Config) error {
+		c.Theme = theme
+		return nil
+	})
+}
+
+// TextScale is the configured text size, 0 when the app uses its default.
+func (r *Registry) TextScale() float64 {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	next := r.cfg
-	next.Theme = theme
-	if err := project.Save(r.path, next); err != nil {
-		return err
-	}
-	r.cfg = next
-	return nil
+	return r.cfg.TextScale
+}
+
+// SetTextScale saves the text size; 0 makes the app use its default.
+func (r *Registry) SetTextScale(scale float64) error {
+	return r.edit(func(c *project.Config) error {
+		c.TextScale = scale
+		return nil
+	})
+}
+
+// KeepsAwake is the config's own choice on idle sleep, which a project may override.
+func (r *Registry) KeepsAwake() bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cfg.KeepsAwake(project.Project{})
+}
+
+// SetKeepAwake saves whether a working session holds off idle sleep.
+func (r *Registry) SetKeepAwake(on bool) error {
+	return r.edit(func(c *project.Config) error {
+		c.KeepAwake = &on
+		return nil
+	})
 }
 
 // Cleanup is the project's clean-up settings, the defaults filled in. A project that is not configured has the defaults.
 func (r *Registry) Cleanup(key string) project.Cleanup {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	i := r.index(key)
-	if i < 0 {
-		return project.Cleanup{}.Resolved()
-	}
-	return r.cfg.Projects[i].CleanupMode.Resolved()
+	return r.project(key).CleanupMode.Resolved()
 }
 
 // SetCleanup saves how the project cleans up after an event, "merge" or "close", to "auto" or "manual".
 func (r *Registry) SetCleanup(key, event, mode string) error {
+	return r.editProject(key, func(p *project.Project) error { return p.CleanupMode.Set(event, mode) })
+}
+
+// BrowserEnabled says whether the project's sessions get the browser. A project that is not configured has the default.
+func (r *Registry) BrowserEnabled(key string) bool { return r.project(key).BrowserOn() }
+
+// SetBrowserEnabled saves whether the project's sessions get the browser and evidence commands.
+func (r *Registry) SetBrowserEnabled(key string, on bool) error {
+	return r.editProject(key, func(p *project.Project) error {
+		p.Browser = &on
+		return nil
+	})
+}
+
+// DigestSchedule is the project's digest schedule, the default filled in. A project that is not configured has the default.
+func (r *Registry) DigestSchedule(key string) string { return r.project(key).DigestSchedule() }
+
+// SetDigestSchedule saves the project's digest schedule, "weekly" or "off".
+func (r *Registry) SetDigestSchedule(key, schedule string) error {
+	if schedule != project.DigestWeekly && schedule != project.DigestOff {
+		return fmt.Errorf("digest schedule must be %s or %s, not %q", project.DigestWeekly, project.DigestOff, schedule)
+	}
+	return r.editProject(key, func(p *project.Project) error {
+		p.Digest = schedule
+		return nil
+	})
+}
+
+// project is the configured project of the key, or the zero project.
+func (r *Registry) project(key string) project.Project {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	i := r.index(key)
-	if i < 0 {
-		return fmt.Errorf("project %s is not in the config", key)
+	if i := r.index(key); i >= 0 {
+		return r.cfg.Projects[i]
 	}
+	return project.Project{}
+}
+
+// edit applies change to a copy of the config, saves it, and keeps it only when the save worked.
+func (r *Registry) edit(change func(*project.Config) error) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	next := r.cfg
-	next.Projects = slices.Clone(r.cfg.Projects)
-	if err := next.Projects[i].CleanupMode.Set(event, mode); err != nil {
+	if err := change(&next); err != nil {
 		return err
 	}
 	if err := project.Save(r.path, next); err != nil {
@@ -93,6 +147,17 @@ func (r *Registry) SetCleanup(key, event, mode string) error {
 	}
 	r.cfg = next
 	return nil
+}
+
+func (r *Registry) editProject(key string, change func(*project.Project) error) error {
+	return r.edit(func(c *project.Config) error {
+		i := r.index(key)
+		if i < 0 {
+			return fmt.Errorf("project %s is not in the config", key)
+		}
+		c.Projects = slices.Clone(c.Projects)
+		return change(&c.Projects[i])
+	})
 }
 
 func (r *Registry) index(key string) int {

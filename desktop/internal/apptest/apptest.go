@@ -821,6 +821,22 @@ func (h *Harness) SetCleanup(event, mode string) (settings.Settings, error) {
 	return h.settings.SetCleanup(event, mode)
 }
 
+func (h *Harness) SetTextScale(scale float64) (settings.Settings, error) {
+	return h.settings.SetTextScale(scale)
+}
+
+func (h *Harness) SetKeepAwake(on bool) (settings.Settings, error) {
+	return h.settings.SetKeepAwake(on)
+}
+
+func (h *Harness) SetBrowserEnabled(on bool) (settings.Settings, error) {
+	return h.settings.SetBrowserEnabled(on)
+}
+
+func (h *Harness) SetDigestSchedule(schedule string) (settings.Settings, error) {
+	return h.settings.SetDigestSchedule(schedule)
+}
+
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
 
 // PRJSON is what gh pr list prints for one pull request.
