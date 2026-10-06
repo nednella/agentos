@@ -49,15 +49,6 @@ func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
 	return started(s), nil
 }
 
-// Harness starts the harness check.
-func (c *Commands) Harness(context.Context, ctl.Request) (string, error) {
-	s, err := c.s.HarnessCheck()
-	if err != nil {
-		return "", err
-	}
-	return started(s), nil
-}
-
 // Open shows a session, named by its number or by words of its title, once it is one and only one.
 func (c *Commands) Open(_ context.Context, req ctl.Request) (string, error) {
 	if len(req.Args) == 0 {

@@ -114,7 +114,6 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		"kill":    sc.Kill,
 		"pr":      sc.PR,
 		"cleanup": sc.Cleanup,
-		"harness": sc.Harness,
 	})
 	for _, view := range []string{"queue", "notes", "evidence", "term", "next", "filter"} {
 		a.router.Handle(view, a.router.View(view))
