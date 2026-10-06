@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/nednella/agentos/desktop/awake"
 	"github.com/nednella/agentos/desktop/browser"
 	"github.com/nednella/agentos/desktop/control"
 	"github.com/nednella/agentos/desktop/digest"
@@ -26,8 +27,9 @@ import (
 type Host struct {
 	Emit      func(event string, payload any)
 	Clipboard func(text string)
-	PickDir   func() (string, error) // "" when the user cancels
-	Quit      func()                 // closes the app, as the user would
+	PickDir   func() (string, error)          // "" when the user cancels
+	Quit      func()                          // closes the app, as the user would
+	Awake     func() (stop func(), err error) // holds off idle sleep until stop is called
 }
 
 // App is the services, wired together.
@@ -38,6 +40,7 @@ type App struct {
 	notes    *notes.Notes
 	evidence *evidence.Store
 	browsers *browser.Browsers
+	awake    *awake.Awake
 	digests  *digest.Manager
 	updates  *update.Updater
 	router   *control.Router
@@ -59,15 +62,17 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	proofs := evidence.New(c.LocalDir)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
+	stayAwake := awake.New(h.Awake, h.Emit)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, Model: c.Model, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
 		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
+		Awake: stayAwake, KeepAwake: c.Registry.KeepAwake,
 	})
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit, iss)
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
-	a.browsers = browsers
+	a.browsers, a.awake = browsers, stayAwake
 	a.media = media.Handler(c.DataDir, c.LocalDir)
 	browsers.Hook(func(id string) string {
 		name, err := session.ParseName(id)
@@ -123,6 +128,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		evidence.NewService(proofs, changes),
 		browser.NewService(browsers, proofs, changes, ctx),
 		digest.NewService(mgr),
+		awake.NewService(stayAwake),
 		stats.NewService(waits, sess),
 		update.NewService(a.updates, ctx),
 	}
@@ -161,6 +167,7 @@ func (a *App) Start(ctx context.Context) error {
 func (a *App) Stop() {
 	a.terms.CloseAll()
 	a.browsers.CloseAll()
+	a.awake.Hold(false)
 	a.sessions.Stop()
 	a.router.Close()
 }

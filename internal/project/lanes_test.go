@@ -64,6 +64,25 @@ func TestBranchFor(t *testing.T) {
 	}
 }
 
+func TestKeepsAwake(t *testing.T) {
+	off, on := false, true
+	for _, tt := range []struct {
+		name string
+		c    Config
+		p    Project
+		want bool
+	}{
+		{"default", Config{}, Project{}, true},
+		{"config off", Config{KeepAwake: &off}, Project{}, false},
+		{"project off", Config{}, Project{KeepAwake: &off}, false},
+		{"project on beats config off", Config{KeepAwake: &off}, Project{KeepAwake: &on}, true},
+	} {
+		if got := tt.c.KeepsAwake(tt.p); got != tt.want {
+			t.Errorf("%s: KeepsAwake = %v, want %v", tt.name, got, tt.want)
+		}
+	}
+}
+
 func TestBrowserOn(t *testing.T) {
 	off, on := false, true
 	for _, tt := range []struct {

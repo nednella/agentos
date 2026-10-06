@@ -161,6 +161,20 @@ func TestSessionsSurviveWithoutALocale(t *testing.T) {
 	}
 }
 
+func TestMacStaysAwakeWhileASessionWorks(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.NewSession("busy", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	awake := func() any { return h.Rec.Last("awake") }
+
+	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+	eventually(t, "the assertion held", func() bool { return awake() == true })
+	h.Hook(t, s.ID, "Stop", `{}`)
+	eventually(t, "the assertion released", func() bool { return awake() == false })
+}
+
 func TestIdleReminders(t *testing.T) {
 	h := newHarness(t)
 	s, err := h.NewSession("r", "")

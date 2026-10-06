@@ -147,3 +147,16 @@ func TestProjects(t *testing.T) {
 		}
 	})
 }
+
+func TestRegistryKeepAwake(t *testing.T) {
+	off := false
+	r := projects.NewRegistry("", project.Config{
+		KeepAwake: &off,
+		Projects:  []project.Project{{Name: "Quiet Work", Dir: "/q", KeepAwake: new(true)}, {Name: "plain", Dir: "/p"}},
+	})
+	for key, want := range map[string]bool{"quiet-work": true, "plain": false, "unlisted": false} {
+		if got := r.KeepAwake(key); got != want {
+			t.Errorf("KeepAwake(%q) = %v, want %v", key, got, want)
+		}
+	}
+}

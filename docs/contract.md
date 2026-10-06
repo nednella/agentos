@@ -318,6 +318,12 @@ Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, 
 
 The app asks GitHub's releases API on start and every hour. A release newer than `Snapshot.version` arrives as `update`; a dev build is never behind.
 
+### Sleep (`awake`)
+
+| Method | Returns | What it does |
+|---|---|---|
+| `Awake()` | `boolean` | whether the app holds off idle sleep now; later changes arrive as `awake` |
+
 ## Events
 
 | Name | Payload | When |
@@ -337,6 +343,7 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
 | `update` | `{ version: string }` | a release newer than the running one is out; once per release |
+| `awake` | `boolean` | the app took or let go of its idle-sleep assertion: it holds one while a session of any project whose `keep_awake` is on is `working` |
 | `warnings` | `Warning` | a service met a failure it cannot show otherwise: tmux could not be listed (`tmux`; the sessions stay as they were), `gh` could not name the repo (`github`; retried after 30 s), pull requests or worktrees could not be read (`pull requests`, `worktrees`). Sent once per distinct message of a source, and again with `message: ""` when the source works |
 
 Opening a web address is the front end's job: the window runtime's `BrowserOpenURL`, else `window.open`. No Go method does it.
@@ -356,6 +363,7 @@ data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; d
 agent: claude                  # claude (the default, with hooks) or any command, which runs plain
 model: sonnet                  # model of every Claude session unless a project, lane or issue label says otherwise
 effort: medium                 # low, medium, high, xhigh or max
+keep_awake: true               # stop the Mac idle-sleeping while a session works; a project may set its own
 projects:
   - name: livedocument
     dir: /Users/me/code/livedocument
@@ -380,6 +388,7 @@ projects:
     url: ""                    # page a session's browser opens first
     browser: true              # tell sessions about the browser and evidence commands
     digest: weekly             # weekly or off
+    keep_awake: true           # this project's choice; unset follows the top-level one
     pr_watch: ""               # webhook or poll; "" tries gh webhook forward and polls when it does not work
     pr_poll: 30s               # how often to poll the pull requests; at least 1s
 ```
@@ -396,6 +405,13 @@ project's `models` entry for the lane; the built-in choice for the lane (`plan` 
 from a note uses the project's own setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`)
 and in the state file of an ended one, so it outlives a restart. `Session.model` and `Session.effort` show it, and each wait in the tally records
 the model.
+
+### Keeping the Mac awake
+
+While at least one session is `working`, in any project whose `keep_awake` is on (the project's own setting, else the top-level one, else on), the
+app runs `caffeinate -i -w <app pid>`: the Mac does not idle-sleep and the display still may. It stops when no such session works, when the app
+quits, and when the app dies. The top bar shows a moon while it runs. It does not stop a closed lid from sleeping the Mac unless the Mac is in
+clamshell mode (external display and power connected), and it does not stop a manual sleep or a sleep from low battery.
 
 ### Where things are stored
 

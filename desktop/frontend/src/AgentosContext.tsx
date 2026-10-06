@@ -38,6 +38,7 @@ export type Agentos = {
   browserStates: Record<string, BrowserState>
   digest: Digest | null
   digestUnseen: boolean
+  awake: boolean
   toasts: Toast[]
   overlay: Overlay
   sidebarTab: SidebarTab
@@ -139,6 +140,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [views, setViews] = useState<Record<string, SessionView>>({})
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
+  const [awake, setAwake] = useState(false)
   const [shellId, setShellId] = useState('')
   const [update, setUpdate] = useState('')
   const [updating, setUpdating] = useState(false)
@@ -282,6 +284,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
 
   useEffect(() => {
     report(() => enterFrom(api.snapshot()))
+    report(async () => setAwake(await api.awake()))
   }, [enterFrom, report])
 
   // Events of a project can arrive after a switch to another one.
@@ -294,6 +297,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('sessions', ifCurrent(applySessions)), [applySessions])
   useEffect(() => on('term:exit', ({ id }) => setShellId((shell) => (shell === id ? '' : shell))), [])
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
+  useEffect(() => on('awake', setAwake), [])
   useEffect(() => on('issues', ifCurrent(setRawIssues)), [])
   useEffect(() => on('update', ({ version }) => setUpdate(version)), [])
   useEffect(() => on('evidence', ({ id, items }) => setEvidence((map) => ({ ...map, [id]: items }))), [])
@@ -422,6 +426,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       browserStates,
       digest,
       digestUnseen,
+      awake,
       toasts,
       overlay,
       sidebarTab,
@@ -618,7 +623,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

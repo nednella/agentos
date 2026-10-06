@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/nednella/agentos/cli"
+	"github.com/nednella/agentos/desktop/awake"
 	"github.com/nednella/agentos/desktop/devhttp"
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/run"
@@ -52,7 +53,8 @@ func launch() error {
 		hub := devhttp.NewHub()
 		a := app.New(cfg, app.Host{
 			Emit: hub.Emit, Clipboard: func(string) {}, PickDir: func() (string, error) { return "", nil },
-			Quit: func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) },
+			Quit:  func() { _ = syscall.Kill(os.Getpid(), syscall.SIGTERM) },
+			Awake: awake.Caffeinate,
 		}, run.Exec, run.Stream, run.ExecEnv)
 		quitOnSignal(a)
 		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: a.Stop, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
@@ -78,6 +80,7 @@ func launch() error {
 				runtime.Quit(*c)
 			}
 		},
+		Awake: awake.Caffeinate,
 	}, run.Exec, run.Stream, run.ExecEnv)
 	quitOnSignal(a)
 
