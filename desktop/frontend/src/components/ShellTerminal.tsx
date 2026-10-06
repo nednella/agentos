@@ -15,10 +15,7 @@ export function ShellTerminal({ visible }: ShellTerminalProps) {
     return (
       <button
         className="absolute inset-0 flex items-center gap-2 px-3 text-left text-small text-dim"
-        onClick={() => {
-          report(openShell)
-          focus('shell')
-        }}
+        onClick={() => focus('shell')}
       >
         <span className="mono text-accent">{project?.name} ❯</span>
         Click or press ⌘S to open a shell here
