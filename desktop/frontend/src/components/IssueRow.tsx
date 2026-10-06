@@ -50,7 +50,7 @@ export function IssueRow({ issue, cursor }: IssueRowProps) {
         )}
       </span>
       {session && (
-        <button className="flex h-full flex-none items-center justify-end gap-2 pl-1" title={`Open session ${session.n}`} onClick={() => select(session.id)}>
+        <button className="flex h-full flex-none items-center justify-end gap-2 pl-1" title={`Open session ${session.n}`} onMouseDown={(e) => e.preventDefault()} onClick={() => select(session.id)}>
           {session.pr && !dense && <PRMark pr={session.pr} />}
           <StateDot state={session.state} />
         </button>
