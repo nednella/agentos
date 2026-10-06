@@ -773,11 +773,30 @@ func (l *Lifecycle) runCleanupCommand(ctx context.Context, t target, p *cleanupP
 			continue
 		}
 		if err := l.runProjectCommand(ctx, t.proj, b); err != nil {
+			if !l.leftBehind(ctx, t.proj.Dir, b.branch) {
+				removed = append(removed, fmt.Sprintf("clean-up command for %s (failed with nothing left: %v)", b.branch, err))
+				continue
+			}
 			return removed, fmt.Sprintf("the clean-up command failed for %s: %v", b.branch, err)
 		}
 		removed = append(removed, "clean-up command for "+b.branch)
 	}
 	return removed, ""
+}
+
+// leftBehind says whether the branch still exists or any worktree has it checked out. A failed
+// git call counts as left behind, so the clean-up blocks as it did.
+func (l *Lifecycle) leftBehind(ctx context.Context, dir, branch string) bool {
+	trees, err := l.worktrees(ctx, dir)
+	if err != nil {
+		return true
+	}
+	if _, ok := trees.byBranch[branch]; ok {
+		return true
+	}
+	_, err = l.git(ctx, dir, "rev-parse", "--verify", "--quiet", "refs/heads/"+branch)
+	var exit *exec.ExitError
+	return !errors.As(err, &exit) || exit.ExitCode() != 1
 }
 
 // removeSession removes what agentos itself keeps for the session, then the session.
