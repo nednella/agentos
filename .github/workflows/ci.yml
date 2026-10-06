@@ -7,25 +7,60 @@ on:
     branches: [main]
 
 jobs:
-  check:
-    name: Vet and test
+  changes:
+    name: Detect changes
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.filter.outputs.go }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # The go job builds with -tags stub, which embeds a stub page instead of the built front end,
+          # so each side runs on its own files. The embedded prompts and snapshot.js count as Go.
+          filters: |
+            go:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'internal/prompts/**'
+              - 'desktop/browser/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'desktop/frontend/**'
+              - '.github/workflows/ci.yml'
+
+  go:
+    name: Vet and test Go
+    needs: changes
+    if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # The tests' plain agent is bash; macOS's own 3.2 has no bracketed paste, so pasted line breaks would run.
+      - run: brew install tmux bash
+      - run: go vet -tags stub ./...
+      # -p 1: many packages' tests start a real tmux server, real PTYs or a real headless
+      # browser; -p 2 still let a different one of them miss its budget each run on
+      # macos-latest's few vCPUs. One package at a time trades minutes for reliability.
+      - run: go test -tags stub -race -p 1 ./...
+
+  frontend:
+    name: Build front end
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/frontend/package-lock.json
-      # The tests' plain agent is bash; macOS's own 3.2 has no bracketed paste, so pasted line breaks would run.
-      - run: brew install tmux bash
       - run: make desktop-frontend
-      - run: go vet ./...
-      # -p 1: many packages' tests start a real tmux server, real PTYs or a real headless
-      # browser; -p 2 still let a different one of them miss its budget each run on
-      # macos-latest's few vCPUs. One package at a time trades minutes for reliability.
-      - run: go test -race -p 1 ./...
