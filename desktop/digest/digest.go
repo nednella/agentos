@@ -1,4 +1,4 @@
-// Package digest runs a weekly Claude run that finds what changed in the project's tools, and keeps its items.
+// Package digest runs a weekly agent run that finds what changed in the project's tools, and keeps its items.
 package digest
 
 import (
@@ -24,7 +24,6 @@ const (
 	digestPerRun   = 5
 	digestTimeout  = 10 * time.Minute
 	digestRetry    = 6 * time.Hour
-	digestTools    = "WebSearch WebFetch Bash(agentos digest add:*)"
 	digestProjects = "AGENTOS_DIGEST_PROJECT"
 )
 
