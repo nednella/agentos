@@ -831,6 +831,10 @@ func (h *Harness) SetKeepAwake(on bool) (settings.Settings, error) {
 	return h.settings.SetKeepAwake(on)
 }
 
+func (h *Harness) SetPromptSend(mode string) (settings.Settings, error) {
+	return h.settings.SetPromptSend(mode)
+}
+
 func (h *Harness) SetBrowserEnabled(on bool) (settings.Settings, error) {
 	return h.settings.SetBrowserEnabled(on)
 }

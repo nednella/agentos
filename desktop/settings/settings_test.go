@@ -144,6 +144,31 @@ func TestBrowserEnabled(t *testing.T) {
 	}
 }
 
+func TestPromptSend(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    browser_start_url: http://localhost\n"})
+	if got := h.Settings().Prompt; got != "auto" {
+		t.Fatalf("default prompt send = %q", got)
+	}
+	if got, err := h.SetPromptSend("manual"); err != nil || got.Prompt != "manual" {
+		t.Fatalf("SetPromptSend(manual) = %+v, %v", got, err)
+	}
+	if h.App.Sessions().Current().SendsPrompt() {
+		t.Error("the current project still sends the prompt at once")
+	}
+	if data, _ := os.ReadFile(h.Conf); !strings.Contains(string(data), "# keep me") || !strings.Contains(string(data), "session_prompt_send: manual") {
+		t.Errorf("config lost the comment or the value:\n%s", data)
+	}
+	if got, err := h.SetPromptSend("auto"); err != nil || got.Prompt != "auto" {
+		t.Fatalf("SetPromptSend(auto) = %+v, %v", got, err)
+	}
+	if _, err := h.SetPromptSend("later"); err == nil {
+		t.Error("an unknown mode was accepted")
+	}
+	if got := h.Settings().Prompt; got != "auto" {
+		t.Errorf("a rejected mode changed the setting to %q", got)
+	}
+}
+
 func TestDigestSchedule(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    # keep me\n    browser_start_url: http://localhost\n"})
 	if got := h.Settings().Digest; got != "weekly" {

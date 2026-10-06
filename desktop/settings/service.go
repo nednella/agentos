@@ -23,6 +23,8 @@ type Store interface {
 	SetKeepAwake(on bool) error
 	Cleanup(projectKey string) project.Cleanup
 	SetCleanup(projectKey, event, mode string) error
+	PromptSend(projectKey string) string
+	SetPromptSend(projectKey, mode string) error
 	BrowserEnabled(projectKey string) bool
 	SetBrowserEnabled(projectKey string, on bool) error
 	DigestSchedule(projectKey string) string
@@ -40,6 +42,7 @@ type Settings struct {
 	TextScale float64         `json:"textScale"`      // a multiple of the default text size
 	KeepAwake bool            `json:"keepAwake"`      // hold off idle sleep while a session works, for projects that do not say otherwise
 	Cleanup   project.Cleanup `json:"cleanup"`        // the current project's: auto or manual, for merge and close
+	Prompt    string          `json:"promptSend"`     // the current project's: auto or manual
 	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
 	Digest    string          `json:"digestSchedule"` // the current project's: weekly or off
 }
@@ -70,6 +73,7 @@ func (s *Service) Settings() Settings {
 		TextScale: scale,
 		KeepAwake: s.store.KeepsAwake(),
 		Cleanup:   s.store.Cleanup(key),
+		Prompt:    s.store.PromptSend(key),
 		Browser:   s.store.BrowserEnabled(key),
 		Digest:    s.store.DigestSchedule(key),
 	}
@@ -105,6 +109,11 @@ func (s *Service) SetTextScale(scale float64) (Settings, error) {
 // SetKeepAwake saves whether a working session holds off idle sleep. A project's own setting still wins.
 func (s *Service) SetKeepAwake(on bool) (Settings, error) {
 	return s.saved(s.store.SetKeepAwake(on))
+}
+
+// SetPromptSend saves whether the current project sends the text a session starts with at once: "auto" or "manual".
+func (s *Service) SetPromptSend(mode string) (Settings, error) {
+	return s.saved(s.store.SetPromptSend(s.project.Current().Key(), mode))
 }
 
 // SetBrowserEnabled saves whether the current project's sessions get the browser and evidence commands.

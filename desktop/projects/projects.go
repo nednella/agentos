@@ -126,6 +126,20 @@ func (r *Registry) SetDigestSchedule(key, schedule string) error {
 	})
 }
 
+// PromptSend is the project's prompt send mode, the default filled in. A project that is not configured has the default.
+func (r *Registry) PromptSend(key string) string { return r.project(key).PromptSend() }
+
+// SetPromptSend saves whether the project sends the text a session starts with at once, "auto", or waits for Enter, "manual".
+func (r *Registry) SetPromptSend(key, mode string) error {
+	if mode != project.PromptAuto && mode != project.PromptManual {
+		return fmt.Errorf("prompt send must be %s or %s, not %q", project.PromptAuto, project.PromptManual, mode)
+	}
+	return r.editProject(key, func(p *project.Project) error {
+		p.SessionPromptSend = mode
+		return nil
+	})
+}
+
 // project is the configured project of the key, or the zero project.
 func (r *Registry) project(key string) project.Project {
 	r.mu.Lock()
