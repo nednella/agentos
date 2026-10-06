@@ -857,6 +857,9 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
 	}
+	if issue > 0 {
+		env = append(env, "AGENTOS_ISSUE="+strconv.Itoa(issue))
+	}
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
