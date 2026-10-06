@@ -30,6 +30,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         disabled={ended}
         title={ended ? `${session.title} (ended)` : session.title}
         style={ended ? { cursor: 'default', opacity: 1 } : undefined}
+        onMouseDown={(e) => e.preventDefault()}
         onClick={() => {
           select(session.id)
           focus('terminal')
