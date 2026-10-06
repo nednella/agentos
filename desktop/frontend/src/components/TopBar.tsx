@@ -4,28 +4,25 @@ import { useActions, formatShortcut } from '../actions'
 import { useLayout } from '../LayoutContext'
 import type { State } from '../types'
 import { Icon } from './Icon'
-import { Keycap } from './Keycap'
 import { StateDot } from './StateDot'
 
 const drag = { '--wails-draggable': 'drag' } as CSSProperties
 const noDrag = { '--wails-draggable': 'no-drag' } as CSSProperties
 
-const FULL_MIN = 1100
 const DOTS_MIN = 640
 const NEXT_FULL_MIN = 780
 const HELP_MIN = 560
 const MORE_MIN = 480
 
-type CountProps = { state: State; count: number; label: string; condensed: boolean }
+type CountProps = { state: State; count: number; label: string }
 
-function Count({ state, count, label, condensed }: CountProps) {
+function Count({ state, count, label }: CountProps) {
   return (
     <span className="flex items-center gap-1.5 text-body" style={{ opacity: count > 0 ? 1 : 0.5 }} title={`${count} ${label}`}>
       <StateDot state={state} />
       <span className="mono font-semibold" style={{ color: count > 0 ? 'var(--c)' : undefined }} data-state={state}>
         {count}
       </span>
-      {!condensed && <span className="text-soft">{label}</span>}
     </span>
   )
 }
@@ -41,7 +38,6 @@ export function TopBar() {
   const find = (id: string) => actions.find((a) => a.id === id)!
   const keys = (id: string) => formatShortcut(find(id).shortcut!)
   const iconButton = 'btn btn-ghost h-8 w-8 justify-center px-0'
-  const full = width >= FULL_MIN
   const badge = width < DOTS_MIN
 
   return (
@@ -61,9 +57,9 @@ export function TopBar() {
           </span>
         ) : (
           <>
-            <Count state="waiting" count={waiting} label="need you" condensed={!full} />
-            <Count state="working" count={count('working')} label="working" condensed={!full} />
-            <Count state="idle" count={idle} label="idle" condensed={!full} />
+            <Count state="waiting" count={waiting} label="need you" />
+            <Count state="working" count={count('working')} label="working" />
+            <Count state="idle" count={idle} label="idle" />
           </>
         )}
       </div>
@@ -79,11 +75,6 @@ export function TopBar() {
           {othersNeedYou && <span className="dot" data-state="waiting" title="Another project needs you" />}
           <Icon name="chevron" size={12} />
         </button>
-        {project?.repo && (
-          <button className={iconButton} title={`Open ${project.repo} on GitHub`} aria-label="Open repository on GitHub" onClick={() => report(() => find('open-repo').run([]))}>
-            <Icon name="external" />
-          </button>
-        )}
       </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
         {update && (
@@ -100,16 +91,9 @@ export function TopBar() {
             <Icon name="moon" />
           </span>
         )}
-        {width >= NEXT_FULL_MIN ? (
-          <button className="btn" onClick={() => find('next-attention').run([])}>
-            Next
-            <Keycap>{keys('next-attention')}</Keycap>
-          </button>
-        ) : (
-          <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
-            <Icon name="next" />
-          </button>
-        )}
+        <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
+          <Icon name="next" />
+        </button>
         {width >= MORE_MIN && (
           <>
             <button
