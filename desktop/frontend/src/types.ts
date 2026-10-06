@@ -95,8 +95,15 @@ export type Snapshot = {
 
 export type ThemeSetting = 'system' | 'light' | 'dark'
 
+export type CleanupMode = 'auto' | 'manual'
+
+export type CleanupSettings = { merge: CleanupMode; close: CleanupMode }
+
+export type CleanupEvent = keyof CleanupSettings
+
 export type Settings = {
   theme: ThemeSetting
+  cleanup: CleanupSettings
 }
 
 export type WaitKind = 'permission' | 'question' | 'idle'
