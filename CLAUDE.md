@@ -23,6 +23,8 @@ Go is the reference when they disagree.
 - Never install the app to `/Applications` or `~/Applications`, never run
   `make desktop-install`, `install.sh` or `agentos update` against the real home, unless Ned asks.
   Live sessions' hooks call the installed `agentos`, a link into the installed bundle.
+- Stop only the processes you started, by their PID. Never `pkill`, `killall` or kill by a
+  name pattern: one matched the installed app and closed Ned's window.
 - Draft PRs only; never merge, mark ready or request reviewers. Ned's own Claude settings enforce this.
 - Clean-up code deletes worktrees and branches. Any change to it ships with tests against
   throwaway git repos, never a real one.
