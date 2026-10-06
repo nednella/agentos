@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -44,11 +45,26 @@ type Config struct {
 	Effort    string    `yaml:"session_effort,omitempty"` // effort of a Claude session; unset leaves it to claude
 	KeepAwake *bool     `yaml:"keep_mac_awake,omitempty"` // hold off idle sleep while a session works; on unless false
 	Theme     string    `yaml:"app_theme,omitempty"`      // light or dark; unset follows the system
+	TextScale float64   `yaml:"app_text_scale,omitempty"` // size of the app's text, between MinTextScale and MaxTextScale; unset is 1
 	Projects  []Project `yaml:"projects"`
 }
 
 // Themes are the values of Config.Theme.
 var Themes = []string{"light", "dark"}
+
+// The text sizes the app accepts, as a multiple of its default.
+const (
+	MinTextScale = 0.85
+	MaxTextScale = 1.5
+)
+
+// CheckTextScale rejects a text size outside the accepted range.
+func CheckTextScale(scale float64) error {
+	if scale < MinTextScale || scale > MaxTextScale {
+		return fmt.Errorf("text scale must be between %v and %v, not %v", MinTextScale, MaxTextScale, scale)
+	}
+	return nil
+}
 
 // Key is the form of the name that is safe inside a tmux session name and a file path.
 func (p Project) Key() string {
@@ -91,6 +107,11 @@ func Load(path string) (Config, error) {
 	}
 	if cfg.Theme != "" && !slices.Contains(Themes, cfg.Theme) {
 		return Config{}, fmt.Errorf("%s: app_theme must be %s, not %q", path, strings.Join(Themes, " or "), cfg.Theme)
+	}
+	if cfg.TextScale != 0 {
+		if err := CheckTextScale(cfg.TextScale); err != nil {
+			return Config{}, fmt.Errorf("%s: app_text_scale: %w", path, err)
+		}
 	}
 	for i, p := range cfg.Projects {
 		if p.Name == "" || p.Dir == "" {
@@ -182,6 +203,8 @@ func encode(path string, c Config) ([]byte, error) {
 	syncScalar(root, "agent_command", c.Agent, nil)
 	syncScalar(root, "data_dir", c.DataDir, ExpandHome)
 	syncScalar(root, "app_theme", c.Theme, nil)
+	syncScalar(root, "app_text_scale", formatScale(c.TextScale), nil)
+	syncScalar(root, "keep_mac_awake", formatBool(c.KeepAwake), nil)
 	if err := syncProjects(root, c.Projects); err != nil {
 		return nil, err
 	}
@@ -240,6 +263,20 @@ func syncScalar(m *yaml.Node, key, want string, norm func(string) string) {
 	}
 }
 
+func formatScale(scale float64) string {
+	if scale == 0 {
+		return ""
+	}
+	return strconv.FormatFloat(scale, 'f', -1, 64)
+}
+
+func formatBool(b *bool) string {
+	if b == nil {
+		return ""
+	}
+	return strconv.FormatBool(*b)
+}
+
 // syncProjects makes the projects list hold want. A project whose entry already means the same keeps its text.
 func syncProjects(root *yaml.Node, want []Project) error {
 	seq := field(root, "projects")
@@ -274,7 +311,7 @@ func syncProjects(root *yaml.Node, want []Project) error {
 	return nil
 }
 
-// editInPlace updates the entry of p when only its cleanup settings changed, so the rest of the entry keeps
+// editInPlace updates the entry of p when only the settings the panel writes changed, so the rest of the entry keeps
 // its comments and layout. It returns the entry's index, or -1 when there is no such entry.
 func editInPlace(seq *yaml.Node, p Project) int {
 	i := slices.IndexFunc(seq.Content, func(n *yaml.Node) bool { f := field(n, "name"); return f != nil && f.Value == p.Name })
@@ -282,6 +319,8 @@ func editInPlace(seq *yaml.Node, p Project) int {
 		return -1
 	}
 	syncCleanup(seq.Content[i], p.CleanupMode)
+	syncScalar(seq.Content[i], "browser_enabled", formatBool(p.Browser), nil)
+	syncScalar(seq.Content[i], "digest_schedule", p.Digest, nil)
 	if !sameProject(seq.Content[i], p) {
 		return -1
 	}
