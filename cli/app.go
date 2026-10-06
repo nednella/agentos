@@ -31,7 +31,6 @@ func newAppCmds() []*cobra.Command {
 		appCmd("refresh", "Reload the issues and the pull requests", groupWork, cobra.NoArgs),
 		appCmd("pr [n]", "Show the pull requests of the sessions", groupWork, cobra.MaximumNArgs(1)),
 		appCmd("cleanup [n]", "Clean up after session n, or list what waits for it", groupWork, cobra.MaximumNArgs(1)),
-		appCmd("harness", "Start a session that reviews the project's harness", groupWork, cobra.NoArgs),
 		appCmd("queue", "Show the queue", groupViews, cobra.NoArgs),
 		appCmd("notes", "Show the notes", groupViews, cobra.NoArgs),
 		appCmd("evidence", "Show the evidence of the session on screen", groupViews, cobra.NoArgs),

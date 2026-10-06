@@ -39,7 +39,6 @@ func TestAppCommandsSendTheirWords(t *testing.T) {
 		{[]string{"pr"}, "pr", nil, nil},
 		{[]string{"pr", "2"}, "pr", []string{"2"}, nil},
 		{[]string{"cleanup", "2"}, "cleanup", []string{"2"}, nil},
-		{[]string{"harness"}, "harness", nil, nil},
 		{[]string{"digest"}, "digest", nil, map[string]string{}},
 		{[]string{"digest", "--run"}, "digest", nil, map[string]string{"run": "1"}},
 		{[]string{"stats", "--open"}, "stats", nil, map[string]string{"open": "1", "days": "7"}},
@@ -74,7 +73,7 @@ func TestAppCommandsRejectBadArguments(t *testing.T) {
 	})
 	for _, args := range [][]string{
 		{"issue"}, {"open"}, {"next", "x"}, {"queue", "x"}, {"pr", "1", "2"}, {"kill", "1", "2"},
-		{"project", "remove"}, {"project", "add", "a", "b"}, {"harness", "x"},
+		{"project", "remove"}, {"project", "add", "a", "b"},
 		{"project", "add", "/no/such/folder"},
 	} {
 		if _, err := run(t, args...); err == nil {
