@@ -37,8 +37,9 @@ func TestCommands(t *testing.T) {
 	}{
 		{"default ready", Project{}.IssueCommand("ready", 4), "/work 4"},
 		{"default plan", Project{}.IssueCommand("plan", 5), "/investigate 5"},
-		{"idea has no default", Project{}.IssueCommand("idea", 5), ""},
-		{"inbox has no default", Project{}.IssueCommand("inbox", 5), ""},
+		{"default idea", Project{}.IssueCommand("idea", 5), "/investigate 5"},
+		{"default inbox", Project{}.IssueCommand("inbox", 5), "/investigate 5"},
+		{"empty idea sends nothing", Project{Commands: map[string]string{"idea": ""}}.IssueCommand("idea", 5), ""},
 		{"you has none", Project{Commands: map[string]string{"you": "x"}}.IssueCommand("you", 5), ""},
 		{"custom inbox", Project{Commands: map[string]string{"inbox": "/investigate {n}"}}.IssueCommand("inbox", 9), "/investigate 9"},
 		{"default note", Project{}.NoteCommand("buy milk"), "buy milk"},

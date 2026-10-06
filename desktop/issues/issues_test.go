@@ -121,14 +121,11 @@ func TestInboxAndIdeaCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "/investigate 11") })
-	idea, err := h.StartIssue(10) // idea lane: no command by default
+	idea, err := h.StartIssue(10) // idea lane
 	if err != nil {
 		t.Fatal(err)
 	}
-	time.Sleep(600 * time.Millisecond)
-	if pane := h.Pane(t, idea.ID); strings.Contains(pane, "/") && strings.Contains(pane, "investigate") {
-		t.Errorf("an idea got a command:\n%s", pane)
-	}
+	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, idea.ID), "/investigate 10") })
 }
 
 func TestRepoFailureIsWarnedAboutAndNotRemembered(t *testing.T) {

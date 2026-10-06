@@ -16,7 +16,7 @@ var defaultLanes = map[string]string{
 }
 
 var defaultCommands = map[string]string{
-	"ready": "/work {n}", "plan": "/investigate {n}", "inbox": "", "idea": "", "note": "{text}",
+	"ready": "/work {n}", "plan": "/investigate {n}", "inbox": "/investigate {n}", "idea": "/investigate {n}", "note": "{text}",
 }
 
 // laneOrder ranks lanes when an issue's labels map to several.

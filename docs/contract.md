@@ -372,9 +372,9 @@ projects:
     commands:
       ready: "/work {n}"       # sent to a session started from a ready issue; {n} is the issue number
       plan: "/investigate {n}"
-      inbox: ""                # "" sends nothing
-      idea: ""
-      note: "{text}"           # a session started from a note; {text} is the note
+      inbox: "/investigate {n}"
+      idea: "/investigate {n}"
+      note: "{text}"           # a session started from a note; {text} is the note; "" sends nothing
     lanes:                     # GitHub label -> lane; when set it replaces the defaults
       ready: ready
       needs-plan: plan
