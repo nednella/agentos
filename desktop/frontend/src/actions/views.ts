@@ -23,6 +23,12 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
     run: () => layout.zoom(0),
   },
   {
+    id: 'toggle-theme',
+    label: 'Toggle light and dark theme',
+    group: 'App',
+    run: layout.toggleTheme,
+  },
+  {
     id: 'stats',
     label: 'Stats: what interrupts you',
     group: 'App',

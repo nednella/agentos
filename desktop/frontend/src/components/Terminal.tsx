@@ -7,7 +7,7 @@ import { useAgentos } from '../AgentosContext'
 import { api, on } from '../api'
 import { decodeBase64 } from '../base64'
 import { useLayout } from '../LayoutContext'
-import { terminalFont, terminalTheme } from '../terminalTheme'
+import { terminalFont, terminalThemes } from '../terminalTheme'
 
 type TerminalProps = { id: string; active: boolean; kind?: 'session' | 'shell'; onLeave?(): void }
 
@@ -32,7 +32,9 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
   leave.current = onLeave
   const lastEsc = useRef(0)
   const { focusRequest } = useAgentos()
-  const { scale } = useLayout()
+  const { scale, theme } = useLayout()
+  const themeRef = useRef(theme)
+  themeRef.current = theme
   const host = useRef<HTMLDivElement>(null)
   const xterm = useRef<Xterm | null>(null)
   const fit = useRef<FitAddon | null>(null)
@@ -73,7 +75,7 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       // and xterm offers a slider over them.
       scrollback: 0,
       allowProposedApi: true,
-      theme: terminalTheme,
+      theme: terminalThemes[themeRef.current],
     })
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
@@ -192,6 +194,10 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       fit.current = null
     }
   }, [id])
+
+  useEffect(() => {
+    if (xterm.current) xterm.current.options.theme = terminalThemes[theme]
+  }, [theme])
 
   useEffect(() => {
     const term = xterm.current

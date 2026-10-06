@@ -5,6 +5,7 @@ import type { SidebarTab } from './AgentosContext'
 import { devFlags } from './api'
 import { readStored, writeStored } from './storage'
 
+export type Theme = 'dark' | 'light'
 export type Band = 'compact' | 'medium' | 'wide'
 export type LayoutMode = 'narrow' | Band
 export type Panel = 'sidebar' | 'terminal' | 'sessions' | 'shell'
@@ -40,6 +41,7 @@ export type Layout = {
   mode: LayoutMode
   width: number
   scale: number
+  theme: Theme
   sidebarOpen: boolean
   sessionsOpen: boolean
   shellOpen: boolean
@@ -52,6 +54,7 @@ export type Layout = {
   statsOpen: boolean
   digestOpen: boolean
   zoom(step: -1 | 0 | 1): void
+  toggleTheme(): void
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
   resetWidth(panel: SidePanel): void
@@ -121,6 +124,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
   const [scale, setScale] = useState(() => readStored('agentos.scale', DEFAULT_SCALE))
+  const [theme, setTheme] = useState<Theme>(() => readStored<Theme>('agentos.theme', 'dark'))
   const [stored, setStored] = useState(() => readStored<Partial<AllPrefs>>(LAYOUT_KEY, {}))
   const [peek, setPeek] = useState<SidePanel | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
@@ -131,6 +135,10 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   useLayoutEffect(() => {
     document.documentElement.style.setProperty('--ui-scale', String(scale))
   }, [scale])
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   const prefs: BandPrefs = { ...fresh(band), ...stored[band] }
   const { widths: fittedWidths, full: fullWidths, sessionsForcedClosed } = fit(width, prefs, 16 * scale)
@@ -211,6 +219,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       mode,
       width,
       scale,
+      theme,
       sidebarOpen,
       sessionsOpen,
       shellOpen: narrow ? mobilePanel === 'shell' : prefs.shellOpen,
@@ -232,6 +241,11 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         writeStored('agentos.scale', next)
         if (zoomToast.current !== null) dismissToast(zoomToast.current)
         zoomToast.current = pushToast({ tone: 'info', text: `Text size ${Math.round(next * 100)}%` })
+      },
+      toggleTheme() {
+        const next = theme === 'dark' ? 'light' : 'dark'
+        setTheme(next)
+        writeStored('agentos.theme', next)
       },
       setMobilePanel,
       setWidth(panel, rem, commit) {
@@ -278,7 +292,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, theme, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>
