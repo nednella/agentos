@@ -39,7 +39,7 @@ func TestEndedSessionKeepsItsPRAndIsCleanedUpOnMerge(t *testing.T) {
 	if len(log) != 1 || log[0].Status != "done" || log[0].PR != 12 {
 		t.Fatalf("log = %+v", log)
 	}
-	if removed := strings.Join(log[0].Removed, "|"); !strings.Contains(removed, "session") || !strings.Contains(removed, "worktree trees/issue-7") {
+	if removed := strings.Join(log[0].Removed, "|"); !strings.Contains(removed, "session") || !strings.Contains(removed, "clean-up command for issue-7") {
 		t.Errorf("removed = %q", log[0].Removed)
 	}
 }

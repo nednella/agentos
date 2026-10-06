@@ -264,7 +264,7 @@ func TestEventsNameTheirProject(t *testing.T) {
 }
 
 func TestCleanupStopsWhenTheAppCloses(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    session_cleanup_command: \"sleep 30; : {worktree} {branch}\"\n"})
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "sleep 30; : {worktree} {branch}"})
 	repoFixture(t, h)
 	issueWorktree(t, h)
 	s := issueSession(h, t, 7)

@@ -497,15 +497,16 @@ const queueSections = `    queue_sections:
 
 // Options changes the harness's config.
 type Options struct {
-	ProjectExtra string        // yaml lines added under the project "main"
-	NoBranch     bool          // leave out the project's `session_branch_fallback: "issue-{n}"` pattern
-	Agent        string        // the config's agent; bash by default
-	TopExtra     string        // yaml lines added at the top of the config
-	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
-	DigestTick   time.Duration
-	UpdateTick   time.Duration // how often to check the releases; an hour by default, and an hour before the first check
-	Releases     string        // what the releases API answers; "" fails the check
-	Version      string        // the version the app believes it runs; "dev" by default
+	ProjectExtra   string        // yaml lines added under the project "main"
+	NoBranch       bool          // leave out the project's `session_branch_fallback: "issue-{n}"` pattern
+	CleanupCommand string        // the project's session_cleanup_command; none by default
+	Agent          string        // the config's agent; bash by default
+	TopExtra       string        // yaml lines added at the top of the config
+	DigestFirst    time.Duration // wait before the first automatic digest check; an hour by default
+	DigestTick     time.Duration
+	UpdateTick     time.Duration // how often to check the releases; an hour by default, and an hour before the first check
+	Releases       string        // what the releases API answers; "" fails the check
+	Version        string        // the version the app believes it runs; "dev" by default
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -549,7 +550,11 @@ func NewWith(t *testing.T, o Options) *Harness {
 	if o.NoBranch {
 		branch = ""
 	}
-	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, queueSections, o.ProjectExtra)
+	cleanup := ""
+	if o.CleanupCommand != "" {
+		cleanup = fmt.Sprintf("    session_cleanup_command: %q\n", o.CleanupCommand)
+	}
+	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, cleanup, queueSections, o.ProjectExtra)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}

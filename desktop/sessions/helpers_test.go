@@ -15,4 +15,9 @@ var (
 	prJSON     = apptest.PRJSON
 )
 
-func newHarness(t *testing.T) *apptest.Harness { return apptest.New(t) }
+// removeWorktreeAndBranch is the clean-up command most tests run: it leaves the project folder alone.
+const removeWorktreeAndBranch = "git worktree remove --force {worktree} && git branch -D {branch}"
+
+func newHarness(t *testing.T) *apptest.Harness {
+	return apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch})
+}
