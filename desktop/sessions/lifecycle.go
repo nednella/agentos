@@ -59,8 +59,9 @@ type Cleanup struct {
 	Reason       string   `json:"reason"`
 }
 
-// target is a session that works on a branch, with the project it belongs to. A session of an
-// issue works on the issue's branch; another one on the branches it was seen on, oldest first.
+// target is a session that works on a branch, with the project it belongs to. It works on the
+// branches it reported or was seen on, oldest first; a session of an issue with none works on the
+// project's branch pattern, when it sets one.
 type target struct {
 	id, title string
 	issue     int
@@ -424,7 +425,7 @@ type prsFile struct {
 	Live   map[string]bool  `json:"live"`   // session id -> its PR was seen draft or open
 	Nudged map[string]nudge `json:"nudged"` // PR number -> nudge
 
-	Branches map[string][]string `json:"branches"` // session id -> the branches it worked on, oldest first; only for sessions with no issue
+	Branches map[string][]string `json:"branches"` // session id -> the branches it worked on, oldest first
 }
 
 // prs needs mu.
@@ -931,7 +932,7 @@ func (l *Lifecycle) Cleanups(key string) []Cleanup {
 	return out[:min(len(out), cleanupsKept)]
 }
 
-// branchesOf are the branches a session with no issue worked on, oldest first.
+// branchesOf are the branches a session worked on, oldest first.
 func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
 	if l == nil {
 		return nil
@@ -941,13 +942,16 @@ func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
 	return slices.Clone(l.prs(proj.Key()).Branches[id])
 }
 
-// learn notes the branch checked out in cwd as one the session works on, when cwd is in the
-// project's repo and the branch is not the main one, and looks up its pull request.
+// learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
+// not the main one.
 func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string) {
-	branch, ok := l.workBranch(ctx, proj, cwd)
-	if !ok {
-		return
+	if branch, ok := l.workBranch(ctx, proj, cwd); ok {
+		l.track(ctx, id, proj, branch)
 	}
+}
+
+// track notes branch as the newest one the session works on and looks up its pull request.
+func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string) {
 	key := proj.Key()
 	l.mu.Lock()
 	f := l.prs(key)

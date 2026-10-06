@@ -443,8 +443,8 @@ func (s *Sessions) take(rec session.Record) {
 	}
 }
 
-// followBranch has the lifecycle look at the branch of a session that has no issue, when the
-// agent moved or finished a turn. It needs mu.
+// followBranch has the lifecycle look at the branch of a session, when the agent moved or
+// finished a turn. It needs mu.
 func (s *Sessions) followBranch(rec session.Record) {
 	moved := rec.Cwd != "" && (rec.Cwd != s.cwds[rec.Session] || rec.Event == "Stop")
 	if !moved {
@@ -452,7 +452,7 @@ func (s *Sessions) followBranch(rec session.Record) {
 	}
 	s.cwds[rec.Session] = rec.Cwd
 	for _, in := range s.info {
-		if in.Name.String() != rec.Session || in.Issue != "" {
+		if in.Name.String() != rec.Session {
 			continue
 		}
 		if proj, ok := s.projectOf(in); ok {
@@ -654,7 +654,7 @@ func (s *Sessions) list() []Session {
 		f := s.life.fields(id)
 		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
 		view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
-		if issue > 0 {
+		if view.Branch == "" && issue > 0 {
 			view.Branch = s.project.BranchFor(issue)
 		}
 		if view.History == nil {
@@ -1121,8 +1121,8 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	issue, _ := strconv.Atoi(in.Issue)
 	id := in.Name.String()
 	branches := s.life.branchesOf(proj, id)
-	if issue > 0 {
-		branches = []string{proj.BranchFor(issue)}
+	if fallback := proj.BranchFor(issue); len(branches) == 0 && issue > 0 && fallback != "" {
+		branches = []string{fallback}
 	}
 	if len(branches) == 0 {
 		return target{}, false
@@ -1168,6 +1168,25 @@ func (s *Sessions) SetPrefillWait(d time.Duration) {
 }
 
 // Has says whether a session of that id is running, in any project.
+// Track records branch as the one the session works on, and watches its worktree and pull request.
+func (s *Sessions) Track(id, branch string) error {
+	s.mu.Lock()
+	var proj project.Project
+	var found bool
+	for _, in := range s.info {
+		if in.Name.String() == id {
+			proj, found = s.projectOf(in)
+			break
+		}
+	}
+	s.mu.Unlock()
+	if !found {
+		return fmt.Errorf("session %q is not running", id)
+	}
+	s.life.track(s.ctx, id, proj, branch)
+	return nil
+}
+
 func (s *Sessions) Has(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()

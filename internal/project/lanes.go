@@ -64,13 +64,9 @@ func (p Project) NoteCommand(text string) string {
 	return strings.ReplaceAll(p.command("note"), "{text}", text)
 }
 
-// BranchFor is the branch the work on an issue happens on.
+// BranchFor is the branch the work on an issue happens on, or "" when the project names none.
 func (p Project) BranchFor(number int) string {
-	pattern := p.Branch
-	if pattern == "" {
-		pattern = "issue-{n}"
-	}
-	return strings.ReplaceAll(pattern, "{n}", strconv.Itoa(number))
+	return strings.ReplaceAll(p.Branch, "{n}", strconv.Itoa(number))
 }
 
 // BrowserOn says whether sessions get the browser and evidence commands.

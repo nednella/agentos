@@ -9,6 +9,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
+	ctl "github.com/nednella/agentos/internal/control"
 )
 
 func plainSession(h *apptest.Harness, t *testing.T) sessions.Session {
@@ -157,5 +158,51 @@ func TestPlainSessionCleanupRemovesItsWorktree(t *testing.T) {
 	}
 	if got := gitIn(t, h.Dir, "branch", "--show-current"); got != "main" {
 		t.Errorf("project folder is on %q", got)
+	}
+}
+
+func TestSessionReportsItsBranch(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	gitIn(t, h.Dir, "checkout", "main")
+	s := plainSession(h, t)
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+
+	if resp := h.Ask(t, ctl.Request{Cmd: "track", Session: s.ID}); resp.OK {
+		t.Error("track without a branch was accepted")
+	}
+	if resp := h.Ask(t, ctl.Request{Cmd: "track", Opts: map[string]string{"branch": "my-fix"}}); resp.OK {
+		t.Error("track outside a session was accepted")
+	}
+	resp := h.Ask(t, ctl.Request{Cmd: "track", Session: s.ID, Opts: map[string]string{"branch": "my-fix"}})
+	if !resp.OK {
+		t.Fatalf("track: %s", resp.Error)
+	}
+	eventually(t, "the PR of the reported branch", hasPR(h, s.ID))
+	if got, _ := h.Session(s.ID); got.Branch != "my-fix" {
+		t.Errorf("session = %+v", got)
+	}
+}
+
+func TestIssueSessionWithoutBranchPatternFollowsItsFolder(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{NoBranch: true})
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	gitIn(t, h.Dir, "checkout", "main")
+	s, err := h.Sessions().Create("#5 work", "", false, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Branch != "" {
+		t.Errorf("fresh session names branch %q", s.Branch)
+	}
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+
+	gitIn(t, h.Dir, "checkout", "my-fix")
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the PR of the branch the session works on", hasPR(h, s.ID))
+	if got, _ := h.Session(s.ID); got.Branch != "my-fix" {
+		t.Errorf("session = %+v", got)
 	}
 }

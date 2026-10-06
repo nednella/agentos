@@ -37,7 +37,7 @@ type Session = {
   model: string         // model the agent was started with ("sonnet"); "" for an agent other than claude or a session from before the field
   effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
-  branch: string        // branch of the issue's work (from the project's `branch` pattern); for a session with no issue, the branch its PR was found on, else the newest it worked on; "" if none
+  branch: string        // the branch the session works on: the one it reported with `agentos track`, else the one checked out in its working folder; for an issue session with neither, the project's `branch` pattern. The branch its PR was found on, else the newest; "" if none
   worktree: string      // path of the git worktree on that branch; "" if none
   pr: PR | null
   prAttention: '' | 'checks' | 'comments'   // failing checks, or comments newer than the last AckPR
@@ -399,7 +399,7 @@ projects:
     effort: ""                 # this project's effort; "" uses the top-level one
     models:                    # lane -> model and effort of sessions started for an issue there; either key may be left out
       plan: {model: opus}      # the built-in choice: plan runs on opus, every other lane on the project's model
-    branch: "issue-{n}"        # branch of an issue's work
+    branch: ""                 # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
     cleanup: ""                # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
     url: ""                    # page a session's browser opens first
     browser: true              # tell sessions about the browser and evidence commands
@@ -469,7 +469,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
-| From inside a session | `browser <command>`, `show <file> [--caption …] \| --text …`, `note <text>` | `agentos browser help` lists the browser commands |
+| From inside a session | `browser <command>`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` lists the browser commands |
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux (works with
 the app closed); `--all` does it for every project and stops the shells too. Used by the app itself: `agentos hook <Event>`, `agentos digest add`.

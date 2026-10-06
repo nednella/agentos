@@ -482,6 +482,7 @@ func NoClaude(context.Context, string, []string, string, ...string) ([]byte, err
 // Options changes the harness's config.
 type Options struct {
 	ProjectExtra string        // yaml lines added under the project "main"
+	NoBranch     bool          // leave out the project's `branch: "issue-{n}"` pattern
 	Agent        string        // the config's agent; bash by default
 	TopExtra     string        // yaml lines added at the top of the config
 	DigestFirst  time.Duration // wait before the first automatic digest check; an hour by default
@@ -528,7 +529,11 @@ func NewWith(t *testing.T, o Options) *Harness {
 	}
 	dir := t.TempDir()
 	confPath := filepath.Join(state, "config.yaml")
-	conf := fmt.Sprintf("agent: %s\n%sprojects:\n  - name: main\n    dir: %s\n    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, o.ProjectExtra)
+	branch := "    branch: \"issue-{n}\"\n"
+	if o.NoBranch {
+		branch = ""
+	}
+	conf := fmt.Sprintf("agent: %s\n%sprojects:\n  - name: main\n    dir: %s\n%s    commands:\n      ready: \"/ship {n}\"\n      inbox: \"/investigate {n}\"\n%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, o.ProjectExtra)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}

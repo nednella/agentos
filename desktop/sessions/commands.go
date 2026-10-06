@@ -49,6 +49,21 @@ func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
 	return started(s), nil
 }
 
+// Track tells the app which branch the asking session works on.
+func (c *Commands) Track(_ context.Context, req ctl.Request) (string, error) {
+	branch := strings.TrimSpace(req.Opts["branch"])
+	if branch == "" {
+		return "", errors.New("usage: agentos track --branch <name>")
+	}
+	if _, err := session.ParseName(req.Session); err != nil {
+		return "", errors.New("this command works inside an agentos session; AGENTOS_SESSION is not set")
+	}
+	if err := c.s.Track(req.Session, branch); err != nil {
+		return "", err
+	}
+	return "tracking " + branch, nil
+}
+
 // Open shows a session, named by its number or by words of its title, once it is one and only one.
 func (c *Commands) Open(_ context.Context, req ctl.Request) (string, error) {
 	if len(req.Args) == 0 {
