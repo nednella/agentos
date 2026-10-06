@@ -37,7 +37,7 @@ type Session = {
   model: string         // model the agent was started with ("sonnet"); "" when none was set, for an agent other than claude, or for a session from before the field
   effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
-  branch: string        // the branch the session works on: the one it reported with `agentos track`, else the one checked out in its working folder; for an issue session with neither, the project's `branch` pattern. The branch its PR was found on, else the newest; "" if none
+  branch: string        // the branch the session works on: the one it reported with `agentos track`, else the one checked out in its working folder; for an issue session with neither, the project's `session_branch_fallback` pattern. The branch its PR was found on, else the newest; "" if none
   worktree: string      // path of the git worktree on that branch; "" if none
   pr: PR | null
   prAttention: '' | 'checks' | 'comments'   // failing checks, or comments newer than the last AckPR
@@ -159,7 +159,7 @@ type Cleanup = {
   pr: number
   merged: boolean       // the PR was merged when the clean-up ran
   status: 'done' | 'blocked'
-  removed: string[]     // "worktree trees/issue-394", "branch issue-394", "temp files", "evidence", "session"
+  removed: string[]     // "clean-up command for issue-394", "temp files", "evidence", "session"
   reason: string        // when blocked
 }
 
@@ -248,31 +248,35 @@ type Digest = {
 |---|---|---|
 | `RefreshPRs()` | | fetches the PRs of sessions on a branch now (the app also watches them, see below); results arrive as `sessions` |
 | `AckPR(id)` | | the user has seen the PR's comments and failing checks; clears `prAttention` until something new arrives |
-| `Cleanup(id, force)` | | cleans up after a session now: worktree, branch, temp files, evidence, browser tab, session. Without `force` the safety checks apply |
+| `Cleanup(id, force)` | | cleans up after a session now: runs the project's `session_cleanup_command` for each of its branches, then removes temp files, evidence, browser tab and session. Without `force` the safety checks apply |
 | `Cleanups()` | `Cleanup[]` | the current project's log, newest first, at most 100 |
 
 A session with an issue works on the issue's branch. A session without one works on the branches it was seen on: each hook reports the agent's
 working directory (`cwd`), and on a change of directory and at the end of each turn the app reads the branch checked out there. A directory in another
 repo, a detached head and the main branch (origin's default, else `main`) are ignored. The branches are remembered per session in `prs.json`, oldest
-first, and the PR of a session is the one on the newest branch that has one. A session with no such branch has no PR and nothing to clean up. For one
-of these sessions a project folder that holds the branch is not left alone: after the safety checks the clean-up switches it back to main, then deletes
-the branch, and a linked worktree is removed as for an issue; every branch of the session goes. A new comment or failing check wakes a live session
+first, and the PR of a session is the one on the newest branch that has one. A session with no such branch has no PR and nothing to clean up. Every
+branch of the session goes through the clean-up command, whether the branch is checked out in the project folder or in a linked worktree. A new comment or failing check wakes a live session
 of this kind; an ended one is not recreated.
 
-Whether a session is cleaned up on its own is the project's `cleanup` setting, per event: `merge` is `auto` by default, `close` is `manual`.
+Whether a session is cleaned up on its own is the project's `session_cleanup_mode`, per event: `merge` is `auto` by default, `close` is `manual`.
 An `auto` event cleans up when the PR reached it after the session saw the PR draft or open. A PR first seen already merged or closed, or an event set to
 `manual`, sets `cleanup: 'ask'`: the user decides. The safety checks apply in both modes. Blocked means the worktree has changes or the branch has commits that are not on origin; for a merged PR whose remote branch is gone, the branch must be contained in the commit the PR merged (`headRefOid`), else the reason is "the branch has commits that are not in the merged pull request". Closing the app during a clean-up stops it and leaves a `blocked` entry with the reason "app closed during clean-up".
-`Cleanup(id, true)` overrides. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
+`Cleanup(id, true)` overrides.
+
+The git side of a clean-up belongs to the project: the app runs `session_cleanup_command` through `sh -c` in the project folder, once per branch of the session that has a
+worktree or a local branch, after the safety checks and before it removes its own session. `{branch}`, `{worktree}` (the folder the branch is checked out in, `''` if none)
+and `{dir}` (the project folder) are shell-quoted. A command that fails stops the clean-up with `blocked` and the command's error. With no command, a clean-up removes only the session:
+branches and folders stay. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
 agent finished still cleans up, and the row shows the PR merged.
 
 How the app watches: every 5 minutes it fetches every tracked PR. In between, each project with a session on a branch has a watcher. Unless
-the project's `pr_watch` says `poll`, the watcher streams the repo's `pull_request`, `pull_request_review`, `issue_comment` and `check_suite` events
+the project's `pr_watch_method` says `poll`, the watcher streams the repo's `pull_request`, `pull_request_review`, `issue_comment` and `check_suite` events
 through `gh webhook forward` (needs the extension and admin on the repo; a stream that ends within 10 s never worked, and the project is polled
-instead; one that drops later is retried after 30 s, with a warning when `pr_watch: webhook` asked for it). Polling asks GitHub for the repo's
-PR list every `pr_poll` (30 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
+instead; one that drops later is retried after 30 s, with a warning when `pr_watch_method: webhook` asked for it). Polling asks GitHub for the repo's
+PR list every `pr_poll_interval` (30 s) with `If-None-Match`, so an unchanged list costs no request, and fetches only the PRs whose `updated_at` moved,
 plus those whose checks are still running. When a tracked PR merges or closes, the queue is read again (`issues`). When a PR gets a new
-comment or review, the app types the project's `on_review` command into its session and sends it; failing checks on a new commit send
-`on_checks` (`{n}` is the PR number). A key that is not set sends nothing: the row is still flagged and the notice still shows. A session
+comment or review, the app types the project's `pr_review_command` into its session and sends it; failing checks on a new commit send
+`pr_checks_command` (`{n}` is the PR number). A key that is not set sends nothing: the row is still flagged and the notice still shows. A session
 waiting on the user gets the text once it is not; an ended session gets a new session for its issue with the text sent, and its row goes. The new session resumes the old one's conversation
 (`claude --resume <id>`, the `session_id` of the hook events, kept in the state file) in the project folder. An agent that cannot resume, or a session with no
 recorded id, gets a fresh conversation.
@@ -298,7 +302,7 @@ One hidden browser per project (separate profile, so logins persist), one tab pe
 
 | Method | Returns | What it does |
 |---|---|---|
-| `BrowserOpen(id, url)` | `BrowserState` | opens the session's tab, starting the browser if needed; `url` "" means the project's `url`, else a blank page. Rejects when that first page cannot be opened; the tab then stays open and `browser:state` has it. Two calls for one session share one tab |
+| `BrowserOpen(id, url)` | `BrowserState` | opens the session's tab, starting the browser if needed; `url` "" means the project's `browser_start_url`, else a blank page. Rejects when that first page cannot be opened; the tab then stays open and `browser:state` has it. Two calls for one session share one tab |
 | `BrowserGoto(id, url)` | | a bare host gets `https://`; localhost, IPs and `.local` get `http://` |
 | `BrowserNav(id, action)` | | `'back' \| 'forward' \| 'reload' \| 'stop'` |
 | `BrowserInput(id, input)` | | |
@@ -341,7 +345,7 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 | Method | Returns | What it does |
 |---|---|---|
 | `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", cleanup: {merge, close}}`. `cleanup` is the current project's, each `"auto"` or `"manual"`, the defaults filled in |
-| `SetTheme(theme)` | `Settings` | saves the theme to the config file; `system` removes the key. Rejects any other value |
+| `SetTheme(theme)` | `Settings` | saves the theme to `app_theme` in the config file; `system` removes the key. Rejects any other value |
 | `SetCleanup(event, mode)` | `Settings` | saves the current project's clean-up mode for `merge` or `close` to `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 
 ## Events
@@ -363,7 +367,7 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
 | `update` | `{ version: string }` | a release newer than the running one is out; once per release |
-| `awake` | `boolean` | the app took or let go of its idle-sleep assertion: it holds one while a session of any project whose `keep_awake` is on is `working` |
+| `awake` | `boolean` | the app took or let go of its idle-sleep assertion: it holds one while a session of any project whose `keep_mac_awake` is on is `working` |
 | `warnings` | `Warning` | a service met a failure it cannot show otherwise: tmux could not be listed (`tmux`; the sessions stay as they were), `gh` could not name the repo (`github`; retried after 30 s), pull requests or worktrees could not be read (`pull requests`, `worktrees`). Sent once per distinct message of a source, and again with `message: ""` when the source works |
 
 Opening a web address is the front end's job: the window runtime's `BrowserOpenURL`, else `window.open`. No Go method does it.
@@ -380,33 +384,33 @@ folders are served. Use the URL in `<img src>`.
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
-agent: claude                  # claude (the default, with hooks) or any command, which runs plain
+agent_command: claude          # claude (the default, with hooks) or any command, which runs plain
 session_model: ""              # model of every Claude session unless a project, action or issue label says otherwise; "" leaves it to claude
 session_effort: ""             # low, medium, high, xhigh or max; "" leaves it to claude
-keep_awake: true               # stop the Mac idle-sleeping while a session works; a project may set its own
-theme: dark                    # light or dark; unset follows the macOS appearance. The settings panel writes it
+keep_mac_awake: true          # stop the Mac idle-sleeping while a session works; a project may set its own
+app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
 projects:
   - name: livedocument
-    dir: /Users/me/code/livedocument
+    directory: /Users/me/code/livedocument
     # everything below is optional; the values shown are the defaults
     queue_sections: []         # the groups of the queue, in order; see below
     note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
     session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter
     session_model: ""          # this project's model; "" uses the top-level one
     session_effort: ""         # this project's effort; "" uses the top-level one
-    branch: ""                 # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
-    remove_worktree: ""        # shell command that removes a worktree; {branch}, {worktree}; "" runs git worktree remove
-    cleanup:                   # does the app clean up by itself? The settings panel writes it
+    session_branch_fallback: "" # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
+    session_cleanup_command: "" # shell command that cleans up the git side of a session; {branch}, {worktree}, {dir}, e.g. "git worktree remove {worktree} && git branch -D {branch}"; "" leaves branches and folders alone
+    session_cleanup_mode:      # does the app clean up by itself? The settings panel writes it
       merge: auto              # auto or manual: after the pull request merged; auto needs the session to have seen it open
       close: manual            # auto or manual: after the pull request closed unmerged; auto needs the session to have seen it open
-    url: ""                    # page a session's browser opens first
-    browser: true              # tell sessions about the browser and evidence commands
-    digest: weekly             # weekly or off
-    keep_awake: true           # this project's choice; unset follows the top-level one
-    pr_watch: ""               # webhook or poll; "" tries gh webhook forward and polls when it does not work
-    pr_poll: 30s               # how often to poll the pull requests; at least 1s
-    on_review: ""              # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
-    on_checks: ""              # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
+    browser_start_url: ""      # page a session's browser opens first
+    browser_enabled: true      # tell sessions about the browser and evidence commands
+    digest_schedule: weekly    # weekly or off
+    keep_mac_awake: true       # this project's choice; unset follows the top-level one
+    pr_watch_method: ""        # webhook or poll; "" tries gh webhook forward and polls when it does not work
+    pr_poll_interval: 30s      # how often to poll the pull requests; at least 1s
+    pr_review_command: ""      # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
+    pr_checks_command: ""      # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
 ```
 
 ### Queue sections and actions
@@ -446,7 +450,7 @@ ended one, so it outlives a restart. `Session.model` and `Session.effort` show i
 
 ### Keeping the Mac awake
 
-While at least one session is `working`, in any project whose `keep_awake` is on (the project's own setting, else the top-level one, else on), the
+While at least one session is `working`, in any project whose `keep_mac_awake` is on (the project's own setting, else the top-level one, else on), the
 app runs `caffeinate -i -w <app pid>`: the Mac does not idle-sleep and the display still may. It stops when no such session works, when the app
 quits, and when the app dies. The top bar shows a moon while it runs. It does not stop a closed lid from sleeping the Mac unless the Mac is in
 clamshell mode (external display and power connected), and it does not stop a manual sleep or a sleep from low battery.

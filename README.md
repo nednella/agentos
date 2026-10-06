@@ -50,8 +50,13 @@ queue_sections:
 agentos sets no model, effort or command of its own. `docs/contract.md` has the details.
 
 A session's pull request that gets a review, a comment or failing checks flags its row. To also
-send the agent a command, set `on_review` or `on_checks` on the project, for example
-`on_review: "/address-review {n}"`; `docs/contract.md` has the details.
+send the agent a command, set `pr_review_command` or `pr_checks_command` on the project, for example
+`pr_review_command: "/address-review {n}"`; `docs/contract.md` has the details.
+
+When a session's pull request merges, the app removes the session. To also clean up git, set
+`session_cleanup_command` on the project, for example
+`session_cleanup_command: "git worktree remove {worktree} && git branch -D {branch}"`. Without it,
+branches and folders stay as they are.
 
 `⌘K` opens the command palette and `⌘/` lists every shortcut. `agentos --help` lists the command.
 `docs/contract.md` describes the config file at `~/.config/agentos/config.yaml` and every key.
