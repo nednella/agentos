@@ -347,11 +347,12 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", textScale, keepAwake, cleanup: {merge, close}, browserEnabled, digestSchedule}`. `textScale` is a multiple of the default text size (1 when unset). `keepAwake` is the top-level `keep_mac_awake`. `cleanup`, `browserEnabled` and `digestSchedule` are the current project's, the defaults filled in: `cleanup` has each of `merge` and `close` as `"auto"` or `"manual"`, `digestSchedule` is `"weekly"` or `"off"` |
+| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", textScale, keepAwake, cleanup: {merge, close}, promptSend, browserEnabled, digestSchedule}`. `textScale` is a multiple of the default text size (1 when unset). `keepAwake` is the top-level `keep_mac_awake`. `cleanup`, `promptSend`, `browserEnabled` and `digestSchedule` are the current project's, the defaults filled in: `cleanup` has each of `merge` and `close` as `"auto"` or `"manual"`, `promptSend` is `"auto"` or `"manual"`, `digestSchedule` is `"weekly"` or `"off"` |
 | `SetTheme(theme)` | `Settings` | saves the theme to `app_theme` in the config file; `system` removes the key. Rejects any other value |
 | `SetCleanup(event, mode)` | `Settings` | saves the current project's clean-up mode for `merge` or `close` to `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 | `SetTextScale(scale)` | `Settings` | saves the text size to `app_text_scale`; 1 removes the key. Rejects a value below 0.85 or above 1.5 |
 | `SetKeepAwake(on)` | `Settings` | saves the top-level `keep_mac_awake`. A project's own `keep_mac_awake` still wins |
+| `SetPromptSend(mode)` | `Settings` | saves the current project's `session_prompt_send`, `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 | `SetBrowserEnabled(on)` | `Settings` | saves the current project's `browser_enabled`. Rejects a project that is not in the config file |
 | `SetDigestSchedule(schedule)` | `Settings` | saves the current project's `digest_schedule`, `weekly` or `off`. Rejects any other value, and a project that is not in the config file |
 
@@ -394,8 +395,6 @@ folders are served. Use the URL in `<img src>`.
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
 agent_command: claude          # claude (the default, with hooks) or any command, which runs plain
-session_model: ""              # model of every Claude session unless a project, action or issue label says otherwise; "" leaves it to claude
-session_effort: ""             # low, medium, high, xhigh or max; "" leaves it to claude
 keep_mac_awake: true          # stop the Mac idle-sleeping while a session works; a project may set its own. The settings panel writes it
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
 app_text_scale: 1.2            # text size as a multiple of the default, 0.85 to 1.5; unset is 1. The settings panel writes it
@@ -405,9 +404,7 @@ projects:
     # everything below is optional; the values shown are the defaults
     queue_sections: []         # the groups of the queue, in order; see below
     note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
-    session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter
-    session_model: ""          # this project's model; "" uses the top-level one
-    session_effort: ""         # this project's effort; "" uses the top-level one
+    session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter. The settings panel writes it
     session_branch_fallback: "" # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
     session_cleanup_command: "" # shell command that cleans up the git side of a session; {branch}, {worktree}, {dir}, {force} (--force when forced, else empty), e.g. "git worktree remove {force} {worktree} && git branch -D {branch}"; "" leaves branches and folders alone
     session_cleanup_mode:      # does the app clean up by itself? The settings panel writes it
@@ -447,15 +444,14 @@ queue_sections:
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
 - With no `queue_sections` the queue is one list, `Issue.section` is `""`, and each issue has one action, `Start`, which types `Work on issue #<n>: <title>`. A section with no actions has that same action.
 
-The old `lanes`, `commands` and `models` keys, and the built-in model, effort and commands, are gone. They are not read.
+The old `lanes`, `commands`, `models`, `session_model` and `session_effort` keys, and the built-in model, effort and commands, are gone. They are not read, and the app removes `session_model` and `session_effort` from the file the next time it saves a setting.
 
 ### How a session picks its model
 
 Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets
 a value, model and effort each on their own: the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored); the
-action's `model` and `effort`; the project's `session_model` and `session_effort`; the top-level ones. When none sets a value, no flag is passed and
-claude uses its own default. A session started for an issue uses the action and the labels; a new session or one started from a note uses the
-project's setting and the top-level one. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`) and in the state file of an
+action's `model` and `effort`. When none sets a value, no flag is passed and claude uses its own default. A session started for an issue uses
+the action and the labels; a new session or one started from a note passes no flag. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`) and in the state file of an
 ended one, so it outlives a restart. `Session.model` and `Session.effort` show it ("" when none was set), and each wait in the tally records the model.
 
 ### Keeping the Mac awake
