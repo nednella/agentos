@@ -77,7 +77,6 @@ export type Agentos = {
   setSessionView(id: string, view: SessionView): void
   cycleSessionView(delta: -1 | 1): void
   openBrowser(id: string, url?: string): Promise<void>
-  harnessCheck(): Promise<void>
   runDigest(): Promise<void>
   digestToNote(itemId: string): Promise<void>
   dismissDigestItem(itemId: string): Promise<void>
@@ -534,9 +533,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         } else if (url) {
           await api.browserGoto(id, url)
         }
-      },
-      async harnessCheck() {
-        addSession(await api.harnessCheck())
       },
       async runDigest() {
         await api.runDigest()
