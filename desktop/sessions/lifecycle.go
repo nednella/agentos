@@ -62,12 +62,13 @@ type Cleanup struct {
 // branches it reported or was seen on, oldest first; a session of an issue with none works on the
 // project's branch pattern, when it sets one.
 type target struct {
-	id, title string
-	issue     int
-	branches  []string
-	proj      project.Project
-	model     project.Model // what the session ran, so a replacement for an ended one runs the same
-	ended     bool
+	id, title    string
+	issue        int
+	branches     []string
+	proj         project.Project
+	model        project.Model // what the session ran, so a replacement for an ended one runs the same
+	ended        bool
+	conversation string // the agent's id for its conversation, "" when unknown
 }
 
 // track is what is known about the pull request and clean-up of one session.

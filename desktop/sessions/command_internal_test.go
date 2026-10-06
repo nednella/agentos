@@ -34,11 +34,40 @@ func TestClaudeGetsTheBrowserPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
-			argv := s.commandFor(session.Name{Project: "p", N: 1}, tt.proj, project.Model{})
+			argv := s.commandFor(session.Name{Project: "p", N: 1}, tt.proj, project.Model{}, "")
 			i := slices.Index(argv, "--append-system-prompt")
 			if (i >= 0) != tt.want || (tt.want && argv[i+1] != prompts.BrowserSession()) {
 				t.Errorf("argv = %q", argv)
 			}
 		})
+	}
+}
+
+func TestCommandResumesAConversation(t *testing.T) {
+	name := session.Name{Project: "p", N: 1}
+	claude := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
+	argv := claude.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc")
+	if i := slices.Index(argv, "--resume"); i < 0 || argv[i+1] != "abc" {
+		t.Errorf("argv = %q", argv)
+	}
+	plain := &Sessions{agent: agent.Plain{Argv: []string{"bash"}}, browsers: fakeBrowsers{}}
+	if argv := plain.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc"); !slices.Equal(argv, []string{"bash"}) {
+		t.Errorf("argv = %q", argv)
+	}
+}
+
+func TestConversationOfARunningAndAnEndedSession(t *testing.T) {
+	s := &Sessions{
+		records: map[string]session.Record{"p/1": {Conversation: "live"}},
+		ended:   map[string]*endedSession{"p/2": {rec: session.Record{Conversation: "gone"}}},
+	}
+	if got := s.conversationOf("p/1"); got != "live" {
+		t.Errorf("running: %q", got)
+	}
+	if got := s.conversationOf("p/2"); got != "gone" {
+		t.Errorf("ended: %q", got)
+	}
+	if got := s.conversationOf("p/3"); got != "" {
+		t.Errorf("unknown: %q", got)
 	}
 }
