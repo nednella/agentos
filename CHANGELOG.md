@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.3.0](https://github.com/nednella/agentos/compare/v0.2.0...v0.3.0) (2026-10-06)
+
+
+### Features
+
+* **desktop:** create a new project from the app ([#106](https://github.com/nednella/agentos/issues/106)) ([3616e60](https://github.com/nednella/agentos/commit/3616e602d253c3e267cd7805e92da5582df69036))
+* **desktop:** create a project with a folder, README and GitHub repo ([7fdb00e](https://github.com/nednella/agentos/commit/7fdb00eaf6dc406bab50e9fc210ef27fcfda34c8))
+* **ui:** add New project to the project panel ([230fa38](https://github.com/nednella/agentos/commit/230fa38faf616f2554520e2474aa274f73ef4e24))
+
+
+### Bug Fixes
+
+* **desktop:** create the GitHub repo public ([b0aaee4](https://github.com/nednella/agentos/commit/b0aaee44364d11074aad6130f21beb8858295749))
+* name the local app bundle agentos-dev.app; stop sessions killing by name ([#102](https://github.com/nednella/agentos/issues/102)) ([0ca3203](https://github.com/nednella/agentos/commit/0ca320396e8e1442fa073d7243a3568ba87c27b8))
+* **ui:** send terminal resize once a drag settles ([8a853b3](https://github.com/nednella/agentos/commit/8a853b3ec85ae7060e0cc515129a2fd265cf181e))
+* **ui:** send terminal resize once a drag settles ([#104](https://github.com/nednella/agentos/issues/104)) ([46c2efd](https://github.com/nednella/agentos/commit/46c2efd43644f465cb2f984e3c913297cd63b8cb))
+
 ## [0.2.0](https://github.com/nednella/agentos/compare/v0.1.0...v0.2.0) (2026-10-06)
 
 
