@@ -102,7 +102,7 @@ type Note = {
 
 type Snapshot = {
   project: Project      // project.key says which project the rest is about; drop events of another key
-  projects: Project[]   // every known project: configured, current, and any with live sessions
+  projects: Project[]   // every known project: configured with a folder on this machine, current, and any with live sessions
   sessions: Session[]   // current project, sorted: waiting, idle, working, ended; newest event first in a group
   shell: string         // the current project's shell session id ("<key>/shell"), "" until ShellOpen
   notes: Note[]         // current project: not archived before archived; pinned first, then newest first
