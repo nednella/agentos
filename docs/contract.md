@@ -345,9 +345,15 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", cleanup: {merge, close}}`. `cleanup` is the current project's, each `"auto"` or `"manual"`, the defaults filled in |
+| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", textScale, keepAwake, cleanup: {merge, close}, browserEnabled, digestSchedule}`. `textScale` is a multiple of the default text size (1 when unset). `keepAwake` is the top-level `keep_mac_awake`. `cleanup`, `browserEnabled` and `digestSchedule` are the current project's, the defaults filled in: `cleanup` has each of `merge` and `close` as `"auto"` or `"manual"`, `digestSchedule` is `"weekly"` or `"off"` |
 | `SetTheme(theme)` | `Settings` | saves the theme to `app_theme` in the config file; `system` removes the key. Rejects any other value |
 | `SetCleanup(event, mode)` | `Settings` | saves the current project's clean-up mode for `merge` or `close` to `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
+| `SetTextScale(scale)` | `Settings` | saves the text size to `app_text_scale`; 1 removes the key. Rejects a value below 0.85 or above 1.5 |
+| `SetKeepAwake(on)` | `Settings` | saves the top-level `keep_mac_awake`. A project's own `keep_mac_awake` still wins |
+| `SetBrowserEnabled(on)` | `Settings` | saves the current project's `browser_enabled`. Rejects a project that is not in the config file |
+| `SetDigestSchedule(schedule)` | `Settings` | saves the current project's `digest_schedule`, `weekly` or `off`. Rejects any other value, and a project that is not in the config file |
+
+A saved setting applies at once; the app reads the config file only when it starts.
 
 ## Events
 
@@ -388,8 +394,9 @@ data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; d
 agent_command: claude          # claude (the default, with hooks) or any command, which runs plain
 session_model: ""              # model of every Claude session unless a project, action or issue label says otherwise; "" leaves it to claude
 session_effort: ""             # low, medium, high, xhigh or max; "" leaves it to claude
-keep_mac_awake: true          # stop the Mac idle-sleeping while a session works; a project may set its own
+keep_mac_awake: true          # stop the Mac idle-sleeping while a session works; a project may set its own. The settings panel writes it
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
+app_text_scale: 1.2            # text size as a multiple of the default, 0.85 to 1.5; unset is 1. The settings panel writes it
 projects:
   - name: livedocument
     directory: /Users/me/code/livedocument
@@ -405,8 +412,8 @@ projects:
       merge: auto              # auto or manual: after the pull request merged; auto needs the session to have seen it open
       close: manual            # auto or manual: after the pull request closed unmerged; auto needs the session to have seen it open
     browser_start_url: ""      # page a session's browser opens first
-    browser_enabled: true      # tell sessions about the browser and evidence commands
-    digest_schedule: weekly    # weekly or off
+    browser_enabled: true      # tell sessions about the browser and evidence commands. The settings panel writes it
+    digest_schedule: weekly    # weekly or off. The settings panel writes it
     keep_mac_awake: true       # this project's choice; unset follows the top-level one
     pr_watch_method: ""        # webhook or poll; "" tries gh webhook forward and polls when it does not work
     pr_poll_interval: 30s      # how often to poll the pull requests; at least 1s
