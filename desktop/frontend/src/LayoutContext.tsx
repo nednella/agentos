@@ -130,11 +130,11 @@ function useSystemTheme(): Theme {
 }
 
 export function LayoutProvider({ children }: LayoutProviderProps) {
-  const { selectedId, settings, sidebarTab, setSidebarTab, focus, pushToast, dismissToast } = useAgentos()
+  const { selectedId, settings, setTextScale, sidebarTab, setSidebarTab, focus, report, pushToast, dismissToast } = useAgentos()
   const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
-  const [scale, setScale] = useState(() => readStored('agentos.scale', DEFAULT_SCALE))
+  const scale = settings.textScale
   const systemTheme = useSystemTheme()
   const theme = settings.theme === 'system' ? systemTheme : settings.theme
   const [stored, setStored] = useState(() => readStored<Partial<AllPrefs>>(LAYOUT_KEY, {}))
@@ -249,8 +249,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       zoom(step) {
         const at = SCALES.indexOf(scale)
         const next = step === 0 ? DEFAULT_SCALE : SCALES[Math.min(Math.max((at < 0 ? 2 : at) + step, 0), SCALES.length - 1)]
-        setScale(next)
-        writeStored('agentos.scale', next)
+        report(() => setTextScale(next))
         if (zoomToast.current !== null) dismissToast(zoomToast.current)
         zoomToast.current = pushToast({ tone: 'info', text: `Text size ${Math.round(next * 100)}%` })
       },
@@ -299,7 +298,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, theme, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus],
+    [mode, width, scale, theme, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus, report, setTextScale],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

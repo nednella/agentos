@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues } from './mockIssues'
 import { handleInput, newPage, normalizeUrl, pageRects, pageTitle, renderPage } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -649,7 +649,7 @@ export function createMock(params: URLSearchParams) {
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
-  let settings: Settings = { theme: 'system', cleanup: { merge: 'auto', close: 'manual' } }
+  let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, browserEnabled: true, digestSchedule: 'weekly' }
 
   const backend = {
     Snapshot: async () => snapshot(),
@@ -956,6 +956,22 @@ export function createMock(params: URLSearchParams) {
     },
     SetCleanup: async (event: CleanupEvent, mode: CleanupMode) => {
       settings = { ...settings, cleanup: { ...settings.cleanup, [event]: mode } }
+      return settings
+    },
+    SetTextScale: async (textScale: number) => {
+      settings = { ...settings, textScale }
+      return settings
+    },
+    SetKeepAwake: async (keepAwake: boolean) => {
+      settings = { ...settings, keepAwake }
+      return settings
+    },
+    SetBrowserEnabled: async (browserEnabled: boolean) => {
+      settings = { ...settings, browserEnabled }
+      return settings
+    },
+    SetDigestSchedule: async (digestSchedule: DigestSchedule) => {
+      settings = { ...settings, digestSchedule }
       return settings
     },
     Update: async () => {
