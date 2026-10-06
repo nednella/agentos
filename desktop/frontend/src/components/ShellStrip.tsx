@@ -1,7 +1,8 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
+import { Icon } from './Icon'
 import { ShellList } from './ShellList'
 import { ShellTerminal } from './ShellTerminal'
 
@@ -13,8 +14,9 @@ const cornerPad = { paddingLeft: 'var(--corner-pad)', paddingRight: 'var(--corne
 const terminalInset = { marginLeft: 'calc(var(--corner-pad) - 0.75rem)', marginRight: 'calc(var(--corner-pad) - 0.75rem)', marginBottom: '0.375rem' }
 
 export function ShellStrip() {
-  const { project, shellIds, focus } = useAgentos()
+  const { project, shellIds, shellId, focus } = useAgentos()
   const { shellOpen, shellRem, setShellOpen, setShellHeight, resetShellHeight } = useLayout()
+  const [listOpen, setListOpen] = useState(true)
   const drag = useRef<{ y: number; rem: number; root: number } | null>(null)
 
   const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize)
@@ -79,20 +81,30 @@ export function ShellStrip() {
         onPointerUp={onPointerUp}
         onDoubleClick={resetShellHeight}
       />
-      <button
-        className="panel-head flex w-full items-center gap-2 border-b border-line text-left"
-        style={{ ...cornerPad, height: `${HEADER_REM}rem` }}
-        aria-label="Collapse the shell"
-        onClick={() => setShellOpen(false)}
-      >
-        <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
-        <span className="text-small text-dim">Shell</span>
-      </button>
+      <div className="panel-head flex items-center border-b border-line" style={{ ...cornerPad, height: `${HEADER_REM}rem` }}>
+        <button className="flex h-full flex-1 items-center gap-2 text-left" aria-label="Collapse the shell" onClick={() => setShellOpen(false)}>
+          <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
+          <span className="text-small text-dim">Shell{shellIds.length > 1 ? ` ${shellIds.indexOf(shellId) + 1}` : ''}</span>
+        </button>
+        {shellIds.length > 0 && (
+          <button
+            className="flex h-full items-center text-dim hover:text-ink"
+            title={listOpen ? 'Hide the shell list' : 'Show the shell list'}
+            aria-label={listOpen ? 'Hide the shell list' : 'Show the shell list'}
+            aria-expanded={listOpen}
+            onClick={() => setListOpen(!listOpen)}
+          >
+            <span className={`transition-transform duration-150 ${listOpen ? '' : 'rotate-180'}`}>
+              <Icon name="chevron" size={15} />
+            </span>
+          </button>
+        )}
+      </div>
       <div className="flex" style={{ height: `${shellRem}rem`, marginBottom: '0.375rem' }}>
         <div className="relative min-w-0 flex-1" style={{ marginLeft: terminalInset.marginLeft }}>
           <ShellTerminal visible />
         </div>
-        {shellIds.length > 0 && <ShellList />}
+        {shellIds.length > 0 && listOpen && <ShellList />}
       </div>
     </div>
   )
