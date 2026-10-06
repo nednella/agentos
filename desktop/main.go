@@ -73,7 +73,7 @@ func launch() error {
 			}
 		},
 		PickDir: func() (string, error) {
-			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Add a project folder", CanCreateDirectories: true})
+			return runtime.OpenDirectoryDialog(*window.Load(), runtime.OpenDialogOptions{Title: "Choose a folder", CanCreateDirectories: true})
 		},
 		Quit: func() {
 			if c := window.Load(); c != nil {

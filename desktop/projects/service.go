@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/internal/project"
@@ -52,13 +53,14 @@ type Service struct {
 	notes    Notes
 	repos    Repos
 	releases Releases
+	run      run.Runner
 	stateDir string
 	pickDir  func() (string, error) // "" when the user cancels
 	ctx      func() context.Context
 }
 
-func NewService(r *Registry, s Sessions, n Notes, repos Repos, releases Releases, stateDir string, pickDir func() (string, error), ctx func() context.Context) *Service {
-	return &Service{registry: r, sessions: s, notes: n, repos: repos, releases: releases, stateDir: stateDir, pickDir: pickDir, ctx: ctx}
+func NewService(r *Registry, s Sessions, n Notes, repos Repos, releases Releases, runner run.Runner, stateDir string, pickDir func() (string, error), ctx func() context.Context) *Service {
+	return &Service{registry: r, sessions: s, notes: n, repos: repos, releases: releases, run: runner, stateDir: stateDir, pickDir: pickDir, ctx: ctx}
 }
 
 // Snapshot is everything the screen needs; call it on load.

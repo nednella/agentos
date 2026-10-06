@@ -278,20 +278,21 @@ func Eventually(t *testing.T, what string, cond func() bool) {
 // FakeGH answers the gh calls with canned output; any other command runs for real.
 
 type FakeGH struct {
-	mu        sync.Mutex
-	calls     []string
-	Repo      error
-	Create    string        // what gh issue create prints
-	CreateErr error         // what gh issue create fails with, if set; it still prints Create
-	Delay     time.Duration // how long gh issue create takes
-	Releases  string        // what the releases API answers; "" fails the check
-	pr        string        // what gh pr list prints
-	PRErr     error         // what gh pr list fails with, if set
-	IssuesErr error         // what gh issue list fails with, if set
-	pulls     string        // the body gh api prints for the repo's pull request list
-	etag      string        // its ETag: a request carrying it gets a 304
-	hooks     []*io.PipeWriter
-	hooked    bool // gh webhook forward works
+	mu            sync.Mutex
+	calls         []string
+	Repo          error
+	CreateRepoErr error         // what gh repo create fails with, if set
+	Create        string        // what gh issue create prints
+	CreateErr     error         // what gh issue create fails with, if set; it still prints Create
+	Delay         time.Duration // how long gh issue create takes
+	Releases      string        // what the releases API answers; "" fails the check
+	pr            string        // what gh pr list prints
+	PRErr         error         // what gh pr list fails with, if set
+	IssuesErr     error         // what gh issue list fails with, if set
+	pulls         string        // the body gh api prints for the repo's pull request list
+	etag          string        // its ETag: a request carrying it gets a 304
+	hooks         []*io.PipeWriter
+	hooked        bool // gh webhook forward works
 }
 
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
@@ -321,6 +322,8 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			return []byte("[]"), nil
 		}
 		return []byte(f.pr), nil
+	case args[0] == "repo" && args[1] == "create":
+		return nil, f.CreateRepoErr
 	case args[0] == "repo":
 		if f.Repo != nil {
 			return nil, f.Repo
@@ -716,6 +719,9 @@ func (h *Harness) SwitchProject(name string) (projects.Snapshot, error) {
 func (h *Harness) AddProject() (projects.Snapshot, error) { return h.projects.AddProject() }
 func (h *Harness) AddProjectDir(dir string) (projects.Snapshot, error) {
 	return h.projects.AddProjectDir(dir)
+}
+func (h *Harness) NewProject(name string) (projects.Snapshot, error) {
+	return h.projects.NewProject(name)
 }
 func (h *Harness) RemoveProject(name string) (projects.Snapshot, error) {
 	return h.projects.RemoveProject(name)
