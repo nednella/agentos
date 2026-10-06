@@ -265,7 +265,7 @@ An `auto` event cleans up when the PR reached it after the session saw the PR dr
 
 The git side of a clean-up belongs to the project: the app runs `session_cleanup_command` through `sh -c` in the project folder, once per branch of the session that has a
 worktree or a local branch, after the safety checks and before it removes its own session. `{branch}`, `{worktree}` (the folder the branch is checked out in, `''` if none)
-and `{dir}` (the project folder) are shell-quoted. A command that fails stops the clean-up with `blocked` and the command's error. With no command, a clean-up removes only the session:
+and `{dir}` (the project folder) are shell-quoted. A command that fails stops the clean-up with `blocked` and the command's error, unless the branch no longer exists locally and no worktree has it checked out: then the error is logged on the clean-up entry and the clean-up carries on. With no command, a clean-up removes only the session:
 branches and folders stay. An ended session's PR is tracked like a live one's until its row is dismissed or cleaned up, so a merge after the
 agent finished still cleans up, and the row shows the PR merged.
 
