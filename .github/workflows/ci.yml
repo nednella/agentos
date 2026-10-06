@@ -20,7 +20,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: desktop/frontend/package-lock.json
-      - run: brew install tmux
+      # The tests' plain agent is bash; macOS's own 3.2 has no bracketed paste, so pasted line breaks would run.
+      - run: brew install tmux bash
       - run: make desktop-frontend
       - run: go vet ./...
       # -p 1: many packages' tests start a real tmux server, real PTYs or a real headless
