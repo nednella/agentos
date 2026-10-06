@@ -944,20 +944,24 @@ func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
 
 // learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
 // not the main one.
-func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string) {
+func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string, turnEnded bool) {
 	if branch, ok := l.workBranch(ctx, proj, cwd); ok {
-		l.track(ctx, id, proj, branch)
+		l.track(ctx, id, proj, branch, turnEnded)
 	}
 }
 
 // track notes branch as the newest one the session works on and looks up its pull request.
-func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string) {
+// A branch it already knows is looked up again only when the turn ended: the agent may just have opened the PR.
+func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string, turnEnded bool) {
 	key := proj.Key()
 	l.mu.Lock()
 	f := l.prs(key)
 	known := f.Branches[id]
 	if len(known) > 0 && known[len(known)-1] == branch {
 		l.mu.Unlock()
+		if turnEnded {
+			l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
+		}
 		return
 	}
 	f.Branches[id] = append(slices.DeleteFunc(slices.Clone(known), func(b string) bool { return b == branch }), branch)
