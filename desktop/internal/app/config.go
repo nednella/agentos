@@ -65,11 +65,12 @@ func Load() (Config, error) {
 	current := project.Project{}
 	if dir == "/" {
 		last := projects.ReadLast(stateDir)
-		switch i := slices.IndexFunc(cfg.Projects, func(p project.Project) bool { return p.Name == last }); {
+		here := slices.DeleteFunc(slices.Clone(cfg.Projects), func(p project.Project) bool { return !p.Present() })
+		switch i := slices.IndexFunc(here, func(p project.Project) bool { return p.Name == last }); {
 		case i >= 0:
-			current = cfg.Projects[i]
-		case len(cfg.Projects) > 0:
-			current = cfg.Projects[0]
+			current = here[i]
+		case len(here) > 0:
+			current = here[0]
 		default:
 			current = cfg.Resolve(home)
 		}

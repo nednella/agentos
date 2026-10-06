@@ -37,6 +37,12 @@ type Project struct {
 	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
 }
 
+// Present says whether the project's folder exists on this machine.
+func (p Project) Present() bool {
+	info, err := os.Stat(p.Dir)
+	return err == nil && info.IsDir()
+}
+
 // Config is the optional ~/.config/agentos/config.yaml.
 type Config struct {
 	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
