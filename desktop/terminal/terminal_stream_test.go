@@ -121,9 +121,9 @@ func TestClipboardFromTheAgent(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "the clipboard", func() bool { return h.Rec.HasClip("copied-text") })
-	if !strings.Contains(h.Rec.Output(s.ID), "\x1b]52;") {
-		t.Error("the OSC 52 bytes were not forwarded")
-	}
+	// The clipboard copy runs synchronously off each PTY read; the matching term:data event
+	// waits for the output flush timer, so it can still be pending once HasClip turns true.
+	eventually(t, "the OSC 52 bytes forwarded in the output", func() bool { return strings.Contains(h.Rec.Output(s.ID), "\x1b]52;") })
 }
 
 func TestTerminalAttachesToTheShell(t *testing.T) {
