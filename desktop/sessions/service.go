@@ -21,12 +21,21 @@ type ShellInfo struct {
 	ID string `json:"id"`
 }
 
-// ShellOpen makes sure the current project has a shell session and returns its id.
+// ShellOpen makes sure the current project has a shell session and returns the first one's id.
 // Attach to it with TermOpen like any session; it is not a session row.
 func (v *Service) ShellOpen() (ShellInfo, error) {
 	id, err := v.s.OpenShell()
 	return ShellInfo{ID: id}, err
 }
+
+// ShellNew starts another shell in the current project and returns its id.
+func (v *Service) ShellNew() (ShellInfo, error) {
+	id, err := v.s.NewShell()
+	return ShellInfo{ID: id}, err
+}
+
+// ShellClose stops one shell of the current project.
+func (v *Service) ShellClose(id string) error { return v.s.CloseShell(id) }
 
 // KillSession stops the agent; its row stays as ended.
 func (v *Service) KillSession(id string) error { return v.s.Kill(id) }
