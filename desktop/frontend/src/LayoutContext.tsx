@@ -6,6 +6,7 @@ import { devFlags } from './api'
 import { readStored, writeStored } from './storage'
 
 export type Theme = 'dark' | 'light'
+const DARK_QUERY = '(prefers-color-scheme: dark)'
 export type Band = 'compact' | 'medium' | 'wide'
 export type LayoutMode = 'narrow' | Band
 export type Panel = 'sidebar' | 'terminal' | 'sessions' | 'shell'
@@ -118,13 +119,26 @@ function fit(width: number, prefs: BandPrefs, root: number): Fitted {
 
 type LayoutProviderProps = { children: ReactNode }
 
+function useSystemTheme(): Theme {
+  const [theme, setTheme] = useState<Theme>(() => (matchMedia(DARK_QUERY).matches ? 'dark' : 'light'))
+  useEffect(() => {
+    const query = matchMedia(DARK_QUERY)
+    const onChange = (e: MediaQueryListEvent) => setTheme(e.matches ? 'dark' : 'light')
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+  return theme
+}
+
 export function LayoutProvider({ children }: LayoutProviderProps) {
   const { selectedId, sidebarTab, setSidebarTab, focus, pushToast, dismissToast } = useAgentos()
   const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode
   const [scale, setScale] = useState(() => readStored('agentos.scale', DEFAULT_SCALE))
-  const [theme, setTheme] = useState<Theme>(() => readStored<Theme>('agentos.theme', 'dark'))
+  const [chosenTheme, setChosenTheme] = useState(() => readStored<Theme | null>('agentos.theme', null))
+  const systemTheme = useSystemTheme()
+  const theme = chosenTheme ?? systemTheme
   const [stored, setStored] = useState(() => readStored<Partial<AllPrefs>>(LAYOUT_KEY, {}))
   const [peek, setPeek] = useState<SidePanel | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
@@ -244,7 +258,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       toggleTheme() {
         const next = theme === 'dark' ? 'light' : 'dark'
-        setTheme(next)
+        setChosenTheme(next)
         writeStored('agentos.theme', next)
       },
       setMobilePanel,

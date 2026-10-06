@@ -104,8 +104,7 @@ func launch() error {
 		// The Edit menu is what makes ⌘C, ⌘V and ⌘X reach the web view on macOS. Select All loses its key in stripMenuShortcuts.
 		Menu: menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
 		Mac: &mac.Options{
-			TitleBar:   mac.TitleBarHiddenInset(),
-			Appearance: mac.NSAppearanceNameDarkAqua,
+			TitleBar: mac.TitleBarHiddenInset(),
 		},
 	})
 }
