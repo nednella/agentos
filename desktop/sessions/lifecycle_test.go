@@ -380,6 +380,36 @@ func TestCleanupCommandFailureStopsBeforeTheSession(t *testing.T) {
 	}
 }
 
+func TestCleanupCommandFailureWithNothingLeftCleansUpTheSession(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git worktree remove --force {worktree} && git branch -D {branch}; exit 3"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "clean-up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Errorf("worktree exists %v, branches %q", exists(wt), branches(t, h.Dir))
+	}
+	log := h.Cleanups()
+	if len(log) != 1 || log[0].Status != "done" || !strings.Contains(strings.Join(log[0].Removed, "|"), "failed with nothing left: sh -c: exit status 3") {
+		t.Errorf("log = %+v", log)
+	}
+}
+
+func TestCleanupCommandFailureWithABranchLeftStillBlocks(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git worktree remove --force {worktree}; exit 3"})
+	repoFixture(t, h)
+	issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+
+	openThenMerge(h)
+	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if got, _ := h.Session(s.ID); !strings.Contains(got.CleanupReason, "the clean-up command failed for issue-7") {
+		t.Errorf("reason = %q", got.CleanupReason)
+	}
+}
+
 func TestSessionWithoutIssueIsNeverCleanedUp(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
