@@ -332,6 +332,13 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 |---|---|---|
 | `Awake()` | `boolean` | whether the app holds off idle sleep now; later changes arrive as `awake` |
 
+### Settings (`settings`)
+
+| Method | Returns | What it does |
+|---|---|---|
+| `Settings()` | `Settings` | the app settings: `{theme: "system" \| "light" \| "dark"}` |
+| `SetTheme(theme)` | `Settings` | saves the theme to the config file; `system` removes the key. Rejects any other value |
+
 ## Events
 
 | Name | Payload | When |
@@ -364,7 +371,7 @@ folders are served. Use the URL in `<img src>`.
 
 ## Config file
 
-`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, and keeps every key below, its comments and its `~` paths.
+`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed and when a setting changes, and keeps every key below, its comments and its `~` paths.
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
@@ -372,6 +379,7 @@ agent: claude                  # claude (the default, with hooks) or any command
 model: sonnet                  # model of every Claude session unless a project, lane or issue label says otherwise
 effort: medium                 # low, medium, high, xhigh or max
 keep_awake: true               # stop the Mac idle-sleeping while a session works; a project may set its own
+theme: dark                    # light or dark; unset follows the macOS appearance. The settings panel writes it
 projects:
   - name: livedocument
     dir: /Users/me/code/livedocument

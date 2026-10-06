@@ -23,10 +23,11 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
     run: () => layout.zoom(0),
   },
   {
-    id: 'toggle-theme',
-    label: 'Toggle light and dark theme',
+    id: 'settings',
+    label: 'Settings',
     group: 'App',
-    run: layout.toggleTheme,
+    shortcut: { key: ',' },
+    run: () => a.setOverlay('settings'),
   },
   {
     id: 'stats',

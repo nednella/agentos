@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session, Snapshot, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, Digest, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -17,7 +17,7 @@ export type Toast = {
 export type SessionView = 'terminal' | 'browser' | 'evidence'
 export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
-export type Overlay = 'palette' | 'projects' | 'shortcuts' | { issue: number } | null
+export type Overlay = 'palette' | 'projects' | 'shortcuts' | 'settings' | { issue: number } | null
 export type SidebarTab = 'queue' | 'notes'
 export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
 export type PendingImage = { base64: string; mime: string }
@@ -39,6 +39,7 @@ export type Agentos = {
   digest: Digest | null
   digestUnseen: boolean
   awake: boolean
+  settings: Settings
   toasts: Toast[]
   overlay: Overlay
   sidebarTab: SidebarTab
@@ -91,6 +92,7 @@ export type Agentos = {
   setSidebarTab(tab: SidebarTab): void
   setNoteDraft(text: string): void
   setOverlay(overlay: Overlay): void
+  setTheme(theme: ThemeSetting): Promise<void>
   setComposing(open: boolean): void
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
@@ -142,6 +144,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
+  const [settings, setSettings] = useState<Settings>({ theme: 'system' })
   const [shellId, setShellId] = useState('')
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
@@ -288,6 +291,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => {
     report(() => enterFrom(api.snapshot()))
     report(async () => setAwake(await api.awake()))
+    report(async () => setSettings(await api.settings()))
   }, [enterFrom, report])
 
   // Events of a project can arrive after a switch to another one.
@@ -430,6 +434,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       digest,
       digestUnseen,
       awake,
+      settings,
       toasts,
       overlay,
       sidebarTab,
@@ -617,6 +622,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setSidebarTab,
       setNoteDraft,
       setOverlay,
+      async setTheme(theme) {
+        setSettings(await api.setTheme(theme))
+      },
       setComposing,
       setIssueFilter(query) {
         setIssueFilterState(query)
@@ -627,7 +635,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

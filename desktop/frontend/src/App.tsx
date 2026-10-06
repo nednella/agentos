@@ -5,6 +5,7 @@ import { MobileTabs } from './components/MobileTabs'
 import { Palette } from './components/Palette'
 import { ProjectPanel } from './components/ProjectPanel'
 import { SessionsPanel } from './components/SessionsPanel'
+import { SettingsPanel } from './components/SettingsPanel'
 import { ShortcutsSheet } from './components/ShortcutsSheet'
 import { ShellPanel } from './components/ShellPanel'
 import { ShellStrip } from './components/ShellStrip'
@@ -49,6 +50,7 @@ export function App() {
       <ProjectPanel />
       <IssueDialog />
       <ShortcutsSheet />
+      <SettingsPanel />
       <Toasts />
     </div>
   )

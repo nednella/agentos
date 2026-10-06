@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, IssueDetail, Note, Session, Snapshot, Stats, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, Digest, EventMap, Evidence, Issue, IssueDetail, Note, Session, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -53,6 +53,8 @@ type Backend = {
   DismissDigestItem(itemId: string): Promise<void>
   Update(): Promise<void>
   Awake(): Promise<boolean>
+  Settings(): Promise<Settings>
+  SetTheme(theme: ThemeSetting): Promise<Settings>
 }
 
 type Unsubscribe = () => void
@@ -82,6 +84,7 @@ const namespaces = {
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   update: ['Update'],
   awake: ['Awake'],
+  settings: ['Settings', 'SetTheme'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -155,6 +158,8 @@ export const api = {
   evidence: (id: string) => backend.Evidence(id),
   deleteEvidence: (id: string, evidenceId: string) => backend.DeleteEvidence(id, evidenceId),
   awake: () => backend.Awake(),
+  settings: () => backend.Settings(),
+  setTheme: (theme: ThemeSetting) => backend.SetTheme(theme),
   digest: () => backend.Digest(),
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),

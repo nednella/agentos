@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues } from './mockIssues'
 import { handleInput, newPage, normalizeUrl, pageRects, pageTitle, renderPage } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserInput, BrowserState, Cleanup, Digest, DigestItem, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Snapshot, State, Stats, Wait, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, Digest, DigestItem, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -649,6 +649,8 @@ export function createMock(params: URLSearchParams) {
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
+  let settings: Settings = { theme: 'system' }
+
   const backend = {
     Snapshot: async () => snapshot(),
     Awake: async () => data.some((p) => projectView(p).working > 0),
@@ -944,6 +946,11 @@ export function createMock(params: URLSearchParams) {
     DismissDigestItem: async (itemId: string) => {
       digest = { ...digest, items: digest.items.filter((i) => i.id !== itemId) }
       pushDigest()
+    },
+    Settings: async () => settings,
+    SetTheme: async (theme: ThemeSetting) => {
+      settings = { theme }
+      return settings
     },
     Update: async () => {
       await delay(undefined, 2500)
