@@ -102,11 +102,14 @@ export type CleanupEvent = keyof CleanupSettings
 
 export type DigestSchedule = 'weekly' | 'off'
 
+export type PromptSend = 'auto' | 'manual'
+
 export type Settings = {
   theme: ThemeSetting
   textScale: number
   keepAwake: boolean
   cleanup: CleanupSettings
+  promptSend: PromptSend
   browserEnabled: boolean
   digestSchedule: DigestSchedule
 }

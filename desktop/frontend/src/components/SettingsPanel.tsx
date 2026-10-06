@@ -42,7 +42,7 @@ function SettingRow({ label, hint, children }: SettingRowProps) {
 }
 
 export function SettingsPanel() {
-  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setCleanup, setBrowserEnabled, setDigestSchedule, report } = useAgentos()
+  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setCleanup, setPromptSend, setBrowserEnabled, setDigestSchedule, report } = useAgentos()
   const { scale, zoom } = useLayout()
   if (overlay !== 'settings') return null
 
@@ -81,6 +81,9 @@ export function SettingsPanel() {
           </SettingRow>
           <SettingRow label="Clean up after a close" hint="Auto cleans up when you close the pull request. Manual asks first.">
             <SegmentedControl label="Clean up after a close" options={MODES} value={settings.cleanup.close} onChange={(value) => report(() => setCleanup('close', value))} />
+          </SettingRow>
+          <SettingRow label="Send the first prompt" hint="Auto sends what a new session starts with at once. Manual types it and waits for Enter.">
+            <SegmentedControl label="Send the first prompt" options={MODES} value={settings.promptSend} onChange={(value) => report(() => setPromptSend(value))} />
           </SettingRow>
           <SettingRow label="Browser enabled" hint="Tells new sessions about the browser and evidence commands.">
             <SegmentedControl label="Browser enabled" options={SWITCH} value={settings.browserEnabled ? 'on' : 'off'} onChange={(value) => report(() => setBrowserEnabled(value === 'on'))} />

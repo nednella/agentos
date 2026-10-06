@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Note, Project, Session, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Note, Project, Session, PromptSend, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -100,6 +100,7 @@ export type Agentos = {
   setCleanup(event: CleanupEvent, mode: CleanupMode): Promise<void>
   setTextScale(scale: number): Promise<void>
   setKeepAwake(on: boolean): Promise<void>
+  setPromptSend(mode: PromptSend): Promise<void>
   setBrowserEnabled(on: boolean): Promise<void>
   setDigestSchedule(schedule: DigestSchedule): Promise<void>
   setComposing(open: boolean): void
@@ -153,7 +154,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
-  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, browserEnabled: true, digestSchedule: 'weekly' })
+  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly' })
   const [shellIds, setShellIds] = useState<string[]>([])
   const [pickedShell, setPickedShell] = useState('')
   const shellId = shellIds.includes(pickedShell) ? pickedShell : (shellIds[0] ?? '')
@@ -665,6 +666,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async setKeepAwake(on) {
         setSettings(await api.setKeepAwake(on))
+      },
+      async setPromptSend(mode) {
+        setSettings(await api.setPromptSend(mode))
       },
       async setBrowserEnabled(on) {
         setSettings(await api.setBrowserEnabled(on))
