@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/nednella/agentos/compare/v0.4.0...v0.5.0) (2026-10-06)
+
+
+### Features
+
+* **ui:** follow system light and dark appearance ([c2efba9](https://github.com/nednella/agentos/commit/c2efba92d8ac435b0b9701871db55d315faef5fe))
+
 ## [0.4.0](https://github.com/nednella/agentos/compare/v0.3.1...v0.4.0) (2026-10-06)
 
 
