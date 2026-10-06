@@ -46,6 +46,7 @@ export type Agentos = {
   composing: boolean
   focusRequest: { target: FocusTarget; n: number }
   shellId: string
+  version: string
   update: string
   updating: boolean
   openShell(): Promise<void>
@@ -142,6 +143,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
   const [shellId, setShellId] = useState('')
+  const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
   const [updating, setUpdating] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -251,6 +253,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setProjects(snap.projects)
       setNotes(snap.notes)
       setShellId(snap.shell)
+      setVersion(snap.version)
       setUpdate(snap.update)
       setRawIssues([])
       setIssuesDisabled(false)
@@ -434,6 +437,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       composing,
       focusRequest,
       shellId,
+      version,
       update,
       updating,
       async applyUpdate() {
@@ -623,7 +627,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
