@@ -30,6 +30,10 @@ The app checks for updates when it starts and every hour; click `Update` in the 
 Open `agentos`, add a project folder with `⌘P` → *Add project* (or run `agentos project add` in the
 folder), then press `⌘N` for a session or `Enter` on an issue to start one from it.
 
+A session's pull request that gets a review, a comment or failing checks flags its row. To also
+send the agent a command, set `on_review` or `on_checks` on the project, for example
+`on_review: "/address-review {n}"`; `docs/contract.md` has the details.
+
 `⌘K` opens the command palette and `⌘/` lists every shortcut. `agentos --help` lists the command.
 `docs/contract.md` describes the config file at `~/.config/agentos/config.yaml` and every key.
 
