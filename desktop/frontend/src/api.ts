@@ -10,6 +10,7 @@ type Backend = {
   SwitchProject(name: string): Promise<Snapshot>
   AddProject(): Promise<Snapshot>
   AddProjectDir(dir: string): Promise<Snapshot>
+  NewProject(name: string): Promise<Snapshot>
   RemoveProject(name: string): Promise<Snapshot>
   AddNote(text: string): Promise<Note>
   UpdateNote(id: string, text: string): Promise<Note>
@@ -71,7 +72,7 @@ declare global {
 
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
-  projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'RemoveProject'],
+  projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'RemoveProject'],
   sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'HarnessCheck', 'ShellOpen'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'IssueDetail'],
@@ -114,6 +115,7 @@ export const api = {
   switchProject: (name: string) => backend.SwitchProject(name),
   addProject: () => backend.AddProject(),
   addProjectDir: (dir: string) => backend.AddProjectDir(dir),
+  newProject: (name: string) => backend.NewProject(name),
   removeProject: (name: string) => backend.RemoveProject(name),
   addNote: (text: string) => backend.AddNote(text),
   updateNote: (id: string, text: string) => backend.UpdateNote(id, text),

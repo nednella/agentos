@@ -91,7 +91,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	a.updates = update.New(func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return runner(ctx, "", name, args...)
 	}, c.StateDir, Bundle(), h.Emit, upd.Relaunch, h.Quit)
-	proj := projects.NewService(c.Registry, sess, store, iss, a.updates, c.StateDir, h.PickDir, ctx)
+	proj := projects.NewService(c.Registry, sess, store, iss, a.updates, runner, c.StateDir, h.PickDir, ctx)
 	sessSvc := sessions.NewService(sess, ctx)
 	a.router = control.New(sess, func(name string) error { _, err := proj.SwitchProject(name); return err }, h.Emit)
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}

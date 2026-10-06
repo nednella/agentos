@@ -3,6 +3,7 @@ import { useAgentos } from '../AgentosContext'
 import { useArmedConfirm } from '../useArmedConfirm'
 import { ProjectRow } from './ProjectRow'
 import { Icon } from './Icon'
+import { InlineInput } from './InlineInput'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 
@@ -13,9 +14,10 @@ export function ProjectPanel() {
 }
 
 function ProjectPanelContent() {
-  const { project, projects, switchProject, addProject, removeProject, setOverlay, report } = useAgentos()
+  const { project, projects, switchProject, addProject, newProject, removeProject, setOverlay, report } = useAgentos()
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(Math.max(0, projects.findIndex((p) => p.name === project?.name)))
+  const [naming, setNaming] = useState(false)
   const removal = useArmedConfirm<string>()
 
   const shown = useMemo(() => projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase())), [projects, query])
@@ -77,16 +79,38 @@ function ProjectPanelContent() {
           />
         ))}
       </div>
-      <button
-        className="row h-10 items-center gap-2 border-t border-line px-4 text-soft"
-        onClick={() => {
-          close()
-          report(() => addProject())
-        }}
-      >
-        <Icon name="plus" />
-        Add project…
-      </button>
+      {naming ? (
+        <div className="border-t border-line p-3">
+          <InlineInput
+            placeholder="Name of the new project"
+            blur="cancel"
+            action="Create"
+            icon={<Icon name="plus" />}
+            onSubmit={(name) => {
+              close()
+              report(() => newProject(name))
+            }}
+            onCancel={() => setNaming(false)}
+          />
+        </div>
+      ) : (
+        <div className="flex border-t border-line">
+          <button
+            className="row h-10 flex-1 items-center gap-2 px-4 text-soft"
+            onClick={() => {
+              close()
+              report(() => addProject())
+            }}
+          >
+            <Icon name="plus" />
+            Add project…
+          </button>
+          <button className="row h-10 flex-1 items-center gap-2 border-l border-line px-4 text-soft" onClick={() => setNaming(true)}>
+            <Icon name="plus" />
+            New project…
+          </button>
+        </div>
+      )}
     </Overlay>
   )
 }
