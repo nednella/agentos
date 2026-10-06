@@ -25,7 +25,7 @@ const proxy = (get) => new Proxy({}, { get: (_, name) => get(name) })
 window.go = proxy((pkg) => proxy((type) => proxy((method) => async (...args) => {
   const res = await fetch('/__call/' + pkg + '.' + type + '/' + method, { method: 'POST', headers: { 'X-Agentos': '1' }, body: JSON.stringify(args) })
   const text = await res.text()
-  if (!res.ok) throw text
+  if (!res.ok) throw text.trimEnd()
   return text ? JSON.parse(text) : undefined
 })))
 window.runtime = { EventsOn: (name, handler) => {
