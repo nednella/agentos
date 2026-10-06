@@ -45,6 +45,7 @@ export type Agentos = {
   shellId: string
   openShell(): Promise<void>
   select(id: string): void
+  detach(): void
   stepSession(delta: number): void
   newSession(title?: string): Promise<Session>
   killSession(id: string): Promise<void>
@@ -144,13 +145,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const lastCleanupToast = useRef(0)
   const warningToasts = useRef(new Map<Warning['source'], { message: string; key: number }>())
   const failedBrowserIds = useRef(new Set<string>())
+  const detached = useRef(false)
   sessionsRef.current = sessions
   projectRef.current = project
 
   const selectId = useCallback((id: string | null) => {
     selectedRef.current = id
     setSelectedId(id)
-    if (id) setOpenedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
+    if (!id) return
+    detached.current = false
+    setOpenedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
   }, [])
 
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
@@ -194,7 +198,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       setSessions(list)
       setOpenedIds((ids) => ids.filter((id) => list.some((s) => s.id === id)))
       const current = selectedRef.current
-      if (current && list.some((s) => s.id === current)) return
+      if (detached.current || (current && list.some((s) => s.id === current))) return
       const remembered = list.find((s) => s.id === lastSelected.current.get(projectRef.current?.name ?? ''))
       const next = remembered ?? list[0]
       selectId(next ? next.id : null)
@@ -218,6 +222,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       projectEpoch.current = epoch
       if (projectRef.current && selectedRef.current) lastSelected.current.set(projectRef.current.name, selectedRef.current)
       projectRef.current = snap.project
+      detached.current = false
       selectId(null)
       setProject(snap.project)
       setProjects(snap.projects)
@@ -407,6 +412,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       select(id) {
         selectId(id)
         focus('terminal')
+      },
+      detach() {
+        detached.current = true
+        selectId(null)
+        setOpenedIds([])
       },
       stepSession(delta) {
         const list = sessionsRef.current

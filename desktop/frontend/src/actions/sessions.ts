@@ -41,6 +41,15 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
     },
   },
   {
+    id: 'detach-all',
+    label: 'Detach all sessions',
+    group: 'Sessions',
+    shortcut: { key: 'w', shift: true },
+    run() {
+      a.detach()
+    },
+  },
+  {
     id: 'next-attention',
     label: 'Next that needs you',
     group: 'Sessions',
