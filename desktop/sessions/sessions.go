@@ -91,6 +91,7 @@ type Sessions struct {
 	warn     *warn.Warnings
 
 	createMu sync.Mutex // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
+	shellMu  sync.Mutex // one shell check-and-create at a time: two callers at once would both find no shell and tmux refuses the second
 
 	mu         sync.Mutex
 	ctx        context.Context
@@ -1086,6 +1087,8 @@ func (s *Sessions) ShellID() string {
 // in the project folder, and returns its id. The shell reports nothing: it is
 // not an agent, so it gets no hooks and no session number.
 func (s *Sessions) OpenShell() (string, error) {
+	s.shellMu.Lock()
+	defer s.shellMu.Unlock()
 	s.mu.Lock()
 	ctx, proj := s.ctx, s.project
 	s.mu.Unlock()

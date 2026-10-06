@@ -111,3 +111,25 @@ func TestShellSurvivesARestart(t *testing.T) {
 		t.Errorf("the shell came back as a row: %+v", list)
 	}
 }
+
+func TestConcurrentShellOpensShareOneShell(t *testing.T) {
+	h := shellHarness(t)
+	const calls = 4
+	ids := make(chan string, calls)
+	errs := make(chan error, calls)
+	for range calls {
+		go func() {
+			shell, err := h.ShellOpen()
+			ids <- shell.ID
+			errs <- err
+		}()
+	}
+	for range calls {
+		if err := <-errs; err != nil {
+			t.Errorf("ShellOpen: %v", err)
+		}
+		if id := <-ids; id != "main/shell" {
+			t.Errorf("ShellOpen = %q", id)
+		}
+	}
+}
