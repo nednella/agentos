@@ -14,7 +14,7 @@ import (
 // the local folder's, which never moves.
 var dataNames = []string{"notes.json", "notes-media", "evidence", "stats.jsonl", "digest.json"}
 
-var errDataFixed = errors.New("AGENTOS_DATA_DIR sets the data folder, so it cannot change here")
+var errDataFixed = errors.New("AGENTOS_DEV_DATA_DIR sets the data folder, so it cannot change here")
 
 // DataDirChoice is a folder picked for the data, and whether it is empty, so the data can be copied in.
 type DataDirChoice struct {

@@ -47,7 +47,7 @@ type Settings struct {
 	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
 	Digest    string          `json:"digestSchedule"` // the current project's: weekly or off
 	DataDir   string          `json:"dataDir"`        // the folder the running app keeps notes, evidence, stats and digests in
-	DataFixed bool            `json:"dataDirFixed"`   // AGENTOS_DATA_DIR sets the folder, so it cannot change here
+	DataFixed bool            `json:"dataDirFixed"`   // AGENTOS_DEV_DATA_DIR sets the folder, so it cannot change here
 }
 
 // Service is bound to the front end.

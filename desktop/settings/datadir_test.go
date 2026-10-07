@@ -39,7 +39,7 @@ func TestDataDirFixedByEnvironment(t *testing.T) {
 	}
 	h.Rec.SetPick(t.TempDir())
 	if _, err := h.PickDataDir(); err == nil {
-		t.Error("the picker opened while AGENTOS_DATA_DIR sets the folder")
+		t.Error("the picker opened while AGENTOS_DEV_DATA_DIR sets the folder")
 	}
 	if err := h.SetDataDir(t.TempDir(), false); err == nil || configDataDir(t, h) != "" {
 		t.Errorf("SetDataDir = %v, data_dir %q", err, configDataDir(t, h))

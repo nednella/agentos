@@ -40,7 +40,7 @@ Work only inside that worktree. Never touch the tree Ned is sitting in.
   for the front end.
 - For anything visible, run the real app in browser mode and look at it, as
   `docs/testing.md` describes. Always set `AGENTOS_TMUX_SOCKET`, `AGENTOS_STATE_DIR`,
-  `AGENTOS_DATA_DIR` and `AGENTOS_CONFIG` to throwaway values: the defaults hold Ned's
+  `AGENTOS_DEV_DATA_DIR` and `AGENTOS_CONFIG` to throwaway values: the defaults hold Ned's
   live sessions.
 - Never claim something works that you did not run.
 

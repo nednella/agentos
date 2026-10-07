@@ -41,7 +41,7 @@ export function DataDirRow({ dir, fixed }: DataDirRowProps) {
     <div className="border-b border-line py-4 last:border-b-0">
       <p className="text-body font-medium">Data folder</p>
       <p className="mt-0.5 text-small text-dim">
-        Where agentos keeps your notes, evidence, stats and digests. {fixed ? 'AGENTOS_DATA_DIR sets it, so it cannot change here.' : 'Changing it relaunches agentos.'}
+        Where agentos keeps your notes, evidence, stats and digests. {fixed ? 'AGENTOS_DEV_DATA_DIR sets it, so it cannot change here.' : 'Changing it relaunches agentos.'}
       </p>
       <div className="mt-3 flex items-center gap-2">
         <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md border border-line-strong bg-raised px-2.5 text-soft" title={shown}>

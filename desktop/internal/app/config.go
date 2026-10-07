@@ -3,6 +3,7 @@ package app
 
 import (
 	"cmp"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -26,7 +27,7 @@ type Config struct {
 	StateDir     string
 	DataDir      string // notes, evidence and stats: may be a synced folder
 	LocalDir     string // PR tracking and the clean-up log: never synced
-	DataDirFixed bool   // AGENTOS_DATA_DIR sets the data folder, so the settings cannot change it
+	DataDirFixed bool   // AGENTOS_DEV_DATA_DIR sets the data folder, so the settings cannot change it
 	Tmux         *term.Tmux
 	Agent        agent.Agent
 }
@@ -53,7 +54,11 @@ func Load() (Config, error) {
 	}
 	dataDir := cmp.Or(cfg.DataDir, filepath.Join(home, ".local", "share", "agentos"))
 	localDir := filepath.Join(home, ".local", "share", "agentos")
-	override := os.Getenv("AGENTOS_DATA_DIR")
+	// A check still setting the old name would otherwise write to the real data folder.
+	if os.Getenv("AGENTOS_DATA_DIR") != "" {
+		return Config{}, errors.New("AGENTOS_DATA_DIR is now AGENTOS_DEV_DATA_DIR: rename it")
+	}
+	override := os.Getenv("AGENTOS_DEV_DATA_DIR")
 	if override != "" {
 		dataDir, localDir = override, override
 	}

@@ -341,7 +341,7 @@ func TestNotesLiveInTheDataDir(t *testing.T) {
 	root := t.TempDir()
 	synced := filepath.Join(root, "cloud", "agentos")
 	t.Setenv("HOME", filepath.Join(root, "home"))
-	t.Setenv("AGENTOS_DATA_DIR", "")
+	t.Setenv("AGENTOS_DEV_DATA_DIR", "")
 	conf := filepath.Join(root, "config.yaml")
 	if err := os.WriteFile(conf, []byte("data_dir: "+synced+"\nprojects:\n  - {name: p, directory: "+root+"}\n"), 0o600); err != nil {
 		t.Fatal(err)
@@ -363,9 +363,14 @@ func TestNotesLiveInTheDataDir(t *testing.T) {
 		t.Error("the note was not written to data_dir")
 	}
 
-	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(root, "override"))
+	t.Setenv("AGENTOS_DEV_DATA_DIR", filepath.Join(root, "override"))
 	if cfg, _ = app.Load(); cfg.DataDir != filepath.Join(root, "override") {
 		t.Errorf("the override gave %q", cfg.DataDir)
+	}
+
+	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(root, "old"))
+	if _, err := app.Load(); err == nil || !strings.Contains(err.Error(), "AGENTOS_DEV_DATA_DIR") {
+		t.Errorf("the old name gave %v", err)
 	}
 }
 

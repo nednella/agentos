@@ -18,7 +18,7 @@ Go is the reference when they disagree.
 ## Hard rules
 
 - Tests and manual checks run in an isolated setup: always set `AGENTOS_TMUX_SOCKET`,
-  `AGENTOS_STATE_DIR`, `AGENTOS_DATA_DIR` and `AGENTOS_CONFIG` to throwaway values. The
+  `AGENTOS_STATE_DIR`, `AGENTOS_DEV_DATA_DIR` and `AGENTOS_CONFIG` to throwaway values. The
   default socket holds Ned's live sessions; a test on it has killed them twice.
 - Never install the app to `/Applications` or `~/Applications`, never run
   `make desktop-install`, `install.sh` or `agentos update` against the real home, unless Ned asks.
