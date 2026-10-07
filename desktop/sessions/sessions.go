@@ -340,7 +340,7 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 		return
 	}
 	if time.Since(at) > endedKept {
-		_ = bus.RemoveState(s.stateDir, name)
+		s.drop(name)
 		return
 	}
 	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort}
