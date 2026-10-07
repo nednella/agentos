@@ -190,6 +190,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     setOpenedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
   }, [])
 
+  const detach = useCallback(() => {
+    const id = selectedRef.current
+    if (!id) return
+    detached.current = true
+    selectId(null)
+    setOpenedIds((ids) => ids.filter((opened) => opened !== id))
+  }, [selectId])
+
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
 
   const dismissToast = useCallback((key: number) => {
@@ -491,13 +499,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         selectId(id)
         focus('terminal')
       },
-      detach() {
-        const id = selectedRef.current
-        if (!id) return
-        detached.current = true
-        selectId(null)
-        setOpenedIds((ids) => ids.filter((opened) => opened !== id))
-      },
+      detach,
       stepSession(delta) {
         const list = sessionsRef.current
         if (list.length === 0) return
@@ -510,6 +512,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async killSession(id) {
         await api.killSession(id)
+        if (selectedRef.current !== id) return
+        const next = sessionsRef.current.find((s) => s.id !== id && s.state !== 'ended')
+        if (next) selectId(next.id)
+        else detach()
       },
       async dismissSession(id) {
         await api.dismissSession(id)
@@ -685,7 +691,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, selectId, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, selectId, detach, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
