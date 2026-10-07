@@ -35,8 +35,8 @@ function pathOf(url: string): string {
 
 export function pageTitle(url: string): string {
   const path = pathOf(url)
-  const name = { '/': 'Home', '/documents': 'Documents', '/pricing': 'Pricing', '/login': 'Sign in' }[path] ?? 'Page'
-  return `${name} · Acme Docs`
+  const name = { '/': 'Home', '/products': 'Products', '/cart': 'Cart', '/login': 'Sign in' }[path] ?? 'Page'
+  return `${name} · Acme Store`
 }
 
 export function newPage(url: string): PageModel {
@@ -77,16 +77,16 @@ export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = p.width,
   ctx.fillRect(0, 0, w, HEADER_H)
   ctx.fillStyle = '#ffffff'
   ctx.font = '600 18px sans-serif'
-  ctx.fillText('Acme Docs', PAD, 34)
+  ctx.fillText('Acme Store', PAD, 34)
   ctx.font = '14px sans-serif'
   ctx.fillStyle = '#cbd5e1'
-  ;['Documents', 'Pricing', 'Sign in'].forEach((label, i) => ctx.fillText(label, w - 300 + i * 96, 33))
+  ;['Products', 'Cart', 'Sign in'].forEach((label, i) => ctx.fillText(label, w - 300 + i * 96, 33))
   ctx.fillStyle = '#111827'
   ctx.font = '700 30px sans-serif'
-  ctx.fillText({ '/': 'Welcome back', '/documents': 'Your documents', '/pricing': 'Simple pricing', '/login': 'Sign in' }[path] ?? 'Not found', PAD, HEADER_H + 58)
+  ctx.fillText({ '/': 'Welcome back', '/products': 'All products', '/cart': 'Your cart', '/login': 'Sign in' }[path] ?? 'Not found', PAD, HEADER_H + 58)
   ctx.font = '14px sans-serif'
   ctx.fillStyle = '#4b5563'
-  ctx.fillText('Search every file your team has shared.', PAD, HEADER_H + 84)
+  ctx.fillText('Search everything in the shop.', PAD, HEADER_H + 84)
 
   ctx.fillStyle = '#ffffff'
   ctx.strokeStyle = p.focused ? '#4f46e5' : '#cbd5e1'
@@ -95,7 +95,7 @@ export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = p.width,
   ctx.strokeRect(input.x, input.y, input.w, input.h)
   ctx.font = '16px sans-serif'
   ctx.fillStyle = p.typed ? '#111827' : '#9ca3af'
-  ctx.fillText(p.typed || 'Search documents', input.x + 12, input.y + 26)
+  ctx.fillText(p.typed || 'Search products', input.x + 12, input.y + 26)
   if (p.focused) {
     const caret = input.x + 12 + ctx.measureText(p.typed).width + 1
     ctx.fillStyle = '#4f46e5'
@@ -111,7 +111,7 @@ export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = p.width,
   ctx.fillStyle = '#111827'
   ctx.font = '600 15px sans-serif'
   ctx.fillText(p.submitted ? `3 results for "${p.submitted}"` : 'Recent', PAD, listY)
-  ;['Q4 plan.pdf', 'Onboarding deck.pdf', 'Pricing notes.pdf'].forEach((name, i) => {
+  ;['Canvas tote bag', 'Cotton tote, large', 'Tote with zip'].forEach((name, i) => {
     const y = listY + 16 + i * 52
     if (y + 44 > h) return
     ctx.fillStyle = '#ffffff'

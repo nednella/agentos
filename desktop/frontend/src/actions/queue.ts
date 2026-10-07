@@ -34,7 +34,7 @@ export const queueActions = ({ a, layout }: ActionContext): Action[] => [
     id: 'filter-queue',
     label: 'Filter the queue…',
     group: 'Queue',
-    palette: { prompt: 'Filter, e.g. @mariam-k label:idea -type:bug', initial: a.issueFilter },
+    palette: { prompt: 'Filter, e.g. @alex-r label:idea -type:bug', initial: a.issueFilter },
     uiCommand: 'filter',
     run(args) {
       layout.showSidebarTab('queue')

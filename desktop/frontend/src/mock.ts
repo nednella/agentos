@@ -21,13 +21,13 @@ type ProjectData = { name: string; dir: string; repo: string; notes: Note[]; iss
 const minute = 60_000
 const noteTexts = [
   'Retry banner when the websocket drops\nShow a thin bar under the header and retry with backoff. Maybe reuse the toast style so it does not feel like a third kind of notice.\nThe backoff should reset on the first successful frame, not on connect, because the proxy accepts and then drops.',
-  'Ask Mariam about the viewer password copy. She said something about "unlock" vs "open" last week and I forgot which way it went.',
-  'Try a keyboard shortcut sheet in the viewer, like the one here. `?` opens it, Esc closes. See https://github.com/upscopeio/livedocument/issues/436 for the dark mode thread, same overlay could host it.',
-  'Embed: should the allowlist be case-insensitive?\nCheck how Safari reports the referrer for iframes. I think it strips the path but keeps the origin, which is fine, but the scheme might differ.',
-  'Idea: per-page dwell time as a sparkline in the stats table',
-  'Rename Library to Documents everywhere in the copy. Check the emails too, the invite template still says Library.',
-  'Write the migration note for the plan catalogue: old flat map goes away, tiers-native, planFor(currency, period). Call out that Stripe only needs currency + period + cost.',
-  'Check the sendBeacon payload size limit (64KB in most browsers)',
+  'Ask Alex about the checkout button copy. They said something about "Buy now" vs "Pay" last week and I forgot which way it went.',
+  'Try a keyboard shortcut sheet in the shop, like the one here. `?` opens it, Esc closes. See https://github.com/acme/storefront/issues/436 for the dark mode thread, same overlay could host it.',
+  'Shipping: should the postcode match be case-insensitive?\nCheck how the address lookup returns UK postcodes. I think it keeps the space but upper-cases the letters, which is fine, but older orders might differ.',
+  'Idea: weekly sales as a sparkline in the stats table',
+  'Rename Catalogue to Shop everywhere in the copy. Check the emails too, the order template still says Catalogue.',
+  'Write the migration note for the price table: old flat map goes away, priceFor(currency, region). Call out that the payment provider only needs currency + amount.',
+  'Check the image upload size limit (10MB on the CDN)',
 ]
 
 const shot = (hue: number, label: string) =>
@@ -44,12 +44,12 @@ function seedNotes(texts: string[]): Note[] {
     updatedAt: now - (i + 1) * 37 * minute,
     pinned: i === 2,
     archived: i >= texts.length - 2,
-    images: i === 0 ? [shot(210, 'before: banner overlaps'), shot(150, 'after: thin bar')] : i === 3 ? [shot(30, 'referrer header')] : [],
+    images: i === 0 ? [shot(210, 'before: banner overlaps'), shot(150, 'after: thin bar')] : i === 3 ? [shot(30, 'postcode lookup')] : [],
   }))
 }
 
 const causes: { kind: WaitKind; label: string; weight: number; waitMin: number }[] = [
-  { kind: 'permission', label: 'Bash: upscope test api', weight: 18, waitMin: 2 },
+  { kind: 'permission', label: 'Bash: npm run test', weight: 18, waitMin: 2 },
   { kind: 'permission', label: 'Bash: npx tsc --noEmit', weight: 14, waitMin: 1 },
   { kind: 'permission', label: 'Edit', weight: 12, waitMin: 1 },
   { kind: 'permission', label: 'Bash: gh pr create', weight: 6, waitMin: 3 },
@@ -89,7 +89,7 @@ function seedWaits(titles: [string, number][]): Wait[] {
 }
 
 function pr(number: number, state: PR['state'], checks: PR['checks'], comments = 0): PR {
-  return { number, url: `https://github.com/upscopeio/livedocument/pull/${number}`, state, checks, comments, updatedAt: Date.now() - 3 * minute }
+  return { number, url: `https://github.com/acme/storefront/pull/${number}`, state, checks, comments, updatedAt: Date.now() - 3 * minute }
 }
 
 const details: Record<State, string[]> = {
@@ -97,9 +97,9 @@ const details: Record<State, string[]> = {
     'Edit route-list.tsx',
     'Bash npx tsc --noEmit',
     'Read Layout.tsx',
-    'Grep documentContext',
+    'Grep productContext',
     'Edit Index.tsx',
-    'Write DocumentReader.tsx',
+    'Write ProductGallery.tsx',
   ],
   waiting: ['Claude needs your permission', 'Claude has a question for you'],
   idle: ['Done: 4 files changed', 'Done: tests pass'],
@@ -134,7 +134,7 @@ export function createMock(params: URLSearchParams) {
   const handlers = new Map<string, Set<Handler>>()
   const sessions: MockSession[] = []
   const data: ProjectData[] = [
-    { name: 'livedocument', dir: '~/code/upscope/livedocument', repo: 'upscopeio/livedocument', notes: seedNotes(noteTexts), issues: buildIssues('upscopeio/livedocument'), waits: seedWaits([['#454 entry split', 454], ['#444 embed route', 444], ['#326 sendBeacon', 326], ['#389 stripe retries', 389], ['billing tests scratch', 0]]), cleanups: [{ at: Date.now() - 5 * 3_600_000, sessionTitle: '#371 old banner', issue: 371, pr: 440, merged: true, status: 'done', removed: ['worktree trees/issue-371', 'branch issue-371', 'temp files', 'session'], reason: '' }, { at: Date.now() - 26 * 3_600_000, sessionTitle: '#366 retry copy', issue: 366, pr: 431, merged: true, status: 'done', removed: ['worktree trees/issue-366', 'branch issue-366', 'session'], reason: '' }] },
+    { name: 'storefront', dir: '~/code/acme/storefront', repo: 'acme/storefront', notes: seedNotes(noteTexts), issues: buildIssues('acme/storefront'), waits: seedWaits([['#454 product page split', 454], ['#444 checkout route', 444], ['#326 cart rounding', 326], ['#389 webhook retries', 389], ['checkout tests scratch', 0]]), cleanups: [{ at: Date.now() - 5 * 3_600_000, sessionTitle: '#371 old banner', issue: 371, pr: 440, merged: true, status: 'done', removed: ['worktree trees/issue-371', 'branch issue-371', 'temp files', 'session'], reason: '' }, { at: Date.now() - 26 * 3_600_000, sessionTitle: '#366 retry copy', issue: 366, pr: 431, merged: true, status: 'done', removed: ['worktree trees/issue-366', 'branch issue-366', 'session'], reason: '' }] },
     { name: 'agentos', dir: '~/code/agentos', repo: 'nednella/agentos', notes: seedNotes(noteTexts.slice(0, 3)), issues: buildIssues('nednella/agentos'), waits: seedWaits([['#12 session memory', 12]]).slice(0, 12), cleanups: [] },
     { name: 'scratch', dir: '~/scratch', repo: '', notes: [], issues: [], waits: [], cleanups: [] },
   ]
@@ -340,16 +340,16 @@ export function createMock(params: URLSearchParams) {
   }
 
   if (!flags.empty) {
-    seed('#454 entry split', 454, 'working', [['working', 74], ['waiting', 52], ['working', 47], ['idle', 31], ['working', 12]])
-    seed('#444 embed route', 444, 'waiting', [['working', 96], ['idle', 70], ['working', 38], ['waiting', 4]])
-    seed('#326 sendBeacon', 326, 'idle', [['working', 41], ['waiting', 33], ['working', 30], ['idle', 6]])
-    seed('billing tests scratch', 0, 'working', [['working', 22], ['waiting', 15], ['working', 13]])
+    seed('#454 product page split', 454, 'working', [['working', 74], ['waiting', 52], ['working', 47], ['idle', 31], ['working', 12]])
+    seed('#444 checkout route', 444, 'waiting', [['working', 96], ['idle', 70], ['working', 38], ['waiting', 4]])
+    seed('#326 cart rounding', 326, 'idle', [['working', 41], ['waiting', 33], ['working', 30], ['idle', 6]])
+    seed('checkout tests scratch', 0, 'working', [['working', 22], ['waiting', 15], ['working', 13]])
     seed('#412 locale sweep', 412, 'idle', [['working', 50], ['idle', 20]])
-    seed('#437 cobrowse strip', 437, 'idle', [['working', 80], ['idle', 25]])
+    seed('#437 coupon strip', 437, 'idle', [['working', 80], ['idle', 25]])
     seed('#430 thumbnail ratio', 430, 'ended', [['working', 60], ['ended', 18]])
     seed('spike: websocket retry', 0, 'ended', [['working', 140], ['idle', 110], ['ended', 95]])
-    seed('#389 stripe retries', 389, 'working', [['working', 58], ['idle', 40], ['working', 9]])
-    const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'livedocument')!
+    seed('#389 webhook retries', 389, 'working', [['working', 58], ['idle', 40], ['working', 9]])
+    const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'storefront')!
     byIssue(454).pr = pr(457, 'draft', 'pending')
     Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
     Object.assign(byIssue(326), { pr: pr(449, 'open', 'passing', 3), prAttention: 'comments' })
@@ -606,38 +606,38 @@ export function createMock(params: URLSearchParams) {
 
   const driven = sessions.find((s) => s.issue === 454)
   if (driven) {
-    const page = openPage(driven, 'https://docs.acme.test/documents')
+    const page = openPage(driven, 'https://shop.acme.test/products')
     const typeText = (text: string) => {
       const { field } = pageRects(page)
       handleInput(page, { type: 'mouse', action: 'down', x: field.x + 10, y: field.y + 10, button: 'left', clickCount: 1, modifiers: 0 })
       for (const ch of text) handleInput(page, { type: 'key', action: 'down', key: ch, code: '', text: ch, modifiers: 0 })
     }
     const steps: (() => void)[] = [
-      () => navigate(driven.id, 'https://docs.acme.test/documents'),
-      () => typeText('q4 plan'),
+      () => navigate(driven.id, 'https://shop.acme.test/products'),
+      () => typeText('canvas tote'),
       () => {
         const { button } = pageRects(page)
         handleInput(page, { type: 'mouse', action: 'down', x: button.x + 10, y: button.y + 10, button: 'left', clickCount: 1, modifiers: 0 })
       },
-      () => addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'Search results for "q4 plan" after the entry split', source: 'agent' }),
+      () => addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'Search results for "canvas tote" after the page split', source: 'agent' }),
       () => {
         page.typed = ''
         page.submitted = ''
-        navigate(driven.id, 'https://docs.acme.test/pricing')
+        navigate(driven.id, 'https://shop.acme.test/cart')
       },
     ]
     let step = 0
     setTimeout(() => {
       setInterval(() => steps[step++ % steps.length](), 4500)
     }, 6000)
-    addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'Before: documents list on master', source: 'agent' }, Date.now() - 50 * minute)
-    page.submitted = 'plan'
+    addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'Before: products list on main', source: 'agent' }, Date.now() - 50 * minute)
+    page.submitted = 'tote'
     addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'After: same page on issue-454', source: 'agent' }, Date.now() - 44 * minute)
     page.submitted = ''
-    addEvidence(driven, { kind: 'text', url: '', text: 'tsc --noEmit: 0 errors\nvitest: 214 passed, 0 failed\nThe entry now answers with edit or view access.', caption: 'Checks before the PR', source: 'agent' }, Date.now() - 20 * minute)
+    addEvidence(driven, { kind: 'text', url: '', text: 'tsc --noEmit: 0 errors\nvitest: 214 passed, 0 failed\nThe gallery now loads on the client only.', caption: 'Checks before the PR', source: 'agent' }, Date.now() - 20 * minute)
   }
   const second = sessions.find((s) => s.issue === 326)
-  if (second) addEvidence(second, { kind: 'text', url: '', text: 'sendBeacon fires on pagehide, not unload. Safari drops unload handlers in the back-forward cache.', caption: 'Why pagehide', source: 'agent' }, Date.now() - 30 * minute)
+  if (second) addEvidence(second, { kind: 'text', url: '', text: 'Totals are summed in cents and formatted once. Rounding each line drifted by a cent on large carts.', caption: 'Why cents', source: 'agent' }, Date.now() - 30 * minute)
   sessions.forEach((s) => {
     if (s.evidence > 0) s.nextChangeAt = Number.MAX_SAFE_INTEGER
   })
@@ -650,11 +650,11 @@ export function createMock(params: URLSearchParams) {
     return [
       item(1, now - 2 * 86_400_000, 'Claude Code', 'Hooks can match Bash commands with a pattern', 'Could replace the per-project permission rules in the config.'),
       item(2, now - 2 * 86_400_000, 'wails', 'v2.11 fixes the drag region in full screen', 'The hidden title bar here uses the drag region.'),
-      item(3, now - 2 * 86_400_000, 'react', 'ReactDOM.render warnings are louder in 18.3', 'Two Parcel entry files still call render.'),
-      item(4, now - 2 * 86_400_000, 'tailwind', 'v4.1 ships container queries in core', 'Could unblock the viewer layout work.'),
-      item(5, now - 2 * 86_400_000, 'drizzle', 'Batch inserts land in 0.40', 'The contact import inserts rows one by one.'),
+      item(3, now - 2 * 86_400_000, 'react', 'ReactDOM.render warnings are louder in 18.3', 'Two entry files still call render.'),
+      item(4, now - 2 * 86_400_000, 'tailwind', 'v4.1 ships container queries in core', 'Could unblock the product grid layout work.'),
+      item(5, now - 2 * 86_400_000, 'drizzle', 'Batch inserts land in 0.40', 'The customer import inserts rows one by one.'),
       item(6, now - 9 * 86_400_000, 'Claude Code', 'Plan mode now shows a checklist', 'Matches how /investigate presents its plan.'),
-      item(7, now - 9 * 86_400_000, 'bullmq', 'Flow producers get a retry option', 'The PDF pipeline retries by hand today.'),
+      item(7, now - 9 * 86_400_000, 'bullmq', 'Flow producers get a retry option', 'The image pipeline retries by hand today.'),
     ]
   }
   let digest: Digest = { running: false, lastRunAt: Date.now() - 2 * 86_400_000, nextRunAt: Date.now() + 5 * 86_400_000, error: '', project: data[0].name, items: seedDigest() }
@@ -941,7 +941,7 @@ export function createMock(params: URLSearchParams) {
           ['Claude Code', 'Skills can declare allowed tools', 'Lets /work run without a permission prompt for tsc.'],
           ['wails', 'Native file drop events', 'Notes could take dropped screenshots from Finder.'],
           ['xterm.js', 'Synchronized output mode', 'Would stop flicker while the agent redraws.'],
-          ['vite', 'v8 build is faster', 'No change needed, nice to have for the embed.'],
+          ['vite', 'v8 build is faster', 'No change needed, nice to have for the shop.'],
           ['gh', 'pr checks --watch exits on first failure', 'The PR poller could use it.'],
         ].map(([source, title, why], i) => ({ id: `dg-new-${now}-${i}`, title, why, url: 'https://example.com/changelog/new', source, at: now, noteId: '' }))
         digest = { running: false, lastRunAt: now, nextRunAt: now + 7 * 86_400_000, error: '', project: digest.project, items: [...fresh, ...digest.items].slice(0, 30) }
