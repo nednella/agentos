@@ -132,7 +132,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		awake.NewService(stayAwake),
 		stats.NewService(waits, sess),
 		update.NewService(a.updates, ctx),
-		settings.NewService(c.Registry, sess),
+		settings.NewService(c.Registry, sess, c.DataDir, c.DataDirFixed, h.PickDir, a.updates.Relaunch),
 	}
 	return a
 }

@@ -76,6 +76,14 @@ func (r *Registry) SetTextScale(scale float64) error {
 	})
 }
 
+// SetDataDir saves the folder for notes, evidence, stats and digests; the app reads it when it starts.
+func (r *Registry) SetDataDir(dir string) error {
+	return r.edit(func(c *project.Config) error {
+		c.DataDir = dir
+		return nil
+	})
+}
+
 // KeepsAwake is the config's own choice on idle sleep, which a project may override.
 func (r *Registry) KeepsAwake() bool {
 	r.mu.Lock()

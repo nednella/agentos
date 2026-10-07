@@ -508,6 +508,7 @@ type Options struct {
 	UpdateTick     time.Duration // how often to check the releases; an hour by default, and an hour before the first check
 	Releases       string        // what the releases API answers; "" fails the check
 	Version        string        // the version the app believes it runs; "dev" by default
+	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DATA_DIR, and home in the state dir
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -555,7 +556,11 @@ func NewWith(t *testing.T, o Options) *Harness {
 	if o.CleanupCommand != "" {
 		cleanup = fmt.Sprintf("    session_cleanup_command: %q\n", o.CleanupCommand)
 	}
-	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), o.TopExtra, dir, branch, cleanup, queueSections, o.ProjectExtra)
+	top := o.TopExtra
+	if o.DataDirConfig {
+		top += "data_dir: " + filepath.Join(state, "data") + "\n"
+	}
+	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), top, dir, branch, cleanup, queueSections, o.ProjectExtra)
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +569,12 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_STATE_DIR", state)
 	t.Setenv("AGENTOS_CONFIG", confPath)
 	t.Setenv("AGENTOS_DIR", dir)
-	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
+	if o.DataDirConfig {
+		t.Setenv("AGENTOS_DATA_DIR", "")
+		t.Setenv("HOME", filepath.Join(state, "home")) // the local folder sits under home
+	} else {
+		t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
+	}
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(state, "claude")) // never the user's own settings
 
 	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{Releases: o.Releases}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
@@ -853,6 +863,12 @@ func (h *Harness) SetBrowserEnabled(on bool) (settings.Settings, error) {
 
 func (h *Harness) SetDigestSchedule(schedule string) (settings.Settings, error) {
 	return h.settings.SetDigestSchedule(schedule)
+}
+
+func (h *Harness) PickDataDir() (settings.DataDirChoice, error) { return h.settings.PickDataDir() }
+
+func (h *Harness) SetDataDir(dir string, withData bool) error {
+	return h.settings.SetDataDir(dir, withData)
 }
 
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
