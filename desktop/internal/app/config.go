@@ -84,15 +84,15 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, Tmux: tmux, Agent: pickAgent(cfg.Agent)}, nil
+	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
 // agents' hooks cannot call back, so Claude runs plain and sessions stay idle.
-func pickAgent(name string) agent.Agent {
+func pickAgent(name string, dirs []string) agent.Agent {
 	exe, err := exec.LookPath("agentos")
 	if err == nil {
-		return agent.New(name, exe)
+		return agent.New(name, exe, dirs...)
 	}
 	log.Printf("agentos: the agentos command is not on PATH, so agents will not report their state: %v", err)
 	if name == "" || name == "claude" {

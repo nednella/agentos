@@ -33,6 +33,19 @@ func TestClaudeCommand(t *testing.T) {
 	}
 }
 
+func TestClaudeGrantsDirs(t *testing.T) {
+	argv := Claude{Exe: "/x", Dirs: []string{"/data", "/local"}}.Command("p/1", Launch{})
+	var settings struct {
+		Permissions struct{ AdditionalDirectories []string }
+	}
+	if err := json.Unmarshal([]byte(argv[2]), &settings); err != nil {
+		t.Fatal(err)
+	}
+	if got := settings.Permissions.AdditionalDirectories; !slices.Equal(got, []string{"/data", "/local"}) {
+		t.Errorf("additionalDirectories = %q", got)
+	}
+}
+
 func TestClaudeLaunch(t *testing.T) {
 	tests := []struct {
 		name string
