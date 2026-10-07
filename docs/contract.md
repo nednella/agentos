@@ -34,7 +34,7 @@ type Session = {
   lastEventAt: number   // unix ms; 0 if none
   createdAt: number     // unix ms
   issue: number         // GitHub issue the session was started for; 0 if none
-  model: string         // model the agent was started with ("sonnet"); "" when none was set, for an agent other than claude, or for a session from before the field
+  model: string         // model the agent was started with ("sonnet"); "" when none was set or found, for an agent other than claude, or for a session from before the field
   effort: string        // effort it was started with ("medium"); "" likewise
   history: { state: State; at: number }[]   // state changes, oldest first, at most 200
   branch: string        // the branch the session works on: the one it reported with `agentos track`, else the one checked out in its working folder; for an issue session with neither, the project's `session_branch_fallback` pattern. The branch its PR was found on, else the newest; "" if none
@@ -218,7 +218,7 @@ type Digest = {
 
 | Method | Returns | What it does |
 |---|---|---|
-| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder with the project's model and effort; a non-empty `prefill` is typed in, not sent, once the agent is ready |
+| `NewSession(title, prefill)` | `Session` | starts the agent in the project folder with the model and effort of claude's own settings (see config); a non-empty `prefill` is typed in, not sent, once the agent is ready |
 | `KillSession(id)` | | stops the agent; the row stays as `ended`; rejects the shell |
 | `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
 | `RenameSession(id, title)` | | rejects the shell |
@@ -450,8 +450,11 @@ The old `lanes`, `commands`, `models`, `session_model` and `session_effort` keys
 
 Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets
 a value, model and effort each on their own: the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored); the
-action's `model` and `effort`. When none sets a value, no flag is passed and claude uses its own default. A session started for an issue uses
-the action and the labels; a new session or one started from a note passes no flag. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`) and in the state file of an
+action's `model` and `effort`. A session started for an issue uses
+the action and the labels; a new session or one started from a note has neither. Last comes claude's own settings, read when the session
+starts: `model`, and the effort in `modelSettings.<model>.effortLevel` for the model chosen, else `effortLevel`, from the project folder's
+`.claude/settings.local.json`, then its `.claude/settings.json`, then `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`. When none sets a
+value, no flag is passed and claude uses its own default. The choice is saved on the tmux session (`@agentos-model`, `@agentos-effort`) and in the state file of an
 ended one, so it outlives a restart. `Session.model` and `Session.effort` show it ("" when none was set), and each wait in the tally records the model.
 
 ### Keeping the Mac awake
