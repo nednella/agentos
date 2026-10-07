@@ -2,7 +2,10 @@ package sessions
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"slices"
+	"strconv"
 	"testing"
 
 	"github.com/nednella/agentos/internal/agent"
@@ -38,6 +41,7 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("npm_config_cache", t.TempDir())
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
 			tt.proj.Dir = "/work/p"
 			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "")
@@ -84,5 +88,76 @@ func TestConversationOfARunningAndAnEndedSession(t *testing.T) {
 	}
 	if got := s.conversationOf("p/3"); got != "" {
 		t.Errorf("unknown: %q", got)
+	}
+}
+
+// fakeNpxCache makes npm cache folders the way npx fills them: _npx/<hash>/node_modules/<package>, with a .bin link.
+func fakeNpxCache(t *testing.T, hashes map[string]string, withBin bool) string {
+	t.Helper()
+	cache := t.TempDir()
+	for hash, version := range hashes {
+		modules := filepath.Join(cache, "_npx", hash, "node_modules")
+		if err := os.MkdirAll(filepath.Join(modules, "chrome-devtools-mcp"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(modules, "chrome-devtools-mcp", "package.json"), []byte(`{"name":"chrome-devtools-mcp","version":"`+version+`"}`), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if withBin {
+			if err := os.MkdirAll(filepath.Join(modules, ".bin"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(modules, ".bin", "chrome-devtools-mcp"), []byte("#!/usr/bin/env node\n"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	return cache
+}
+
+func TestMCPServerRunsFromTheNpxCacheWhenThePinnedVersionIsThere(t *testing.T) {
+	cache := fakeNpxCache(t, map[string]string{"aaaa": "1.9.0", "bbbb": chromeDevToolsMCPVersion}, true)
+	bin := filepath.Join(cache, "_npx", "bbbb", "node_modules", ".bin", "chrome-devtools-mcp")
+	want := `{"mcpServers":{"browser":{"command":` + strconv.Quote(bin) + `,"args":["--browser-url=http://127.0.0.1:23456",` +
+		`"--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
+	if got := browserMCPConfig(23456, "/work/p", cache); got != want {
+		t.Errorf("config = %s\nwant %s", got, want)
+	}
+}
+
+func TestMCPServerFallsBackToNpx(t *testing.T) {
+	tests := []struct {
+		name   string
+		cache  string
+		hashes map[string]string
+		bin    bool
+	}{
+		{"no cache folder", "", nil, false},
+		{"empty cache", "", map[string]string{}, true},
+		{"another version only", "", map[string]string{"aaaa": "1.9.0"}, true},
+		{"the version without its command file", "", map[string]string{"aaaa": chromeDevToolsMCPVersion}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.cache
+			if tt.hashes != nil {
+				cache = fakeNpxCache(t, tt.hashes, tt.bin)
+			}
+			if got := browserMCPConfig(23456, "/work/p", cache); got != wantMCPConfig {
+				t.Errorf("config = %s\nwant %s", got, wantMCPConfig)
+			}
+		})
+	}
+}
+
+func TestNpmCacheDir(t *testing.T) {
+	t.Setenv("npm_config_cache", "/somewhere/cache")
+	if got := npmCacheDir(); got != "/somewhere/cache" {
+		t.Errorf("npmCacheDir with the variable set = %q", got)
+	}
+	t.Setenv("npm_config_cache", "")
+	home, _ := os.UserHomeDir()
+	if got := npmCacheDir(); got != filepath.Join(home, ".npm") {
+		t.Errorf("npmCacheDir without it = %q", got)
 	}
 }

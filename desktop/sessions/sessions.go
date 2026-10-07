@@ -1374,18 +1374,58 @@ const (
 // outside the session's own, in a window of another session.
 const browserToolsDenied = "mcp__browser__new_page mcp__browser__close_page"
 
+// npmCacheDir is npm's cache folder: where $npm_config_cache points, else ~/.npm.
+func npmCacheDir() string {
+	if dir := os.Getenv("npm_config_cache"); dir != "" {
+		return dir
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".npm")
+}
+
+// cachedMCPBin is the command file of the pinned MCP server when npx has it in its cache under npmCache, else "".
+// Running it directly saves the `npm exec` process npx keeps beside the server.
+func cachedMCPBin(npmCache string) string {
+	if npmCache == "" {
+		return ""
+	}
+	packages, _ := filepath.Glob(filepath.Join(npmCache, "_npx", "*", "node_modules", chromeDevToolsMCPName, "package.json"))
+	for _, manifest := range packages {
+		data, err := os.ReadFile(manifest)
+		var pkg struct {
+			Version string `json:"version"`
+		}
+		if err != nil || json.Unmarshal(data, &pkg) != nil || pkg.Version != chromeDevToolsMCPVersion {
+			continue
+		}
+		bin := filepath.Join(filepath.Dir(manifest), "..", ".bin", chromeDevToolsMCPName)
+		if _, err := os.Stat(bin); err == nil {
+			return filepath.Clean(bin)
+		}
+	}
+	return ""
+}
+
 // browserMCPConfig is the --mcp-config JSON that adds the page tools as the MCP server "browser", attached to the
-// project's browser on port. workspace is the folder the tools may read upload files from.
-func browserMCPConfig(port int, workspace string) string {
+// project's browser on port. workspace is the folder the tools may read upload files from. The server runs from
+// npmCache when the pinned version is there; otherwise npx runs it, which also fills the cache for the next session.
+func browserMCPConfig(port int, workspace, npmCache string) string {
 	type server struct {
 		Command string            `json:"command"`
 		Args    []string          `json:"args"`
 		Env     map[string]string `json:"env"`
 	}
+	args := []string{"--browser-url=http://127.0.0.1:" + strconv.Itoa(port), "--no-usage-statistics", "--no-performance-crux", "--workspace=" + workspace}
+	command := cachedMCPBin(npmCache)
+	if command == "" {
+		command = "npx"
+		args = append([]string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion}, args...)
+	}
 	config, _ := json.Marshal(map[string]map[string]server{"mcpServers": {"browser": {
-		Command: "npx",
-		Args: []string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion,
-			"--browser-url=http://127.0.0.1:" + strconv.Itoa(port), "--no-usage-statistics", "--no-performance-crux", "--workspace=" + workspace},
+		Command: command, Args: args,
 		Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"},
 	}}})
 	return string(config)
@@ -1398,7 +1438,7 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 		return argv
 	}
 	if port := s.browsers.Port(name.Project); port != 0 {
-		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir), "--disallowedTools", browserToolsDenied,
+		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied,
 			"--append-system-prompt", prompts.BrowserSession())
 	}
 	return argv
