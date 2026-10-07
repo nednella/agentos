@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.12.0](https://github.com/nednella/agentos/compare/v0.11.1...v0.12.0) (2026-10-07)
+
+
+### Features
+
+* **build:** draw terminal prompt app icon ([11701f5](https://github.com/nednella/agentos/commit/11701f58d9da4f51f85290113ace59d0abbc2e96))
+* **cli:** let the agent raise its browser window with --front ([4d1bfe3](https://github.com/nednella/agentos/commit/4d1bfe300e14fe022a533aecc29cd2c1e1ddd1b5))
+* **desktop:** dismiss a browser dialog left open for 5 seconds ([fc42dd9](https://github.com/nednella/agentos/commit/fc42dd9589bb7b639ae929f74414f79a055caf13))
+* **desktop:** drive the session browser through chrome-devtools-mcp ([18d7779](https://github.com/nednella/agentos/commit/18d7779eb5463398ac2fad6c4f7e16e4097e4950))
+* **desktop:** give each project's browser a fixed debugging port ([401a32b](https://github.com/nednella/agentos/commit/401a32b2d2942ce7a95cd826b989920e183fdde3))
+* **desktop:** name the session in its browser window's title ([4eaa6de](https://github.com/nednella/agentos/commit/4eaa6de9f86006231df4f71aa1e8dd1a5a72b9ff))
+* **desktop:** open a session's tabs in its own browser window ([858e506](https://github.com/nednella/agentos/commit/858e506984cd68a34f3ea260a4559e741d990d8e))
+* **desktop:** open each session's page in its own headed browser window ([bf8da5c](https://github.com/nednella/agentos/commit/bf8da5cadbe7987bc5bba6287e91c6b49f5157b5))
+* **desktop:** show a status summary in the headed browser tab ([f0e0fa2](https://github.com/nednella/agentos/commit/f0e0fa20843686236058e72b0a27f5319fe27a2d))
+
+
+### Bug Fixes
+
+* **desktop:** ask the browser to quit before killing it ([213b27b](https://github.com/nednella/agentos/commit/213b27bf70054c412adeae0bf5f6edb40380bb61))
+* **desktop:** centre window buttons on top bar ([a3e873c](https://github.com/nednella/agentos/commit/a3e873c76116c973d2ef9aeef826f0150c28acc2))
+* **ui:** pad top of queue list ([84d7abb](https://github.com/nednella/agentos/commit/84d7abb47bd23743a608d630ac449aee32cb194d))
+
+
+### Performance Improvements
+
+* **desktop:** start chrome-devtools-mcp straight from the npx cache ([582c990](https://github.com/nednella/agentos/commit/582c990f7ba3b109d00fecdf32ac6f2527828188))
+
 ## [0.11.1](https://github.com/nednella/agentos/compare/v0.11.0...v0.11.1) (2026-10-07)
 
 
