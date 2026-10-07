@@ -78,7 +78,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </button>
         )}
       </div>
-      <div className="short:hidden flex items-center gap-3 pt-2.5 pr-4 pb-0.5 pl-11">
+      <div className="short:hidden flex items-center gap-3 px-4 pt-2.5 pb-0.5">
         <StateBadge state={session.state} />
         <ModelTag model={session.model} effort={session.effort} />
       </div>
