@@ -28,7 +28,7 @@ function Count({ state, count, label }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseen, awake, report, update, updating, applyUpdate } = useAgentos()
+  const { project, projects, sessions, setOverlay, digestUnseen, report, update, updating, applyUpdate } = useAgentos()
   const { width, statsOpen, digestOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
@@ -81,15 +81,6 @@ export function TopBar() {
           <button className="btn btn-accent" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
             {updating ? 'Updating…' : width >= NEXT_FULL_MIN ? `v${update} available · Update` : 'Update'}
           </button>
-        )}
-        {awake && (
-          <span
-            className="grid h-8 w-8 place-items-center text-soft"
-            title="Keeping this Mac awake while a session works"
-            aria-label="Keeping this Mac awake while a session works"
-          >
-            <Icon name="moon" />
-          </span>
         )}
         <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>
           <Icon name="next" />

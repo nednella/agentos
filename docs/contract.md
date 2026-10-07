@@ -458,7 +458,7 @@ ended one, so it outlives a restart. `Session.model` and `Session.effort` show i
 
 While at least one session is `working`, in any project whose `keep_mac_awake` is on (the project's own setting, else the top-level one, else on), the
 app runs `caffeinate -i -w <app pid>`: the Mac does not idle-sleep and the display still may. It stops when no such session works, when the app
-quits, and when the app dies. The top bar shows a moon while it runs. It does not stop a closed lid from sleeping the Mac unless the Mac is in
+quits, and when the app dies. It does not stop a closed lid from sleeping the Mac unless the Mac is in
 clamshell mode (external display and power connected), and it does not stop a manual sleep or a sleep from low battery.
 
 ### Where things are stored
