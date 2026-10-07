@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/nednella/agentos/internal/project"
 )
 
 func prJSON(state string, draft bool, rollup string, comments, reviews int) string {
@@ -53,5 +55,27 @@ func TestParseWorktrees(t *testing.T) {
 	w := parseWorktrees("worktree /p\nHEAD abc\nbranch refs/heads/main\n\nworktree /p/trees/issue-7\nHEAD def\nbranch refs/heads/issue-7\n\nworktree /p/detached\nHEAD 123\ndetached\n")
 	if w.main != "/p" || w.byBranch["issue-7"] != "/p/trees/issue-7" || w.byBranch["main"] != "/p" || len(w.byBranch) != 2 {
 		t.Errorf("worktrees = %+v", w)
+	}
+}
+
+func TestPollResultForAForgottenSessionIsDropped(t *testing.T) {
+	l := newLifecycle(nil, nil, t.TempDir(), t.TempDir(), nil, func(string, any) {})
+	proj := project.Project{Name: "p"}
+	for _, tt := range []struct {
+		name   string
+		forget bool
+		want   bool
+	}{{"forgotten", true, false}, {"kept", false, true}} {
+		t.Run(tt.name, func(t *testing.T) {
+			id := "p/" + tt.name
+			if tt.forget {
+				l.forget(id)
+			}
+			o := l.update(target{id: id, proj: proj}, "issue-7", "", &PR{Number: 7, State: "open"})
+			_, tracked := l.tracks[id]
+			if tracked != tt.want || l.prs("p").Live[id] != tt.want || (!tt.want && o != (outcome{})) {
+				t.Errorf("tracked %v, live %v, outcome %+v, want tracked %v", tracked, l.prs("p").Live[id], o, tt.want)
+			}
+		})
 	}
 }
