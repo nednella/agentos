@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -169,5 +170,37 @@ func TestWindowLabel(t *testing.T) {
 		if got := windowLabel(tt.in); got != tt.want {
 			t.Errorf("windowLabel(%q) = %q, want %q", tt.in, got, tt.want)
 		}
+	}
+}
+
+func TestConsoleShownKeepsTheLastLinesAfterTheAgentDrains(t *testing.T) {
+	var mu sync.Mutex
+	events := 0
+	b := New(t.TempDir(), func(event string, _ any) {
+		mu.Lock()
+		defer mu.Unlock()
+		if event == "browser:state" {
+			events++
+		}
+	})
+	tb := &tab{b: b, id: "demo/1"}
+	if got := tb.snapshotState().Console; got == nil || len(got) != 0 {
+		t.Fatalf("Console = %#v, want an empty list", got)
+	}
+	for i := range 25 {
+		tb.logConsole(strconv.Itoa(i))
+	}
+	if drained := tb.drainConsole(); len(drained) != 25 {
+		t.Fatalf("drained %d lines, want 25", len(drained))
+	}
+	got := tb.snapshotState().Console
+	if len(got) != consoleShown || got[0] != "5" || got[consoleShown-1] != "24" {
+		t.Fatalf("Console = %v, want lines 5 to 24", got)
+	}
+	time.Sleep(consolePublishGap * 3)
+	mu.Lock()
+	defer mu.Unlock()
+	if events != 1 {
+		t.Errorf("published %d state events for 25 lines, want 1", events)
 	}
 }

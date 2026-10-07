@@ -27,6 +27,8 @@ const (
 	defaultViewWidth  = 1280
 	defaultViewHeight = 800
 	consoleKept       = 200
+	consoleShown      = 20
+	consolePublishGap = 500 * time.Millisecond
 	browserStartLimit = 15 * time.Second
 	callLimit         = 15 * time.Second
 	closeGrace        = time.Minute
@@ -43,6 +45,10 @@ type BrowserState struct {
 	CanGoForward bool   `json:"canGoForward"`
 	Error        string `json:"error"`
 	Headed       bool   `json:"headed"`
+	LoadedAt     int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
+	// Console is the page's last few console errors and failed requests, oldest first.
+	// It is a copy: the agent's `console` command drains another buffer.
+	Console []string `json:"console"`
 }
 
 // BrowserInput is one mouse, wheel, key or paste event from the user, in CSS pixels of the page viewport.
@@ -149,6 +155,8 @@ type tab struct {
 	visible   bool
 	loadSeq   int
 	console   []string
+	recent    []string    // the last consoleShown lines, for the front end; never drained
+	recentPub *time.Timer // set while a coalesced publish of recent is pending
 	requests  map[string]string
 }
 
@@ -159,7 +167,12 @@ func (t *tab) call(ctx context.Context, method string, params any) (json.RawMess
 func (t *tab) snapshotState() BrowserState {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	return t.state
+	st := t.state
+	st.Console = slices.Clone(t.recent)
+	if st.Console == nil {
+		st.Console = []string{}
+	}
+	return st
 }
 
 // publish sends the tab's state to the front end.
@@ -170,6 +183,19 @@ func (t *tab) logConsole(line string) {
 	defer t.mu.Unlock()
 	if len(t.console) < consoleKept {
 		t.console = append(t.console, line)
+	}
+	t.recent = append(t.recent, line)
+	if len(t.recent) > consoleShown {
+		t.recent = t.recent[len(t.recent)-consoleShown:]
+	}
+	// A noisy page would otherwise publish a state event per line.
+	if t.recentPub == nil {
+		t.recentPub = time.AfterFunc(consolePublishGap, func() {
+			t.mu.Lock()
+			t.recentPub = nil
+			t.mu.Unlock()
+			t.publish()
+		})
 	}
 }
 
@@ -496,7 +522,7 @@ func (b *Browsers) State(id string) BrowserState {
 	if t := b.tab(id); t != nil {
 		return t.snapshotState()
 	}
-	return BrowserState{ID: id, Headed: !b.headless}
+	return BrowserState{ID: id, Headed: !b.headless, Console: []string{}}
 }
 
 // webAddress turns what the user typed into an address the browser can open.
@@ -821,7 +847,9 @@ func (t *tab) event(method string, params json.RawMessage) {
 	case "Page.loadEventFired":
 		t.mu.Lock()
 		t.loadSeq++
+		t.state.LoadedAt = time.Now().UnixMilli()
 		t.mu.Unlock()
+		t.publish()
 	case "Page.screencastFrame":
 		t.frame(params)
 	case "Runtime.consoleAPICalled":

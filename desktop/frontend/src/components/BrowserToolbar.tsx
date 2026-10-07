@@ -2,15 +2,14 @@ import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import type { BrowserState } from '../types'
+import { CaptureButton } from './CaptureButton'
 import { Icon } from './Icon'
-import { InlineInput } from './InlineInput'
 
 type BrowserToolbarProps = { id: string; state: BrowserState }
 
 export function BrowserToolbar({ id, state }: BrowserToolbarProps) {
-  const { report, pushToast } = useAgentos()
+  const { report } = useAgentos()
   const [draft, setDraft] = useState<string | null>(null)
-  const [capturing, setCapturing] = useState(false)
   const nav = (action: 'back' | 'forward' | 'reload' | 'stop') => report(() => api.browserNav(id, action))
   const iconButton = 'btn btn-ghost h-8 w-8 justify-center px-0'
 
@@ -52,31 +51,12 @@ export function BrowserToolbar({ id, state }: BrowserToolbarProps) {
         }}
       />
       {state.loading && <span className="spinner" role="status" aria-label="Loading" />}
-      {state.title && !capturing && (
+      {state.title && (
         <span className="hidden max-w-[12rem] truncate text-small text-dim lg:block" title={state.title}>
           {state.title}
         </span>
       )}
-      {capturing ? (
-        <InlineInput
-          placeholder="Caption (optional), Enter to capture"
-          blur="cancel"
-          className="w-64 max-w-full"
-          onSubmit={(caption) => {
-            setCapturing(false)
-            report(async () => {
-              await api.browserScreenshot(id, caption.trim())
-              pushToast({ tone: 'info', text: 'Captured to Evidence' })
-            })
-          }}
-          onCancel={() => setCapturing(false)}
-        />
-      ) : (
-        <button className="btn" title="Capture the page as evidence" onClick={() => setCapturing(true)}>
-          <Icon name="camera" />
-          <span className="hidden sm:inline">Capture</span>
-        </button>
-      )}
+      <CaptureButton id={id} />
       <button className={iconButton} title="Close this browser tab" aria-label="Close browser tab" onClick={() => report(() => api.browserClose(id))}>
         <Icon name="close" />
       </button>
