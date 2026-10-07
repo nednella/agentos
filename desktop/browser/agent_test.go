@@ -223,4 +223,15 @@ func TestBrowserTabs(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("close closes the window with every tab", func(t *testing.T) {
+		mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
+		eventually(t, "two pages", func() bool { return pages() == 2 })
+		if out := mustBrowser(t, h, s.ID, "close"); out != "closed your window" {
+			t.Errorf("close printed %q", out)
+		}
+		if st := h.BrowserState(s.ID); st.Open || b.Has(s.ID) {
+			t.Errorf("state after close = %+v", st)
+		}
+	})
 }
