@@ -399,8 +399,8 @@ keep_mac_awake: true          # stop the Mac idle-sleeping while a session works
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
 app_text_scale: 1.2            # text size as a multiple of the default, 0.85 to 1.5; unset is 1. The settings panel writes it
 projects:
-  - name: livedocument
-    directory: /Users/me/code/livedocument
+  - name: storefront
+    directory: /Users/me/code/storefront
     # everything below is optional; the values shown are the defaults
     queue_sections: []         # the groups of the queue, in order; see below
     note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
