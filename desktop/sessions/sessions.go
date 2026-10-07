@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -89,6 +90,7 @@ type Sessions struct {
 	tmux     *term.Tmux
 	agent    agent.Agent
 	stateDir string
+	localDir string
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
 
@@ -201,7 +203,7 @@ func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, emit: o.Emit, warn: warn.New(o.Emit),
+		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -433,6 +435,15 @@ func (s *Sessions) drop(id string) {
 	_ = bus.RemoveState(s.stateDir, id)
 	go s.evidence.Purge(id)
 	go s.browsers.Close(s.ctx, id)
+	if name, err := session.ParseName(id); err == nil {
+		go os.RemoveAll(s.tmpDir(name))
+	}
+}
+
+// tmpDir is the session's own TMPDIR, and Claude's scratchpad. It sits in a folder the agent may use
+// without asking, so the screenshots and scratch files it makes there need no approval, and it goes with the session.
+func (s *Sessions) tmpDir(name session.Name) string {
+	return filepath.Join(s.localDir, name.Project, "tmp", name.Token)
 }
 
 // Dismiss removes an ended session's row.
@@ -893,6 +904,11 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if issue > 0 {
 		env = append(env, "AGENTOS_ISSUE="+strconv.Itoa(issue))
 	}
+	tmp := s.tmpDir(name)
+	if err := os.MkdirAll(tmp, 0o700); err != nil {
+		return fmt.Errorf("making the session's temp folder: %w", err)
+	}
+	env = append(env, "TMPDIR="+tmp, "CLAUDE_CODE_TMPDIR="+tmp)
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
