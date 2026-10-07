@@ -508,7 +508,7 @@ type Options struct {
 	UpdateTick     time.Duration // how often to check the releases; an hour by default, and an hour before the first check
 	Releases       string        // what the releases API answers; "" fails the check
 	Version        string        // the version the app believes it runs; "dev" by default
-	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DATA_DIR, and home in the state dir
+	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DEV_DATA_DIR, and home in the state dir
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -570,10 +570,10 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_CONFIG", confPath)
 	t.Setenv("AGENTOS_DIR", dir)
 	if o.DataDirConfig {
-		t.Setenv("AGENTOS_DATA_DIR", "")
+		t.Setenv("AGENTOS_DEV_DATA_DIR", "")
 		t.Setenv("HOME", filepath.Join(state, "home")) // the local folder sits under home
 	} else {
-		t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
+		t.Setenv("AGENTOS_DEV_DATA_DIR", filepath.Join(state, "data"))
 	}
 	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(state, "claude")) // never the user's own settings
 

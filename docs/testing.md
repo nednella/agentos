@@ -10,7 +10,7 @@ Every run outside `go test` MUST set all of these:
 S=$(mktemp -d "${TMPDIR:-/tmp}/aos.XXXX")
 export AGENTOS_TMUX_SOCKET=aos-test-$$      # never "agentos", the owner's socket
 export AGENTOS_STATE_DIR=$S                 # never ~/.local/state/agentos
-export AGENTOS_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and stats)
+export AGENTOS_DEV_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and stats)
 export AGENTOS_CONFIG=$S/config.yaml        # never ~/.config/agentos/config.yaml
 ```
 
