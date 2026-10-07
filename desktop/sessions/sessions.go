@@ -808,6 +808,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
+	model = s.fill(proj.Dir, model)
 	name, ctx, ready := s.reserve(proj, text)
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
@@ -826,6 +827,18 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		s.life.ensureWatchers(ctx)
 	}
 	return view, nil
+}
+
+// fill sets what model leaves unset from the agent's own settings, skipping a value the agent would not accept.
+func (s *Sessions) fill(dir string, model project.Model) project.Model {
+	l := s.agent.Fill(dir, agent.Launch{Model: model.Model, Effort: model.Effort})
+	if (project.Model{Model: l.Model}).Validate() == nil {
+		model.Model = l.Model
+	}
+	if (project.Model{Effort: l.Effort}).Validate() == nil {
+		model.Effort = l.Effort
+	}
+	return model
 }
 
 // reserve picks the lowest free number of the project. With a prefill it also
