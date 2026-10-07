@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
@@ -16,7 +16,8 @@ const terminalInset = { marginLeft: 'calc(var(--corner-pad) - 0.75rem)', marginR
 export function ShellStrip() {
   const { project, shellIds, shellId, focus } = useAgentos()
   const { shellOpen, shellRem, setShellOpen, setShellHeight, resetShellHeight } = useLayout()
-  const [listOpen, setListOpen] = useState(true)
+  const [listOpen, setListOpen] = useState(false)
+  const listRoot = useRef<HTMLDivElement>(null)
   const drag = useRef<{ y: number; rem: number; root: number } | null>(null)
 
   const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize)
@@ -46,6 +47,24 @@ export function ShellStrip() {
     const step = e.key === 'ArrowUp' ? KEY_STEP_REM : -KEY_STEP_REM
     setShellHeight(Math.min(shellRem + step, (0.6 * window.innerHeight) / root()), true)
   }
+
+  useEffect(() => {
+    if (!listOpen) return
+    const close = (e: MouseEvent) => {
+      if (!listRoot.current?.contains(e.target as Node)) setListOpen(false)
+    }
+    const escape = (e: globalThis.KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setListOpen(false)
+    }
+    window.addEventListener('mousedown', close)
+    window.addEventListener('keydown', escape, true)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('keydown', escape, true)
+    }
+  }, [listOpen])
 
   if (!shellOpen) {
     return (
@@ -87,24 +106,30 @@ export function ShellStrip() {
           <span className="text-small text-dim">Shell{shellIds.length > 1 ? ` ${shellIds.indexOf(shellId) + 1}` : ''}</span>
         </button>
         {shellIds.length > 0 && (
-          <button
-            className="flex h-full items-center text-dim hover:text-ink"
-            title={listOpen ? 'Hide the shell list' : 'Show the shell list'}
-            aria-label={listOpen ? 'Hide the shell list' : 'Show the shell list'}
-            aria-expanded={listOpen}
-            onClick={() => setListOpen(!listOpen)}
-          >
-            <span className={`transition-transform duration-150 ${listOpen ? '' : 'rotate-180'}`}>
-              <Icon name="chevron" size={15} />
-            </span>
-          </button>
+          <div ref={listRoot} className="relative h-full">
+            <button
+              className="flex h-full items-center text-dim hover:text-ink"
+              title={listOpen ? 'Hide the shell list' : 'Show the shell list'}
+              aria-label={listOpen ? 'Hide the shell list' : 'Show the shell list'}
+              aria-expanded={listOpen}
+              onClick={() => setListOpen(!listOpen)}
+            >
+              <span className={`transition-transform duration-150 ${listOpen ? 'rotate-180' : ''}`}>
+                <Icon name="chevron" size={15} />
+              </span>
+            </button>
+            {listOpen && (
+              <ShellList
+                className="fade-in absolute top-full right-0 mt-1 overflow-hidden rounded-md border border-line-strong bg-raised shadow-2xl"
+                style={{ maxHeight: `calc(${shellRem}rem - 0.25rem)`, zIndex: 'var(--z-popup)' }}
+                onPick={() => setListOpen(false)}
+              />
+            )}
+          </div>
         )}
       </div>
-      <div className="flex" style={{ height: `${shellRem}rem`, marginBottom: '0.375rem' }}>
-        <div className="relative min-w-0 flex-1" style={{ marginLeft: terminalInset.marginLeft }}>
-          <ShellTerminal visible />
-        </div>
-        {shellIds.length > 0 && listOpen && <ShellList />}
+      <div className="relative" style={{ ...terminalInset, height: `${shellRem}rem` }}>
+        <ShellTerminal visible />
       </div>
     </div>
   )
