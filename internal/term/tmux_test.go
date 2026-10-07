@@ -43,12 +43,12 @@ func TestSessionLifecycle(t *testing.T) {
 		t.Fatalf("List without a server = %v, %v", infos, err)
 	}
 
-	name := session.Name{Project: "demo", N: 1}
+	name := session.Name{Project: "demo", Token: "a1"}
 	dir := t.TempDir()
-	if err := tmux.NewSession(ctx, name, "first agent", dir, []string{"AGENTOS_SESSION=demo/1"}, []string{"sleep", "60"}, 100, 30); err != nil {
+	if err := tmux.NewSession(ctx, name, "first agent", dir, []string{"AGENTOS_SESSION=demo/a1"}, []string{"sleep", "60"}, 100, 30); err != nil {
 		t.Fatal(err)
 	}
-	other := session.Name{Project: "demo", N: 2}
+	other := session.Name{Project: "demo", Token: "b2"}
 	if err := tmux.NewSession(ctx, other, "tabs\tand ünïcode", dir, nil, []string{"sleep", "60"}, 100, 30); err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestListSkipsSessionsAgentosDidNotMake(t *testing.T) {
 func TestShellSessionsAreListedApart(t *testing.T) {
 	tmux := newTestTmux(t)
 	ctx := context.Background()
-	agent, shell := session.Name{Project: "demo", N: 1}, session.Name{Project: "demo", Shell: 1}
+	agent, shell := session.Name{Project: "demo", Token: "a1"}, session.Name{Project: "demo", Shell: 1}
 	if tmux.Has(ctx, shell) {
 		t.Fatal("Has without a server is true")
 	}
@@ -131,7 +131,7 @@ func TestShellSessionsAreListedApart(t *testing.T) {
 	if infos, err = list(tmux, ctx); err != nil || len(infos) != 1 {
 		t.Errorf("List = %v, %v", infos, err)
 	}
-	if !tmux.Has(ctx, shell) || !tmux.Has(ctx, agent) || tmux.Has(ctx, session.Name{Project: "demo", N: 2}) || tmux.Has(ctx, session.Name{Project: "dem", Shell: 1}) {
+	if !tmux.Has(ctx, shell) || !tmux.Has(ctx, agent) || tmux.Has(ctx, session.Name{Project: "demo", Token: "b2"}) || tmux.Has(ctx, session.Name{Project: "dem", Shell: 1}) {
 		t.Error("Has gave a wrong answer")
 	}
 }
@@ -144,7 +144,7 @@ func list(t *Tmux, ctx context.Context) ([]Info, error) {
 func TestTargetsMatchTheWholeName(t *testing.T) {
 	tmux := newTestTmux(t)
 	ctx := context.Background()
-	one, ten := session.Name{Project: "p", N: 1}, session.Name{Project: "p", N: 10}
+	one, ten := session.Name{Project: "p", Token: "a1"}, session.Name{Project: "p", Token: "a10"}
 	for _, n := range []session.Name{one, ten} {
 		if err := tmux.NewSession(ctx, n, "title", t.TempDir(), nil, []string{"sleep", "60"}, 100, 30); err != nil {
 			t.Fatal(err)
@@ -159,24 +159,24 @@ func TestTargetsMatchTheWholeName(t *testing.T) {
 	infos, _ := list(tmux, ctx)
 	for _, in := range infos {
 		if in.Name == ten && (in.Title != "title" || in.Issue != "") {
-			t.Errorf("p/10 changed with p/1: %+v", in)
+			t.Errorf("p/a10 changed with p/1: %+v", in)
 		}
 	}
 	if err := tmux.Kill(ctx, one); err != nil {
 		t.Fatal(err)
 	}
 	if !tmux.Has(ctx, ten) || tmux.Has(ctx, one) {
-		t.Error("killing p/1 did not leave exactly p/10")
+		t.Error("killing p/a1 did not leave exactly p/a10")
 	}
 	if err := tmux.Kill(ctx, one); err == nil {
-		t.Error("killing p/1 again hit p/10")
+		t.Error("killing p/a1 again hit p/a10")
 	}
 }
 
 func TestTrailingSemicolonSurvives(t *testing.T) {
 	tmux := newTestTmux(t)
 	ctx := context.Background()
-	name := session.Name{Project: "demo", N: 1}
+	name := session.Name{Project: "demo", Token: "a1"}
 	if err := tmux.NewSession(ctx, name, "fix a;", t.TempDir(), nil, []string{"cat"}, 100, 30); err != nil {
 		t.Fatal(err)
 	}

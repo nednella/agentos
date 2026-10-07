@@ -103,7 +103,7 @@ func TestParseEvent(t *testing.T) {
 func TestSort(t *testing.T) {
 	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	mk := func(n int, s State, ago time.Duration) Session {
-		return Session{Name: Name{Project: "p", N: n}, State: s, At: t0.Add(-ago)}
+		return Session{Name: Name{Project: "p", Token: "t"}, N: n, State: s, At: t0.Add(-ago)}
 	}
 	ss := []Session{
 		mk(1, Idle, 0),
@@ -118,7 +118,7 @@ func TestSort(t *testing.T) {
 	Sort(ss)
 	var got []int
 	for _, s := range ss {
-		got = append(got, s.Name.N)
+		got = append(got, s.N)
 	}
 	want := []int{4, 1, 7, 6, 3, 5, 2, 8}
 	for i := range want {
@@ -134,8 +134,10 @@ func TestParseName(t *testing.T) {
 		want    Name
 		wantErr bool
 	}{
-		{"api/3", Name{Project: "api", N: 3}, false},
-		{"my-app/12", Name{Project: "my-app", N: 12}, false},
+		{"api/3", Name{Project: "api", Token: "3"}, false},
+		{"my-app/12", Name{Project: "my-app", Token: "12"}, false},
+		{"api/k3x9q0ab", Name{Project: "api", Token: "k3x9q0ab"}, false},
+		{"api/shells", Name{Project: "api", Token: "shells"}, false},
 		{"a/b/7", Name{}, true},
 		{"../7", Name{}, true},
 		{"a..b/7", Name{}, true},
@@ -143,8 +145,11 @@ func TestParseName(t *testing.T) {
 		{"api", Name{}, true},
 		{"/3", Name{}, true},
 		{"api/", Name{}, true},
-		{"api/x", Name{}, true},
-		{"api/0", Name{}, true},
+		{"api/X", Name{}, true},
+		{"api/a_b", Name{}, true},
+		{"api/a b", Name{}, true},
+		{"api/a:b", Name{}, true},
+		{"api/a.b", Name{}, true},
 		{"api/shell", Name{Project: "api", Shell: 1}, false},
 		{"api/shell-2", Name{Project: "api", Shell: 2}, false},
 		{"api/shell-12", Name{Project: "api", Shell: 12}, false},
@@ -152,7 +157,6 @@ func TestParseName(t *testing.T) {
 		{"api/shell-02", Name{}, true},
 		{"api/shell-x", Name{}, true},
 		{"a/b/shell", Name{}, true},
-		{"api/shells", Name{}, true},
 		{"/shell", Name{}, true},
 	}
 	for _, tt := range tests {
@@ -164,7 +168,7 @@ func TestParseName(t *testing.T) {
 			if err == nil && got.String() != tt.in {
 				t.Errorf("round trip = %q, want %q", got.String(), tt.in)
 			}
-			if err == nil && got.IsShell() != strings.Contains(tt.in, "/shell") {
+			if err == nil && got.IsShell() != (strings.Contains(tt.in, "/shell") && got.Token == "") {
 				t.Errorf("IsShell = %v for %q", got.IsShell(), tt.in)
 			}
 		})
@@ -180,6 +184,18 @@ func TestNextN(t *testing.T) {
 		if got := NextN(tt.used); got != tt.want {
 			t.Errorf("NextN(%v) = %d, want %d", tt.used, got, tt.want)
 		}
+	}
+}
+
+func TestNewToken(t *testing.T) {
+	seen := map[string]bool{}
+	for range 100 {
+		tok := NewToken()
+		name, err := ParseName("p/" + tok)
+		if err != nil || len(tok) != 8 || name.Token != tok || seen[tok] {
+			t.Fatalf("NewToken() = %q, %+v, %v", tok, name, err)
+		}
+		seen[tok] = true
 	}
 }
 

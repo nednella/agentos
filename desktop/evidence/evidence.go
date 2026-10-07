@@ -13,7 +13,6 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"sync"
 	"time"
 
@@ -49,14 +48,13 @@ func New(dataDir string) *Store {
 // File is the file behind the URL of a picture, or "".
 func (e *Store) File(url string) string { return media.File(e.dir, media.EvidenceFolder, url) }
 
-// folder is where the session's evidence lives. The session's number is reused
-// after it ends, so the folder is emptied when a session ends.
+// folder is where the session's evidence lives.
 func (e *Store) folder(id string) (string, error) {
 	name, err := session.ParseName(id)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(e.dir, name.Project, media.EvidenceFolder, strconv.Itoa(name.N)), nil
+	return filepath.Join(e.dir, name.Project, media.EvidenceFolder, name.Token), nil
 }
 
 // load needs mu.
@@ -151,7 +149,7 @@ func (e *Store) AddImage(id string, data []byte, caption, source string) (Eviden
 	}
 	parsed, _ := session.ParseName(id)
 	item := Evidence{ID: name, Kind: "image", Caption: caption, Source: source, At: time.Now().UnixMilli(),
-		URL: path.Join(media.Prefix, parsed.Project, media.EvidenceFolder, strconv.Itoa(parsed.N), name+ext)}
+		URL: path.Join(media.Prefix, parsed.Project, media.EvidenceFolder, parsed.Token, name+ext)}
 	return e.add(id, item, filepath.Join(dir, name+ext))
 }
 

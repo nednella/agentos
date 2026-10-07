@@ -20,6 +20,7 @@ func TestHandlerServesBothKinds(t *testing.T) {
 	}
 	write(filepath.Join(dir, "main", "notes-media", "a.png"), "note picture")
 	write(filepath.Join(dir, "main", "evidence", "3", "b.JPG"), "evidence picture")
+	write(filepath.Join(dir, "main", "evidence", "k3x9q0ab", "c.png"), "token picture")
 	write(filepath.Join(dir, "main", "notes.json"), "secret")
 	write(filepath.Join(dir, "main", "notes-media", "page.html"), "<script>")
 	write(filepath.Join(dir, "main", "evidence", "3", "index.json"), "secret")
@@ -32,6 +33,7 @@ func TestHandlerServesBothKinds(t *testing.T) {
 	}{
 		{"/media/main/notes-media/a.png", 200, "note picture"},
 		{"/media/main/evidence/3/b.JPG", 200, "evidence picture"},
+		{"/media/main/evidence/k3x9q0ab/c.png", 200, "token picture"},
 		{"/media/main/notes.json", 404, ""},
 		{"/media/main/notes-media/page.html", 404, ""},
 		{"/media/main/evidence/3/index.json", 404, ""},

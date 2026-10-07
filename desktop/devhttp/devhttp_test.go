@@ -26,13 +26,14 @@ func TestCallRunsABoundMethod(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s, ok := got.(sessions.Session); !ok || s.Title != "via call" {
-		t.Errorf("result = %+v", got)
+	s, ok := got.(sessions.Session)
+	if !ok || s.Title != "via call" {
+		t.Fatalf("result = %+v", got)
 	}
 	if got, err = call(h.App.Services(), "projects.Service", "Snapshot", []byte(`[]`)); err != nil || len(got.(projects.Snapshot).Sessions) != 1 {
 		t.Errorf("Snapshot = %+v, %v", got, err)
 	}
-	if got, err = call(h.App.Services(), "sessions.Service", "RenameSession", []byte(`["main/1","renamed"]`)); err != nil || got != nil {
+	if got, err = call(h.App.Services(), "sessions.Service", "RenameSession", []byte(`["`+s.ID+`","renamed"]`)); err != nil || got != nil {
 		t.Errorf("a method with no result gave %v, %v", got, err)
 	}
 }

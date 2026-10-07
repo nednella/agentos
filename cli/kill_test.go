@@ -49,7 +49,7 @@ func killSetup(t *testing.T) (*term.Tmux, string) {
 		name  session.Name
 		title string
 		dir   string
-	}{{session.Name{Project: "demo", N: 1}, "one", demo}, {session.Name{Project: "demo", N: 2}, "two", demo}, {session.Name{Project: "other", N: 1}, "three", other}} {
+	}{{session.Name{Project: "demo", Token: "a1"}, "one", demo}, {session.Name{Project: "demo", Token: "b2"}, "two", demo}, {session.Name{Project: "other", Token: "a1"}, "three", other}} {
 		if err := tmux.NewSession(context.Background(), s.name, s.title, s.dir, nil, []string{"sleep", "60"}, 80, 24); err != nil {
 			t.Fatal(err)
 		}
@@ -89,13 +89,13 @@ func names(t *testing.T, tmux *term.Tmux) string {
 func TestKillStopsOnlyThisProject(t *testing.T) {
 	tmux, state := killSetup(t)
 	out := runKill(t)
-	if !strings.Contains(out, "stopping demo/1 (one)") || !strings.Contains(out, "stopping demo/2 (two)") || strings.Contains(out, "other/1") {
+	if !strings.Contains(out, "stopping demo/a1 (one)") || !strings.Contains(out, "stopping demo/b2 (two)") || strings.Contains(out, "other/a1") {
 		t.Errorf("output = %q", out)
 	}
-	if got := names(t, tmux); got != "other/1" {
+	if got := names(t, tmux); got != "other/a1" {
 		t.Errorf("sessions left: %q", got)
 	}
-	if left := bus.ReadAll(state); len(left) != 1 || left["other/1"].Session == "" {
+	if left := bus.ReadAll(state); len(left) != 1 || left["other/a1"].Session == "" {
 		t.Errorf("state files left: %v", left)
 	}
 	if out := runKill(t); !strings.Contains(out, "no agents to stop") {
