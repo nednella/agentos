@@ -35,11 +35,11 @@ export function diffBlock(file: string): string {
     `  ${dim('⎿')}  Updated ${file} with 3 additions and 2 removals`,
     context(41, "import { useParams } from 'react-router-dom'"),
     context(42, ''),
-    removed(43, 'const link = useLinkContext()'),
-    removed(44, 'const doc = link.document'),
-    added(43, 'const { document: doc, link } = useDocumentLink()'),
-    added(44, 'if (!doc) return <LiveDocumentLoadError />'),
-    added(45, 'const canEdit = link.access === "edit"'),
+    removed(43, 'const shop = useShopContext()'),
+    removed(44, 'const product = shop.product'),
+    added(43, 'const { product, stock } = useProduct()'),
+    added(44, 'if (!product) return <ProductNotFound />'),
+    added(45, 'const canBuy = stock.count > 0'),
     context(46, ''),
     context(47, 'return ('),
     '',
@@ -47,18 +47,18 @@ export function diffBlock(file: string): string {
 }
 
 export const paragraphs = [
-  'The entry file now answers with edit or view access, so the viewer no longer needs its own layout wrapper. I moved the reader into the document folder and renamed the context to match the link it carries.',
+  'The product page now renders on the server and only the gallery loads on the client, so the page no longer needs its own layout wrapper. I moved the gallery into the product folder and renamed the context to match.',
   'Next I will run the type checker across the frontend and confirm that no import still points at the old partials folder. If anything is left over it will show up as a missing module.',
   'Two components still read the old context. I am switching them over now, then I will sweep the tests that mocked the previous shape.',
-  'The beacon fires on pagehide, not unload, because Safari drops unload handlers once the page is in the back-forward cache. That keeps the last view duration intact.',
+  'The cart now sums totals in cents and formats them once, because rounding each line drifted by a cent on large orders. That keeps the total equal to what the payment provider charges.',
 ]
 
 export const toolLines = [
-  'Read(app-frontend/src/js/pages/[slug]/Index.tsx)',
-  'Search(pattern: "documentContext", path: "app-frontend")',
+  'Read(web/src/pages/product/[id]/Index.tsx)',
+  'Search(pattern: "productContext", path: "web")',
   'Bash(npx tsc --noEmit)',
-  'Update(app-frontend/src/js/pages/[slug]/Layout.tsx)',
-  'Read(app-frontend/src/js/pages/[slug]/edit/Index.tsx)',
+  'Update(web/src/pages/product/[id]/Layout.tsx)',
+  'Read(web/src/pages/product/[id]/Gallery.tsx)',
 ]
 
 export function toolCall(index: number): string {
