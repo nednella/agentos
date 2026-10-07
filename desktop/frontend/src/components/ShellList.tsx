@@ -34,8 +34,10 @@ export function ShellList({
       <button
         className="row h-8 flex-none items-center gap-2 border-b border-line px-3 text-small text-soft"
         onClick={() => {
-          report(newShell);
-          focus("shell");
+          report(async () => {
+            await newShell();
+            focus("shell");
+          });
           onPick?.();
         }}
       >
