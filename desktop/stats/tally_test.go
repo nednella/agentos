@@ -15,7 +15,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.Hook(t, s.ID, "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"upscope test api foo/bar.test.ts"}}`)
+	h.Hook(t, s.ID, "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"make test api foo/bar.test.ts"}}`)
 	h.Hook(t, s.ID, "Notification", `{"message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}`)
 	eventually(t, "open wait", func() bool {
 		st, _ := h.Stats(7)
@@ -44,7 +44,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	for _, c := range st.ByCause {
 		causes = append(causes, fmt.Sprintf("%s/%s/%d", c.Kind, c.Label, c.Count))
 	}
-	want := []string{"idle/Reply landed/1", "permission/Bash: upscope test api/1", "permission/Edit/1", "question/Question/1"}
+	want := []string{"idle/Reply landed/1", "permission/Bash: make test api/1", "permission/Edit/1", "question/Question/1"}
 	slices.Sort(causes)
 	if !slices.Equal(causes, want) {
 		t.Errorf("causes = %q, want %q", causes, want)
