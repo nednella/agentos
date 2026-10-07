@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -28,7 +27,6 @@ import (
 const (
 	defaultViewWidth  = 1280
 	defaultViewHeight = 800
-	consoleKept       = 200
 	consoleShown      = 20
 	consolePublishGap = 500 * time.Millisecond
 	browserStartLimit = 15 * time.Second
@@ -53,7 +51,6 @@ type BrowserState struct {
 	Headed       bool   `json:"headed"`
 	LoadedAt     int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
 	// Console is the page's last few console errors, failed requests and dismissed dialogs, oldest first.
-	// It is a copy: the agent's `console` command drains another buffer.
 	Console []string `json:"console"`
 }
 
@@ -162,7 +159,6 @@ type tab struct {
 	height    int
 	visible   bool
 	loadSeq   int
-	console   []string
 	recent    []string    // the last consoleShown lines, for the front end; never drained
 	recentPub *time.Timer // set while a coalesced publish of recent is pending
 	requests  map[string]string
@@ -190,9 +186,6 @@ func (t *tab) publish() { t.b.emit("browser:state", t.snapshotState()) }
 func (t *tab) logConsole(line string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	if len(t.console) < consoleKept {
-		t.console = append(t.console, line)
-	}
 	t.recent = append(t.recent, line)
 	if len(t.recent) > consoleShown {
 		t.recent = t.recent[len(t.recent)-consoleShown:]
@@ -206,14 +199,6 @@ func (t *tab) logConsole(line string) {
 			t.publish()
 		})
 	}
-}
-
-func (t *tab) drainConsole() []string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	out := t.console
-	t.console = nil
-	return out
 }
 
 // start launches the project's browser unless it runs already.
@@ -1243,22 +1228,14 @@ func (t *tab) key(ctx context.Context, in BrowserInput) error {
 	return err
 }
 
-// Screenshot returns a PNG of the viewport, the whole page, or one element's box (selector is an element ref).
-func (b *Browsers) Screenshot(ctx context.Context, id string, full bool, ref string) ([]byte, error) {
+// Screenshot returns a PNG of the viewport or the whole page.
+func (b *Browsers) Screenshot(ctx context.Context, id string, full bool) ([]byte, error) {
 	t, err := b.need(id)
 	if err != nil {
 		return nil, err
 	}
 	params := map[string]any{"format": "png"}
-	switch {
-	case ref != "":
-		rect, err := t.elementBox(ctx, ref)
-		if err != nil {
-			return nil, err
-		}
-		params["clip"] = map[string]any{"x": rect.PageX, "y": rect.PageY, "width": rect.Width, "height": rect.Height, "scale": 1}
-		params["captureBeyondViewport"] = true
-	case full:
+	if full {
 		raw, err := t.call(ctx, "Page.getLayoutMetrics", nil)
 		if err != nil {
 			return nil, err
@@ -1320,8 +1297,6 @@ func stopStrayBrowser(profile string) {
 	}
 }
 
-var refPattern = regexp.MustCompile(`^e[0-9]+$`)
-
 // eval runs JavaScript in the page and returns its JSON result.
 func (t *tab) eval(ctx context.Context, expression string) (json.RawMessage, error) {
 	raw, err := t.call(ctx, "Runtime.evaluate", map[string]any{"expression": expression, "returnByValue": true, "awaitPromise": true})
@@ -1350,60 +1325,6 @@ func (t *tab) eval(ctx context.Context, expression string) (json.RawMessage, err
 		return nil, errors.New(msg)
 	}
 	return res.Result.Value, nil
-}
-
-// call runs fn in the page with one JSON argument.
-func (t *tab) apply(ctx context.Context, fn string, arg any) (json.RawMessage, error) {
-	a, err := json.Marshal(arg)
-	if err != nil {
-		return nil, err
-	}
-	return t.eval(ctx, "("+fn+")("+string(a)+")")
-}
-
-type box struct {
-	X, Y, Width, Height float64
-	PageX, PageY        float64
-	Covered             bool
-	Error               string
-}
-
-const boxScript = `(ref) => {
-  const el = document.querySelector('[data-agentos-ref="' + ref + '"]')
-  if (!el) return { error: 'unknown' }
-  el.scrollIntoView({ block: 'center', inline: 'center' })
-  const r = el.getBoundingClientRect()
-  if (!(r.width > 0 && r.height > 0)) return { error: 'hidden' }
-  const x = r.left + r.width / 2, y = r.top + r.height / 2
-  const top = document.elementFromPoint(x, y)
-  return { x, y, width: r.width, height: r.height, pageX: r.left + scrollX, pageY: r.top + scrollY,
-           covered: !!top && top !== el && !el.contains(top) && !top.contains(el) }
-}`
-
-// elementBox scrolls the element with the ref into view and measures it.
-func (t *tab) elementBox(ctx context.Context, ref string) (box, error) {
-	if !refPattern.MatchString(ref) {
-		return box{}, fmt.Errorf("%q is not an element ref like e12", ref)
-	}
-	raw, err := t.apply(ctx, boxScript, ref)
-	if err != nil {
-		return box{}, err
-	}
-	var r struct {
-		X, Y, Width, Height, PageX, PageY float64
-		Covered                           bool
-		Error                             string
-	}
-	if err := json.Unmarshal(raw, &r); err != nil {
-		return box{}, fmt.Errorf("reading the element's position: %w", err)
-	}
-	switch r.Error {
-	case "unknown":
-		return box{}, fmt.Errorf("no element %s on the page: run snapshot again", ref)
-	case "hidden":
-		return box{}, fmt.Errorf("%s is not visible", ref)
-	}
-	return box{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height, PageX: r.PageX, PageY: r.PageY, Covered: r.Covered}, nil
 }
 
 // Hook sets what the browsers ask of the app: the page a new tab opens first, the label that names a session in

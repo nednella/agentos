@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/internal/control"
@@ -32,7 +33,7 @@ func NewCommands(b *Browsers, a Asker, scene Scene, s *evidence.Store, c evidenc
 	return &Commands{browsers: b, asker: a, scene: scene, store: s, changes: c}
 }
 
-// Browser runs one agentos browser command in the asking session's tab; without one it shows the browser view.
+// Browser runs one agentos browser command (open, screenshot) for the asking session; without one it shows the browser view.
 func (c *Commands) Browser(ctx context.Context, req control.Request) (string, error) {
 	if len(req.Args) == 0 {
 		return c.scene.UI(req, "browser"), nil
@@ -41,6 +42,9 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 	if sub == "help" {
 		return prompts.BrowserHelp(), nil
 	}
+	if sub != "open" && sub != "screenshot" {
+		return "", fmt.Errorf("unknown browser command %q: run agentos browser help", sub)
+	}
 	id, err := c.asker.AskerSession(req)
 	if err != nil {
 		return "", err
@@ -48,17 +52,17 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 	if !c.browsers.Available() {
 		return "", errors.New("no Brave, Chrome, Chromium or Edge browser found")
 	}
-	if sub != "screenshot" {
-		return c.browsers.agent(ctx, id, sub, args, req.Opts)
-	}
-	ref := ""
-	if len(args) > 0 {
-		ref = args[0]
+	switch sub {
+	case "open":
+		if len(args) < 1 {
+			return "", errors.New("usage: agentos browser open <url> [--front]")
+		}
+		return c.browsers.AgentOpen(ctx, id, args[0], req.Opts["front"] != "")
 	}
 	if _, err := c.browsers.tabFor(ctx, id); err != nil {
 		return "", err
 	}
-	png, err := c.browsers.Screenshot(ctx, id, req.Opts["full"] != "", ref)
+	png, err := c.browsers.Screenshot(ctx, id, req.Opts["full"] != "")
 	if err != nil {
 		return "", err
 	}

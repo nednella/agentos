@@ -7,15 +7,15 @@ import (
 	"testing"
 )
 
-// The hashes are those of the texts as they stood in Go source before they moved here.
+// The hashes pin the texts: changing one is deliberate, and updates its hash here.
 func TestPromptsKeepTheirText(t *testing.T) {
 	tests := []struct {
 		name string
 		text string
 		hash string
 	}{
-		{"browser session", BrowserSession(), "479d542f0a6920f861bf8db587040d05b7999c1421491e52640b3a23f3e20312"},
-		{"browser help", BrowserHelp(), "e851ad6ab2752270868c8febcee3e98c2e7e479bf2e9023e2f9383d1d336859e"},
+		{"browser session", BrowserSession(), "9e17563dc37844a7c4b42ad45bc2190b089cf872b8a409e65300b8c15f553d28"},
+		{"browser help", BrowserHelp(), "2c488dfb52eea50ed13383aa71bedb6a48dda552646ba9f5a7de423ff38a16f3"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

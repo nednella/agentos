@@ -70,7 +70,7 @@ func (s *Service) BrowserState(id string) BrowserState { return s.browsers.State
 func (s *Service) BrowserScreenshot(id, caption string) (evidence.Evidence, error) {
 	ctx, cancel := s.browserCtx()
 	defer cancel()
-	png, err := s.browsers.Screenshot(ctx, id, false, "")
+	png, err := s.browsers.Screenshot(ctx, id, false)
 	if err != nil {
 		return evidence.Evidence{}, err
 	}
