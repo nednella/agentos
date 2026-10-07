@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.1](https://github.com/nednella/agentos/compare/v0.10.0...v0.10.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **ui:** hide kill button on ended session ([0c0344c](https://github.com/nednella/agentos/commit/0c0344cffe8d0ee2e24d2cebe053cdb171afeccf))
+* **ui:** keep killed session as ended row ([c9490dc](https://github.com/nednella/agentos/commit/c9490dc5a07d2a382d74d69f4d58e8ded20ce8a2))
+
 ## [0.10.0](https://github.com/nednella/agentos/compare/v0.9.0...v0.10.0) (2026-10-06)
 
 
