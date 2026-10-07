@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.11.0](https://github.com/nednella/agentos/compare/v0.10.2...v0.11.0) (2026-10-07)
+
+
+### Features
+
+* **desktop:** let settings change data folder ([c6da83b](https://github.com/nednella/agentos/commit/c6da83b81071c5bcc2e40d1146f14d26310f055a))
+* **desktop:** start sessions with agent's default model ([51fdbb1](https://github.com/nednella/agentos/commit/51fdbb1f2197ad0ed083eaac26f25207b6fa7c14))
+* **internal:** read model defaults from agent's own settings ([66f53eb](https://github.com/nednella/agentos/commit/66f53eba7f210bcde56bb591b40f21dfa74d51e3))
+* **ui:** add data folder setting ([dad8cbb](https://github.com/nednella/agentos/commit/dad8cbbd9aa7e8fe2e7ca07f885b6771ce892c7a))
+* **ui:** remove ⌘1–9 shortcuts for jumping to session ([ac2371a](https://github.com/nednella/agentos/commit/ac2371a24f06889d8a89e7afe1d500a8ad77b5d2))
+
+
+### Bug Fixes
+
+* **cli:** keep late hook from bringing dismissed session back ([a0a9447](https://github.com/nednella/agentos/commit/a0a94473c786c1592e156bd5e63a0935dff4caff))
+* **desktop:** close session's browser tab when its row goes ([aa3935c](https://github.com/nednella/agentos/commit/aa3935c177b078175b89abefbe56f8b4b275dd02))
+* **desktop:** drop pull request results for forgotten session ([aa179ec](https://github.com/nednella/agentos/commit/aa179ecc985b4cee140ed68e127455a4a0c1ae69))
+* **desktop:** give each session its own temp folder ([76608ef](https://github.com/nednella/agentos/commit/76608ef5314338efcf75afd3132283d371ac0d68))
+* **desktop:** remove expired row's evidence and pull request tracking ([294cecb](https://github.com/nednella/agentos/commit/294cecbbd7789f54ba61ac41c4b6b40cc002c70c))
+* **internal:** give each session unique id ([fee1a86](https://github.com/nednella/agentos/commit/fee1a8611536949e0d729640902e7629eb5a94c2))
+* **internal:** keep a session's identity out of new tmux servers ([a4247e1](https://github.com/nednella/agentos/commit/a4247e16ceb1071eec4f37811b89f8a47a6525a4))
+* **internal:** let Claude sessions use app folders without asking ([8bbd2dd](https://github.com/nednella/agentos/commit/8bbd2dde7f2d1b4c4cb5497f81d1ad8f858249fe))
+* **ui:** align status badge with stat bar ([a0e6865](https://github.com/nednella/agentos/commit/a0e686565d1d148f386de0b5e44bb07853ce8452))
+* **ui:** move selection off killed session ([13dddc0](https://github.com/nednella/agentos/commit/13dddc02022329c84fdeb4530fb20243887478c6))
+* **ui:** open shell list as dropdown over shell ([180bec1](https://github.com/nednella/agentos/commit/180bec102f63eb4c303998658b46053716a657f9))
+* **ui:** place settings before search in top bar ([eab94c2](https://github.com/nednella/agentos/commit/eab94c2d48bb426cff91235b738c7fa0f35b6b1d))
+* **ui:** remove keep-awake sign from top bar ([d6e3a8d](https://github.com/nednella/agentos/commit/d6e3a8d89d9f32a9e0837bec96f5f02d98009a78))
+
 ## [0.10.2](https://github.com/nednella/agentos/compare/v0.10.1...v0.10.2) (2026-10-07)
 
 
