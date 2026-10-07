@@ -1,11 +1,15 @@
 // Drives headless Brave over the DevTools protocol, for checking the front end without a window.
-// Usage: node scripts/cdp.mjs <url> <width> <height> '[{"wait":500},{"click":[x,y]},{"type":"text"},{"key":{"key":"Enter","code":"Enter"}},{"eval":"js"},{"shot":"/path.png"}]'
+// Usage: node scripts/cdp.mjs <url> <width> <height> '[{"wait":500},{"click":[x,y]},{"type":"text"},{"key":{"key":"Enter","code":"Enter"}},{"eval":"js"},{"shot":"name.png"}]'
+// A shot path that is not absolute lands in $TMPDIR, the session's own temp folder.
 // Drives headless Brave over the DevTools protocol: node cdp.mjs <url> <w> <h> <steps-json>
 import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
 const [url, w, h, stepsJson] = process.argv.slice(2)
 const port = 9333
 const brave = spawn('/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
-  ['--headless=new', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', `--user-data-dir=/tmp/agentos-cdp-profile`, 'about:blank'], { stdio: 'ignore' })
+  ['--headless=new', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', `--user-data-dir=${join(tmpdir(), 'agentos-cdp-profile')}`, 'about:blank'], { stdio: 'ignore' })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let target
 for (let i = 0; i < 50 && !target; i++) {
@@ -31,7 +35,7 @@ for (const step of JSON.parse(stepsJson)) {
   if (step.click) { const [x, y] = step.click; for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 }) }
   if (step.type) await send('Input.insertText', { text: step.type })
   if (step.key) { const k = step.key; for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, ...k }) }
-  if (step.shot) { const r = await send('Page.captureScreenshot', { format: 'png' }); (await import('node:fs')).writeFileSync(step.shot, Buffer.from(r.data, 'base64')); console.log('shot:', step.shot) }
+  if (step.shot) { const r = await send('Page.captureScreenshot', { format: 'png' }); const file = resolve(tmpdir(), step.shot); writeFileSync(file, Buffer.from(r.data, 'base64')); console.log('shot:', file) }
 }
 console.log(logs.slice(0, 20).join('\n'))
 ws.close(); brave.kill(); process.exit(0)

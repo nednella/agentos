@@ -7,7 +7,7 @@ that starts the app, a session or the CLI against the default socket or the real
 Every run outside `go test` MUST set all of these:
 
 ```sh
-S=$(mktemp -d /tmp/aos.XXXX)
+S=$(mktemp -d "${TMPDIR:-/tmp}/aos.XXXX")
 export AGENTOS_TMUX_SOCKET=aos-test-$$      # never "agentos", the owner's socket
 export AGENTOS_STATE_DIR=$S                 # never ~/.local/state/agentos
 export AGENTOS_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and stats)
@@ -19,11 +19,14 @@ A throwaway config with a plain shell as the agent keeps Claude out of it:
 ```yaml
 agent_command: bash
 projects:
-  - {name: demo, directory: /tmp/aos.XXXX/demo}
+  - {name: demo, directory: <$S>/demo}
 ```
 
 Clean up afterwards: `tmux -L $AGENTOS_TMUX_SOCKET kill-server`, kill the app and any browser started on
 `$S/data/<key>/browser`, `rm -rf $S`. Check with `pgrep -fl "$S"`.
+
+An agentos session runs with `TMPDIR` set to its own temp folder, which it may use without asking and
+which goes when the session is dismissed. Put screenshots and scratch files there, never in `/tmp`.
 
 ## Unit and integration tests
 
@@ -67,10 +70,10 @@ steps: wait, click at a point, type, key, eval JavaScript, screenshot.
 
 ```sh
 node scripts/cdp.mjs http://127.0.0.1:18772/ 1400 900 \
-  '[{"wait":1500},{"eval":"document.title"},{"click":[700,400]},{"wait":300},{"shot":"/tmp/aos-shot.png"}]'
+  '[{"wait":1500},{"eval":"document.title"},{"click":[700,400]},{"wait":300},{"shot":"aos-shot.png"}]'
 ```
 
-Read the screenshot to check what the page shows. Resize with the width and height arguments to check the layouts.
+A shot path that is not absolute lands in `$TMPDIR`. Read the screenshot to check what the page shows. Resize with the width and height arguments to check the layouts.
 
 ## Releases
 
