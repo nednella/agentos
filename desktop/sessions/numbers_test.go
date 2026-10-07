@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -101,6 +102,37 @@ func TestNewSessionSeesNothingOfADismissedOne(t *testing.T) {
 	if fresh.Evidence != 0 || exists(evidenceDir(h, fresh.ID)) {
 		t.Errorf("the new session has evidence: %+v", fresh)
 	}
+}
+
+func TestSessionHasItsOwnTempFolder(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.NewSession("work", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	name, err := session.ParseName(s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmp := filepath.Join(h.State, "data", name.Project, "tmp", name.Token)
+	if !exists(tmp) {
+		t.Fatalf("no temp folder at %s", tmp)
+	}
+	if err := h.TypeInto(s.ID, "touch $TMPDIR/shot.png"); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := exec.Command("tmux", "-L", h.Socket, "send-keys", "-t", s.ID, "Enter").CombinedOutput(); err != nil {
+		t.Fatalf("pressing Enter: %v: %s", err, out)
+	}
+	eventually(t, "a file made in $TMPDIR to land in the temp folder", func() bool { return exists(filepath.Join(tmp, "shot.png")) })
+
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.DismissSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the temp folder to go", func() bool { return !exists(tmp) })
 }
 
 func TestExpiredEndedRowGoesWithItsEvidenceAndPRs(t *testing.T) {
