@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -63,6 +63,8 @@ type Backend = {
   SetPromptSend(mode: PromptSend): Promise<Settings>
   SetBrowserEnabled(on: boolean): Promise<Settings>
   SetDigestSchedule(schedule: DigestSchedule): Promise<Settings>
+  PickDataDir(): Promise<DataDirChoice>
+  SetDataDir(dir: string, withData: boolean): Promise<void>
 }
 
 type Unsubscribe = () => void
@@ -92,7 +94,7 @@ const namespaces = {
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   update: ['Update'],
   awake: ['Awake'],
-  settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule'],
+  settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule', 'PickDataDir', 'SetDataDir'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -176,6 +178,8 @@ export const api = {
   setPromptSend: (mode: PromptSend) => backend.SetPromptSend(mode),
   setBrowserEnabled: (on: boolean) => backend.SetBrowserEnabled(on),
   setDigestSchedule: (schedule: DigestSchedule) => backend.SetDigestSchedule(schedule),
+  pickDataDir: () => backend.PickDataDir(),
+  setDataDir: (dir: string, withData: boolean) => backend.SetDataDir(dir, withData),
   digest: () => backend.Digest(),
   runDigest: () => backend.RunDigest(),
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),

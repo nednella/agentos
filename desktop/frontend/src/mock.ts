@@ -130,6 +130,7 @@ export function createMock(params: URLSearchParams) {
     done: params.has('done'),
     warn: params.has('warn'),
     update: params.has('update'),
+    fullDataDir: params.has('fulldata'),
   }
   const handlers = new Map<string, Set<Handler>>()
   const sessions: MockSession[] = []
@@ -662,7 +663,7 @@ export function createMock(params: URLSearchParams) {
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
-  let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly' }
+  let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '~/.local/share/agentos', dataDirFixed: false }
 
   const backend = {
     Snapshot: async () => snapshot(),
@@ -991,6 +992,10 @@ export function createMock(params: URLSearchParams) {
     SetDigestSchedule: async (digestSchedule: DigestSchedule) => {
       settings = { ...settings, digestSchedule }
       return settings
+    },
+    PickDataDir: async () => delay({ dir: '~/Library/Mobile Documents/com~apple~CloudDocs/agentos', empty: !flags.fullDataDir }),
+    SetDataDir: async (_dir: string, withData: boolean) => {
+      await delay(undefined, withData ? 2500 : 400)
     },
     Update: async () => {
       await delay(undefined, 2500)
