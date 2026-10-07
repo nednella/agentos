@@ -124,6 +124,7 @@ type Lifecycle struct {
 
 	mu       sync.Mutex
 	tracks   map[string]*track
+	gone     map[string]bool     // forgotten ids: a poll that was waiting on gh must not write for them
 	files    map[string]*prsFile // by project key
 	etags    map[string]string   // by project key: the ETag of the last pull request list
 	watchers map[string]*watcher // by project key
@@ -139,7 +140,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -217,6 +218,7 @@ func (l *Lifecycle) forget(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.tracks, id)
+	l.gone[id] = true
 	key := session.ProjectKey(id)
 	f := l.prs(key)
 	_, worked := f.Branches[id]
@@ -366,6 +368,9 @@ type outcome struct {
 func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.gone[t.id] {
+		return outcome{}
+	}
 	key := t.proj.Key()
 	tr := l.tracks[t.id]
 	if tr == nil {
@@ -955,6 +960,10 @@ func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, 
 func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string, turnEnded bool) {
 	key := proj.Key()
 	l.mu.Lock()
+	if l.gone[id] {
+		l.mu.Unlock()
+		return
+	}
 	f := l.prs(key)
 	known := f.Branches[id]
 	if len(known) > 0 && known[len(known)-1] == branch {
