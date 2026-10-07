@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.2](https://github.com/nednella/agentos/compare/v0.10.1...v0.10.2) (2026-10-07)
+
+
+### Bug Fixes
+
+* **ui:** even out gaps around session status row ([4a96f81](https://github.com/nednella/agentos/commit/4a96f8125feab4c6753a62968c7910184577adf2))
+* **ui:** tint only title row of session header ([82c787b](https://github.com/nednella/agentos/commit/82c787baf026b6136349375890ebab1d6abe3243))
+
 ## [0.10.1](https://github.com/nednella/agentos/compare/v0.10.0...v0.10.1) (2026-10-07)
 
 
