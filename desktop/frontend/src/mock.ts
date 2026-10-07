@@ -545,6 +545,8 @@ export function createMock(params: URLSearchParams) {
       canGoForward: page ? page.index < page.history.length - 1 : false,
       error: '',
       headed: false,
+      loadedAt: 0,
+      console: [],
     }
   }
 

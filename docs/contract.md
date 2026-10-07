@@ -173,6 +173,8 @@ type BrowserState = {
   canGoForward: boolean
   error: string         // why the browser could not start, e.g. "no Brave, Chrome, Chromium or Edge browser found"
   headed: boolean       // the page lives in its own browser window (the default); false: hidden browser, frames over `browser:frame`
+  loadedAt: number      // unix ms the page last finished loading; 0 if it never has
+  console: string[]     // the page's last 20 console errors, uncaught errors and failed requests, oldest first; a copy, so the agent's `agentos browser console` does not empty it
 }
 
 type BrowserInput =
@@ -379,7 +381,7 @@ A saved setting applies at once; the app reads the config file only when it star
 | `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
 | `browser:frame` | `{ id, data, width, height }` | headless mode only. `data` is base64 JPEG; width and height are the viewport's CSS pixels |
-| `browser:state` | `BrowserState` | URL, title, loading or open changed |
+| `browser:state` | `BrowserState` | URL, title, loading, open or `loadedAt` changed, or `console` gained lines (sent at most every 500 ms, the lines of that span in one event) |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
 | `update` | `{ version: string }` | a release newer than the running one is out; once per release |

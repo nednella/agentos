@@ -164,6 +164,8 @@ export type BrowserState = {
   canGoForward: boolean
   error: string
   headed: boolean
+  loadedAt: number
+  console: string[]
 }
 
 export type BrowserInput =
