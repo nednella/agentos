@@ -321,6 +321,8 @@ One browser per project (separate profile, so logins persist), one window per se
 
 A headed window's title reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the window opens, so a rename shows only in windows opened later. `BrowserState.title`, `agentos browser open` and `agentos browser url` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
 
+A project's browser listens for the DevTools protocol on a fixed port on `127.0.0.1`, between 20000 and 29999. The app picks a free one the first time it needs it and saves it in `~/.local/share/agentos/<key>/browser-port`, outside the profile folder; later starts reuse it. When something else holds the saved port at a start, the app picks another and saves that. The port is known before the browser starts, so a session can name it at launch.
+
 Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
 
 ### Evidence, stats, digest (`evidence`, `stats`, `digest`)
@@ -479,7 +481,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 | What | Where |
 |---|---|
 | notes, note images, evidence, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `evidence/<token>/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
-| PR tracking (acks, live flags, wakes), clean-up log, browser profile, session temp folders | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/`, `tmp/<token>/` (removed when the session is dismissed) |
+| PR tracking (acks, live flags, wakes), clean-up log, browser profile, session temp folders | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/`, `browser-port`, `tmp/<token>/` (removed when the session is dismissed) |
 | state files, sockets, tmux config, last project, app location, release check | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`; `update.json`: the last release check, so the command asks GitHub at most once a day) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.

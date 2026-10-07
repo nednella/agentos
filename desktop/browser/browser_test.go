@@ -2,7 +2,10 @@ package browser
 
 import (
 	"context"
+	"net"
+	"net/http"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -53,12 +56,12 @@ func TestNoBrowserFound(t *testing.T) {
 func TestLaunchArgsPerMode(t *testing.T) {
 	b := New(t.TempDir(), func(string, any) {})
 	b.headless = true
-	if args := b.launchArgs("/p"); !slices.Contains(args, "--headless=new") || !slices.Contains(args, "--hide-scrollbars") {
+	if args := b.launchArgs("/p", 24680); !slices.Contains(args, "--headless=new") || !slices.Contains(args, "--hide-scrollbars") {
 		t.Errorf("headless args = %v", args)
 	}
 	b.headless = false
-	args := b.launchArgs("/p")
-	for _, want := range []string{"--user-data-dir=/p", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
+	args := b.launchArgs("/p", 24680)
+	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
 		if !slices.Contains(args, want) {
 			t.Errorf("headed args lack %s: %v", want, args)
 		}
@@ -202,5 +205,61 @@ func TestConsoleShownKeepsTheLastLinesAfterTheAgentDrains(t *testing.T) {
 	defer mu.Unlock()
 	if events != 1 {
 		t.Errorf("published %d state events for 25 lines, want 1", events)
+	}
+}
+
+func TestPortIsChosenOnceAndKept(t *testing.T) {
+	dir := t.TempDir()
+	first := New(dir, func(string, any) {}).Port("demo")
+	if first < portMin || first > portMax {
+		t.Fatalf("port = %d, want %d to %d", first, portMin, portMax)
+	}
+	if again := New(dir, func(string, any) {}).Port("demo"); again != first {
+		t.Errorf("a new app got port %d, want the saved %d", again, first)
+	}
+	if other := New(dir, func(string, any) {}).Port("other"); other == 0 {
+		t.Error("a second project got no port")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "demo", "browser-port")); err != nil {
+		t.Errorf("the port is not saved beside the profile: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "demo", "browser")); err == nil {
+		t.Error("asking for the port made the browser profile")
+	}
+}
+
+func TestLaunchPortReplacesAPortSomethingElseHolds(t *testing.T) {
+	b := New(t.TempDir(), func(string, any) {})
+	saved := b.Port("demo")
+	if got, err := b.launchPort("demo"); err != nil || got != saved {
+		t.Fatalf("launchPort with the saved port free = %d, %v; want %d", got, err, saved)
+	}
+	l, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(saved)))
+	if err != nil {
+		t.Skipf("port %d taken before the test could take it: %v", saved, err)
+	}
+	defer l.Close()
+	got, err := b.launchPort("demo")
+	if err != nil || got == saved {
+		t.Fatalf("launchPort with the saved port taken = %d, %v", got, err)
+	}
+	if b.Port("demo") != got {
+		t.Error("the new port was not saved")
+	}
+}
+
+func TestBrowserListensOnItsSavedPort(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	port := b.Port("p")
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.Get("http://127.0.0.1:" + strconv.Itoa(port) + "/json/version")
+	if err != nil {
+		t.Fatalf("nothing listens on the saved port %d: %v", port, err)
+	}
+	resp.Body.Close()
+	if b.Port("p") != port {
+		t.Errorf("the port changed from %d to %d once the browser ran", port, b.Port("p"))
 	}
 }
