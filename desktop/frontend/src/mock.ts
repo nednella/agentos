@@ -676,10 +676,10 @@ export function createMock(params: URLSearchParams) {
       emit('issues', { project: current.name, items: currentIssues() })
     },
     KillSession: async (id: string) => {
-      find(id)
-      sessions.splice(sessions.findIndex((s) => s.id === id), 1)
+      const s = find(id)
+      if (s.state === 'ended') throw `session ${id} has ended: dismiss it`
       emit('term:exit', { id })
-      publish()
+      setState(s, 'ended')
       emit('issues', { project: current.name, items: currentIssues() })
     },
     RenameSession: async (id: string, title: string) => {

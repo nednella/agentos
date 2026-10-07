@@ -510,7 +510,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async killSession(id) {
         await api.killSession(id)
-        applySessions(sessionsRef.current.filter((s) => s.id !== id))
       },
       async dismissSession(id) {
         await api.dismissSession(id)
