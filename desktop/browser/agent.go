@@ -97,7 +97,7 @@ func (b *Browsers) agent(ctx context.Context, id, cmd string, args []string, opt
 		return prompts.BrowserHelp(), nil
 	}
 	if cmd == "open" {
-		if err := need(1, "open <url>"); err != nil {
+		if err := need(1, "open <url> [--front]"); err != nil {
 			return "", err
 		}
 	}
@@ -113,6 +113,11 @@ func (b *Browsers) agent(ctx context.Context, id, cmd string, args []string, opt
 		}
 		if err := t.waitLoaded(ctx, before); err != nil {
 			return "", err
+		}
+		if opts["front"] != "" {
+			if err := b.Show(ctx, id); err != nil {
+				return "", err
+			}
 		}
 		return "opened " + t.pageLine(ctx), nil
 	case "back", "reload":

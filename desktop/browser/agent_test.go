@@ -32,7 +32,7 @@ func browserCmd(t *testing.T, h *apptest.Harness, session string, args ...string
 		case "--caption", "--timeout":
 			i++
 			opts[a[2:]] = args[i]
-		case "--full", "--append":
+		case "--full", "--append", "--front":
 			opts[a[2:]] = "1"
 		default:
 			pos = append(pos, a)

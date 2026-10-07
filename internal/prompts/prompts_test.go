@@ -15,7 +15,7 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		hash string
 	}{
 		{"browser session", BrowserSession(), "479d542f0a6920f861bf8db587040d05b7999c1421491e52640b3a23f3e20312"},
-		{"browser help", BrowserHelp(), "5ce9b1d5055ded6f64387636a5fa93a9c88fb048cc99b0eb74729ccad64d41e4"},
+		{"browser help", BrowserHelp(), "e851ad6ab2752270868c8febcee3e98c2e7e479bf2e9023e2f9383d1d336859e"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
