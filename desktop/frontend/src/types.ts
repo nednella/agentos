@@ -160,20 +160,11 @@ export type BrowserState = {
   url: string
   title: string
   loading: boolean
-  canGoBack: boolean
-  canGoForward: boolean
   error: string
-  headed: boolean
   loadedAt: number
   pages: number
   console: string[]
 }
-
-export type BrowserInput =
-  | { type: 'mouse'; action: 'move' | 'down' | 'up'; x: number; y: number; button: 'left' | 'middle' | 'right' | 'none'; clickCount: number; modifiers: number }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: number }
-  | { type: 'key'; action: 'down' | 'up'; key: string; code: string; text: string; modifiers: number }
-  | { type: 'paste'; text: string }
 
 export type Evidence = {
   id: string
@@ -223,7 +214,6 @@ export type EventMap = {
   'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }
   digest: Digest
-  'browser:frame': { id: string; data: string; width: number; height: number }
   'browser:state': BrowserState
   'term:data': { id: string; data: string }
   'term:exit': { id: string }

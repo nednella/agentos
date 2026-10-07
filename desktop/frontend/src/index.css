@@ -689,11 +689,6 @@
     transition: opacity 0.14s 0.08s;
   }
 
-  .browser-page:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
-  }
-
   .spinner {
     width: 0.875rem;
     height: 0.875rem;

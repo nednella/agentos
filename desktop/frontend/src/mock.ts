@@ -1,8 +1,8 @@
 import { buildIssueDetail, buildIssues } from './mockIssues'
-import { handleInput, newPage, normalizeUrl, pageRects, pageTitle, renderPage } from './mockBrowser'
+import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -541,10 +541,7 @@ export function createMock(params: URLSearchParams) {
       url: page?.url ?? '',
       title: page?.title ?? '',
       loading: page?.loading ?? false,
-      canGoBack: (page?.index ?? 0) > 0,
-      canGoForward: page ? page.index < page.history.length - 1 : false,
       error: '',
-      headed: false,
       loadedAt: 0,
       pages: page ? 1 : 0,
       console: [],
@@ -555,21 +552,15 @@ export function createMock(params: URLSearchParams) {
     emit('browser:state', browserStateOf(id))
   }
 
-  function navigate(id: string, url: string, record = true) {
+  function navigate(id: string, url: string) {
     const page = pages.get(id)
     if (!page) throw 'This session has no browser open'
     page.url = url
     page.title = pageTitle(url)
     page.loading = true
-    page.dirty = true
-    if (record) {
-      page.history = [...page.history.slice(0, page.index + 1), url]
-      page.index = page.history.length - 1
-    }
     pushBrowserState(id)
     setTimeout(() => {
       page.loading = false
-      page.dirty = true
       pushBrowserState(id)
     }, 500)
   }
@@ -577,7 +568,7 @@ export function createMock(params: URLSearchParams) {
   function capture(id: string): string {
     const page = pages.get(id)
     if (!page) throw 'This session has no browser open'
-    return renderPage(page, shotCanvas, 640, 400)
+    return renderPage(page, shotCanvas)
   }
 
   function addEvidence(s: MockSession, item: Omit<Evidence, 'id' | 'at'>, at = Date.now()): Evidence {
@@ -600,29 +591,19 @@ export function createMock(params: URLSearchParams) {
     return page
   }
 
-  setInterval(() => {
-    pages.forEach((page, id) => {
-      if (!page.visible || !page.dirty) return
-      page.dirty = false
-      const data = renderPage(page, shotCanvas)
-      emit('browser:frame', { id, data: data.slice(data.indexOf(',') + 1), width: page.width, height: page.height })
-    })
-  }, 200)
-
   const driven = sessions.find((s) => s.issue === 454)
   if (driven) {
     const page = openPage(driven, 'https://shop.acme.test/products')
-    const typeText = (text: string) => {
-      const { field } = pageRects(page)
-      handleInput(page, { type: 'mouse', action: 'down', x: field.x + 10, y: field.y + 10, button: 'left', clickCount: 1, modifiers: 0 })
-      for (const ch of text) handleInput(page, { type: 'key', action: 'down', key: ch, code: '', text: ch, modifiers: 0 })
-    }
     const steps: (() => void)[] = [
       () => navigate(driven.id, 'https://shop.acme.test/products'),
-      () => typeText('canvas tote'),
       () => {
-        const { button } = pageRects(page)
-        handleInput(page, { type: 'mouse', action: 'down', x: button.x + 10, y: button.y + 10, button: 'left', clickCount: 1, modifiers: 0 })
+        const { field } = pageRects()
+        clickAt(page, field.x + 10, field.y + 10)
+        typeText(page, 'canvas tote')
+      },
+      () => {
+        const { button } = pageRects()
+        clickAt(page, button.x + 10, button.y + 10)
       },
       () => addEvidence(driven, { kind: 'image', url: capture(driven.id), text: '', caption: 'Search results for "canvas tote" after the page split', source: 'agent' }),
       () => {
@@ -890,32 +871,6 @@ export function createMock(params: URLSearchParams) {
       return browserStateOf(id)
     },
     BrowserGoto: async (id: string, url: string) => navigate(id, normalizeUrl(url)),
-    BrowserNav: async (id: string, action: 'back' | 'forward' | 'reload' | 'stop') => {
-      const page = pages.get(id)
-      if (!page) throw 'This session has no browser open'
-      if (action === 'reload') navigate(id, page.url, false)
-      if (action === 'stop') page.loading = false
-      if (action === 'back' && page.index > 0) navigate(id, page.history[--page.index], false)
-      if (action === 'forward' && page.index < page.history.length - 1) navigate(id, page.history[++page.index], false)
-      pushBrowserState(id)
-    },
-    BrowserInput: async (id: string, input: BrowserInput) => {
-      const page = pages.get(id)
-      if (page) handleInput(page, input)
-    },
-    BrowserResize: async (id: string, width: number, height: number) => {
-      const page = pages.get(id)
-      if (!page) return
-      page.width = Math.max(Math.round(width), 100)
-      page.height = Math.max(Math.round(height), 100)
-      page.dirty = true
-    },
-    BrowserView: async (id: string, visible: boolean) => {
-      const page = pages.get(id)
-      if (!page) return
-      page.visible = visible
-      page.dirty = true
-    },
     BrowserShow: async () => {},
     BrowserState: async (id: string) => browserStateOf(id),
     BrowserScreenshot: async (id: string, caption: string) =>

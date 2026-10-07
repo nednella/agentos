@@ -3,9 +3,9 @@ import { BrowserConsoleList } from './BrowserConsoleList'
 import { BrowserRecentCaptures } from './BrowserRecentCaptures'
 import { BrowserStatusHeader } from './BrowserStatusHeader'
 
-type BrowserHeadedProps = { session: Session; state: BrowserState }
+type BrowserStatusProps = { session: Session; state: BrowserState }
 
-export function BrowserHeaded({ session, state }: BrowserHeadedProps) {
+export function BrowserStatus({ session, state }: BrowserStatusProps) {
   return (
     <div className="absolute inset-0 flex flex-col">
       <BrowserStatusHeader id={session.id} state={state} />

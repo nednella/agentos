@@ -24,19 +24,17 @@ type page struct {
 	t        *tab
 	targetID string
 
-	sessionID  string // the protocol session; empty until attached
-	windowID   int    // 0 until asked for
-	mainFrame  string
-	url        string
-	title      string // without the session's label
-	loading    bool
-	loadSeq    int
-	loadedAt   int64
-	canBack    bool
-	canForward bool
-	shown      bool // document.visibilityState was "visible" at the last look: the selected tab of its window
-	requests   map[string]string
-	dialog     *time.Timer // set while a JavaScript dialog is open
+	sessionID string // the protocol session; empty until attached
+	windowID  int    // 0 until asked for
+	mainFrame string
+	url       string
+	title     string // without the session's label
+	loading   bool
+	loadSeq   int
+	loadedAt  int64
+	shown     bool // document.visibilityState was "visible" at the last look: the selected tab of its window
+	requests  map[string]string
+	dialog    *time.Timer // set while a JavaScript dialog is open
 }
 
 func (t *tab) newPage(targetID string) *page {
@@ -120,7 +118,6 @@ func (t *tab) change(fn func()) bool {
 	t.state.Pages = len(t.pages)
 	if pg := t.activeLocked(); pg != nil {
 		t.state.URL, t.state.Title, t.state.Loading, t.state.LoadedAt = pg.url, pg.title, pg.loading, pg.loadedAt
-		t.state.CanGoBack, t.state.CanGoForward = pg.canBack, pg.canForward
 	}
 	changed := !reflect.DeepEqual(before, t.state)
 	t.mu.Unlock()
@@ -149,18 +146,12 @@ func (t *tab) attach(ctx context.Context, pg *page) error {
 			return err
 		}
 	}
-	if t.b.headless {
-		if _, err := pg.call(ctx, "Emulation.setDeviceMetricsOverride", t.metrics()); err != nil {
-			return err
-		}
-	} else {
-		if _, err := pg.call(ctx, "Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": titleScript(t.prefix)}); err != nil {
-			return err
-		}
-		// The page may have loaded already.
-		if _, err := pg.eval(ctx, titleScript(t.prefix)); err != nil {
-			return err
-		}
+	if _, err := pg.call(ctx, "Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": titleScript(t.prefix)}); err != nil {
+		return err
+	}
+	// The page may have loaded already.
+	if _, err := pg.eval(ctx, titleScript(t.prefix)); err != nil {
+		return err
 	}
 	if raw, err := pg.call(ctx, "Page.getFrameTree", nil); err == nil {
 		var tree struct {
@@ -232,48 +223,6 @@ func (t *tab) watch() {
 		}
 		t.refreshAll(context.Background())
 	}
-}
-
-// refreshHistory updates the back and forward flags.
-func (pg *page) refreshHistory() {
-	ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-	defer cancel()
-	h, err := pg.history(ctx)
-	if err != nil {
-		return
-	}
-	pg.t.change(func() {
-		pg.canBack, pg.canForward = h.Current > 0, h.Current < len(h.Entries)-1
-	})
-}
-
-type history struct {
-	Current int `json:"currentIndex"`
-	Entries []struct {
-		ID int `json:"id"`
-	} `json:"entries"`
-}
-
-func (pg *page) history(ctx context.Context) (history, error) {
-	raw, err := pg.call(ctx, "Page.getNavigationHistory", nil)
-	var h history
-	if err == nil {
-		err = json.Unmarshal(raw, &h)
-	}
-	return h, err
-}
-
-func (pg *page) step(ctx context.Context, delta int) error {
-	h, err := pg.history(ctx)
-	if err != nil {
-		return err
-	}
-	i := h.Current + delta
-	if i < 0 || i >= len(h.Entries) {
-		return errors.New("no page to go to")
-	}
-	_, err = pg.call(ctx, "Page.navigateToHistoryEntry", map[string]any{"entryId": h.Entries[i].ID})
-	return err
 }
 
 // goTo starts loading an address in the page.
@@ -414,16 +363,12 @@ func (b *Browsers) pageOfTarget(targetID string) *page {
 }
 
 // ownerOf is the session a new page belongs to: the one that owns the page which opened it, else the one with a page
-// in the same window (a tab the owner opened by hand); nil when the page is not the app's. Headless has no windows
-// to tell apart.
+// in the same window (a tab the owner opened by hand); nil when the page is not the app's.
 func (b *Browsers) ownerOf(ctx context.Context, p *browserProc, info targetInfo) *tab {
 	if info.OpenerID != "" {
 		if opener := b.pageOfTarget(info.OpenerID); opener != nil && opener.t.proc == p {
 			return opener.t
 		}
-	}
-	if b.headless {
-		return nil
 	}
 	window, err := windowOf(ctx, p, info.TargetID)
 	if err != nil {
@@ -486,12 +431,6 @@ func (b *Browsers) adopt(p *browserProc, info targetInfo) {
 	if err := t.attach(ctx, pg); err != nil {
 		t.drop(pg)
 		return
-	}
-	t.mu.Lock()
-	casting := t.visible
-	t.mu.Unlock()
-	if b.headless && casting {
-		_ = t.startScreencast(ctx)
 	}
 	t.refreshAll(ctx)
 	t.change(func() {})
@@ -560,10 +499,7 @@ func (b *Browsers) event(p *browserProc, sessionID, method string, params json.R
 			return
 		}
 		title := pg.t.pageTitle(ev.TargetInfo.Title)
-		changed := pg.t.change(func() { pg.url, pg.title = ev.TargetInfo.URL, title })
-		if changed {
-			go pg.refreshHistory()
-		}
+		pg.t.change(func() { pg.url, pg.title = ev.TargetInfo.URL, title })
 	}
 }
 
@@ -598,7 +534,6 @@ func (pg *page) event(method string, params json.RawMessage) {
 		loading := method == "Page.frameStartedLoading"
 		t.change(func() { pg.loading = loading })
 		if !loading {
-			go pg.refreshHistory()
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), callLimit)
 				defer cancel()
@@ -610,8 +545,6 @@ func (pg *page) event(method string, params json.RawMessage) {
 			pg.loadSeq++
 			pg.loadedAt = time.Now().UnixMilli()
 		})
-	case "Page.screencastFrame":
-		pg.frame(params)
 	case "Page.javascriptDialogOpening":
 		var ev struct {
 			Type    string `json:"type"`
@@ -705,28 +638,6 @@ func (pg *page) event(method string, params json.RawMessage) {
 			t.logConsole(fmt.Sprintf("request failed: %s -> %s", req, ev.ErrorText))
 		}
 	}
-}
-
-// frame passes on a live picture from the page when it is the active one, and always acknowledges it.
-func (pg *page) frame(params json.RawMessage) {
-	var ev struct {
-		Data      string `json:"data"`
-		SessionID int    `json:"sessionId"`
-	}
-	if json.Unmarshal(params, &ev) != nil {
-		return
-	}
-	pg.t.mu.Lock()
-	active := pg.t.activeLocked() == pg
-	pg.t.mu.Unlock()
-	if active {
-		pg.t.sendFrame(ev.Data)
-	}
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-		defer cancel()
-		_, _ = pg.call(ctx, "Page.screencastFrameAck", map[string]any{"sessionId": ev.SessionID})
-	}()
 }
 
 // dialogOpened dismisses the dialog if nobody answers it within dialogWait.

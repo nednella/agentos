@@ -903,57 +903,10 @@ func (h *Harness) DeleteEvidence(id, evidenceID string) error {
 	return h.evidence.DeleteEvidence(id, evidenceID)
 }
 
-// CountFrames counts the live-view frames sent for a session.
-func (r *Recorder) CountFrames(id string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	n := 0
-	for _, e := range r.events {
-		if m, ok := e.payload.(map[string]any); ok && e.name == "browser:frame" && m["id"] == id {
-			n++
-		}
-	}
-	return n
-}
-
-// LastFrame is the latest live-view frame.
-func (r *Recorder) LastFrame() map[string]any {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var last map[string]any
-	for _, e := range r.events {
-		if m, ok := e.payload.(map[string]any); ok && e.name == "browser:frame" {
-			last = m
-		}
-	}
-	return last
-}
-
-// HasFrame says whether a live-view frame of that size was sent.
-func (r *Recorder) HasFrame(width, height int) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, e := range r.events {
-		if m, ok := e.payload.(map[string]any); ok && e.name == "browser:frame" && m["width"] == width && m["height"] == height {
-			return true
-		}
-	}
-	return false
-}
-
 func (h *Harness) BrowserOpen(id, url string) (browser.BrowserState, error) {
 	return h.browser.BrowserOpen(id, url)
 }
 func (h *Harness) BrowserState(id string) browser.BrowserState { return h.browser.BrowserState(id) }
-func (h *Harness) BrowserView(id string, visible bool) error {
-	return h.browser.BrowserView(id, visible)
-}
-func (h *Harness) BrowserResize(id string, w, ht int) error {
-	return h.browser.BrowserResize(id, w, ht)
-}
-func (h *Harness) BrowserInput(id string, in browser.BrowserInput) error {
-	return h.browser.BrowserInput(id, in)
-}
 func (h *Harness) BrowserScreenshot(id, caption string) (evidence.Evidence, error) {
 	return h.browser.BrowserScreenshot(id, caption)
 }

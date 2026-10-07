@@ -40,35 +40,16 @@ const (
 
 // BrowserState is what the front end shows of a session's browser: the state of its active page.
 type BrowserState struct {
-	ID           string `json:"id"`
-	Open         bool   `json:"open"`
-	URL          string `json:"url"`
-	Title        string `json:"title"`
-	Loading      bool   `json:"loading"`
-	CanGoBack    bool   `json:"canGoBack"`
-	CanGoForward bool   `json:"canGoForward"`
-	Error        string `json:"error"`
-	Headed       bool   `json:"headed"`
-	LoadedAt     int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
-	Pages        int    `json:"pages"`    // how many pages the session has open; the rest of the state is of the active one
+	ID       string `json:"id"`
+	Open     bool   `json:"open"`
+	URL      string `json:"url"`
+	Title    string `json:"title"`
+	Loading  bool   `json:"loading"`
+	Error    string `json:"error"`
+	LoadedAt int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
+	Pages    int    `json:"pages"`    // how many pages the session has open; the rest of the state is of the active one
 	// Console is the page's last few console errors, failed requests and dismissed dialogs, oldest first.
 	Console []string `json:"console"`
-}
-
-// BrowserInput is one mouse, wheel, key or paste event from the user, in CSS pixels of the page viewport.
-type BrowserInput struct {
-	Type       string  `json:"type"`
-	Action     string  `json:"action"`
-	X          float64 `json:"x"`
-	Y          float64 `json:"y"`
-	Button     string  `json:"button"`
-	ClickCount int     `json:"clickCount"`
-	Modifiers  int     `json:"modifiers"`
-	DeltaX     float64 `json:"deltaX"`
-	DeltaY     float64 `json:"deltaY"`
-	Key        string  `json:"key"`
-	Code       string  `json:"code"`
-	Text       string  `json:"text"`
 }
 
 var browserPaths = []string{
@@ -91,8 +72,8 @@ func findBrowser() string {
 	return ""
 }
 
-// Browsers runs one browser per project and one window per session; with AGENTOS_BROWSER_HEADLESS=1 the
-// browser is hidden and each session has a tab streamed to the front end.
+// Browsers runs one browser per project and one window per session. AGENTOS_BROWSER_HEADLESS=1 starts the
+// browser without windows, for tests.
 type Browsers struct {
 	dataDir    string
 	binary     string
@@ -153,10 +134,7 @@ type tab struct {
 
 	mu        sync.Mutex
 	state     BrowserState
-	pages     []*page // oldest first
-	width     int
-	height    int
-	visible   bool
+	pages     []*page     // oldest first
 	recent    []string    // the last consoleShown lines, from every page
 	recentPub *time.Timer // set while a coalesced publish of recent is pending
 }
@@ -446,13 +424,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	if err != nil {
 		return BrowserState{ID: id, Error: err.Error()}, err
 	}
-	target := map[string]any{"url": "about:blank"}
-	if !b.headless {
-		target["newWindow"] = true
-		target["background"] = true
-		target["width"] = defaultViewWidth
-		target["height"] = defaultViewHeight
-	}
+	target := map[string]any{"url": "about:blank", "newWindow": true, "background": true, "width": defaultViewWidth, "height": defaultViewHeight}
 	raw, err := p.cdp.call(ctx, "", "Target.createTarget", target)
 	if err != nil {
 		return BrowserState{}, err
@@ -461,12 +433,8 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 		TargetID string `json:"targetId"`
 	}
 	_ = json.Unmarshal(raw, &created)
-	prefix := ""
-	if !b.headless {
-		prefix = windowLabel(b.labelFor(id))
-	}
-	t := &tab{b: b, proc: p, id: id, prefix: prefix, width: defaultViewWidth, height: defaultViewHeight,
-		state: BrowserState{ID: id, Open: true, URL: "about:blank", Pages: 1, Headed: !b.headless}}
+	t := &tab{b: b, proc: p, id: id, prefix: windowLabel(b.labelFor(id)),
+		state: BrowserState{ID: id, Open: true, URL: "about:blank", Pages: 1}}
 	first := t.newPage(created.TargetID)
 	t.pages = []*page{first}
 	b.mu.Lock()
@@ -536,12 +504,6 @@ func (t *tab) pageTitle(title string) string {
 	return strings.TrimPrefix(title, t.prefix+" ")
 }
 
-func (t *tab) metrics() map[string]any {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	return map[string]any{"width": t.width, "height": t.height, "deviceScaleFactor": 1, "mobile": false}
-}
-
 func (b *Browsers) tab(id string) *tab {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -560,7 +522,7 @@ func (b *Browsers) State(id string) BrowserState {
 	if t := b.tab(id); t != nil {
 		return t.snapshotState()
 	}
-	return BrowserState{ID: id, Headed: !b.headless, Console: []string{}}
+	return BrowserState{ID: id, Console: []string{}}
 }
 
 // webAddress turns what the user typed into an address the browser can open.
@@ -601,29 +563,6 @@ func (b *Browsers) Goto(ctx context.Context, id, address string) error {
 	return pg.goTo(ctx, address)
 }
 
-// Nav goes back or forward, reloads, or stops loading the session's active page.
-func (b *Browsers) Nav(ctx context.Context, id, action string) error {
-	t, err := b.need(id)
-	if err != nil {
-		return err
-	}
-	pg, err := t.activePage()
-	if err != nil {
-		return err
-	}
-	switch action {
-	case "reload":
-		_, err = pg.call(ctx, "Page.reload", nil)
-	case "stop":
-		_, err = pg.call(ctx, "Page.stopLoading", nil)
-	case "back", "forward":
-		err = pg.step(ctx, map[string]int{"back": -1, "forward": 1}[action])
-	default:
-		err = fmt.Errorf("unknown navigation %q", action)
-	}
-	return err
-}
-
 // Show brings the window of the session's active page to the front.
 func (b *Browsers) Show(ctx context.Context, id string) error {
 	t, err := b.need(id)
@@ -654,7 +593,6 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	}
 	t.mu.Lock()
 	t.state.Open = false
-	t.visible = false
 	for _, pg := range pages {
 		pg.stopDialog()
 	}
@@ -696,159 +634,6 @@ func (b *Browsers) CloseAll() {
 		p.stop()
 		<-p.gone
 	}
-}
-
-// View turns the live picture on or off. Frames are only produced while it is on.
-func (b *Browsers) View(ctx context.Context, id string, visible bool) error {
-	t, err := b.need(id)
-	if err != nil || !b.headless {
-		return err
-	}
-	t.mu.Lock()
-	t.visible = visible
-	t.mu.Unlock()
-	if !visible {
-		_, err = t.call(ctx, "Page.stopScreencast", nil)
-		return err
-	}
-	if err := t.startScreencast(ctx); err != nil {
-		return err
-	}
-	// A page that does not change sends no frame, so send the current picture once.
-	if raw, err := t.call(ctx, "Page.captureScreenshot", map[string]any{"format": "jpeg", "quality": 70}); err == nil {
-		var shot struct {
-			Data string `json:"data"`
-		}
-		if json.Unmarshal(raw, &shot) == nil {
-			t.sendFrame(shot.Data)
-		}
-	}
-	return nil
-}
-
-func (t *tab) startScreencast(ctx context.Context) error {
-	t.mu.Lock()
-	w, h := t.width, t.height
-	t.mu.Unlock()
-	_, err := t.call(ctx, "Page.startScreencast", map[string]any{
-		"format": "jpeg", "quality": 70, "maxWidth": w, "maxHeight": h, "everyNthFrame": 1,
-	})
-	return err
-}
-
-func (t *tab) sendFrame(data string) {
-	t.mu.Lock()
-	visible, w, h := t.visible, t.width, t.height
-	t.mu.Unlock()
-	if visible {
-		t.b.emit("browser:frame", map[string]any{"id": t.id, "data": data, "width": w, "height": h})
-	}
-}
-
-// Resize sets the page viewport to the panel's size, in CSS pixels.
-func (b *Browsers) Resize(ctx context.Context, id string, width, height int) error {
-	t, err := b.need(id)
-	if err != nil || !b.headless {
-		return err
-	}
-	t.mu.Lock()
-	t.width, t.height = min(max(width, 100), 4000), min(max(height, 100), 4000)
-	casting := t.visible
-	t.mu.Unlock()
-	if _, err := t.call(ctx, "Emulation.setDeviceMetricsOverride", t.metrics()); err != nil {
-		return err
-	}
-	if casting {
-		return t.startScreencast(ctx)
-	}
-	return nil
-}
-
-var keyCodes = map[string]int{
-	"Backspace": 8, "Tab": 9, "Enter": 13, "Escape": 27, " ": 32, "PageUp": 33, "PageDown": 34, "End": 35, "Home": 36,
-	"ArrowLeft": 37, "ArrowUp": 38, "ArrowRight": 39, "ArrowDown": 40, "Delete": 46,
-}
-
-// editCommands are the editing shortcuts the browser runs for a meta key chord; headless has no menu to do it.
-var editCommands = map[string]string{"a": "selectAll", "c": "copy", "x": "cut", "z": "undo"}
-
-const (
-	modAlt   = 1
-	modCtrl  = 2
-	modMeta  = 4
-	modShift = 8
-)
-
-// Input sends one user event to the page.
-func (b *Browsers) Input(ctx context.Context, id string, in BrowserInput) error {
-	t, err := b.need(id)
-	if err != nil {
-		return err
-	}
-	switch in.Type {
-	case "mouse":
-		typ := map[string]string{"move": "mouseMoved", "down": "mousePressed", "up": "mouseReleased"}[in.Action]
-		if typ == "" {
-			return fmt.Errorf("unknown mouse action %q", in.Action)
-		}
-		button := in.Button
-		if button == "" {
-			button = "none"
-		}
-		clicks := in.ClickCount
-		if in.Action != "move" && clicks < 1 {
-			clicks = 1
-		}
-		_, err = t.call(ctx, "Input.dispatchMouseEvent", map[string]any{
-			"type": typ, "x": in.X, "y": in.Y, "button": button, "clickCount": clicks, "modifiers": in.Modifiers,
-		})
-	case "wheel":
-		_, err = t.call(ctx, "Input.dispatchMouseEvent", map[string]any{
-			"type": "mouseWheel", "x": in.X, "y": in.Y, "deltaX": in.DeltaX, "deltaY": in.DeltaY, "modifiers": in.Modifiers,
-		})
-	case "key":
-		err = t.key(ctx, in)
-	case "paste":
-		if in.Text != "" {
-			_, err = t.call(ctx, "Input.insertText", map[string]any{"text": in.Text})
-		}
-	default:
-		err = fmt.Errorf("unknown input type %q", in.Type)
-	}
-	return err
-}
-
-func (t *tab) key(ctx context.Context, in BrowserInput) error {
-	params := map[string]any{"key": in.Key, "code": in.Code, "modifiers": in.Modifiers}
-	vk, known := keyCodes[in.Key]
-	if !known && len([]rune(in.Key)) == 1 {
-		vk = int(strings.ToUpper(in.Key)[0])
-	}
-	if vk != 0 {
-		params["windowsVirtualKeyCode"] = vk
-	}
-	if in.Action == "up" {
-		params["type"] = "keyUp"
-		_, err := t.call(ctx, "Input.dispatchKeyEvent", params)
-		return err
-	}
-	text := in.Text
-	if in.Key == "Enter" && text == "" {
-		text = "\r"
-	}
-	chord := in.Modifiers&(modCtrl|modMeta) != 0
-	if text != "" && !chord {
-		params["type"], params["text"] = "keyDown", text
-	} else {
-		params["type"] = "rawKeyDown"
-		if in.Modifiers&modMeta != 0 {
-			if cmd, ok := editCommands[strings.ToLower(in.Key)]; ok {
-				params["commands"] = []string{cmd}
-			}
-		}
-	}
-	_, err := t.call(ctx, "Input.dispatchKeyEvent", params)
-	return err
 }
 
 // Screenshot returns a PNG of the viewport or the whole page of the session's active page.

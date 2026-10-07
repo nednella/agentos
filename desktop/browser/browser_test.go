@@ -65,11 +65,11 @@ func TestLaunchArgsPerMode(t *testing.T) {
 	args := b.launchArgs("/p", 24680)
 	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
 		if !slices.Contains(args, want) {
-			t.Errorf("headed args lack %s: %v", want, args)
+			t.Errorf("args lack %s: %v", want, args)
 		}
 	}
 	if slices.Contains(args, "--headless=new") || slices.Contains(args, "--hide-scrollbars") {
-		t.Errorf("headed args = %v", args)
+		t.Errorf("args = %v", args)
 	}
 }
 
@@ -346,6 +346,7 @@ func TestDialogAnsweredInTimeIsLeftAlone(t *testing.T) {
 
 func TestTitleScriptLabelsTheCurrentDocument(t *testing.T) {
 	b, ctx := newTestBrowsers(t)
+	b.Hook(func(string) string { return "" }, func(string) string { return "demo · 2 fix" }, func() {})
 	if _, err := b.Open(ctx, "p/1", "data:text/html,<title>Hi</title>"); err != nil {
 		t.Fatal(err)
 	}
@@ -410,9 +411,9 @@ func TestSessionClosesWithItsLastPage(t *testing.T) {
 	}
 	waitPages(t, b, "p/1", 2)
 
-	// A page nobody opened for the session (no opener; headless has no window to share) is not the session's.
+	// A page nobody opened for the session (no opener, and its own window) is not the session's.
 	other := b.procs["p"]
-	if _, err := other.cdp.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"}); err != nil {
+	if _, err := other.cdp.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank", "newWindow": true}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(500 * time.Millisecond)
