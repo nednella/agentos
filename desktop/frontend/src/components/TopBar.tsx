@@ -110,6 +110,9 @@ export function TopBar() {
             </button>
           </>
         )}
+        <button className={iconButton} onClick={() => setOverlay('settings')} title={`Settings (${keys('settings')})`} aria-label="Settings">
+          <Icon name="settings" />
+        </button>
         <button className={iconButton} onClick={() => setOverlay('palette')} title={`Command palette (${keys('palette')})`} aria-label="Command palette">
           <Icon name="search" />
         </button>
@@ -118,9 +121,6 @@ export function TopBar() {
             <Icon name="help" />
           </button>
         )}
-        <button className={iconButton} onClick={() => setOverlay('settings')} title={`Settings (${keys('settings')})`} aria-label="Settings">
-          <Icon name="settings" />
-        </button>
       </div>
     </header>
   )
