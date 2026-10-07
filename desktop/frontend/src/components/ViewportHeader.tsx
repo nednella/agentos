@@ -47,7 +47,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           )}
         </div>
         <span className="mono ml-auto flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
-        {kill.armed ? (
+        {session.state === 'ended' ? null : kill.armed ? (
           <span
             className="contents"
             role="alertdialog"
