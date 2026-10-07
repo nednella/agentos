@@ -1,3 +1,5 @@
+<img src="docs/icon.png" alt="agentos icon" width="128">
+
 # agentos
 
 One desktop window for every coding-agent session you run. It shows which session needs you, your
