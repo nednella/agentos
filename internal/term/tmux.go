@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -85,16 +86,16 @@ func (t *Tmux) run(ctx context.Context, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
-// cleanEnv drops TMUX so an app started inside another tmux can still attach.
+// inherited are dropped from the environment the tmux server starts with: TMUX so an app started
+// inside another tmux can still attach, and a session's identity so an app or test started inside
+// an agentos session does not pass it on to every session and shell it starts.
+var inherited = []string{"TMUX", "AGENTOS_SESSION", "AGENTOS_ISSUE", "AGENTOS_PROJECT"}
+
 func cleanEnv() []string {
-	env := os.Environ()
-	out := env[:0:0]
-	for _, kv := range env {
-		if !strings.HasPrefix(kv, "TMUX=") {
-			out = append(out, kv)
-		}
-	}
-	return out
+	return slices.DeleteFunc(os.Environ(), func(kv string) bool {
+		name, _, _ := strings.Cut(kv, "=")
+		return slices.Contains(inherited, name)
+	})
 }
 
 // ListAll returns the agent sessions and the shell sessions.

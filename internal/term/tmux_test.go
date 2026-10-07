@@ -211,3 +211,20 @@ func TestListFailureIsNotNoSessions(t *testing.T) {
 		}
 	}
 }
+
+func TestCleanEnvDropsInheritedSession(t *testing.T) {
+	t.Setenv("TMUX", "/tmp/tmux-1/default,1,0")
+	t.Setenv("AGENTOS_SESSION", "other/abc")
+	t.Setenv("AGENTOS_ISSUE", "7")
+	t.Setenv("AGENTOS_PROJECT", "other")
+	t.Setenv("AGENTOS_KEEP", "yes")
+	env := strings.Join(cleanEnv(), "\n")
+	for _, name := range inherited {
+		if strings.Contains(env, name+"=") {
+			t.Errorf("%s was passed on", name)
+		}
+	}
+	if !strings.Contains(env, "AGENTOS_KEEP=yes") {
+		t.Error("an unrelated variable was dropped")
+	}
+}
