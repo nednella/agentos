@@ -1431,15 +1431,19 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 	return string(config)
 }
 
-// commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
+// commandFor is the agent's command line. Claude learns how to start a session, and about the browser when the
+// project allows it and one exists.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation string) []string {
 	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
-	if _, ok := s.agent.(agent.Claude); !ok || !proj.BrowserOn() || !s.browsers.Available() {
+	if _, ok := s.agent.(agent.Claude); !ok {
 		return argv
 	}
-	if port := s.browsers.Port(name.Project); port != 0 {
-		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied,
-			"--append-system-prompt", prompts.BrowserSession())
+	prompt := prompts.NewSession()
+	if proj.BrowserOn() && s.browsers.Available() {
+		if port := s.browsers.Port(name.Project); port != 0 {
+			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
+			prompt += "\n\n" + prompts.BrowserSession()
+		}
 	}
-	return argv
+	return append(argv, "--append-system-prompt", prompt)
 }
