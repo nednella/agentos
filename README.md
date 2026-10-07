@@ -1,10 +1,15 @@
-<img src="docs/icon.png" alt="agentos icon" width="128">
+<div align="center">
+  <img src="docs/icon.png" alt="agentos" width="128">
+  <h3><b>agentos</b></h3>
+  <p>One desktop window for every coding-agent session you run.</p>
+  <p>
+    <a href="https://github.com/nednella/agentos/releases/latest"><img src="https://img.shields.io/github/v/release/nednella/agentos?style=flat-square&color=a78bfa" alt="Latest release"></a>
+    <img src="https://img.shields.io/badge/macOS-Apple%20silicon-191d25?style=flat-square&logo=apple" alt="macOS on Apple silicon">
+  </p>
+</div>
 
-# agentos
-
-One desktop window for every coding-agent session you run. It shows which session needs you, your
-project's GitHub issues as a queue, your notes, and each agent's real terminal. Agents keep running
-in a hidden tmux when the window closes.
+It shows which session needs you, your project's GitHub issues as a queue, your notes, and each
+agent's real terminal. Agents keep running in a hidden tmux when the window closes.
 
 ![agentos](docs/screenshot.png)
 
