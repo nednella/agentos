@@ -8,7 +8,7 @@
   </p>
 </div>
 
-## What it does
+## Description
 
 ![agentos](docs/screenshot.png)
 
