@@ -29,6 +29,7 @@ type Store interface {
 	SetBrowserEnabled(projectKey string, on bool) error
 	DigestSchedule(projectKey string) string
 	SetDigestSchedule(projectKey, schedule string) error
+	SetDataDir(dir string) error
 }
 
 // Current names the project the panel edits.
@@ -45,16 +46,22 @@ type Settings struct {
 	Prompt    string          `json:"promptSend"`     // the current project's: auto or manual
 	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
 	Digest    string          `json:"digestSchedule"` // the current project's: weekly or off
+	DataDir   string          `json:"dataDir"`        // the folder the running app keeps notes, evidence, stats and digests in
+	DataFixed bool            `json:"dataDirFixed"`   // AGENTOS_DATA_DIR sets the folder, so it cannot change here
 }
 
 // Service is bound to the front end.
 type Service struct {
-	store   Store
-	project Current
+	store     Store
+	project   Current
+	dataDir   string
+	dataFixed bool
+	pickDir   func() (string, error) // "" when the user cancels
+	relaunch  func() error
 }
 
-func NewService(store Store, project Current) *Service {
-	return &Service{store: store, project: project}
+func NewService(store Store, project Current, dataDir string, dataFixed bool, pickDir func() (string, error), relaunch func() error) *Service {
+	return &Service{store: store, project: project, dataDir: dataDir, dataFixed: dataFixed, pickDir: pickDir, relaunch: relaunch}
 }
 
 // Settings are the current settings.
@@ -76,6 +83,8 @@ func (s *Service) Settings() Settings {
 		Prompt:    s.store.PromptSend(key),
 		Browser:   s.store.BrowserEnabled(key),
 		Digest:    s.store.DigestSchedule(key),
+		DataDir:   s.dataDir,
+		DataFixed: s.dataFixed,
 	}
 }
 

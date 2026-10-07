@@ -347,7 +347,7 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 
 | Method | Returns | What it does |
 |---|---|---|
-| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", textScale, keepAwake, cleanup: {merge, close}, promptSend, browserEnabled, digestSchedule}`. `textScale` is a multiple of the default text size (1 when unset). `keepAwake` is the top-level `keep_mac_awake`. `cleanup`, `promptSend`, `browserEnabled` and `digestSchedule` are the current project's, the defaults filled in: `cleanup` has each of `merge` and `close` as `"auto"` or `"manual"`, `promptSend` is `"auto"` or `"manual"`, `digestSchedule` is `"weekly"` or `"off"` |
+| `Settings()` | `Settings` | the settings: `{theme: "system" \| "light" \| "dark", textScale, keepAwake, cleanup: {merge, close}, promptSend, browserEnabled, digestSchedule}`. `textScale` is a multiple of the default text size (1 when unset). `keepAwake` is the top-level `keep_mac_awake`. `cleanup`, `promptSend`, `browserEnabled` and `digestSchedule` are the current project's, the defaults filled in: `cleanup` has each of `merge` and `close` as `"auto"` or `"manual"`, `promptSend` is `"auto"` or `"manual"`, `digestSchedule` is `"weekly"` or `"off"`. `dataDir` is the folder the running app keeps notes, evidence, stats and digests in; `dataDirFixed` is true when `AGENTOS_DATA_DIR` sets it |
 | `SetTheme(theme)` | `Settings` | saves the theme to `app_theme` in the config file; `system` removes the key. Rejects any other value |
 | `SetCleanup(event, mode)` | `Settings` | saves the current project's clean-up mode for `merge` or `close` to `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 | `SetTextScale(scale)` | `Settings` | saves the text size to `app_text_scale`; 1 removes the key. Rejects a value below 0.85 or above 1.5 |
@@ -355,6 +355,8 @@ The app asks GitHub's releases API on start and every hour. A release newer than
 | `SetPromptSend(mode)` | `Settings` | saves the current project's `session_prompt_send`, `auto` or `manual`. Rejects any other value, and a project that is not in the config file |
 | `SetBrowserEnabled(on)` | `Settings` | saves the current project's `browser_enabled`. Rejects a project that is not in the config file |
 | `SetDigestSchedule(schedule)` | `Settings` | saves the current project's `digest_schedule`, `weekly` or `off`. Rejects any other value, and a project that is not in the config file |
+| `PickDataDir()` | `{dir, empty}` | opens the folder picker for a new data folder and changes nothing. `dir` is `""` when cancelled; `empty` is true when the folder holds nothing but hidden files. Rejects when `dataDirFixed` |
+| `SetDataDir(dir, withData)` | — | saves `data_dir`, then relaunches the app, as an update does, to use it. With `withData` it first copies each project's notes, note images, evidence, stats and digest into `dir`, which must be empty, and removes what it copied if the copy fails; the old folder stays as it was. Without, the app uses what `dir` holds. Rejects the current folder, and any change when `dataDirFixed`. When the relaunch fails (no .app bundle) the folder is saved and the error says to reopen the app |
 
 A saved setting applies at once; the app reads the config file only when it starts.
 
@@ -393,7 +395,7 @@ folders are served. Use the URL in `<img src>`.
 `~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed and when a setting changes, and keeps every key below, its comments and its `~` paths.
 
 ```yaml
-data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos
+data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos. The settings panel writes it; the app reads it when it starts
 agent_command: claude          # claude (the default, with hooks) or any command, which runs plain
 keep_mac_awake: true          # stop the Mac idle-sleeping while a session works; a project may set its own. The settings panel writes it
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it

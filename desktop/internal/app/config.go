@@ -21,13 +21,14 @@ const defaultTmuxSocket = "agentos"
 
 // Config is what the app reads from the config file and the environment.
 type Config struct {
-	Registry *projects.Registry
-	Project  project.Project
-	StateDir string
-	DataDir  string // notes, evidence and stats: may be a synced folder
-	LocalDir string // PR tracking and the clean-up log: never synced
-	Tmux     *term.Tmux
-	Agent    agent.Agent
+	Registry     *projects.Registry
+	Project      project.Project
+	StateDir     string
+	DataDir      string // notes, evidence and stats: may be a synced folder
+	LocalDir     string // PR tracking and the clean-up log: never synced
+	DataDirFixed bool   // AGENTOS_DATA_DIR sets the data folder, so the settings cannot change it
+	Tmux         *term.Tmux
+	Agent        agent.Agent
 }
 
 // Load reads the config file and the environment. The project is the one holding AGENTOS_DIR
@@ -52,7 +53,8 @@ func Load() (Config, error) {
 	}
 	dataDir := cmp.Or(cfg.DataDir, filepath.Join(home, ".local", "share", "agentos"))
 	localDir := filepath.Join(home, ".local", "share", "agentos")
-	if override := os.Getenv("AGENTOS_DATA_DIR"); override != "" {
+	override := os.Getenv("AGENTOS_DATA_DIR")
+	if override != "" {
 		dataDir, localDir = override, override
 	}
 	dir := os.Getenv("AGENTOS_DIR")
@@ -84,7 +86,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
+	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
