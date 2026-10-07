@@ -1,7 +1,18 @@
+import type { CSSProperties } from "react";
 import { useAgentos } from "../AgentosContext";
 import { Icon } from "./Icon";
 
-export function ShellList() {
+type ShellListProps = {
+  className?: string;
+  style?: CSSProperties;
+  onPick?(): void;
+};
+
+export function ShellList({
+  className = "flex-none border-l border-line bg-surface",
+  style,
+  onPick,
+}: ShellListProps) {
   const {
     shellIds,
     shellId,
@@ -14,7 +25,8 @@ export function ShellList() {
 
   return (
     <div
-      className="flex w-40 min-h-0 flex-none flex-col border-l border-line bg-surface"
+      className={`flex w-40 min-h-0 flex-col ${className}`}
+      style={style}
       role="tablist"
       aria-label="Shells"
       aria-orientation="vertical"
@@ -24,6 +36,7 @@ export function ShellList() {
         onClick={() => {
           report(newShell);
           focus("shell");
+          onPick?.();
         }}
       >
         <Icon name="plus" size={13} />
@@ -49,6 +62,7 @@ export function ShellList() {
                 onClick={() => {
                   selectShell(id);
                   focus("shell");
+                  onPick?.();
                 }}
               >
                 Shell {i + 1}
