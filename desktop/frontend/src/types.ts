@@ -165,6 +165,7 @@ export type BrowserState = {
   error: string
   headed: boolean
   loadedAt: number
+  pages: number
   console: string[]
 }
 

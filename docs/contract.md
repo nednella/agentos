@@ -174,7 +174,8 @@ type BrowserState = {
   error: string         // why the browser could not start, e.g. "no Brave, Chrome, Chromium or Edge browser found"
   headed: boolean       // the page lives in its own browser window (the default); false: hidden browser, frames over `browser:frame`
   loadedAt: number      // unix ms the page last finished loading; 0 if it never has
-  console: string[]     // the page's last 20 console errors, uncaught errors, failed requests and dismissed dialogs, oldest first
+  pages: number        // how many pages the session has open; url, title, loading and the rest describe the active one
+  console: string[]     // the session's last 20 console errors (from all its pages), uncaught errors, failed requests and dismissed dialogs, oldest first
 }
 
 type BrowserInput =
@@ -317,17 +318,19 @@ One browser per project (separate profile, so logins persist), one window per se
 | `BrowserShow(id)` | | brings the session's window to the front and focuses it |
 | `BrowserState(id)` | `BrowserState` | |
 | `BrowserScreenshot(id, caption)` | `Evidence` | the user's own capture, filed as evidence (`source: 'user'`) |
-| `BrowserClose(id)` | | closes the tab and its window; closing the window closes the tab; the browser stops a minute after its last tab |
+| `BrowserClose(id)` | | closes all the session's pages and their windows; closing the last page closes the tab; the browser stops a minute after its last tab |
 
-A headed window's title reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the window opens, so a rename shows only in windows opened later. `BrowserState.title` and `agentos browser open` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
+Every page of a headed session has a title that reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the session's browser opens, so a rename shows only in sessions opened later. `BrowserState.title` and `agentos browser open` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
 
-The agent's browser commands are `agentos browser open <url> [--front]`, `screenshot [--caption <text>] [--full]` and `help`. `open` loads the page in the session's tab, waits for it to load and prints its title and address, then, in a headed window, the line `page: [<label>] - find it in list_pages by this title prefix`. `screenshot` captures the page. It files a PNG as evidence (`source: 'agent'`) and prints its path. Everything else the agent does on the page goes through the `chrome-devtools-mcp` tools described below.
+A session owns one or more pages. A page belongs to a session when the browser reports that page of the session as its opener (`target=_blank` links, `window.open`, and popups with window features all open pages this way), or, failing that, when the session has a page in the same browser window (a tab the owner opens by hand). A page that fits neither is not the app's and is left alone; headless has no windows to share, so only the opener counts there. An owned page gets the title label, the console, the dialog rule below, and the network error lines, all in the one session's `console`. A page that closes leaves the session; the session's browser counts as closed (`open: false`) when its last page is gone. The active page is the newest whose `document.visibilityState` is `visible` (the selected tab of its window; read every 2 seconds and before `screenshot` and `--front`), else the newest page. `BrowserState` describes the active page, and `pages` counts them (the status header shows "N tabs" above one). `BrowserGoto`, `BrowserNav`, `BrowserInput`, `BrowserShow`, the screenshots and the live view act on the active page.
+
+The agent's browser commands are `agentos browser open <url> [--front]`, `tab <url>`, `screenshot [--caption <text>] [--full]` and `help`. `open` loads the page in the active page, waits for it to load and prints its title and address, then, in a headed window, the line `page: [<label>] - find it in list_pages by this title prefix`. `tab` runs `window.open(<address>, '_blank')` in the session's newest page, through the app's own protocol session with a user gesture so the popup blocker lets it through and the browser puts the tab in that page's window; it waits for the new page to load and prints `opened tab <title> - <address>` and the same label line. `screenshot` captures the active page. It files a PNG as evidence (`source: 'agent'`) and prints its path. Everything else the agent does on the page goes through the `chrome-devtools-mcp` tools described below.
 
 A project's browser listens for the DevTools protocol on a fixed port on `127.0.0.1`, between 20000 and 29999. The app picks a free one the first time it needs it and saves it in `~/.local/share/agentos/<key>/browser-port`, outside the profile folder; later starts reuse it. When something else holds the saved port at a start, the app picks another and saves that. The port is known before the browser starts, so a session can name it at launch.
 
-A Claude session in a project with `browser_enabled` and an installed browser starts with `--mcp-config` adding one MCP server, `browser`: `npx -y --prefer-offline chrome-devtools-mcp@<pinned version> --browser-url=http://127.0.0.1:<port> --no-usage-statistics --no-performance-crux --workspace=<the project folder>`, with `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1`. The server attaches to the project's browser when its tools are first called, and again after the browser restarts; it never closes the browser or its pages. Sessions of one project share the browser, so keeping to its own pages is a rule in the session's system prompt, not something the app enforces: its other tools can still reach any page `list_pages` shows.
+A Claude session in a project with `browser_enabled` and an installed browser starts with `--mcp-config` adding one MCP server, `browser`: `npx -y --prefer-offline chrome-devtools-mcp@<pinned version> --browser-url=http://127.0.0.1:<port> --no-usage-statistics --no-performance-crux --workspace=<the project folder>`, with `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS=1`. The session also starts with `--disallowedTools "mcp__browser__new_page mcp__browser__close_page"`: those tools would open and close pages outside the session's own. The server attaches to the project's browser when its tools are first called, and again after the browser restarts; it never closes the browser or its pages. Sessions of one project share the browser, so keeping to its own pages is a rule in the session's system prompt, not something the app enforces: its other tools can still reach any page `list_pages` shows.
 
-Links with `target=_blank` and `window.open` stay in the session's tab. A JavaScript dialog (`alert`, `confirm`, `prompt`, `beforeunload`) that nobody answers for 5 seconds is dismissed (`accept: false`) in both modes, because an open dialog blocks every later call to its page. The session's `console` gets the line `dialog dismissed after 5s: confirm "Delete?"`. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
+A JavaScript dialog (`alert`, `confirm`, `prompt`, `beforeunload`) that nobody answers for 5 seconds is dismissed (`accept: false`) in both modes, because an open dialog blocks every later call to its page. The session's `console` gets the line `dialog dismissed after 5s: confirm "Delete?"`. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
 
 ### Evidence, stats, digest (`evidence`, `stats`, `digest`)
 
@@ -387,7 +390,7 @@ A saved setting applies at once; the app reads the config file only when it star
 | `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
 | `browser:frame` | `{ id, data, width, height }` | headless mode only. `data` is base64 JPEG; width and height are the viewport's CSS pixels |
-| `browser:state` | `BrowserState` | URL, title, loading, open or `loadedAt` changed, or `console` gained lines (sent at most every 500 ms, the lines of that span in one event) |
+| `browser:state` | `BrowserState` | URL, title, loading, open, `pages` or `loadedAt` changed, or `console` gained lines (sent at most every 500 ms, the lines of that span in one event) |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
 | `update` | `{ version: string }` | a release newer than the running one is out; once per release |
@@ -518,7 +521,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
-| From inside a session | `browser open <url>`, `browser screenshot`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` explains how to use the browser |
+| From inside a session | `browser open <url>`, `browser tab <url>`, `browser screenshot`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` explains how to use the browser |
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux (works with
 the app closed); `--all` does it for every project and stops the shells too. Used by the app itself: `agentos hook <Event>`, `agentos digest add`.

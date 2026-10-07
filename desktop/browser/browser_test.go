@@ -2,8 +2,10 @@ package browser
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -261,6 +263,19 @@ func TestBrowserListensOnItsSavedPort(t *testing.T) {
 	}
 }
 
+func TestAgentOpenNamesThePage(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	b.tab("p/1").prefix = "[demo · 2 fix login]"
+	out, err := b.AgentOpen(ctx, "p/1", "data:text/html,<title>Hi</title>", false)
+	want := "page: [demo · 2 fix login] - find it in list_pages by this title prefix"
+	if err != nil || !strings.HasSuffix(out, "\n"+want) {
+		t.Errorf("AgentOpen = %q, %v; want the last line %q", out, err, want)
+	}
+}
+
 func dialogLines(b *Browsers, id string) string {
 	return strings.Join(b.State(id).Console, "\n")
 }
@@ -307,16 +322,17 @@ func TestDialogAnsweredInTimeIsLeftAlone(t *testing.T) {
 		t.Fatal(err)
 	}
 	tb := b.tab("p/1")
+	pg, _ := tb.activePage()
 	for range 100 {
 		tb.mu.Lock()
-		open := tb.dialog != nil
+		open := pg.dialog != nil
 		tb.mu.Unlock()
 		if open {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if _, err := tb.call(ctx, "Page.handleJavaScriptDialog", map[string]any{"accept": true}); err != nil {
+	if _, err := pg.call(ctx, "Page.handleJavaScriptDialog", map[string]any{"accept": true}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(900 * time.Millisecond)
@@ -328,15 +344,101 @@ func TestDialogAnsweredInTimeIsLeftAlone(t *testing.T) {
 	}
 }
 
-func TestAgentOpenNamesThePage(t *testing.T) {
+func TestTitleScriptLabelsTheCurrentDocument(t *testing.T) {
 	b, ctx := newTestBrowsers(t)
-	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+	if _, err := b.Open(ctx, "p/1", "data:text/html,<title>Hi</title>"); err != nil {
 		t.Fatal(err)
 	}
-	b.tab("p/1").prefix = "[demo · 2 fix login]"
-	out, err := b.AgentOpen(ctx, "p/1", "data:text/html,<title>Hi</title>", false)
-	want := "page: [demo · 2 fix login] - find it in list_pages by this title prefix"
-	if err != nil || !strings.HasSuffix(out, "\n"+want) {
-		t.Errorf("AgentOpen = %q, %v; want the last line %q", out, err, want)
+	pg, _ := b.tab("p/1").activePage()
+	for _, step := range []struct{ js, want string }{
+		{titleScript("[demo · 2 fix]"), "[demo · 2 fix] Hi"},
+		{`document.title = "Next"`, "[demo · 2 fix] Next"},
+		{`document.title = ""`, "[demo · 2 fix]"},
+	} {
+		if _, err := pg.eval(ctx, step.js); err != nil {
+			t.Fatal(err)
+		}
+		deadline := time.Now().Add(5 * time.Second)
+		for {
+			raw, _ := pg.eval(ctx, "document.title")
+			var title string
+			_ = json.Unmarshal(raw, &title)
+			if title == step.want {
+				break
+			}
+			if time.Now().After(deadline) {
+				t.Fatalf("after %.20q the title is %q, want %q", step.js, title, step.want)
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+}
+
+func closeTarget(t *testing.T, ctx context.Context, b *Browsers, pg *page) {
+	t.Helper()
+	if _, err := pg.t.proc.cdp.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitPages(t *testing.T, b *Browsers, id string, want int) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for b.State(id).Pages != want {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d pages, want %d", b.State(id).Pages, want)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func TestSessionClosesWithItsLastPage(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("<title>Tab</title>")) })
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	closed := make(chan struct{}, 4)
+	b.Hook(func(string) string { return "" }, func(string) string { return "" }, func() { closed <- struct{}{} })
+
+	if _, err := b.Open(ctx, "p/1", srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	<-closed // the open
+	if _, err := b.AgentTab(ctx, "p/1", srv.URL+"/two"); err != nil {
+		t.Fatal(err)
+	}
+	waitPages(t, b, "p/1", 2)
+
+	// A page nobody opened for the session (no opener; headless has no window to share) is not the session's.
+	other := b.procs["p"]
+	if _, err := other.cdp.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if n := b.State("p/1").Pages; n != 2 {
+		t.Fatalf("a stranger's page joined the session: %d pages", n)
+	}
+
+	pages := b.tab("p/1").pagesCopy()
+	closeTarget(t, ctx, b, pages[1])
+	waitPages(t, b, "p/1", 1)
+	if st := b.State("p/1"); !st.Open || !b.Has("p/1") {
+		t.Fatalf("closing one of two pages closed the session: %+v", st)
+	}
+	select {
+	case <-closed:
+		t.Fatal("the session counted as closed with a page left")
+	default:
+	}
+
+	closeTarget(t, ctx, b, pages[0])
+	select {
+	case <-closed:
+	case <-time.After(10 * time.Second):
+		t.Fatal("closing the last page did not close the session")
+	}
+	if st := b.State("p/1"); st.Open || b.Has("p/1") {
+		t.Errorf("state after the last page = %+v", st)
 	}
 }

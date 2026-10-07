@@ -1370,6 +1370,10 @@ const (
 	chromeDevToolsMCPVersion = "1.10.1"
 )
 
+// browserToolsDenied are the page tools Claude must not have: new_page and close_page would open and close pages
+// outside the session's own, in a window of another session.
+const browserToolsDenied = "mcp__browser__new_page mcp__browser__close_page"
+
 // browserMCPConfig is the --mcp-config JSON that adds the page tools as the MCP server "browser", attached to the
 // project's browser on port. workspace is the folder the tools may read upload files from.
 func browserMCPConfig(port int, workspace string) string {
@@ -1394,7 +1398,8 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 		return argv
 	}
 	if port := s.browsers.Port(name.Project); port != 0 {
-		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir), "--append-system-prompt", prompts.BrowserSession())
+		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir), "--disallowedTools", browserToolsDenied,
+			"--append-system-prompt", prompts.BrowserSession())
 	}
 	return argv
 }

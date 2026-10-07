@@ -41,8 +41,8 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
 			tt.proj.Dir = "/work/p"
 			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "")
-			prompt, config := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config")
-			if (prompt >= 0) != tt.want || (config >= 0) != tt.want {
+			prompt, config, denied := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config"), slices.Index(argv, "--disallowedTools")
+			if (prompt >= 0) != tt.want || (config >= 0) != tt.want || (denied >= 0) != tt.want {
 				t.Fatalf("argv = %q", argv)
 			}
 			if tt.want && argv[prompt+1] != prompts.BrowserSession() {
@@ -50,6 +50,9 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			}
 			if tt.want && argv[config+1] != wantMCPConfig {
 				t.Errorf("mcp config = %s\nwant %s", argv[config+1], wantMCPConfig)
+			}
+			if tt.want && argv[denied+1] != "mcp__browser__new_page mcp__browser__close_page" {
+				t.Errorf("disallowed tools = %q", argv[denied+1])
 			}
 		})
 	}

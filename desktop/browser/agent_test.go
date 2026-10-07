@@ -2,17 +2,21 @@ package browser_test
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/desktop/browser"
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	ctl "github.com/nednella/agentos/internal/control"
 )
@@ -155,4 +159,81 @@ func TestBrowserWithoutArgumentsShowsTheView(t *testing.T) {
 	if help := h.Ask(t, ctl.Request{Cmd: "browser", Args: []string{"help"}}); !help.OK || !strings.Contains(help.Out, "your session's browser window") {
 		t.Errorf("browser help = %+v", help)
 	}
+}
+
+func TestBrowserTabs(t *testing.T) {
+	h, s := browserHarness(t)
+	srv := demoServer(t)
+	b := h.App.Browsers()
+	b.SetDialogWait(100 * time.Millisecond)
+	eval := func(js string) string {
+		t.Helper()
+		out, err := b.Eval(t.Context(), s.ID, js)
+		if err != nil {
+			t.Fatalf("%s: %v", js, err)
+		}
+		return out
+	}
+	pages := func() int { return h.BrowserState(s.ID).Pages }
+
+	mustBrowser(t, h, s.ID, "open", srv.URL)
+	if st := h.BrowserState(s.ID); st.Pages != 1 || st.Title != "Demo" {
+		t.Fatalf("state after open = %+v", st)
+	}
+
+	t.Run("tab opens an owned page and prints it", func(t *testing.T) {
+		out := mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
+		if want := "opened tab Second - " + srv.URL + "/second"; out != want {
+			t.Errorf("tab printed %q, want %q", out, want)
+		}
+		st := h.BrowserState(s.ID)
+		if st.Pages != 2 || st.Title != "Second" || st.URL != srv.URL+"/second" {
+			t.Errorf("state follows the new page: %+v", st)
+		}
+		if _, err := browserCmd(t, h, s.ID, "tab"); err == nil {
+			t.Error("tab without an address succeeded")
+		}
+		if _, err := browserCmd(t, h, s.ID, "tab", "javascript:alert(1)"); err == nil || pages() != 2 {
+			t.Errorf("tab with a javascript address: %v, %d pages", err, pages())
+		}
+	})
+
+	t.Run("console from the new page reaches the session", func(t *testing.T) {
+		eval(`console.error("from the tab")`)
+		eventually(t, "the console line", func() bool { return slices.Contains(h.BrowserState(s.ID).Console, "console.error: from the tab") })
+	})
+
+	t.Run("a dialog on the new page is dismissed", func(t *testing.T) {
+		eval(`setTimeout(() => { window.answer = confirm("Delete?") }, 0)`)
+		line := `dialog dismissed after 100ms: confirm "Delete?"`
+		eventually(t, "the dialog line", func() bool { return slices.Contains(h.BrowserState(s.ID).Console, line) })
+		eventually(t, "the page to go on", func() bool { return eval("window.answer") == "false" })
+	})
+
+	t.Run("a link with target blank opens a second owned page", func(t *testing.T) {
+		mustBrowser(t, h, s.ID, "open", srv.URL)
+		var encoded string
+		var rect struct{ X, Y, Width, Height float64 }
+		if err := json.Unmarshal([]byte(eval(`JSON.stringify(document.querySelector("a").getBoundingClientRect())`)), &encoded); err != nil || json.Unmarshal([]byte(encoded), &rect) != nil {
+			t.Fatalf("the link's box: %q, %v", encoded, err)
+		}
+		for _, action := range []string{"move", "down", "up"} {
+			in := browser.BrowserInput{Type: "mouse", Action: action, X: rect.X + rect.Width/2, Y: rect.Y + rect.Height/2, Button: "left", ClickCount: 1}
+			if err := h.BrowserInput(s.ID, in); err != nil {
+				t.Fatal(err)
+			}
+		}
+		eventually(t, "the third page", func() bool { return pages() == 3 })
+		eventually(t, "the state to follow it", func() bool { return h.BrowserState(s.ID).URL == srv.URL+"/second" })
+	})
+
+	t.Run("a page that closes leaves the session open", func(t *testing.T) {
+		for want := 2; want >= 1; want-- {
+			_, _ = b.Eval(t.Context(), s.ID, "window.close()")
+			eventually(t, fmt.Sprintf("%d pages", want), func() bool { return pages() == want })
+			if st := h.BrowserState(s.ID); !st.Open || st.Title != "Demo" && want == 1 {
+				t.Errorf("state = %+v", st)
+			}
+		}
+	})
 }
