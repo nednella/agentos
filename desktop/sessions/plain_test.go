@@ -235,3 +235,24 @@ func TestIssueSessionKnowsItsIssue(t *testing.T) {
 		return strings.Contains(h.Pane(t, s.ID), "issue=9")
 	})
 }
+
+func TestReusedNumberStartsClean(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	// What an old main/1 left behind, as a hook that landed after it was dismissed would.
+	dir := filepath.Join(h.State, "data", "main")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "prs.json"), []byte(`{"branches":{"main/1":["my-fix"]},"live":{"main/1":true}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	s := plainSession(h, t)
+	h.RefreshPRs()
+	if got, _ := h.Session(s.ID); s.ID != "main/1" || got.Branch != "" || got.PR != nil || got.Cleanup != "" {
+		t.Errorf("new session = %+v", got)
+	}
+}

@@ -893,10 +893,11 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 }
 
 func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model) error {
-	// A number is reused, so a leftover file must not leak its old state into the new session.
+	// A number is reused, so nothing left of an old session may leak into the new one.
 	if err := bus.RemoveState(s.stateDir, name.String()); err != nil {
 		return err
 	}
+	s.life.forget(name.String())
 	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
 		return err
 	}
@@ -1127,14 +1128,14 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	}
 	issue, _ := strconv.Atoi(in.Issue)
 	id := in.Name.String()
-	branches := s.life.branchesOf(proj, id)
+	branches, gen := s.life.branchesOf(proj, id)
 	if fallback := proj.BranchFor(issue); len(branches) == 0 && issue > 0 && fallback != "" {
 		branches = []string{fallback}
 	}
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id)}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id), gen: gen}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.

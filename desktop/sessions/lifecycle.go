@@ -69,6 +69,7 @@ type target struct {
 	model        project.Model // what the session ran, so a replacement for an ended one runs the same
 	ended        bool
 	conversation string // the agent's id for its conversation, "" when unknown
+	gen          int    // the session's generation when the target was taken
 }
 
 // track is what is known about the pull request and clean-up of one session.
@@ -124,6 +125,7 @@ type Lifecycle struct {
 
 	mu       sync.Mutex
 	tracks   map[string]*track
+	gens     map[string]int      // by session id: bumped when it is forgotten, so a fetch begun before then is dropped
 	files    map[string]*prsFile // by project key
 	etags    map[string]string   // by project key: the ETag of the last pull request list
 	watchers map[string]*watcher // by project key
@@ -139,7 +141,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
+		tracks: map[string]*track{}, gens: map[string]int{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -217,6 +219,7 @@ func (l *Lifecycle) forget(id string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	delete(l.tracks, id)
+	l.gens[id]++
 	key := session.ProjectKey(id)
 	f := l.prs(key)
 	_, worked := f.Branches[id]
@@ -366,6 +369,10 @@ type outcome struct {
 func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if t.gen != l.gens[t.id] {
+		// The session was forgotten mid-fetch; its number may already belong to a new one.
+		return outcome{}
+	}
 	key := t.proj.Key()
 	tr := l.tracks[t.id]
 	if tr == nil {
@@ -932,14 +939,14 @@ func (l *Lifecycle) Cleanups(key string) []Cleanup {
 	return out[:min(len(out), cleanupsKept)]
 }
 
-// branchesOf are the branches a session worked on, oldest first.
-func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
+// branchesOf are the branches a session worked on, oldest first, with its generation.
+func (l *Lifecycle) branchesOf(proj project.Project, id string) ([]string, int) {
 	if l == nil {
-		return nil
+		return nil, 0
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return slices.Clone(l.prs(proj.Key()).Branches[id])
+	return slices.Clone(l.prs(proj.Key()).Branches[id]), l.gens[id]
 }
 
 // learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
