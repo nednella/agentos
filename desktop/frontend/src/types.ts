@@ -112,6 +112,13 @@ export type Settings = {
   promptSend: PromptSend
   browserEnabled: boolean
   digestSchedule: DigestSchedule
+  dataDir: string
+  dataDirFixed: boolean
+}
+
+export type DataDirChoice = {
+  dir: string
+  empty: boolean
 }
 
 export type WaitKind = 'permission' | 'question' | 'idle'

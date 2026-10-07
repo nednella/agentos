@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import type { CleanupMode, DigestSchedule, ThemeSetting } from '../types'
+import { DataDirRow } from './DataDirRow'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 import { SegmentedControl } from './SegmentedControl'
@@ -54,6 +55,7 @@ export function SettingsPanel() {
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
         <h3 className="label pb-1">App</h3>
+        <DataDirRow dir={settings.dataDir} fixed={settings.dataDirFixed} />
         <SettingRow label="Theme" hint="System follows the macOS appearance.">
           <SegmentedControl label="Theme" options={THEMES} value={settings.theme} onChange={(value) => report(() => setTheme(value))} />
         </SettingRow>

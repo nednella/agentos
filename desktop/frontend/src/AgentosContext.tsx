@@ -154,7 +154,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digest, setDigest] = useState<Digest | null>(null)
   const [digestSeen, setDigestSeen] = useState(0)
   const [awake, setAwake] = useState(false)
-  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly' })
+  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '', dataDirFixed: true })
   const [shellIds, setShellIds] = useState<string[]>([])
   const [pickedShell, setPickedShell] = useState('')
   const shellId = shellIds.includes(pickedShell) ? pickedShell : (shellIds[0] ?? '')
