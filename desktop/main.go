@@ -95,6 +95,7 @@ func launch() error {
 		OnStartup: func(c context.Context) {
 			window.Store(&c)
 			stripMenuShortcuts()
+			compactTitleBar()
 			if err := a.Start(c); err != nil {
 				log.Printf("agentos: %v", err)
 			}
