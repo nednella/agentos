@@ -471,7 +471,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 | What | Where |
 |---|---|
 | notes, note images, evidence, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `evidence/<token>/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
-| PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/` |
+| PR tracking (acks, live flags, wakes), clean-up log, browser profile, session temp folders | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/`, `tmp/<token>/` (removed when the session is dismissed) |
 | state files, sockets, tmux config, last project, app location, release check | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`; `update.json`: the last release check, so the command asks GitHub at most once a day) |
 
 All files are written by writing a temp file and renaming it into place; folders are created as needed.
@@ -480,7 +480,7 @@ All files are written by writing a temp file and renaming it into place; folders
 
 `AGENTOS_CONFIG`, `AGENTOS_STATE_DIR` (state dir), `AGENTOS_DATA_DIR` (replaces both data locations), `AGENTOS_TMUX_SOCKET` (default `agentos`),
 `AGENTOS_DIR` (the project folder to start in instead of the current folder), `AGENTOS_HTTP` (browser mode), `AGENTOS_BROWSER` (path of the
-browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, and for a session started for an issue `AGENTOS_ISSUE` (its number). In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
+browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `TMPDIR` and `CLAUDE_CODE_TMPDIR` (both the session's temp folder), and for a session started for an issue `AGENTOS_ISSUE` (its number). Claude starts with `--settings` holding the hooks and `permissions.additionalDirectories` set to `data_dir` and `~/.local/share/agentos`, so it uses the app's folders, its temp folder among them, without asking. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. It runs on the first agent that is installed and signed in, found without spending a request (`claude auth status` exits 0 when signed in); only `claude` is supported so far. With none, the digest's `error` says so. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
 The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`)
