@@ -31,12 +31,21 @@ func hookSetup(t *testing.T) (dir string, received func() []session.Record) {
 		t.Fatal(err)
 	}
 	t.Cleanup(ln.Close)
-	t.Setenv("AGENTOS_SESSION", "demo/1")
+	t.Setenv("AGENTOS_SESSION", "demo/a1")
 	t.Setenv("AGENTOS_SOCKET", bus.SocketPath(dir))
 	return dir, func() []session.Record {
 		mu.Lock()
 		defer mu.Unlock()
 		return append([]session.Record(nil), got...)
+	}
+}
+
+// seedStart saves the state a SessionStart leaves, which a session's later hooks build on.
+func seedStart(t *testing.T, dir string) {
+	t.Helper()
+	rec := session.Record{Session: "demo/a1", State: session.Idle, Event: "SessionStart", At: time.Now().Add(-time.Hour)}
+	if err := bus.WriteState(dir, rec); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -53,16 +62,17 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 
 func TestHookSavesAndReportsTheNewState(t *testing.T) {
 	dir, received := hookSetup(t)
+	seedStart(t, dir)
 
 	reportHook("PreToolUse", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`))
-	rec, err := bus.ReadState(dir, "demo/1")
+	rec, err := bus.ReadState(dir, "demo/a1")
 	if err != nil || rec.State != session.Working || rec.Detail != "Bash ls" {
 		t.Fatalf("saved state = %+v, %v", rec, err)
 	}
 	waitFor(t, "the app to hear of it", func() bool { return len(received()) == 1 })
 
 	reportHook("Stop", strings.NewReader(`{}`))
-	if rec, _ = bus.ReadState(dir, "demo/1"); rec.State != session.Idle {
+	if rec, _ = bus.ReadState(dir, "demo/a1"); rec.State != session.Idle {
 		t.Errorf("state after Stop = %s", rec.State)
 	}
 	waitFor(t, "the second report", func() bool { return len(received()) == 2 })
@@ -84,7 +94,7 @@ func TestHookIgnoresWhatIsNotASession(t *testing.T) {
 	dir, received := hookSetup(t)
 	t.Setenv("AGENTOS_SESSION", "not a session")
 	reportHook("Stop", strings.NewReader(`{}`))
-	t.Setenv("AGENTOS_SESSION", "demo/1")
+	t.Setenv("AGENTOS_SESSION", "demo/a1")
 	t.Setenv("AGENTOS_SOCKET", "")
 	reportHook("Stop", strings.NewReader(`{}`))
 	time.Sleep(100 * time.Millisecond)
@@ -99,11 +109,30 @@ func TestHookWithoutAnAppStillSavesTheState(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(dir)
-	t.Setenv("AGENTOS_SESSION", "demo/1")
+	t.Setenv("AGENTOS_SESSION", "demo/a1")
 	t.Setenv("AGENTOS_SOCKET", bus.SocketPath(dir))
+	seedStart(t, dir)
 	reportHook("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`))
-	if rec, _ := bus.ReadState(dir, "demo/1"); rec.State != session.Working {
+	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Working {
 		t.Errorf("state = %+v", rec)
+	}
+}
+
+func TestOnlySessionStartCreatesTheStateFile(t *testing.T) {
+	tests := []struct {
+		event string
+		want  bool
+	}{{"SessionStart", true}, {"PreToolUse", false}, {"Stop", false}, {"SessionEnd", false}, {"Notification", false}}
+	for _, tt := range tests {
+		t.Run(tt.event, func(t *testing.T) {
+			dir, received := hookSetup(t)
+			reportHook(tt.event, strings.NewReader(`{}`))
+			time.Sleep(50 * time.Millisecond)
+			rec, err := bus.ReadState(dir, "demo/a1")
+			if err != nil || (rec.Session != "") != tt.want || (len(received()) == 1) != tt.want {
+				t.Errorf("after %s: state %+v, %d reports, want a file: %v", tt.event, rec, len(received()), tt.want)
+			}
+		})
 	}
 }
 
@@ -122,16 +151,18 @@ func TestHookCommandIsQuiet(t *testing.T) {
 
 func TestLateHookDoesNotUndoALaterEvent(t *testing.T) {
 	dir, _ := hookSetup(t)
+	seedStart(t, dir)
 	t0 := time.Now()
 	reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
 	reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0)
-	if rec, _ := bus.ReadState(dir, "demo/1"); rec.State != session.Idle || rec.Event != "Stop" {
+	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
 		t.Errorf("a late PostToolUse overwrote Stop: %+v", rec)
 	}
 }
 
 func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
 	dir, _ := hookSetup(t)
+	seedStart(t, dir)
 	for i := range 40 {
 		t0 := time.Now().Add(time.Duration(i) * time.Minute)
 		var wg sync.WaitGroup
@@ -145,7 +176,7 @@ func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
 			reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
 		}()
 		wg.Wait()
-		if rec, _ := bus.ReadState(dir, "demo/1"); rec.State != session.Idle || rec.Event != "Stop" {
+		if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
 			t.Fatalf("round %d: state = %+v, want the Stop", i, rec)
 		}
 	}

@@ -35,6 +35,7 @@ import (
 	"github.com/nednella/agentos/desktop/settings"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
+	"github.com/nednella/agentos/internal/bus"
 	ctl "github.com/nednella/agentos/internal/control"
 )
 
@@ -651,8 +652,18 @@ func (h *Harness) Sessions() *sessions.Sessions { return h.App.Sessions() }
 // Notes is the notes store behind the bound service.
 func (h *Harness) Notes() *notes.Notes { return h.App.Notes() }
 
-// Hook runs the built agentos command as Claude Code would.
+// Hook runs the built agentos command as Claude Code would. A live session has had its
+// SessionStart, which creates the state file, so one is sent first when the file is missing.
 func (h *Harness) Hook(t *testing.T, id, event, stdin string) {
+	t.Helper()
+	live := exec.Command("tmux", "-L", h.Socket, "has-session", "-t", "="+id).Run() == nil
+	if rec, _ := bus.ReadState(h.State, id); live && event != "SessionStart" && rec.Session == "" {
+		h.hook(t, id, "SessionStart", "{}")
+	}
+	h.hook(t, id, event, stdin)
+}
+
+func (h *Harness) hook(t *testing.T, id, event, stdin string) {
 	t.Helper()
 	cmd := exec.Command(CLIPath(t), "hook", event)
 	cmd.Env = append(os.Environ(), "AGENTOS_SESSION="+id, "AGENTOS_SOCKET="+filepath.Join(h.State, "agentos.sock"))

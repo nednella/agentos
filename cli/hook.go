@@ -59,6 +59,9 @@ func saveHook(dir, name string, ev session.Event, at time.Time) (session.Record,
 	}
 	defer unlock()
 	prev, _ := bus.ReadState(dir, name)
+	if prev.Session == "" && ev.Name != "SessionStart" {
+		return session.Record{}, false // a hook that fires after the session was dismissed must not bring its file back
+	}
 	if prev.At.After(at) {
 		return session.Record{}, false
 	}
