@@ -40,6 +40,23 @@ func TestStrayBrowserIsReplaced(t *testing.T) {
 	}
 }
 
+func TestStartForgetsTheLastRunsPages(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	saved := filepath.Join(b.dataDir, "p", "browser", "Default", "Sessions", "Session_1")
+	if err := os.MkdirAll(filepath.Dir(saved), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(saved, []byte("old pages"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(saved); !os.IsNotExist(err) {
+		t.Errorf("the last run's session file is still there: %v", err)
+	}
+}
+
 func TestNoBrowserFound(t *testing.T) {
 	b := New(t.TempDir(), func(string, any) {})
 	b.binary = ""
