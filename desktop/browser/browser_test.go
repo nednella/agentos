@@ -263,3 +263,70 @@ func TestBrowserListensOnItsSavedPort(t *testing.T) {
 		t.Errorf("the port changed from %d to %d once the browser ran", port, b.Port("p"))
 	}
 }
+
+func dialogLines(b *Browsers, id string) string {
+	return strings.Join(b.State(id).Console, "\n")
+}
+
+func TestDialogLeftOpenIsDismissed(t *testing.T) {
+	const page = `<!doctype html><title>Dialogs</title>`
+	tests := []struct{ name, js, result, line string }{
+		{"confirm", `confirm("Delete?")`, "[false,true]", `dialog dismissed after 100ms: confirm "Delete?"`},
+		{"prompt", `prompt("Name?", "x")`, "[null,true]", `dialog dismissed after 100ms: prompt "Name?"`},
+		{"alert", `alert("Saved")`, "[null,true]", `dialog dismissed after 100ms: alert "Saved"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			b, ctx := newTestBrowsers(t)
+			b.SetDialogWait(100 * time.Millisecond)
+			if _, err := b.Open(ctx, "p/1", "data:text/html,"+page); err != nil {
+				t.Fatal(err)
+			}
+			// The dialog opens from a timer, so the call that starts it is not blocked by it.
+			if _, err := b.Eval(ctx, "p/1", `setTimeout(() => { window.answer = `+tt.js+`; window.after = true }, 0)`); err != nil {
+				t.Fatal(err)
+			}
+			deadline := time.Now().Add(10 * time.Second)
+			for !strings.Contains(dialogLines(b, "p/1"), tt.line) {
+				if time.Now().After(deadline) {
+					t.Fatalf("no line %q in the console: %q", tt.line, dialogLines(b, "p/1"))
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			if got, err := b.Eval(ctx, "p/1", `JSON.stringify([window.answer, window.after])`); err != nil || got != strconv.Quote(tt.result) {
+				t.Errorf("page state after the dismissal = %s, %v; want %s", got, err, tt.result)
+			}
+		})
+	}
+}
+
+func TestDialogAnsweredInTimeIsLeftAlone(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	b.SetDialogWait(500 * time.Millisecond)
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Eval(ctx, "p/1", `setTimeout(() => { window.answer = confirm("Keep?") }, 0)`); err != nil {
+		t.Fatal(err)
+	}
+	tb := b.tab("p/1")
+	for range 100 {
+		tb.mu.Lock()
+		open := tb.dialog != nil
+		tb.mu.Unlock()
+		if open {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if _, err := tb.call(ctx, "Page.handleJavaScriptDialog", map[string]any{"accept": true}); err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(900 * time.Millisecond)
+	if got, err := b.Eval(ctx, "p/1", `window.answer`); err != nil || got != "true" {
+		t.Errorf("answer = %s, %v; want true", got, err)
+	}
+	if lines := dialogLines(b, "p/1"); strings.Contains(lines, "dismissed") {
+		t.Errorf("a dialog answered in time was reported dismissed: %q", lines)
+	}
+}

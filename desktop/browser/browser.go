@@ -34,6 +34,10 @@ const (
 	browserStartLimit = 15 * time.Second
 	callLimit         = 15 * time.Second
 	closeGrace        = time.Minute
+	// dialogWait is how long a JavaScript dialog may stay open before agentos dismisses it: a dialog blocks every
+	// call to its page, including the ones that would answer it.
+	dialogWait  = 5 * time.Second
+	dialogShown = 80
 )
 
 // BrowserState is what the front end shows of a session's tab.
@@ -48,7 +52,7 @@ type BrowserState struct {
 	Error        string `json:"error"`
 	Headed       bool   `json:"headed"`
 	LoadedAt     int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
-	// Console is the page's last few console errors and failed requests, oldest first.
+	// Console is the page's last few console errors, failed requests and dismissed dialogs, oldest first.
 	// It is a copy: the agent's `console` command drains another buffer.
 	Console []string `json:"console"`
 }
@@ -92,16 +96,17 @@ func findBrowser() string {
 // Browsers runs one browser per project and one window per session; with AGENTOS_BROWSER_HEADLESS=1 the
 // browser is hidden and each session has a tab streamed to the front end.
 type Browsers struct {
-	dataDir  string
-	binary   string
-	headless bool
-	emit     func(event string, payload any)
-	grace    time.Duration
-	urlFor   func(sessionID string) string // the page a new tab opens first
-	labelFor func(sessionID string) string // names the session in its window's title
-	onTabs   func()                        // a tab opened or closed
-	launchMu sync.Mutex
-	portMu   sync.Mutex
+	dataDir    string
+	binary     string
+	headless   bool
+	emit       func(event string, payload any)
+	grace      time.Duration
+	dialogWait time.Duration
+	urlFor     func(sessionID string) string // the page a new tab opens first
+	labelFor   func(sessionID string) string // names the session in its window's title
+	onTabs     func()                        // a tab opened or closed
+	launchMu   sync.Mutex
+	portMu     sync.Mutex
 
 	mu      sync.Mutex
 	procs   map[string]*browserProc // by project key
@@ -112,7 +117,7 @@ type Browsers struct {
 // New runs the browsers with their profiles under dataDir.
 func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
-		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, grace: closeGrace,
+		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, grace: closeGrace, dialogWait: dialogWait,
 		urlFor: func(string) string { return "" }, labelFor: func(string) string { return "" }, onTabs: func() {},
 		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
@@ -161,6 +166,7 @@ type tab struct {
 	recent    []string    // the last consoleShown lines, for the front end; never drained
 	recentPub *time.Timer // set while a coalesced publish of recent is pending
 	requests  map[string]string
+	dialog    *time.Timer // set while a JavaScript dialog is open
 }
 
 func (t *tab) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
@@ -408,6 +414,7 @@ func (b *Browsers) exited(p *browserProc) {
 	for _, t := range lost {
 		t.mu.Lock()
 		t.state.Open = false
+		t.stopDialog()
 		t.mu.Unlock()
 		t.publish()
 	}
@@ -789,6 +796,7 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	t.mu.Lock()
 	t.state.Open = false
 	t.visible = false
+	t.stopDialog()
 	t.mu.Unlock()
 	t.publish()
 	b.onTabs()
@@ -943,6 +951,18 @@ func (t *tab) event(method string, params json.RawMessage) {
 		t.publish()
 	case "Page.screencastFrame":
 		t.frame(params)
+	case "Page.javascriptDialogOpening":
+		var ev struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(params, &ev) == nil {
+			t.dialogOpened(ev.Type, ev.Message)
+		}
+	case "Page.javascriptDialogClosed":
+		t.mu.Lock()
+		t.stopDialog()
+		t.mu.Unlock()
 	case "Runtime.consoleAPICalled":
 		var ev struct {
 			Type string `json:"type"`
@@ -1024,6 +1044,34 @@ func (t *tab) event(method string, params json.RawMessage) {
 			t.logConsole(fmt.Sprintf("request failed: %s -> %s", req, ev.ErrorText))
 		}
 	}
+}
+
+// stopDialog forgets the open dialog's timer. The tab's mutex must be held.
+func (t *tab) stopDialog() {
+	if t.dialog != nil {
+		t.dialog.Stop()
+		t.dialog = nil
+	}
+}
+
+// dialogOpened dismisses the dialog if nobody answers it within dialogWait.
+func (t *tab) dialogOpened(kind, message string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.stopDialog()
+	wait := t.b.dialogWait
+	t.dialog = time.AfterFunc(wait, func() {
+		ctx, cancel := context.WithTimeout(context.Background(), callLimit)
+		defer cancel()
+		if _, err := t.call(ctx, "Page.handleJavaScriptDialog", map[string]any{"accept": false}); err != nil {
+			return
+		}
+		line := util.FirstLine(message)
+		if r := []rune(line); len(r) > dialogShown {
+			line = string(r[:dialogShown]) + "..."
+		}
+		t.logConsole(fmt.Sprintf("dialog dismissed after %s: %s %q", wait, kind, line))
+	})
 }
 
 // View turns the live picture on or off. Frames are only produced while it is on.
@@ -1376,3 +1424,6 @@ func (b *Browsers) Eval(ctx context.Context, id, js string) (string, error) {
 
 // SetGrace sets how long a browser outlives its last tab.
 func (b *Browsers) SetGrace(d time.Duration) { b.grace = d }
+
+// SetDialogWait sets how long a JavaScript dialog may stay open before it is dismissed.
+func (b *Browsers) SetDialogWait(d time.Duration) { b.dialogWait = d }
