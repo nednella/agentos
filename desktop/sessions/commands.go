@@ -40,9 +40,9 @@ func (c *Commands) find(arg string) (Session, error) {
 
 func started(s Session) string { return fmt.Sprintf("started session %d: %s", s.N, s.Title) }
 
-// New starts a session titled with the words given.
+// New starts a session titled with the words given, and gives it the prompt, sent unless the project says manual.
 func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
-	s, err := c.s.Create(strings.Join(req.Args, " "), "", false, 0)
+	s, err := c.s.Create(strings.Join(req.Args, " "), req.Opts["prompt"], c.s.Current().SendsPrompt(), 0)
 	if err != nil {
 		return "", err
 	}

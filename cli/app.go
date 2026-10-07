@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +26,7 @@ func appCmd(use, short, group string, args cobra.PositionalArgs) *cobra.Command 
 func newAppCmds() []*cobra.Command {
 	return []*cobra.Command{
 		appCmd("issue <number...>", "Start a session for each issue", groupWork, cobra.MinimumNArgs(1)),
-		appCmd("new [title]", "Start a session", groupWork, nil),
+		newNewCmd(),
 		appCmd("open <n|title>", "Show a session in the terminal", groupWork, cobra.MinimumNArgs(1)),
 		appCmd("next", "Show the session that needs you most", groupWork, cobra.NoArgs),
 		appCmd("refresh", "Reload the issues and the pull requests", groupWork, cobra.NoArgs),
@@ -65,4 +66,23 @@ func newProjectCmd() *cobra.Command {
 		},
 	})
 	return project
+}
+
+func newNewCmd() *cobra.Command {
+	var prompt string
+	cmd := &cobra.Command{
+		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin)", GroupID: groupWork,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if prompt == "-" {
+				data, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), 1<<20))
+				if err != nil {
+					return fmt.Errorf("reading the prompt: %w", err)
+				}
+				prompt = string(data)
+			}
+			return askApp(cmd, control.Request{Cmd: "new", Args: args, Opts: map[string]string{"prompt": strings.TrimSpace(prompt)}})
+		},
+	}
+	cmd.Flags().StringVar(&prompt, "prompt", "", "the first message of the new session")
+	return cmd
 }
