@@ -174,7 +174,7 @@ type BrowserState = {
   error: string         // why the browser could not start, e.g. "no Brave, Chrome, Chromium or Edge browser found"
   headed: boolean       // the page lives in its own browser window (the default); false: hidden browser, frames over `browser:frame`
   loadedAt: number      // unix ms the page last finished loading; 0 if it never has
-  console: string[]     // the page's last 20 console errors, uncaught errors and failed requests, oldest first; a copy, so the agent's `agentos browser console` does not empty it
+  console: string[]     // the page's last 20 console errors, uncaught errors, failed requests and dismissed dialogs, oldest first; a copy, so the agent's `agentos browser console` does not empty it
 }
 
 type BrowserInput =
@@ -323,7 +323,7 @@ A headed window's title reads `[<project name> · <n> <session title>] <page tit
 
 A project's browser listens for the DevTools protocol on a fixed port on `127.0.0.1`, between 20000 and 29999. The app picks a free one the first time it needs it and saves it in `~/.local/share/agentos/<key>/browser-port`, outside the profile folder; later starts reuse it. When something else holds the saved port at a start, the app picks another and saves that. The port is known before the browser starts, so a session can name it at launch.
 
-Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
+Links with `target=_blank` and `window.open` stay in the session's tab. A JavaScript dialog (`alert`, `confirm`, `prompt`, `beforeunload`) that nobody answers for 5 seconds is dismissed (`accept: false`) in both modes, because an open dialog blocks every later call to its page. The session's `console` gets the line `dialog dismissed after 5s: confirm "Delete?"`. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
 
 ### Evidence, stats, digest (`evidence`, `stats`, `digest`)
 
