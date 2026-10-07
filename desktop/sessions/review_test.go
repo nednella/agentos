@@ -160,13 +160,8 @@ func TestDismissedSessionStaysGoneAfterALateHook(t *testing.T) {
 		t.Fatal(err)
 	}
 	h.Hook(t, s.ID, "SessionEnd", `{}`) // Claude's hook, running after the dismissal
-	file := filepath.Join(h.State, "sessions", s.ID+".json")
-	if !exists(file) {
-		t.Fatal("the late hook left no state file: the test shows nothing")
-	}
-	h.Sessions().Refresh()
-	if exists(file) {
-		t.Error("the state file of a dismissed session was kept")
+	if exists(filepath.Join(h.State, "sessions", s.ID+".json")) {
+		t.Error("the late hook wrote the state file of a dismissed session")
 	}
 	if got := h.Restart(t).Sessions().List(); len(got) != 0 {
 		t.Errorf("a dismissed session came back after a restart: %+v", got)
