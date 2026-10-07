@@ -11,6 +11,8 @@
 It shows which session needs you, your project's GitHub issues as a queue, your notes, and each
 agent's real terminal. Agents keep running in a hidden tmux when the window closes.
 
+## Screenshot
+
 ![agentos](docs/screenshot.png)
 
 ## Install
