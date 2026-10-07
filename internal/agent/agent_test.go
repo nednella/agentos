@@ -2,6 +2,8 @@ package agent
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -86,5 +88,52 @@ func TestClaudeHeadless(t *testing.T) {
 	env := ClaudeHeadless.Env([]string{"PATH=/bin", "ANTHROPIC_API_KEY=k", "DEPLOY_TOKEN=s", "AGENTOS_SESSION=main/9"})
 	if want := []string{"PATH=/bin", "ANTHROPIC_API_KEY=k"}; !slices.Equal(env, want) {
 		t.Errorf("env = %q, want %q", env, want)
+	}
+}
+
+func TestClaudeFill(t *testing.T) {
+	write := func(t *testing.T, path, body string) {
+		t.Helper()
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tests := []struct {
+		name                string
+		user, shared, local string
+		l, want             Launch
+	}{
+		{"no settings", "", "", "", Launch{}, Launch{}},
+		{"the user's", `{"model": "opus", "effortLevel": "medium"}`, "", "", Launch{}, Launch{Model: "opus", Effort: "medium"}},
+		{"the project's over the user's", `{"model": "opus", "effortLevel": "medium"}`, `{"model": "sonnet"}`, "", Launch{}, Launch{Model: "sonnet", Effort: "medium"}},
+		{"local over shared", "", `{"model": "sonnet"}`, `{"model": "haiku"}`, Launch{}, Launch{Model: "haiku"}},
+		{"a set value stays", `{"model": "opus", "effortLevel": "medium"}`, "", "", Launch{Effort: "max", Resume: "abc"}, Launch{Model: "opus", Effort: "max", Resume: "abc"}},
+		{"the model's own effort", `{"model": "claude-opus-5-5", "effortLevel": "medium", "modelSettings": {"claude-opus-5-5": {"effortLevel": "high"}}}`, "", "", Launch{}, Launch{Model: "claude-opus-5-5", Effort: "high"}},
+		{"another model's effort is not used", `{"model": "opus", "effortLevel": "medium", "modelSettings": {"claude-sonnet-5-5": {"effortLevel": "high"}}}`, "", "", Launch{}, Launch{Model: "opus", Effort: "medium"}},
+		{"a broken file is skipped", `{"model": "opus"}`, `{not json`, "", Launch{}, Launch{Model: "opus"}},
+	}
+	for _, tt := range tests {
+		user, dir := t.TempDir(), t.TempDir()
+		for path, body := range map[string]string{
+			filepath.Join(user, "settings.json"):                 tt.user,
+			filepath.Join(dir, ".claude", "settings.json"):       tt.shared,
+			filepath.Join(dir, ".claude", "settings.local.json"): tt.local,
+		} {
+			if body != "" {
+				write(t, path, body)
+			}
+		}
+		if got := (Claude{ConfigDir: user}).Fill(dir, tt.l); got != tt.want {
+			t.Errorf("%s: Fill = %+v, want %+v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestPlainFillsNothing(t *testing.T) {
+	if got := (Plain{}).Fill(t.TempDir(), Launch{Effort: "high"}); got != (Launch{Effort: "high"}) {
+		t.Errorf("Fill = %+v", got)
 	}
 }

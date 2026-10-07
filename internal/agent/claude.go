@@ -2,6 +2,8 @@ package agent
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 
 	"github.com/nednella/agentos/internal/util"
 )
@@ -13,7 +15,8 @@ var claudeEvents = []string{
 
 // Claude runs Claude Code with hooks that call back into the agentos binary at Exe.
 // The hooks come from --settings, so they apply to our sessions only.
-type Claude struct{ Exe string }
+// ConfigDir holds the user's own settings.json.
+type Claude struct{ Exe, ConfigDir string }
 
 type hookCommand struct {
 	Type    string `json:"type"`
@@ -43,4 +46,49 @@ func (c Claude) Command(_ string, l Launch) []string {
 		argv = append(argv, "--resume", l.Resume)
 	}
 	return argv
+}
+
+type claudeSettings struct {
+	Model         string `json:"model"`
+	EffortLevel   string `json:"effortLevel"`
+	ModelSettings map[string]struct {
+		EffortLevel string `json:"effortLevel"`
+	} `json:"modelSettings"`
+}
+
+// Fill reads claude's settings files, the project's local and shared ones before the user's, so the first
+// that sets a value wins. A model's own effort in modelSettings wins over effortLevel. A file that is
+// missing or not JSON is skipped.
+func (c Claude) Fill(dir string, l Launch) Launch {
+	paths := []string{filepath.Join(dir, ".claude", "settings.local.json"), filepath.Join(dir, ".claude", "settings.json")}
+	if c.ConfigDir != "" {
+		paths = append(paths, filepath.Join(c.ConfigDir, "settings.json"))
+	}
+	var files []claudeSettings
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var s claudeSettings
+		if json.Unmarshal(data, &s) == nil {
+			files = append(files, s)
+		}
+	}
+	for _, s := range files {
+		if l.Model == "" {
+			l.Model = s.Model
+		}
+	}
+	for _, s := range files {
+		if l.Effort == "" {
+			l.Effort = s.ModelSettings[l.Model].EffortLevel
+		}
+	}
+	for _, s := range files {
+		if l.Effort == "" {
+			l.Effort = s.EffortLevel
+		}
+	}
+	return l
 }
