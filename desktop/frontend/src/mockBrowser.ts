@@ -1,22 +1,16 @@
-import type { BrowserInput } from './types'
-
 export type PageModel = {
   url: string
   title: string
-  history: string[]
-  index: number
   typed: string
   focused: boolean
   submitted: string
   loading: boolean
-  width: number
-  height: number
-  visible: boolean
-  dirty: boolean
 }
 
 type Rect = { x: number; y: number; w: number; h: number }
 
+const WIDTH = 640
+const HEIGHT = 400
 const HEADER_H = 56
 const PAD = 24
 
@@ -43,20 +37,14 @@ export function newPage(url: string): PageModel {
   return {
     url,
     title: pageTitle(url),
-    history: [url],
-    index: 0,
     typed: '',
     focused: false,
     submitted: '',
     loading: false,
-    width: 800,
-    height: 500,
-    visible: false,
-    dirty: true,
   }
 }
 
-function layout(w: number, h: number): { input: Rect; button: Rect } {
+function layout(w = WIDTH, h = HEIGHT): { input: Rect; button: Rect } {
   const formY = HEADER_H + 112
   const wide = w >= 560
   const inputW = wide ? Math.min(w - PAD * 2 - 130, 440) : w - PAD * 2
@@ -65,7 +53,7 @@ function layout(w: number, h: number): { input: Rect; button: Rect } {
   return { input, button: { ...button, h: Math.min(button.h, h) } }
 }
 
-export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = p.width, h = p.height): string {
+export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = WIDTH, h = HEIGHT): string {
   canvas.width = w
   canvas.height = h
   const ctx = canvas.getContext('2d')!
@@ -130,27 +118,18 @@ export function renderPage(p: PageModel, canvas: HTMLCanvasElement, w = p.width,
   return canvas.toDataURL('image/jpeg', 0.7)
 }
 
-export function handleInput(p: PageModel, input: BrowserInput) {
-  const { input: field, button } = layout(p.width, p.height)
-  const inside = (r: Rect, x: number, y: number) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
-  if (input.type === 'mouse' && input.action === 'down') {
-    p.focused = inside(field, input.x, input.y)
-    if (inside(button, input.x, input.y)) p.submitted = p.typed || 'everything'
-    p.dirty = true
-  }
-  if (input.type === 'key' && input.action === 'down' && p.focused) {
-    if (input.key === 'Backspace') p.typed = p.typed.slice(0, -1)
-    else if (input.key === 'Enter') p.submitted = p.typed || 'everything'
-    else if (input.text) p.typed += input.text
-    p.dirty = true
-  }
-  if (input.type === 'paste' && p.focused) {
-    p.typed += input.text
-    p.dirty = true
-  }
+export function clickAt(p: PageModel, x: number, y: number) {
+  const { input, button } = layout()
+  const inside = (r: Rect) => x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h
+  p.focused = inside(input)
+  if (inside(button)) p.submitted = p.typed || 'everything'
 }
 
-export function pageRects(p: PageModel): { field: Rect; button: Rect } {
-  const { input, button } = layout(p.width, p.height)
+export function typeText(p: PageModel, text: string) {
+  if (p.focused) p.typed += text
+}
+
+export function pageRects(): { field: Rect; button: Rect } {
+  const { input, button } = layout()
   return { field: input, button }
 }

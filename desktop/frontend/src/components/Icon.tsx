@@ -24,8 +24,6 @@ type IconName =
   | 'settings'
   | 'back'
   | 'forward'
-  | 'reload'
-  | 'stop'
   | 'camera'
   | 'compare'
   | 'issue'
@@ -76,8 +74,6 @@ function IconShape({ name }: IconShapeProps) {
   if (name === 'digest') return <path d="M3 2.5h8.5v11H4.5a1.5 1.5 0 0 1-1.5-1.5ZM11.5 5H14v7a1.5 1.5 0 0 1-1.5 1.5M5.5 5.5h4M5.5 8h4M5.5 10.5h2.5" />
   if (name === 'back') return <path d="M9.5 3.5 5 8l4.5 4.5M5 8h8" />
   if (name === 'forward') return <path d="M6.5 3.5 11 8l-4.5 4.5M11 8H3" />
-  if (name === 'reload') return <path d="M13 8a5 5 0 1 1-1.6-3.7M13 2.5v3h-3" />
-  if (name === 'stop') return <path d="m4 4 8 8M12 4l-8 8" />
   if (name === 'camera') return <path d="M2 5h3l1-1.5h4L11 5h3v8H2ZM8 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z" />
   if (name === 'compare') return <path d="M2.5 3h4.5v10H2.5ZM9 3h4.5v10H9Z" />
   if (name === 'issue') return <path d="M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM8 5.5v3.2M8 10.8v.01" />

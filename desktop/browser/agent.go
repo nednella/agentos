@@ -55,7 +55,7 @@ func (b *Browsers) tabFor(ctx context.Context, id string) (*tab, error) {
 	return b.need(id)
 }
 
-// pageHelp is the last line of what the agent commands print for a page in a headed window.
+// pageHelp is the last line of what the agent commands print for a page.
 func (t *tab) pageHelp() string {
 	if t.prefix == "" {
 		return ""

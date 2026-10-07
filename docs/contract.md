@@ -169,21 +169,11 @@ type BrowserState = {
   url: string
   title: string
   loading: boolean
-  canGoBack: boolean
-  canGoForward: boolean
   error: string         // why the browser could not start, e.g. "no Brave, Chrome, Chromium or Edge browser found"
-  headed: boolean       // the page lives in its own browser window (the default); false: hidden browser, frames over `browser:frame`
   loadedAt: number      // unix ms the page last finished loading; 0 if it never has
   pages: number        // how many pages the session has open; url, title, loading and the rest describe the active one
   console: string[]     // the session's last 20 console errors (from all its pages), uncaught errors, failed requests and dismissed dialogs, oldest first
 }
-
-type BrowserInput =
-  | { type: 'mouse'; action: 'move' | 'down' | 'up'; x: number; y: number; button: 'left' | 'middle' | 'right' | 'none'; clickCount: number; modifiers: number }
-  | { type: 'wheel'; x: number; y: number; deltaX: number; deltaY: number; modifiers: number }
-  | { type: 'key'; action: 'down' | 'up'; key: string; code: string; text: string; modifiers: number }
-  | { type: 'paste'; text: string }
-// x, y: CSS pixels in the page viewport. modifiers: 1 alt, 2 ctrl, 4 meta, 8 shift.
 
 type DigestItem = {
   id: string
@@ -305,26 +295,22 @@ Each comment count and each failing commit counts once, remembered in `prs.json`
 
 ### Browser (`browser`)
 
-One browser per project (separate profile, so logins persist), one window per session, opened behind the other windows so it takes no focus. The page follows the window's real size and pixel ratio. With `AGENTOS_BROWSER_HEADLESS=1` the browser is hidden instead and each session has a tab the front end draws from `browser:frame`; call `BrowserResize` before `BrowserView(id, true)` there.
+One browser per project (separate profile, so logins persist), one window per session, opened behind the other windows so it takes no focus. The page follows the window's real size and pixel ratio. The tab in the front end shows the page's status (title, address, console, recent captures), not the page itself.
 
 | Method | Returns | What it does |
 |---|---|---|
 | `BrowserOpen(id, url)` | `BrowserState` | opens the session's tab, starting the browser if needed; `url` "" means the project's `browser_start_url`, else a blank page. Rejects when that first page cannot be opened; the tab then stays open and `browser:state` has it. Two calls for one session share one tab |
 | `BrowserGoto(id, url)` | | a bare host gets `https://`; localhost, IPs and `.local` get `http://` |
-| `BrowserNav(id, action)` | | `'back' \| 'forward' \| 'reload' \| 'stop'` |
-| `BrowserInput(id, input)` | | |
-| `BrowserResize(id, width, height)` | | headless only (no-op when `headed`): CSS pixels of the panel; the page viewport follows |
-| `BrowserView(id, visible)` | | headless only (no-op when `headed`): frames are sent only while visible |
 | `BrowserShow(id)` | | brings the session's window to the front and focuses it |
 | `BrowserState(id)` | `BrowserState` | |
 | `BrowserScreenshot(id, caption)` | `Evidence` | the user's own capture, filed as evidence (`source: 'user'`) |
 | `BrowserClose(id)` | | closes all the session's pages and their windows; closing the last page closes the tab; the browser stops a minute after its last tab |
 
-Every page of a headed session has a title that reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the session's browser opens, so a rename shows only in sessions opened later. `BrowserState.title` and `agentos browser open` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
+Every page of a session has a title that reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the session's browser opens, so a rename shows only in sessions opened later. `BrowserState.title` and `agentos browser open` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
 
-A session owns one or more pages. A page belongs to a session when the browser reports that page of the session as its opener (`target=_blank` links, `window.open`, and popups with window features all open pages this way), or, failing that, when the session has a page in the same browser window (a tab the owner opens by hand). A page that fits neither is not the app's and is left alone; headless has no windows to share, so only the opener counts there. An owned page gets the title label, the console, the dialog rule below, and the network error lines, all in the one session's `console`. A page that closes leaves the session; the session's browser counts as closed (`open: false`) when its last page is gone. The active page is the newest whose `document.visibilityState` is `visible` (the selected tab of its window; read every 2 seconds and before `screenshot` and `--front`), else the newest page. `BrowserState` describes the active page, and `pages` counts them (the status header shows "N tabs" above one). `BrowserGoto`, `BrowserNav`, `BrowserInput`, `BrowserShow`, the screenshots and the live view act on the active page.
+A session owns one or more pages. A page belongs to a session when the browser reports that page of the session as its opener (`target=_blank` links, `window.open`, and popups with window features all open pages this way), or, failing that, when the session has a page in the same browser window (a tab the owner opens by hand). A page that fits neither is not the app's and is left alone. An owned page gets the title label, the console, the dialog rule below, and the network error lines, all in the one session's `console`. A page that closes leaves the session; the session's browser counts as closed (`open: false`) when its last page is gone. The active page is the newest whose `document.visibilityState` is `visible` (the selected tab of its window; read every 2 seconds and before `screenshot` and `--front`), else the newest page. `BrowserState` describes the active page, and `pages` counts them (the status header shows "N tabs" above one). `BrowserGoto`, `BrowserShow` and the screenshots act on the active page.
 
-The agent's browser commands are `agentos browser open <url> [--front]`, `tab <url>`, `screenshot [--caption <text>] [--full]` and `help`. `open` loads the page in the active page, waits for it to load and prints its title and address, then, in a headed window, the line `page: [<label>] - find it in list_pages by this title prefix`. `tab` runs `window.open(<address>, '_blank')` in the session's newest page, through the app's own protocol session with a user gesture so the popup blocker lets it through and the browser puts the tab in that page's window; it waits for the new page to load and prints `opened tab <title> - <address>` and the same label line. `screenshot` captures the active page. It files a PNG as evidence (`source: 'agent'`) and prints its path. Everything else the agent does on the page goes through the `chrome-devtools-mcp` tools described below.
+The agent's browser commands are `agentos browser open <url> [--front]`, `tab <url>`, `screenshot [--caption <text>] [--full]` and `help`. `open` loads the page in the active page, waits for it to load and prints its title and address, then the line `page: [<label>] - find it in list_pages by this title prefix`. `tab` runs `window.open(<address>, '_blank')` in the session's newest page, through the app's own protocol session with a user gesture so the popup blocker lets it through and the browser puts the tab in that page's window; it waits for the new page to load and prints `opened tab <title> - <address>` and the same label line. `screenshot` captures the active page. It files a PNG as evidence (`source: 'agent'`) and prints its path. Everything else the agent does on the page goes through the `chrome-devtools-mcp` tools described below.
 
 A project's browser listens for the DevTools protocol on a fixed port on `127.0.0.1`, between 20000 and 29999. The app picks a free one the first time it needs it and saves it in `~/.local/share/agentos/<key>/browser-port`, outside the profile folder; later starts reuse it. When something else holds the saved port at a start, the app picks another and saves that. The port is known before the browser starts, so a session can name it at launch.
 
@@ -389,7 +375,6 @@ A saved setting applies at once; the app reads the config file only when it star
 | `stats` | none | a wait opened or closed; refetch `Stats` if the view is open |
 | `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
-| `browser:frame` | `{ id, data, width, height }` | headless mode only. `data` is base64 JPEG; width and height are the viewport's CSS pixels |
 | `browser:state` | `BrowserState` | URL, title, loading, open, `pages` or `loadedAt` changed, or `console` gained lines (sent at most every 500 ms, the lines of that span in one event) |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
@@ -497,7 +482,7 @@ All files are written by writing a temp file and renaming it into place; folders
 
 `AGENTOS_CONFIG`, `AGENTOS_STATE_DIR` (state dir), `AGENTOS_DEV_DATA_DIR` (replaces both data locations), `AGENTOS_TMUX_SOCKET` (default `agentos`),
 `AGENTOS_DIR` (the project folder to start in instead of the current folder), `AGENTOS_HTTP` (browser mode), `AGENTOS_BROWSER` (path of the
-browser to drive), `AGENTOS_BROWSER_HEADLESS` (`1`: hide the browser and stream frames instead of opening windows). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `TMPDIR` and `CLAUDE_CODE_TMPDIR` (both the session's temp folder), and for a session started for an issue `AGENTOS_ISSUE` (its number). Claude starts with `--settings` holding the hooks and `permissions.additionalDirectories` set to `data_dir` and `~/.local/share/agentos`, so it uses the app's folders, its temp folder among them, without asking. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
+browser to drive), `AGENTOS_BROWSER_HEADLESS` (`1`, tests only: start the browser without windows). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `TMPDIR` and `CLAUDE_CODE_TMPDIR` (both the session's temp folder), and for a session started for an issue `AGENTOS_ISSUE` (its number). Claude starts with `--settings` holding the hooks and `permissions.additionalDirectories` set to `data_dir` and `~/.local/share/agentos`, so it uses the app's folders, its temp folder among them, without asking. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. It runs on the first agent that is installed and signed in, found without spending a request (`claude auth status` exits 0 when signed in); only `claude` is supported so far. With none, the digest's `error` says so. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
 The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`)

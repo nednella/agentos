@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserInput, BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -40,10 +40,6 @@ type Backend = {
   Cleanups(): Promise<Cleanup[]>
   BrowserOpen(id: string, url: string): Promise<BrowserState>
   BrowserGoto(id: string, url: string): Promise<void>
-  BrowserNav(id: string, action: 'back' | 'forward' | 'reload' | 'stop'): Promise<void>
-  BrowserInput(id: string, input: BrowserInput): Promise<void>
-  BrowserResize(id: string, width: number, height: number): Promise<void>
-  BrowserView(id: string, visible: boolean): Promise<void>
   BrowserShow(id: string): Promise<void>
   BrowserState(id: string): Promise<BrowserState>
   BrowserScreenshot(id: string, caption: string): Promise<Evidence>
@@ -91,7 +87,7 @@ const namespaces = {
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
   stats: ['Stats'],
   evidence: ['Evidence', 'DeleteEvidence'],
-  browser: ['BrowserOpen', 'BrowserGoto', 'BrowserNav', 'BrowserInput', 'BrowserResize', 'BrowserView', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
+  browser: ['BrowserOpen', 'BrowserGoto', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   update: ['Update'],
   awake: ['Awake'],
@@ -160,11 +156,6 @@ export const api = {
   cleanups: () => backend.Cleanups(),
   browserOpen: (id: string, url: string) => backend.BrowserOpen(id, url),
   browserGoto: (id: string, url: string) => backend.BrowserGoto(id, url),
-  browserNav: (id: string, action: 'back' | 'forward' | 'reload' | 'stop') => backend.BrowserNav(id, action),
-  // Input and resize arrive in bursts and can outlive the tab; losing one is harmless.
-  browserInput: (id: string, input: BrowserInput) => backend.BrowserInput(id, input).catch(() => {}),
-  browserResize: (id: string, width: number, height: number) => backend.BrowserResize(id, width, height).catch(() => {}),
-  browserView: (id: string, visible: boolean) => backend.BrowserView(id, visible).catch(() => {}),
   browserShow: (id: string) => backend.BrowserShow(id),
   browserState: (id: string) => backend.BrowserState(id),
   browserScreenshot: (id: string, caption: string) => backend.BrowserScreenshot(id, caption),

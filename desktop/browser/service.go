@@ -34,30 +34,6 @@ func (s *Service) BrowserGoto(id, url string) error {
 	return s.browsers.Goto(ctx, id, url)
 }
 
-func (s *Service) BrowserNav(id, action string) error {
-	ctx, cancel := s.browserCtx()
-	defer cancel()
-	return s.browsers.Nav(ctx, id, action)
-}
-
-func (s *Service) BrowserInput(id string, in BrowserInput) error {
-	ctx, cancel := context.WithTimeout(s.ctx(), callLimit)
-	defer cancel()
-	return s.browsers.Input(ctx, id, in)
-}
-
-func (s *Service) BrowserResize(id string, width, height int) error {
-	ctx, cancel := context.WithTimeout(s.ctx(), callLimit)
-	defer cancel()
-	return s.browsers.Resize(ctx, id, width, height)
-}
-
-func (s *Service) BrowserView(id string, visible bool) error {
-	ctx, cancel := context.WithTimeout(s.ctx(), callLimit)
-	defer cancel()
-	return s.browsers.View(ctx, id, visible)
-}
-
 func (s *Service) BrowserShow(id string) error {
 	ctx, cancel := context.WithTimeout(s.ctx(), callLimit)
 	defer cancel()
