@@ -1,7 +1,9 @@
 package sessions_test
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -98,5 +100,32 @@ func TestNewSessionSeesNothingOfADismissedOne(t *testing.T) {
 	}
 	if fresh.Evidence != 0 || exists(evidenceDir(h, fresh.ID)) {
 		t.Errorf("the new session has evidence: %+v", fresh)
+	}
+}
+
+func TestExpiredEndedRowGoesWithItsEvidenceAndPRs(t *testing.T) {
+	h := newHarness(t)
+	const id = "main/old1"
+	long := time.Now().Add(-8 * 24 * time.Hour)
+	rec := session.Record{Session: id, State: session.Ended, Event: "SessionEnd", At: long, Title: "old", EndedAt: long.UnixMilli()}
+	if err := bus.WriteState(h.State, rec); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := evidence.New(filepath.Join(h.State, "data")).AddText(id, "proof", "", "agent"); err != nil {
+		t.Fatal(err)
+	}
+	prs := filepath.Join(h.State, "data", "main", "prs.json")
+	if err := os.WriteFile(prs, []byte(`{"acks":{},"live":{"main/old1":true},"branches":{"main/old1":["issue-7"]}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	h.Sessions().Refresh()
+	eventually(t, "the evidence to go", func() bool { return !exists(evidenceDir(h, id)) })
+	data, err := os.ReadFile(prs)
+	if err != nil || strings.Contains(string(data), id) {
+		t.Errorf("prs.json = %s, %v", data, err)
+	}
+	if exists(filepath.Join(h.State, "sessions", "main", "old1.json")) || len(h.Sessions().List()) != 0 {
+		t.Error("the expired row stayed")
 	}
 }
