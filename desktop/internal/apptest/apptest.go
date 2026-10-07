@@ -564,6 +564,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	t.Setenv("AGENTOS_CONFIG", confPath)
 	t.Setenv("AGENTOS_DIR", dir)
 	t.Setenv("AGENTOS_DATA_DIR", filepath.Join(state, "data"))
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(state, "claude")) // never the user's own settings
 
 	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{Releases: o.Releases}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
 	h.App = h.build(t)
