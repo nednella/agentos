@@ -90,6 +90,7 @@ type Browsers struct {
 	emit     func(event string, payload any)
 	grace    time.Duration
 	urlFor   func(sessionID string) string // the page a new tab opens first
+	labelFor func(sessionID string) string // names the session in its window's title
 	onTabs   func()                        // a tab opened or closed
 	launchMu sync.Mutex
 
@@ -103,7 +104,7 @@ type Browsers struct {
 func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
 		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, grace: closeGrace,
-		urlFor: func(string) string { return "" }, onTabs: func() {},
+		urlFor: func(string) string { return "" }, labelFor: func(string) string { return "" }, onTabs: func() {},
 		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
 }
@@ -138,6 +139,7 @@ type tab struct {
 	id        string
 	targetID  string
 	sessionID string
+	prefix    string // what the title script puts before the page's title
 
 	mu        sync.Mutex
 	state     BrowserState
@@ -349,7 +351,11 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 		SessionID string `json:"sessionId"`
 	}
 	_ = json.Unmarshal(raw, &attached)
-	t := &tab{b: b, proc: p, id: id, targetID: created.TargetID, sessionID: attached.SessionID,
+	prefix := ""
+	if !b.headless {
+		prefix = windowLabel(b.labelFor(id))
+	}
+	t := &tab{b: b, proc: p, id: id, prefix: prefix, targetID: created.TargetID, sessionID: attached.SessionID,
 		width: defaultViewWidth, height: defaultViewHeight, requests: map[string]string{},
 		state: BrowserState{ID: id, Open: true, URL: "about:blank", Headed: !b.headless}}
 	b.mu.Lock()
@@ -376,6 +382,11 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 			method string
 			params any
 		}{"Emulation.setDeviceMetricsOverride", t.metrics()})
+	} else {
+		setups = append(setups, struct {
+			method string
+			params any
+		}{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": titleScript(prefix)}})
 	}
 	for _, setup := range setups {
 		if _, err := t.call(ctx, setup.method, setup.params); err != nil {
@@ -421,6 +432,45 @@ const keepInTab = `(() => {
   document.addEventListener('submit', (e) => { if (e.target && e.target.target && !own(e.target.target)) e.target.target = '_self' }, true)
   window.open = (url) => { if (url) location.href = url; return window }
 })()`
+
+// windowLabel is the bracketed label before a window's title. Whitespace is collapsed the way document.title
+// collapses it, so the label read back from the page still matches and pageTitle can strip it.
+func windowLabel(label string) string {
+	return "[" + strings.Join(strings.Fields(label), " ") + "]"
+}
+
+// titleScript keeps prefix before the page's document title, and is the whole title when the page has none.
+func titleScript(prefix string) string {
+	quoted, _ := json.Marshal(prefix)
+	return `(() => {
+  if (window !== top) return
+  const prefix = ` + string(quoted) + `
+  const watch = () => observer.observe(document, { subtree: true, childList: true, characterData: true })
+  const apply = () => {
+    const own = document.title === prefix ? '' : document.title.startsWith(prefix + ' ') ? document.title.slice(prefix.length + 1) : document.title
+    const want = own ? prefix + ' ' + own : prefix
+    if (document.title === want) return
+    // Unwatched while writing, so a title that reads back different from what was set cannot retrigger apply forever.
+    observer.disconnect()
+    document.title = want
+    watch()
+  }
+  const observer = new MutationObserver(apply)
+  watch()
+  apply()
+})()`
+}
+
+// pageTitle is the title the page set, without the label the window shows before it.
+func (t *tab) pageTitle(title string) string {
+	if t.prefix == "" {
+		return title
+	}
+	if title == t.prefix {
+		return ""
+	}
+	return strings.TrimPrefix(title, t.prefix+" ")
+}
 
 func (t *tab) metrics() map[string]any {
 	t.mu.Lock()
@@ -557,6 +607,7 @@ func (t *tab) refreshMeta() {
 		return
 	}
 	title, addr, _ := strings.Cut(both, "\n")
+	title = t.pageTitle(title)
 	t.mu.Lock()
 	changed := t.state.Title != title || (t.state.URL != addr && addr != "")
 	t.state.Title = title
@@ -704,9 +755,10 @@ func (b *Browsers) event(p *browserProc, sessionID, method string, params json.R
 			}
 			b.mu.Unlock()
 			if t != nil {
+				title := t.pageTitle(ev.TargetInfo.Title)
 				t.mu.Lock()
-				changed := t.state.URL != ev.TargetInfo.URL || t.state.Title != ev.TargetInfo.Title
-				t.state.URL, t.state.Title = ev.TargetInfo.URL, ev.TargetInfo.Title
+				changed := t.state.URL != ev.TargetInfo.URL || t.state.Title != title
+				t.state.URL, t.state.Title = ev.TargetInfo.URL, title
 				t.mu.Unlock()
 				if changed {
 					t.publish()
@@ -1187,9 +1239,10 @@ func (t *tab) elementBox(ctx context.Context, ref string) (box, error) {
 	return box{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height, PageX: r.PageX, PageY: r.PageY, Covered: r.Covered}, nil
 }
 
-// Hook sets what the browsers ask of the app: the page a new tab opens first, and a nudge when a tab opens or closes.
-func (b *Browsers) Hook(urlFor func(sessionID string) string, onTabs func()) {
-	b.urlFor, b.onTabs = urlFor, onTabs
+// Hook sets what the browsers ask of the app: the page a new tab opens first, the label that names a session in
+// its window's title, and a nudge when a tab opens or closes.
+func (b *Browsers) Hook(urlFor, labelFor func(sessionID string) string, onTabs func()) {
+	b.urlFor, b.labelFor, b.onTabs = urlFor, labelFor, onTabs
 }
 
 // Eval runs JavaScript in the session's page and returns its JSON result.

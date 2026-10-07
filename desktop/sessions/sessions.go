@@ -709,6 +709,25 @@ func (s *Sessions) List() []Session {
 	return s.list()
 }
 
+// Title is the title of the live session with the given id, or "" when there is none.
+func (s *Sessions) Title(id string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, in := range s.info {
+		if in.Name.String() == id {
+			return cmp.Or(in.Title, defaultTitle)
+		}
+	}
+	return ""
+}
+
+// Number is the number the app shows for the session with the given id, or 0 when there is none.
+func (s *Sessions) Number(id string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.nums[id]
+}
+
 // Current is the current project as the config holds it now, so a setting saved from the panel applies at once.
 func (s *Sessions) Current() project.Project {
 	s.mu.Lock()

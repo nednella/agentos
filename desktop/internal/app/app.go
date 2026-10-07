@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 
@@ -86,6 +87,18 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 			}
 		}
 		return ""
+	}, func(id string) string {
+		name, err := session.ParseName(id)
+		if err != nil {
+			return id
+		}
+		project := name.Project
+		for _, p := range c.Registry.List() {
+			if p.Key() == name.Project {
+				project = p.Name
+			}
+		}
+		return fmt.Sprintf("%s · %d %s", project, sess.Number(id), sess.Title(id))
 	}, sess.Touch)
 	mgr := digest.NewManager(digest.New(c.DataDir), sess, store, claude, h.Emit, c.StateDir, ctx)
 	a.digests = mgr
