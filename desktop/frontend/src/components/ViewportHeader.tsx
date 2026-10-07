@@ -21,8 +21,8 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
   }
 
   return (
-    <header className="panel-head flex flex-none flex-col gap-1.5 px-4 pt-2.5 pb-1.5 short:py-1.5">
-      <div className="flex items-center gap-3">
+    <header className="flex flex-none flex-col">
+      <div className="panel-head flex items-center gap-3 px-4 py-2.5 short:py-1.5">
         <span className="mono w-4 flex-none text-title font-semibold text-soft">{session.n}</span>
         <div className="min-w-0">
           {renaming ? (
@@ -78,12 +78,12 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </button>
         )}
       </div>
-      <div className="short:hidden flex items-center gap-3 pl-7">
+      <div className="short:hidden flex items-center gap-3 py-1.5 pr-4 pl-11">
         <StateBadge state={session.state} />
         <ModelTag model={session.model} effort={session.effort} />
       </div>
       {kill.armed && (
-        <p className="pt-1.5 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
+        <p className="px-4 pt-1.5 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
           Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
           <code className="mono">claude --resume</code>.
         </p>
