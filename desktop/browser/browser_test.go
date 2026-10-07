@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -45,6 +46,24 @@ func TestNoBrowserFound(t *testing.T) {
 	}
 	if s := b.State("p/1"); s.Open || s.ID != "p/1" {
 		t.Errorf("state = %+v", s)
+	}
+}
+
+func TestLaunchArgsPerMode(t *testing.T) {
+	b := New(t.TempDir(), func(string, any) {})
+	b.headless = true
+	if args := b.launchArgs("/p"); !slices.Contains(args, "--headless=new") || !slices.Contains(args, "--hide-scrollbars") {
+		t.Errorf("headless args = %v", args)
+	}
+	b.headless = false
+	args := b.launchArgs("/p")
+	for _, want := range []string{"--user-data-dir=/p", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
+		if !slices.Contains(args, want) {
+			t.Errorf("headed args lack %s: %v", want, args)
+		}
+	}
+	if slices.Contains(args, "--headless=new") || slices.Contains(args, "--hide-scrollbars") {
+		t.Errorf("headed args = %v", args)
 	}
 }
 

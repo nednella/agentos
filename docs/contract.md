@@ -172,6 +172,7 @@ type BrowserState = {
   canGoBack: boolean
   canGoForward: boolean
   error: string         // why the browser could not start, e.g. "no Brave, Chrome, Chromium or Edge browser found"
+  headed: boolean       // the page lives in its own browser window (the default); false: hidden browser, frames over `browser:frame`
 }
 
 type BrowserInput =
@@ -301,7 +302,7 @@ Each comment count and each failing commit counts once, remembered in `prs.json`
 
 ### Browser (`browser`)
 
-One hidden browser per project (separate profile, so logins persist), one tab per session. Call `BrowserResize` before `BrowserView(id, true)`.
+One browser per project (separate profile, so logins persist), one window per session, opened behind the other windows so it takes no focus. The page follows the window's real size and pixel ratio. With `AGENTOS_BROWSER_HEADLESS=1` the browser is hidden instead and each session has a tab the front end draws from `browser:frame`; call `BrowserResize` before `BrowserView(id, true)` there.
 
 | Method | Returns | What it does |
 |---|---|---|
@@ -309,11 +310,12 @@ One hidden browser per project (separate profile, so logins persist), one tab pe
 | `BrowserGoto(id, url)` | | a bare host gets `https://`; localhost, IPs and `.local` get `http://` |
 | `BrowserNav(id, action)` | | `'back' \| 'forward' \| 'reload' \| 'stop'` |
 | `BrowserInput(id, input)` | | |
-| `BrowserResize(id, width, height)` | | CSS pixels of the panel; the page viewport follows |
-| `BrowserView(id, visible)` | | frames are sent only while visible |
+| `BrowserResize(id, width, height)` | | headless only (no-op when `headed`): CSS pixels of the panel; the page viewport follows |
+| `BrowserView(id, visible)` | | headless only (no-op when `headed`): frames are sent only while visible |
+| `BrowserShow(id)` | | brings the session's window to the front and focuses it |
 | `BrowserState(id)` | `BrowserState` | |
 | `BrowserScreenshot(id, caption)` | `Evidence` | the user's own capture, filed as evidence (`source: 'user'`) |
-| `BrowserClose(id)` | | closes the tab; the browser stops a minute after its last tab |
+| `BrowserClose(id)` | | closes the tab and its window; closing the window closes the tab; the browser stops a minute after its last tab |
 
 Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
 
@@ -374,7 +376,7 @@ A saved setting applies at once; the app reads the config file only when it star
 | `stats` | none | a wait opened or closed; refetch `Stats` if the view is open |
 | `cleanups` | `ProjectList<Cleanup>` | a clean-up finished or was blocked; the project is the one the clean-up ran in, which may not be the current one |
 | `evidence` | `{ id, items }` | a session's evidence changed |
-| `browser:frame` | `{ id, data, width, height }` | `data` is base64 JPEG; width and height are the viewport's CSS pixels |
+| `browser:frame` | `{ id, data, width, height }` | headless mode only. `data` is base64 JPEG; width and height are the viewport's CSS pixels |
 | `browser:state` | `BrowserState` | URL, title, loading or open changed |
 | `ui:command` | `{ name, args: string[] }` | a CLI command wants the front end to change the view: `queue`, `notes`, `evidence`, `term`, `browser`, `next`, `digest`, `stats` (no args); `filter` (the query words); `open` (a session number or title, already checked to exist) |
 | `digest` | `Digest` | the current project's digest changed; `project` is its key |
@@ -482,7 +484,7 @@ All files are written by writing a temp file and renaming it into place; folders
 
 `AGENTOS_CONFIG`, `AGENTOS_STATE_DIR` (state dir), `AGENTOS_DEV_DATA_DIR` (replaces both data locations), `AGENTOS_TMUX_SOCKET` (default `agentos`),
 `AGENTOS_DIR` (the project folder to start in instead of the current folder), `AGENTOS_HTTP` (browser mode), `AGENTOS_BROWSER` (path of the
-browser to drive). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `TMPDIR` and `CLAUDE_CODE_TMPDIR` (both the session's temp folder), and for a session started for an issue `AGENTOS_ISSUE` (its number). Claude starts with `--settings` holding the hooks and `permissions.additionalDirectories` set to `data_dir` and `~/.local/share/agentos`, so it uses the app's folders, its temp folder among them, without asking. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
+browser to drive), `AGENTOS_BROWSER_HEADLESS` (`1`: hide the browser and stream frames instead of opening windows). Inside a session: `AGENTOS_SESSION`, `AGENTOS_SOCKET`, `TMPDIR` and `CLAUDE_CODE_TMPDIR` (both the session's temp folder), and for a session started for an issue `AGENTOS_ISSUE` (its number). Claude starts with `--settings` holding the hooks and `permissions.additionalDirectories` set to `data_dir` and `~/.local/share/agentos`, so it uses the app's folders, its temp folder among them, without asking. In the shell session: `AGENTOS_PROJECT`, `AGENTOS_SOCKET`. A digest run gets
 `AGENTOS_DIGEST_PROJECT`. It runs on the first agent that is installed and signed in, found without spending a request (`claude auth status` exits 0 when signed in); only `claude` is supported so far. With none, the digest's `error` says so. The run happens in an empty temporary folder with only `WebSearch`, `WebFetch` and `agentos digest add`, and an environment cut to `PATH`, `HOME`, the two `AGENTOS_` variables and what `claude` needs to log in and reach its provider (`ANTHROPIC_*`, `CLAUDE_*`, `AWS_*`, proxy and certificate variables). The prompt lists the package and module names the app read from `package.json` and `go.mod` files (placeholder `{dependencies}`). `agentos digest add` takes only `http` and `https` links.
 
 The texts given to agents (the digest run, the browser lines in a session's system prompt, `agentos browser help`)

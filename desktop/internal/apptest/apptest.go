@@ -749,6 +749,7 @@ func ClaudeOnPath(t *testing.T) string {
 
 // Main runs a package's tests and removes the command they built.
 func Main(m *testing.M) int {
+	os.Setenv("AGENTOS_BROWSER_HEADLESS", "1") // tests never open windows on the owner's screen
 	code := m.Run()
 	if cliDir != "" {
 		os.RemoveAll(cliDir)

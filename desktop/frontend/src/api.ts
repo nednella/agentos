@@ -44,6 +44,7 @@ type Backend = {
   BrowserInput(id: string, input: BrowserInput): Promise<void>
   BrowserResize(id: string, width: number, height: number): Promise<void>
   BrowserView(id: string, visible: boolean): Promise<void>
+  BrowserShow(id: string): Promise<void>
   BrowserState(id: string): Promise<BrowserState>
   BrowserScreenshot(id: string, caption: string): Promise<Evidence>
   BrowserClose(id: string): Promise<void>
@@ -90,7 +91,7 @@ const namespaces = {
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
   stats: ['Stats'],
   evidence: ['Evidence', 'DeleteEvidence'],
-  browser: ['BrowserOpen', 'BrowserGoto', 'BrowserNav', 'BrowserInput', 'BrowserResize', 'BrowserView', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
+  browser: ['BrowserOpen', 'BrowserGoto', 'BrowserNav', 'BrowserInput', 'BrowserResize', 'BrowserView', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   update: ['Update'],
   awake: ['Awake'],
@@ -164,6 +165,7 @@ export const api = {
   browserInput: (id: string, input: BrowserInput) => backend.BrowserInput(id, input).catch(() => {}),
   browserResize: (id: string, width: number, height: number) => backend.BrowserResize(id, width, height).catch(() => {}),
   browserView: (id: string, visible: boolean) => backend.BrowserView(id, visible).catch(() => {}),
+  browserShow: (id: string) => backend.BrowserShow(id),
   browserState: (id: string) => backend.BrowserState(id),
   browserScreenshot: (id: string, caption: string) => backend.BrowserScreenshot(id, caption),
   browserClose: (id: string) => backend.BrowserClose(id),

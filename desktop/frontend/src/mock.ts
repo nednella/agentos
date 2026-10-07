@@ -544,6 +544,7 @@ export function createMock(params: URLSearchParams) {
       canGoBack: (page?.index ?? 0) > 0,
       canGoForward: page ? page.index < page.history.length - 1 : false,
       error: '',
+      headed: false,
     }
   }
 
@@ -912,6 +913,7 @@ export function createMock(params: URLSearchParams) {
       page.visible = visible
       page.dirty = true
     },
+    BrowserShow: async () => {},
     BrowserState: async (id: string) => browserStateOf(id),
     BrowserScreenshot: async (id: string, caption: string) =>
       addEvidence(find(id), { kind: 'image', url: capture(id), text: '', caption, source: 'user' }),
