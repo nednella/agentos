@@ -432,6 +432,7 @@ func (s *Sessions) drop(id string) {
 	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
 	go s.evidence.Purge(id)
+	go s.browsers.Close(s.ctx, id)
 }
 
 // Dismiss removes an ended session's row.

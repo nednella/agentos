@@ -220,7 +220,7 @@ type Digest = {
 |---|---|---|
 | `NewSession(title, prefill)` | `Session` | starts the agent in the project folder with the model and effort of claude's own settings (see config); a non-empty `prefill` is typed in, not sent, once the agent is ready |
 | `KillSession(id)` | | stops the agent; the row stays as `ended`; rejects the shell |
-| `DismissSession(id)` | | removes the row of an ended session (and its evidence); rejects a running one |
+| `DismissSession(id)` | | removes the row of an ended session, with its evidence and its browser tab; rejects a running one |
 | `RenameSession(id, title)` | | rejects the shell |
 | `TypeInto(id, text)` | | types text into the prompt, not sent; line breaks cannot submit it |
 | `ShellOpen()` | `{ id: string }` | makes sure the current project has a shell session and returns the first one's id. A shell runs (`$SHELL -l` in the project folder, kept in the hidden tmux, with `AGENTOS_PROJECT` and `AGENTOS_SOCKET` set and no `AGENTOS_SESSION`); attach with `TermOpen` like any session. It is not a session: not in `sessions`, the counts, clean-up or the hook states |
