@@ -119,7 +119,7 @@ func newBrowserCmd() *cobra.Command {
 			if len(args) == 0 {
 				return askApp(cmd, control.Request{Cmd: "browser"})
 			}
-			pos, opts, err := parseFlags(args[1:], []string{"caption", "timeout"}, []string{"full", "append"})
+			pos, opts, err := parseFlags(args[1:], []string{"caption", "timeout"}, []string{"full", "append", "front"})
 			if err != nil {
 				return err
 			}

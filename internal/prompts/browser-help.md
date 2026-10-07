@@ -2,7 +2,7 @@
 
 agentos browser: drive the session's browser. Every command acts on this session's tab.
 
-  open <url>                  go to a page and wait for it to load
+  open <url> [--front]        go to a page and wait for it to load; --front also raises the window
   back | reload               move in the page history
   url                         print the current address and title
   snapshot                    outline of the page: text, headings, and every control with a ref (e1, e2, ...)

@@ -165,6 +165,7 @@ func TestBrowserCommandSendsItsWords(t *testing.T) {
 	}{
 		{[]string{"browser", "open", "https://example.com"}, []string{"open", "https://example.com"}, map[string]string{}, 75_000},
 		{[]string{"browser", "screenshot", "--caption", "the page", "--full"}, []string{"screenshot"}, map[string]string{"caption": "the page", "full": "1"}, 75_000},
+		{[]string{"browser", "open", "https://example.com", "--front"}, []string{"open", "https://example.com"}, map[string]string{"front": "1"}, 75_000},
 		{[]string{"browser", "type", "e3", "hello", "--append"}, []string{"type", "e3", "hello"}, map[string]string{"append": "1"}, 75_000},
 		{[]string{"browser", "wait-for", "Saved", "--timeout", "2000"}, []string{"wait-for", "Saved"}, map[string]string{"timeout": "2000"}, 17_000},
 		{[]string{"browser", "wait", "500"}, []string{"wait", "500"}, map[string]string{}, 15_500},
