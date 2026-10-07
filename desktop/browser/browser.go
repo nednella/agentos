@@ -31,6 +31,7 @@ const (
 	browserStartLimit = 15 * time.Second
 	callLimit         = 15 * time.Second
 	closeGrace        = time.Minute
+	stopLimit         = 5 * time.Second
 	// dialogWait is how long a JavaScript dialog may stay open before agentos dismisses it: a dialog blocks every
 	// call to its page, including the ones that would answer it.
 	dialogWait  = 5 * time.Second
@@ -254,7 +255,7 @@ func (b *Browsers) launchArgs(profile string, port int) []string {
 	}
 	// Without these a window hidden behind others stops painting and running timers, and agent screenshots hang.
 	return append(args, "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding",
-		"--disable-background-timer-throttling", "--no-startup-window")
+		"--disable-background-timer-throttling", "--no-startup-window", "--hide-crash-restore-bubble")
 }
 
 // Port is the project's remote debugging port: the one saved for it, else a free one it saves now, 0 when that fails.
@@ -361,6 +362,21 @@ func waitForEndpoint(ctx context.Context, port int, gone <-chan struct{}) (strin
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
+}
+
+// stop asks the browser to quit and kills it only if it has not gone within stopLimit. A killed browser counts as
+// crashed, and on its next start reopens the old pages in windows that belong to no session.
+func (p *browserProc) stop() {
+	if p.cdp != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), stopLimit)
+		defer cancel()
+		_, _ = p.cdp.call(ctx, "", "Browser.close", nil)
+		select {
+		case <-p.gone:
+		case <-ctx.Done():
+		}
+	}
+	p.kill()
 }
 
 func (p *browserProc) kill() {
@@ -656,7 +672,7 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 			idle := p.tabs <= 0
 			b.mu.Unlock()
 			if idle {
-				p.kill()
+				p.stop()
 			}
 		})
 	}
@@ -677,7 +693,7 @@ func (b *Browsers) CloseAll() {
 	})
 	b.mu.Unlock()
 	for _, p := range procs {
-		p.kill()
+		p.stop()
 		<-p.gone
 	}
 }
