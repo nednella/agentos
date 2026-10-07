@@ -221,6 +221,12 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 		return nil, err
 	}
 	p.cdp = c
+	// A browser that drops the connection cannot be driven any more, though it may still run: forget it, and the next
+	// start ends it as a stray.
+	go func() {
+		<-c.done
+		b.exited(p)
+	}()
 	if _, err := c.call(ctx, "", "Target.setDiscoverTargets", map[string]any{"discover": true}); err != nil {
 		p.kill()
 		return nil, err
