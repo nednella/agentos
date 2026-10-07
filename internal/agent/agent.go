@@ -18,11 +18,11 @@ type Agent interface {
 }
 
 // New returns the adapter for the configured agent. "claude" (or empty) gets
-// hooks; any other value runs as a plain command with no state reports.
-func New(name, exe string) Agent {
+// hooks and the use of dirs; any other value runs as a plain command with no state reports.
+func New(name, exe string, dirs ...string) Agent {
 	switch name {
 	case "", "claude":
-		return Claude{Exe: exe, ConfigDir: claudeConfigDir()}
+		return Claude{Exe: exe, ConfigDir: claudeConfigDir(), Dirs: dirs}
 	}
 	return Plain{Argv: strings.Fields(name)}
 }

@@ -15,8 +15,12 @@ var claudeEvents = []string{
 
 // Claude runs Claude Code with hooks that call back into the agentos binary at Exe.
 // The hooks come from --settings, so they apply to our sessions only.
-// ConfigDir holds the user's own settings.json.
-type Claude struct{ Exe, ConfigDir string }
+// ConfigDir holds the user's own settings.json. Dirs are the app's own folders, which the
+// agent may use without asking, so a fresh claude install does not prompt for them.
+type Claude struct {
+	Exe, ConfigDir string
+	Dirs           []string
+}
 
 type hookCommand struct {
 	Type    string `json:"type"`
@@ -32,9 +36,13 @@ func (c Claude) Command(_ string, l Launch) []string {
 	for _, ev := range claudeEvents {
 		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: util.ShellQuote(c.Exe) + " hook " + ev}}}}
 	}
+	type permissions struct {
+		AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
+	}
 	settings, _ := json.Marshal(struct {
-		Hooks map[string][]hookGroup `json:"hooks"`
-	}{hooks})
+		Hooks       map[string][]hookGroup `json:"hooks"`
+		Permissions permissions            `json:"permissions"`
+	}{hooks, permissions{c.Dirs}})
 	argv := []string{"claude", "--settings", string(settings)}
 	if l.Model != "" {
 		argv = append(argv, "--model", l.Model)
