@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/nednella/agentos/desktop/control"
+	"github.com/nednella/agentos/desktop/sessions"
 	ctl "github.com/nednella/agentos/internal/control"
 )
 
@@ -48,6 +49,13 @@ func TestSessionCommands(t *testing.T) {
 			}
 		})
 	}
+
+	if resp := h.Ask(t, ctl.Request{Cmd: "new", Args: []string{"side"}, Opts: map[string]string{"prompt": "context for the new session"}}); !resp.OK || resp.Out != "started session 3: side" {
+		t.Fatalf("new with a prompt = %+v", resp)
+	}
+	list := h.Sessions().List()
+	third := list[slices.IndexFunc(list, func(s sessions.Session) bool { return s.N == 3 })]
+	eventually(t, "the prompt in the new session", func() bool { return strings.Contains(h.Pane(t, third.ID), "context for the new session") })
 
 	if resp := h.Ask(t, ctl.Request{Cmd: "kill", Args: []string{"2"}}); !resp.OK || resp.Out != "killed session 2: fix logout" {
 		t.Errorf("kill = %+v", resp)

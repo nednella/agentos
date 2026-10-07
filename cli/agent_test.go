@@ -72,6 +72,38 @@ func TestNoteReadsStdinWithoutText(t *testing.T) {
 	}
 }
 
+func TestNewSendsThePrompt(t *testing.T) {
+	var got control.Request
+	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
+		got = req
+		return control.Response{OK: true, Out: "ok"}
+	})
+	tests := []struct {
+		name  string
+		args  []string
+		stdin string
+		want  string
+	}{
+		{"flag", []string{"new", "side", "topic", "--prompt", "look at auth"}, "", "look at auth"},
+		{"stdin", []string{"new", "side", "topic", "--prompt", "-"}, "line one\nline two\n", "line one\nline two"},
+		{"none", []string{"new", "side", "topic"}, "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := newRootCmd()
+			root.SetIn(strings.NewReader(tt.stdin))
+			root.SetOut(&bytes.Buffer{})
+			root.SetArgs(tt.args)
+			if err := root.Execute(); err != nil {
+				t.Fatal(err)
+			}
+			if got.Cmd != "new" || strings.Join(got.Args, " ") != "side topic" || got.Opts["prompt"] != tt.want {
+				t.Errorf("request = %+v", got)
+			}
+		})
+	}
+}
+
 func TestStatsCommandSendsItsFlags(t *testing.T) {
 	var got control.Request
 	fakeApp(t, func(_ context.Context, req control.Request) control.Response {

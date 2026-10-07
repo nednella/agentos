@@ -502,7 +502,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 | Group | Command | Does |
 |---|---|---|
 | Work | `issue <n...>` | starts a session per issue; an issue with a live session is reported as already running |
-| Work | `new [title]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most |
+| Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` types its text (`-` reads it from stdin) into the new session once the agent is ready, sent unless `session_prompt_send` is `manual`: a session uses it to hand a topic to a session of its own |
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
