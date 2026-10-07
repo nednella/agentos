@@ -189,6 +189,11 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 		return nil, fmt.Errorf("creating the browser profile: %w", err)
 	}
 	stopStrayBrowser(profile)
+	// A browser that ended with pages open restores them at its next start, into the first session's window, which
+	// then adopts them as its own.
+	if err := os.RemoveAll(filepath.Join(profile, "Default", "Sessions")); err != nil {
+		return nil, fmt.Errorf("clearing the browser's last session: %w", err)
+	}
 	port, err := b.launchPort(key)
 	if err != nil {
 		return nil, err

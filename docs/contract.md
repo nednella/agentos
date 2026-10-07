@@ -295,7 +295,7 @@ Each comment count and each failing commit counts once, remembered in `prs.json`
 
 ### Browser (`browser`)
 
-One browser per project (separate profile, so logins persist), one window per session, opened behind the other windows so it takes no focus. The page follows the window's real size and pixel ratio. The tab in the front end shows the page's status (title, address, console, recent captures), not the page itself.
+One browser per project (separate profile, so logins persist), one window per session, opened behind the other windows so it takes no focus. Each start clears the pages the profile saved from its last run, so a browser that crashed or was killed reopens none of them. The page follows the window's real size and pixel ratio. The tab in the front end shows the page's status (title, address, console, recent captures), not the page itself.
 
 | Method | Returns | What it does |
 |---|---|---|
