@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,6 +101,7 @@ type Browsers struct {
 	labelFor func(sessionID string) string // names the session in its window's title
 	onTabs   func()                        // a tab opened or closed
 	launchMu sync.Mutex
+	portMu   sync.Mutex
 
 	mu      sync.Mutex
 	procs   map[string]*browserProc // by project key
@@ -224,10 +227,12 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		return nil, fmt.Errorf("creating the browser profile: %w", err)
 	}
-	portFile := filepath.Join(profile, "DevToolsActivePort")
-	_ = os.Remove(portFile)
 	stopStrayBrowser(profile)
-	cmd := exec.Command(b.binary, b.launchArgs(profile)...)
+	port, err := b.launchPort(key)
+	if err != nil {
+		return nil, err
+	}
+	cmd := exec.Command(b.binary, b.launchArgs(profile, port)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting the browser: %w", err)
@@ -239,7 +244,7 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 		b.exited(p)
 	}()
 
-	wsURL, err := waitForEndpoint(ctx, portFile, p.gone)
+	wsURL, err := waitForEndpoint(ctx, port, p.gone)
 	if err != nil {
 		p.kill()
 		return nil, err
@@ -260,8 +265,8 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	return p, nil
 }
 
-func (b *Browsers) launchArgs(profile string) []string {
-	args := []string{"--remote-debugging-port=0", "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check"}
+func (b *Browsers) launchArgs(profile string, port int) []string {
+	args := []string{"--remote-debugging-port=" + strconv.Itoa(port), "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check"}
 	if b.headless {
 		return append(args, "--headless=new", "--hide-scrollbars", "about:blank")
 	}
@@ -270,12 +275,98 @@ func (b *Browsers) launchArgs(profile string) []string {
 		"--disable-background-timer-throttling", "--no-startup-window")
 }
 
-func waitForEndpoint(ctx context.Context, portFile string, gone <-chan struct{}) (string, error) {
+// Port is the project's remote debugging port: the one saved for it, else a free one it saves now, 0 when that fails.
+// It starts no browser, so a session can name the port in its agent's tool config before the first page opens.
+func (b *Browsers) Port(key string) int {
+	b.portMu.Lock()
+	defer b.portMu.Unlock()
+	if port := b.savedPort(key); port != 0 {
+		return port
+	}
+	port, err := freePort()
+	if err != nil || b.savePort(key, port) != nil {
+		return 0
+	}
+	return port
+}
+
+// launchPort is the port the project's browser listens on at this start: the saved one, unless something else holds
+// it now, then a new one that is saved instead.
+func (b *Browsers) launchPort(key string) (int, error) {
+	b.portMu.Lock()
+	defer b.portMu.Unlock()
+	if port := b.savedPort(key); port != 0 && portFree(port) {
+		return port, nil
+	}
+	port, err := freePort()
+	if err != nil {
+		return 0, fmt.Errorf("finding a port for the browser: %w", err)
+	}
+	if err := b.savePort(key, port); err != nil {
+		return 0, err
+	}
+	return port, nil
+}
+
+func (b *Browsers) portFile(key string) string { return filepath.Join(b.dataDir, key, "browser-port") }
+
+func (b *Browsers) savedPort(key string) int {
+	data, err := os.ReadFile(b.portFile(key))
+	if err != nil {
+		return 0
+	}
+	port, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil || port < portMin || port > portMax {
+		return 0
+	}
+	return port
+}
+
+func (b *Browsers) savePort(key string, port int) error {
+	if err := os.MkdirAll(filepath.Dir(b.portFile(key)), 0o700); err != nil {
+		return fmt.Errorf("saving the browser port: %w", err)
+	}
+	return os.WriteFile(b.portFile(key), []byte(strconv.Itoa(port)+"\n"), 0o600)
+}
+
+// The ports sit below the range the system gives to outgoing connections, so one of them stays free between runs.
+const (
+	portMin = 20000
+	portMax = 29999
+)
+
+func portFree(port int) bool {
+	l, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
+	if err != nil {
+		return false
+	}
+	_ = l.Close()
+	return true
+}
+
+func freePort() (int, error) {
+	for range 100 {
+		if port := portMin + rand.IntN(portMax-portMin+1); portFree(port) {
+			return port, nil
+		}
+	}
+	return 0, errors.New("no free port")
+}
+
+// waitForEndpoint polls the browser on port until it names the websocket to its protocol.
+func waitForEndpoint(ctx context.Context, port int, gone <-chan struct{}) (string, error) {
 	deadline := time.After(browserStartLimit)
+	url := "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(port)) + "/json/version"
+	client := &http.Client{Timeout: time.Second}
 	for {
-		if data, err := os.ReadFile(portFile); err == nil {
-			if lines := strings.Split(strings.TrimSpace(string(data)), "\n"); len(lines) >= 2 {
-				return "ws://" + net.JoinHostPort("127.0.0.1", strings.TrimSpace(lines[0])) + strings.TrimSpace(lines[1]), nil
+		if resp, err := client.Get(url); err == nil {
+			var info struct {
+				WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+			}
+			err = json.NewDecoder(resp.Body).Decode(&info)
+			resp.Body.Close()
+			if err == nil && info.WebSocketDebuggerURL != "" {
+				return info.WebSocketDebuggerURL, nil
 			}
 		}
 		select {
