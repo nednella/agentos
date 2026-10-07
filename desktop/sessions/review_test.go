@@ -203,9 +203,8 @@ func TestRemovingAProjectEndsItsSessions(t *testing.T) {
 	}
 }
 
-func TestReusedNumberDoesNotInheritTheLiveFlag(t *testing.T) {
+func TestNewSessionDoesNotInheritAnOlderOnesLiveFlag(t *testing.T) {
 	h := newHarness(t)
-	// An earlier run left main/1 ended, after it saw its PR open.
 	long := time.Now().Add(-time.Hour)
 	if err := bus.WriteState(h.State, session.Record{Session: "main/1", State: session.Ended, Event: "SessionEnd", At: long, Title: "old", Issue: 7, EndedAt: long.UnixMilli()}); err != nil {
 		t.Fatal(err)
@@ -223,8 +222,8 @@ func TestReusedNumberDoesNotInheritTheLiveFlag(t *testing.T) {
 	}
 
 	s := issueSession(h, t, 7)
-	if s.ID != "main/1" {
-		t.Fatalf("the new session is %s, not the reused main/1", s.ID)
+	if s.ID == "main/1" {
+		t.Fatal("the new session took the id of the old one")
 	}
 	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
 	h.RefreshPRs()
@@ -245,7 +244,7 @@ func TestSessionIsKilledWhenItsIssueCannotBeRecorded(t *testing.T) {
 		t.Errorf("the failed session is listed: %+v", got)
 	}
 	out, _ := exec.Command("tmux", "-L", h.Socket, "list-sessions").CombinedOutput()
-	if strings.Contains(string(out), "main/1") {
+	if strings.Contains(string(out), "main/") {
 		t.Errorf("the failed session still runs in tmux:\n%s", out)
 	}
 }

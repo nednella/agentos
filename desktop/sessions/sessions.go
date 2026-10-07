@@ -109,6 +109,8 @@ type Sessions struct {
 	shells     []session.Name           // every project's shell sessions
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
+	nums       map[string]int           // the number each session shows, for this run of the app
+	lastNum    map[string]int           // the last number given in each project
 	dismissed  map[string]bool          // ended sessions the user dismissed: the poll must not bring them back
 	records    map[string]session.Record
 	cwds       map[string]string // the working directory each session's last hook reported
@@ -203,6 +205,7 @@ func newSessions(o Options) *Sessions {
 		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
+		nums: map[string]int{}, lastNum: map[string]int{},
 		records:    map[string]session.Record{},
 		cwds:       map[string]string{},
 		seen:       map[string]session.State{},
@@ -281,6 +284,7 @@ func (s *Sessions) Refresh() {
 		}
 	}
 	s.expireEnded(time.Now())
+	s.number()
 	s.loaded = true
 	s.sync()
 }
@@ -395,11 +399,35 @@ func (s *Sessions) expireEnded(now time.Time) {
 	}
 }
 
+// number gives each session that has no number the next one of its project, oldest first.
+// It needs mu.
+func (s *Sessions) number() {
+	var fresh []term.Info
+	for _, in := range s.info {
+		if _, ok := s.nums[in.Name.String()]; !ok {
+			fresh = append(fresh, in)
+		}
+	}
+	for id, e := range s.ended {
+		if _, ok := s.nums[id]; !ok {
+			fresh = append(fresh, e.info)
+		}
+	}
+	slices.SortFunc(fresh, func(a, b term.Info) int {
+		return cmp.Or(a.Created.Compare(b.Created), cmp.Compare(a.Name.String(), b.Name.String()))
+	})
+	for _, in := range fresh {
+		s.lastNum[in.Name.Project]++
+		s.nums[in.Name.String()] = s.lastNum[in.Name.Project]
+	}
+}
+
 // drop forgets an ended session for good. It needs mu.
 func (s *Sessions) drop(id string) {
 	delete(s.ended, id)
 	delete(s.history, id)
 	delete(s.known, id)
+	delete(s.nums, id)
 	s.dismissed[id] = true
 	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
@@ -619,7 +647,7 @@ func (s *Sessions) list() []Session {
 			continue
 		}
 		byName[in.Name] = in
-		ss := session.Session{Name: in.Name, State: session.Idle}
+		ss := session.Session{Name: in.Name, N: s.nums[in.Name.String()], State: session.Idle}
 		if rec, ok := s.records[in.Name.String()]; ok {
 			ss.State, ss.At, ss.Detail = rec.State, rec.At, rec.Detail
 		}
@@ -628,7 +656,7 @@ func (s *Sessions) list() []Session {
 	for _, e := range s.ended {
 		if e.info.Name.Project == key {
 			byName[e.info.Name] = e.info
-			rail = append(rail, session.Session{Name: e.info.Name, State: session.Ended, At: e.at})
+			rail = append(rail, session.Session{Name: e.info.Name, N: s.nums[e.info.Name.String()], State: session.Ended, At: e.at})
 		}
 	}
 	session.Sort(rail)
@@ -638,7 +666,7 @@ func (s *Sessions) list() []Session {
 		id := ss.Name.String()
 		issue, _ := strconv.Atoi(in.Issue)
 		view := Session{
-			ID: id, N: ss.Name.N, Title: cmp.Or(in.Title, defaultTitle),
+			ID: id, N: ss.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
 			CreatedAt: in.Created.UnixMilli(), Issue: issue, Model: in.Model, Effort: in.Effort, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
@@ -772,7 +800,7 @@ func (s *Sessions) liveIssueSessions(key string) []string {
 	var out []string
 	for _, in := range s.info {
 		if issue, _ := strconv.Atoi(in.Issue); issue > 0 && in.Name.Project == key {
-			out = append(out, fmt.Sprintf("session %d for #%d", in.Name.N, issue))
+			out = append(out, fmt.Sprintf("session %d for #%d", s.nums[in.Name.String()], issue))
 		}
 	}
 	return out
@@ -841,25 +869,13 @@ func (s *Sessions) fill(dir string, model project.Model) project.Model {
 	return model
 }
 
-// reserve picks the lowest free number of the project. With a prefill it also
+// reserve mints the name of a new session. With a prefill it also
 // returns the channel that closes when the agent says it is ready. It takes mu.
 func (s *Sessions) reserve(proj project.Project, prefill string) (name session.Name, ctx context.Context, ready chan struct{}) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	ctx = s.ctx
-	var used []int
-	for _, in := range s.info {
-		if in.Name.Project == proj.Key() {
-			used = append(used, in.Name.N)
-		}
-	}
-	for _, e := range s.ended { // an ended session keeps its number until it is dismissed
-		if e.info.Name.Project == proj.Key() {
-			used = append(used, e.info.Name.N)
-		}
-	}
-	name = session.Name{Project: proj.Key(), N: session.NextN(used)}
-	delete(s.dismissed, name.String())
+	name = session.Name{Project: proj.Key(), Token: session.NewToken()}
 	if prefill != "" {
 		ready = make(chan struct{})
 		s.ready[name.String()] = ready
@@ -896,6 +912,7 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 	if !slices.ContainsFunc(s.info, func(i term.Info) bool { return i.Name == name }) {
 		s.info = append(s.info, in)
 	}
+	s.number()
 	s.sync()
 	for _, v := range s.list() {
 		if v.ID == name.String() {
@@ -906,10 +923,6 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 }
 
 func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model) error {
-	// A number is reused, so a leftover file must not leak its old state into the new session.
-	if err := bus.RemoveState(s.stateDir, name.String()); err != nil {
-		return err
-	}
 	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
 		return err
 	}

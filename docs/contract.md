@@ -26,8 +26,8 @@ type State = 'waiting' | 'working' | 'idle' | 'ended'
 // ended: the session's process is gone; the row stays until dismissed, for at most 7 days.
 
 type Session = {
-  id: string            // tmux session name "<project key>/<n>"; stable; key for every call
-  n: number             // small number shown to the user
+  id: string            // tmux session name "<project key>/<token>", a token of 8 random a-z0-9 chars; unique, never reused; key for every call
+  n: number             // number shown to the user; counts up per project for this run of the app, restarts at 1 on relaunch, never reused while the app runs
   title: string
   state: State
   detail: string        // short live line: "Edit route-list.tsx", ""
@@ -123,7 +123,7 @@ type Warning = {
 type Evidence = {
   id: string
   kind: 'image' | 'text'
-  url: string           // "/media/<project key>/evidence/<n>/<file>" for images, "" for text
+  url: string           // "/media/<project key>/evidence/<token>/<file>" for images, "" for text
   text: string          // for kind 'text'
   caption: string
   source: 'agent' | 'user'
@@ -385,7 +385,7 @@ Opening a web address is the front end's job: the window runtime's `BrowserOpenU
 ## Media
 
 Pictures are served by the Go side under `/media/…`, in the window and in the `AGENTOS_HTTP` mode: note images at
-`/media/<project key>/notes-media/<file>` and evidence at `/media/<project key>/evidence/<n>/<file>`. Only png, jpeg, gif and webp files of those two
+`/media/<project key>/notes-media/<file>` and evidence at `/media/<project key>/evidence/<token>/<file>`. Only png, jpeg, gif and webp files of those two
 folders are served. Use the URL in `<img src>`.
 
 ## Config file
@@ -470,7 +470,7 @@ Everything is grouped by project (`<key>` is the project name, lower-cased, with
 
 | What | Where |
 |---|---|
-| notes, note images, evidence, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `evidence/<n>/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
+| notes, note images, evidence, stats, digest | `<data_dir>/<key>/notes.json`, `notes-media/`, `evidence/<token>/`, `stats.jsonl`, `digest.json` (`data_dir` defaults to `~/.local/share/agentos`) |
 | PR tracking (acks, live flags, wakes), clean-up log, browser profile | always under `~/.local/share/agentos/<key>/`: `prs.json`, `cleanups.json`, `browser/` |
 | state files, sockets, tmux config, last project, app location, release check | `~/.local/state/agentos` (`control.sock`, `tmux.conf`, `last-project`, `app-path`: the bundle the app runs from, for `agentos`; `update.json`: the last release check, so the command asks GitHub at most once a day) |
 

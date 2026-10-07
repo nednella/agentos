@@ -40,6 +40,7 @@ type Record struct {
 // Session is one agent as the screen sees it.
 type Session struct {
 	Name   Name
+	N      int // the number shown, 0 when none was given
 	Title  string
 	State  State
 	At     time.Time
@@ -68,6 +69,9 @@ func Sort(ss []Session) {
 		if !a.At.Equal(b.At) {
 			return a.At.After(b.At)
 		}
-		return a.Name.N < b.Name.N
+		if a.N != b.N {
+			return a.N < b.N
+		}
+		return a.Name.String() < b.Name.String()
 	})
 }

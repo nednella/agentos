@@ -1,23 +1,32 @@
 package session
 
 import (
+	"crypto/rand"
 	"fmt"
 	"strconv"
 	"strings"
 )
 
-// Name is the tmux session name: "<project key>/<n>". The title shown to the
-// user lives in a tmux option, so renaming never changes the name the agent's
-// hooks report under. A name with Shell set is one of the project's shells,
-// "<project key>/shell" for the first and "<project key>/shell-<k>" for the
-// rest; a shell is not an agent and never reports.
+// Name is the tmux session name: "<project key>/<token>". The token is minted once and
+// never reused, so a session shares nothing with an earlier one; a session an older build
+// numbered keeps its number as its token. The title shown to the user lives in a tmux
+// option, so renaming never changes the name the agent's hooks report under. A name with
+// Shell set is one of the project's shells, "<project key>/shell" for the first and
+// "<project key>/shell-<k>" for the rest; a shell is not an agent and never reports.
 type Name struct {
 	Project string
-	N       int
+	Token   string
 	Shell   int
 }
 
-const shellSuffix = "shell"
+const (
+	shellSuffix = "shell"
+	tokenChars  = "abcdefghijklmnopqrstuvwxyz0123456789"
+	tokenLen    = 8
+)
+
+// NewToken returns a random token for a new session.
+func NewToken() string { return strings.ToLower(rand.Text()[:tokenLen]) }
 
 func (n Name) String() string {
 	switch {
@@ -26,7 +35,7 @@ func (n Name) String() string {
 	case n.Shell > 1:
 		return fmt.Sprintf("%s/%s-%d", n.Project, shellSuffix, n.Shell)
 	}
-	return fmt.Sprintf("%s/%d", n.Project, n.N)
+	return n.Project + "/" + n.Token
 }
 
 // IsShell says whether the name is one of a project's shells rather than an agent.
@@ -36,7 +45,7 @@ func (n Name) IsShell() bool { return n.Shell > 0 }
 func ParseName(s string) (Name, error) {
 	i := strings.IndexByte(s, '/')
 	if i <= 0 || i != strings.LastIndexByte(s, '/') || strings.Contains(s[:i], "..") {
-		return Name{}, fmt.Errorf("session name %q is not <project>/<n>", s)
+		return Name{}, fmt.Errorf("session name %q is not <project>/<token>", s)
 	}
 	if s[i+1:] == shellSuffix {
 		return Name{Project: s[:i], Shell: 1}, nil
@@ -48,11 +57,11 @@ func ParseName(s string) (Name, error) {
 		}
 		return Name{Project: s[:i], Shell: k}, nil
 	}
-	n, err := strconv.Atoi(s[i+1:])
-	if err != nil || n < 1 {
-		return Name{}, fmt.Errorf("session name %q has no positive number", s)
+	token := s[i+1:]
+	if token == "" || strings.Trim(token, tokenChars) != "" {
+		return Name{}, fmt.Errorf("session name %q has no valid token", s)
 	}
-	return Name{Project: s[:i], N: n}, nil
+	return Name{Project: s[:i], Token: token}, nil
 }
 
 // ProjectKey is the project key in a session id, or "project" when the id does not parse.

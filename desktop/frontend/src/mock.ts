@@ -298,7 +298,7 @@ export function createMock(params: URLSearchParams) {
     owner = current,
   ): MockSession {
     const s: MockSession = {
-      id: `agentos-${Math.random().toString(36).slice(2, 6)}`,
+      id: `${owner.name}/${Math.random().toString(36).slice(2, 10)}`,
       n: nextN++,
       title,
       state: initial,
