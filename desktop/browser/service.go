@@ -58,6 +58,12 @@ func (s *Service) BrowserView(id string, visible bool) error {
 	return s.browsers.View(ctx, id, visible)
 }
 
+func (s *Service) BrowserShow(id string) error {
+	ctx, cancel := context.WithTimeout(s.ctx(), callLimit)
+	defer cancel()
+	return s.browsers.Show(ctx, id)
+}
+
 func (s *Service) BrowserState(id string) BrowserState { return s.browsers.State(id) }
 
 // BrowserScreenshot files the user's own capture of the tab as evidence.

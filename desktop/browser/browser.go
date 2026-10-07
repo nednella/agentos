@@ -1,4 +1,4 @@
-// Package browser runs one hidden browser per project and one tab per session.
+// Package browser runs one browser per project and one window per session.
 package browser
 
 import (
@@ -42,6 +42,7 @@ type BrowserState struct {
 	CanGoBack    bool   `json:"canGoBack"`
 	CanGoForward bool   `json:"canGoForward"`
 	Error        string `json:"error"`
+	Headed       bool   `json:"headed"`
 }
 
 // BrowserInput is one mouse, wheel, key or paste event from the user, in CSS pixels of the page viewport.
@@ -80,10 +81,12 @@ func findBrowser() string {
 	return ""
 }
 
-// Browsers runs one hidden browser per project and one tab per session.
+// Browsers runs one browser per project and one window per session; with AGENTOS_BROWSER_HEADLESS=1 the
+// browser is hidden and each session has a tab streamed to the front end.
 type Browsers struct {
 	dataDir  string
 	binary   string
+	headless bool
 	emit     func(event string, payload any)
 	grace    time.Duration
 	urlFor   func(sessionID string) string // the page a new tab opens first
@@ -99,7 +102,7 @@ type Browsers struct {
 // New runs the browsers with their profiles under dataDir.
 func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
-		dataDir: dataDir, binary: findBrowser(), emit: emit, grace: closeGrace,
+		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, grace: closeGrace,
 		urlFor: func(string) string { return "" }, onTabs: func() {},
 		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
@@ -196,8 +199,7 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	portFile := filepath.Join(profile, "DevToolsActivePort")
 	_ = os.Remove(portFile)
 	stopStrayBrowser(profile)
-	cmd := exec.Command(b.binary, "--headless=new", "--remote-debugging-port=0", "--user-data-dir="+profile,
-		"--no-first-run", "--no-default-browser-check", "--hide-scrollbars", "about:blank")
+	cmd := exec.Command(b.binary, b.launchArgs(profile)...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting the browser: %w", err)
@@ -228,6 +230,16 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	b.procs[key] = p
 	b.mu.Unlock()
 	return p, nil
+}
+
+func (b *Browsers) launchArgs(profile string) []string {
+	args := []string{"--remote-debugging-port=0", "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check"}
+	if b.headless {
+		return append(args, "--headless=new", "--hide-scrollbars", "about:blank")
+	}
+	// Without these a window hidden behind others stops painting and running timers, and agent screenshots hang.
+	return append(args, "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding",
+		"--disable-background-timer-throttling", "--no-startup-window")
 }
 
 func waitForEndpoint(ctx context.Context, portFile string, gone <-chan struct{}) (string, error) {
@@ -314,7 +326,14 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	if err != nil {
 		return BrowserState{ID: id, Error: err.Error()}, err
 	}
-	raw, err := p.cdp.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank"})
+	target := map[string]any{"url": "about:blank"}
+	if !b.headless {
+		target["newWindow"] = true
+		target["background"] = true
+		target["width"] = defaultViewWidth
+		target["height"] = defaultViewHeight
+	}
+	raw, err := p.cdp.call(ctx, "", "Target.createTarget", target)
 	if err != nil {
 		return BrowserState{}, err
 	}
@@ -332,7 +351,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	_ = json.Unmarshal(raw, &attached)
 	t := &tab{b: b, proc: p, id: id, targetID: created.TargetID, sessionID: attached.SessionID,
 		width: defaultViewWidth, height: defaultViewHeight, requests: map[string]string{},
-		state: BrowserState{ID: id, Open: true, URL: "about:blank"}}
+		state: BrowserState{ID: id, Open: true, URL: "about:blank", Headed: !b.headless}}
 	b.mu.Lock()
 	b.tabs[id] = t
 	p.tabs++
@@ -343,7 +362,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	b.mu.Unlock()
 	b.onTabs()
 
-	for _, setup := range []struct {
+	setups := []struct {
 		method string
 		params any
 	}{
@@ -351,8 +370,14 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 		{"Runtime.enable", nil},
 		{"Network.enable", nil},
 		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": keepInTab}},
-		{"Emulation.setDeviceMetricsOverride", t.metrics()},
-	} {
+	}
+	if b.headless {
+		setups = append(setups, struct {
+			method string
+			params any
+		}{"Emulation.setDeviceMetricsOverride", t.metrics()})
+	}
+	for _, setup := range setups {
 		if _, err := t.call(ctx, setup.method, setup.params); err != nil {
 			b.Close(ctx, id)
 			return BrowserState{}, err
@@ -421,7 +446,7 @@ func (b *Browsers) State(id string) BrowserState {
 	if t := b.tab(id); t != nil {
 		return t.snapshotState()
 	}
-	return BrowserState{ID: id}
+	return BrowserState{ID: id, Headed: !b.headless}
 }
 
 // webAddress turns what the user typed into an address the browser can open.
@@ -573,6 +598,16 @@ func (t *tab) refreshHistory() {
 	}
 }
 
+// Show brings the session's window to the front.
+func (b *Browsers) Show(ctx context.Context, id string) error {
+	t, err := b.need(id)
+	if err != nil {
+		return err
+	}
+	_, err = t.proc.cdp.call(ctx, "", "Target.activateTarget", map[string]any{"targetId": t.targetID})
+	return err
+}
+
 // Close closes the session's tab, and the project's browser once its last tab has been closed for a while.
 func (b *Browsers) Close(ctx context.Context, id string) {
 	b.mu.Lock()
@@ -629,6 +664,26 @@ func (b *Browsers) CloseAll() {
 // event takes a protocol event. It runs in the connection's read loop, so it never waits for a reply.
 func (b *Browsers) event(p *browserProc, sessionID, method string, params json.RawMessage) {
 	if sessionID == "" {
+		if method == "Target.targetDestroyed" {
+			var ev struct {
+				TargetID string `json:"targetId"`
+			}
+			if json.Unmarshal(params, &ev) != nil {
+				return
+			}
+			b.mu.Lock()
+			for id, c := range b.tabs {
+				if c.targetID == ev.TargetID {
+					go func() {
+						ctx, cancel := context.WithTimeout(context.Background(), callLimit)
+						defer cancel()
+						b.Close(ctx, id)
+					}()
+				}
+			}
+			b.mu.Unlock()
+			return
+		}
 		if method == "Target.targetInfoChanged" {
 			var ev struct {
 				TargetInfo struct {
@@ -803,7 +858,7 @@ func (t *tab) event(method string, params json.RawMessage) {
 // View turns the live picture on or off. Frames are only produced while it is on.
 func (b *Browsers) View(ctx context.Context, id string, visible bool) error {
 	t, err := b.need(id)
-	if err != nil {
+	if err != nil || !b.headless {
 		return err
 	}
 	t.mu.Lock()
@@ -866,7 +921,7 @@ func (t *tab) frame(params json.RawMessage) {
 // Resize sets the page viewport to the panel's size, in CSS pixels.
 func (b *Browsers) Resize(ctx context.Context, id string, width, height int) error {
 	t, err := b.need(id)
-	if err != nil {
+	if err != nil || !b.headless {
 		return err
 	}
 	t.mu.Lock()

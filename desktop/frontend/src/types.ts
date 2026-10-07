@@ -163,6 +163,7 @@ export type BrowserState = {
   canGoBack: boolean
   canGoForward: boolean
   error: string
+  headed: boolean
 }
 
 export type BrowserInput =
