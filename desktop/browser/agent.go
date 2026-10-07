@@ -82,7 +82,7 @@ func (t *tab) pageLine(ctx context.Context) string {
 		return s.Title + " - " + s.URL
 	}
 	title, addr, _ := strings.Cut(both, "\n")
-	return title + " - " + addr
+	return t.pageTitle(title) + " - " + addr
 }
 
 // agent runs one command of the agentos browser CLI on the session's tab.
@@ -131,7 +131,8 @@ func (b *Browsers) agent(ctx context.Context, id, cmd string, args []string, opt
 		}
 		var out string
 		_ = json.Unmarshal(raw, &out)
-		return out, nil
+		addr, title, _ := strings.Cut(out, "\n")
+		return addr + "\n" + t.pageTitle(title), nil
 	case "snapshot":
 		raw, err := t.eval(ctx, snapshotJS)
 		if err != nil {

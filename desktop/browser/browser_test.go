@@ -135,3 +135,39 @@ func TestOpenReportsAFirstPageThatFails(t *testing.T) {
 		t.Errorf("the tab did not stay open: %+v", st)
 	}
 }
+
+func TestPageTitleDropsTheLabel(t *testing.T) {
+	tests := []struct{ prefix, title, want string }{
+		{"[demo · 2 fix]", "[demo · 2 fix] Example", "Example"},
+		{"[demo · 2 fix]", "[demo · 2 fix]", ""},
+		{"[demo · 2 fix]", "https://example.com/", "https://example.com/"},
+		{"[demo · 2 fix]", "[other] Example", "[other] Example"},
+		{"", "Example", "Example"},
+	}
+	for _, tt := range tests {
+		if got := (&tab{prefix: tt.prefix}).pageTitle(tt.title); got != tt.want {
+			t.Errorf("pageTitle(%q) with prefix %q = %q, want %q", tt.title, tt.prefix, got, tt.want)
+		}
+	}
+}
+
+func TestTitleScriptQuotesTheLabel(t *testing.T) {
+	if script := titleScript(`[a "b" \ c]`); !strings.Contains(script, `"[a \"b\" \\ c]"`) {
+		t.Errorf("label not quoted in %s", script)
+	}
+}
+
+func TestWindowLabel(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"demo · 1 Fix", "[demo · 1 Fix]"},
+		{"demo · 1 Two  spaces", "[demo · 1 Two spaces]"},
+		{"demo · 1 new\nline\t!", "[demo · 1 new line !]"},
+		{"  padded  ", "[padded]"},
+		{"", "[]"},
+	}
+	for _, tt := range tests {
+		if got := windowLabel(tt.in); got != tt.want {
+			t.Errorf("windowLabel(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}

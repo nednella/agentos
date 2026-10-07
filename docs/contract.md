@@ -317,6 +317,8 @@ One browser per project (separate profile, so logins persist), one window per se
 | `BrowserScreenshot(id, caption)` | `Evidence` | the user's own capture, filed as evidence (`source: 'user'`) |
 | `BrowserClose(id)` | | closes the tab and its window; closing the window closes the tab; the browser stops a minute after its last tab |
 
+A headed window's title reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the window opens, so a rename shows only in windows opened later. `BrowserState.title`, `agentos browser open` and `agentos browser url` report the page's own title.
+
 Links with `target=_blank` and `window.open` stay in the session's tab. Meta+A, C, X, Z run the matching edit command; send paste as `{type:'paste'}`.
 
 ### Evidence, stats, digest (`evidence`, `stats`, `digest`)
