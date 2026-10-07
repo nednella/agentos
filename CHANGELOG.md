@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/nednella/agentos/compare/v0.13.0...v0.14.0) (2026-10-07)
+
+
+### Features
+
+* **desktop:** let agents close their browser window ([a796cf6](https://github.com/nednella/agentos/commit/a796cf62986a2367dd30cdda06cf243451b9f392)), closes [#218](https://github.com/nednella/agentos/issues/218)
+
+
+### Bug Fixes
+
+* **desktop:** forget browser whose connection dropped ([93d40d8](https://github.com/nednella/agentos/commit/93d40d8314b79f30929e807ba241c884b901e9a1)), closes [#218](https://github.com/nednella/agentos/issues/218)
+* **desktop:** start browser without last run's pages ([cdf9b15](https://github.com/nednella/agentos/commit/cdf9b15f6c62ea0f279860ea5be52cba9f4d25fb)), closes [#218](https://github.com/nednella/agentos/issues/218)
+* **desktop:** stop browser once its last window closes ([9e5abaf](https://github.com/nednella/agentos/commit/9e5abaf80daf7b6a65c1d6d2f3fbb8cc889dd4b6)), closes [#218](https://github.com/nednella/agentos/issues/218)
+
 ## [0.13.0](https://github.com/nednella/agentos/compare/v0.12.0...v0.13.0) (2026-10-07)
 
 
