@@ -477,4 +477,9 @@ func TestSessionClosesWithItsLastPage(t *testing.T) {
 	if st := b.State("p/1"); st.Open || b.Has("p/1") {
 		t.Errorf("state after the last page = %+v", st)
 	}
+	select {
+	case <-other.gone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the browser still runs with no session's window in it")
+	}
 }

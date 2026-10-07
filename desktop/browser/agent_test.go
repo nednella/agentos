@@ -136,7 +136,6 @@ func TestBrowserAgentCLI(t *testing.T) {
 	})
 
 	t.Run("closing the tab ends the browser", func(t *testing.T) {
-		h.App.Browsers().SetGrace(300 * time.Millisecond)
 		h.BrowserClose(s.ID)
 		if got, _ := h.Session(s.ID); got.Browser {
 			t.Error("the session still shows a browser")

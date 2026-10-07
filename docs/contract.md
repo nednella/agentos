@@ -304,7 +304,7 @@ One browser per project (separate profile, so logins persist), one window per se
 | `BrowserShow(id)` | | brings the session's window to the front and focuses it |
 | `BrowserState(id)` | `BrowserState` | |
 | `BrowserScreenshot(id, caption)` | `Evidence` | the user's own capture, filed as evidence (`source: 'user'`) |
-| `BrowserClose(id)` | | closes all the session's pages and their windows; closing the last page closes the tab; the browser stops a minute after its last tab |
+| `BrowserClose(id)` | | closes all the session's pages and their windows; closing the last page closes the tab; the browser stops once no session has a page in it |
 
 Every page of a session has a title that reads `[<project name> · <n> <session title>] <page title>`, or just the bracketed label when the page has no title; the label is fixed when the session's browser opens, so a rename shows only in sessions opened later. `BrowserState.title` and `agentos browser open` report the page's own title. `agentos browser open <url> --front` also brings the window to the front; without `--front` the window stays behind.
 

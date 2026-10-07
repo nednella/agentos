@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"math/rand/v2"
 	"net"
 	"net/http"
@@ -30,7 +31,6 @@ const (
 	consolePublishGap = 500 * time.Millisecond
 	browserStartLimit = 15 * time.Second
 	callLimit         = 15 * time.Second
-	closeGrace        = time.Minute
 	stopLimit         = 5 * time.Second
 	// dialogWait is how long a JavaScript dialog may stay open before agentos dismisses it: a dialog blocks every
 	// call to its page, including the ones that would answer it.
@@ -79,7 +79,6 @@ type Browsers struct {
 	binary     string
 	headless   bool
 	emit       func(event string, payload any)
-	grace      time.Duration
 	dialogWait time.Duration
 	urlFor     func(sessionID string) string // the page a new tab opens first
 	labelFor   func(sessionID string) string // names the session in its window's title
@@ -96,7 +95,7 @@ type Browsers struct {
 // New runs the browsers with their profiles under dataDir.
 func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
-		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, grace: closeGrace, dialogWait: dialogWait,
+		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, dialogWait: dialogWait,
 		urlFor: func(string) string { return "" }, labelFor: func(string) string { return "" }, onTabs: func() {},
 		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
@@ -121,8 +120,7 @@ type browserProc struct {
 	cdp  *cdp
 	gone chan struct{}
 
-	tabs  int
-	timer *time.Timer
+	tabs int
 }
 
 // tab is one session's browser: the pages it owns, and the state the front end shows.
@@ -353,8 +351,7 @@ func waitForEndpoint(ctx context.Context, port int, gone <-chan struct{}) (strin
 	}
 }
 
-// stop asks the browser to quit and kills it only if it has not gone within stopLimit. A killed browser counts as
-// crashed, and on its next start reopens the old pages in windows that belong to no session.
+// stop asks the browser to quit, so it writes its profile out, and kills it only if it has not gone within stopLimit.
 func (p *browserProc) stop() {
 	if p.cdp != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), stopLimit)
@@ -451,10 +448,6 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	b.mu.Lock()
 	b.tabs[id] = t
 	p.tabs++
-	if p.timer != nil {
-		p.timer.Stop()
-		p.timer = nil
-	}
 	b.mu.Unlock()
 	b.onTabs()
 
@@ -587,7 +580,7 @@ func (b *Browsers) Show(ctx context.Context, id string) error {
 	return pg.activate(ctx)
 }
 
-// Close closes all the session's pages, and the project's browser once its last session has closed for a while.
+// Close closes all the session's pages, and stops the project's browser when no other session has a window in it.
 func (b *Browsers) Close(ctx context.Context, id string) {
 	b.mu.Lock()
 	t := b.tabs[id]
@@ -611,35 +604,24 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	t.publish()
 	b.onTabs()
 
+	p := t.proc
 	b.mu.Lock()
-	defer b.mu.Unlock()
-	t.proc.tabs--
-	if t.proc.tabs <= 0 && t.proc.timer == nil {
-		p := t.proc
-		p.timer = time.AfterFunc(b.grace, func() {
-			b.mu.Lock()
-			idle := p.tabs <= 0
-			b.mu.Unlock()
-			if idle {
-				p.stop()
-			}
-		})
+	p.tabs--
+	// Forgotten before it stops, so an Open meanwhile starts a new browser rather than reuse this one.
+	idle := p.tabs <= 0 && b.procs[p.key] == p
+	if idle {
+		delete(b.procs, p.key)
+	}
+	b.mu.Unlock()
+	if idle {
+		p.stop()
 	}
 }
 
 // CloseAll stops every browser: the app is quitting.
 func (b *Browsers) CloseAll() {
 	b.mu.Lock()
-	procs := slices.Collect(func(yield func(*browserProc) bool) {
-		for _, p := range b.procs {
-			if p.timer != nil {
-				p.timer.Stop()
-			}
-			if !yield(p) {
-				return
-			}
-		}
-	})
+	procs := slices.Collect(maps.Values(b.procs))
 	b.mu.Unlock()
 	for _, p := range procs {
 		p.stop()
@@ -735,9 +717,6 @@ func (b *Browsers) Eval(ctx context.Context, id, js string) (string, error) {
 	raw, err := t.eval(ctx, js)
 	return string(raw), err
 }
-
-// SetGrace sets how long a browser outlives its last tab.
-func (b *Browsers) SetGrace(d time.Duration) { b.grace = d }
 
 // SetDialogWait sets how long a JavaScript dialog may stay open before it is dismissed.
 func (b *Browsers) SetDialogWait(d time.Duration) { b.dialogWait = d }
