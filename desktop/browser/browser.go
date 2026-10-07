@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/internal/session"
-	"github.com/nednella/agentos/internal/util"
 )
 
 const (
@@ -38,7 +37,7 @@ const (
 	dialogShown = 80
 )
 
-// BrowserState is what the front end shows of a session's tab.
+// BrowserState is what the front end shows of a session's browser: the state of its active page.
 type BrowserState struct {
 	ID           string `json:"id"`
 	Open         bool   `json:"open"`
@@ -50,6 +49,7 @@ type BrowserState struct {
 	Error        string `json:"error"`
 	Headed       bool   `json:"headed"`
 	LoadedAt     int64  `json:"loadedAt"` // unix ms the main frame last finished loading, 0 if it never has
+	Pages        int    `json:"pages"`    // how many pages the session has open; the rest of the state is of the active one
 	// Console is the page's last few console errors, failed requests and dismissed dialogs, oldest first.
 	Console []string `json:"console"`
 }
@@ -143,30 +143,21 @@ type browserProc struct {
 	timer *time.Timer
 }
 
-// tab is one session's page.
+// tab is one session's browser: the pages it owns, and the state the front end shows.
 type tab struct {
-	b         *Browsers
-	proc      *browserProc
-	id        string
-	targetID  string
-	sessionID string
-	prefix    string // what the title script puts before the page's title
+	b      *Browsers
+	proc   *browserProc
+	id     string
+	prefix string // what the title script puts before a page's title
 
 	mu        sync.Mutex
 	state     BrowserState
-	mainFrame string
+	pages     []*page // oldest first
 	width     int
 	height    int
 	visible   bool
-	loadSeq   int
-	recent    []string    // the last consoleShown lines, for the front end; never drained
+	recent    []string    // the last consoleShown lines, from every page
 	recentPub *time.Timer // set while a coalesced publish of recent is pending
-	requests  map[string]string
-	dialog    *time.Timer // set while a JavaScript dialog is open
-}
-
-func (t *tab) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
-	return t.proc.cdp.call(ctx, t.sessionID, method, params)
 }
 
 func (t *tab) snapshotState() BrowserState {
@@ -399,7 +390,9 @@ func (b *Browsers) exited(p *browserProc) {
 	for _, t := range lost {
 		t.mu.Lock()
 		t.state.Open = false
-		t.stopDialog()
+		for _, pg := range t.pages {
+			pg.stopDialog()
+		}
 		t.mu.Unlock()
 		t.publish()
 	}
@@ -418,8 +411,8 @@ func (b *Browsers) openLock(id string) *sync.Mutex {
 	return b.opening[id]
 }
 
-// Open gives the session a tab, starting the project's browser if needed, and goes to url when it is not empty.
-// When the first page cannot be opened the tab stays, and Open returns its state with the error.
+// Open gives the session a browser with one page, starting the project's browser if needed, and goes to url when it
+// is not empty. When the first page cannot be opened the page stays, and Open returns the state with the error.
 func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, error) {
 	lock := b.openLock(id)
 	lock.Lock()
@@ -452,21 +445,14 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 		TargetID string `json:"targetId"`
 	}
 	_ = json.Unmarshal(raw, &created)
-	raw, err = p.cdp.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": created.TargetID, "flatten": true})
-	if err != nil {
-		return BrowserState{}, err
-	}
-	var attached struct {
-		SessionID string `json:"sessionId"`
-	}
-	_ = json.Unmarshal(raw, &attached)
 	prefix := ""
 	if !b.headless {
 		prefix = windowLabel(b.labelFor(id))
 	}
-	t := &tab{b: b, proc: p, id: id, prefix: prefix, targetID: created.TargetID, sessionID: attached.SessionID,
-		width: defaultViewWidth, height: defaultViewHeight, requests: map[string]string{},
-		state: BrowserState{ID: id, Open: true, URL: "about:blank", Headed: !b.headless}}
+	t := &tab{b: b, proc: p, id: id, prefix: prefix, width: defaultViewWidth, height: defaultViewHeight,
+		state: BrowserState{ID: id, Open: true, URL: "about:blank", Pages: 1, Headed: !b.headless}}
+	first := t.newPage(created.TargetID)
+	t.pages = []*page{first}
 	b.mu.Lock()
 	b.tabs[id] = t
 	p.tabs++
@@ -477,45 +463,9 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	b.mu.Unlock()
 	b.onTabs()
 
-	setups := []struct {
-		method string
-		params any
-	}{
-		{"Page.enable", nil},
-		{"Runtime.enable", nil},
-		{"Network.enable", nil},
-		{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": keepInTab}},
-	}
-	if b.headless {
-		setups = append(setups, struct {
-			method string
-			params any
-		}{"Emulation.setDeviceMetricsOverride", t.metrics()})
-	} else {
-		setups = append(setups, struct {
-			method string
-			params any
-		}{"Page.addScriptToEvaluateOnNewDocument", map[string]any{"source": titleScript(prefix)}})
-	}
-	for _, setup := range setups {
-		if _, err := t.call(ctx, setup.method, setup.params); err != nil {
-			b.Close(ctx, id)
-			return BrowserState{}, err
-		}
-	}
-	if raw, err := t.call(ctx, "Page.getFrameTree", nil); err == nil {
-		var tree struct {
-			FrameTree struct {
-				Frame struct {
-					ID string `json:"id"`
-				} `json:"frame"`
-			} `json:"frameTree"`
-		}
-		if json.Unmarshal(raw, &tree) == nil {
-			t.mu.Lock()
-			t.mainFrame = tree.FrameTree.Frame.ID
-			t.mu.Unlock()
-		}
+	if err := t.attach(ctx, first); err != nil {
+		b.Close(ctx, id)
+		return BrowserState{}, err
 	}
 	go t.watch()
 	if url == "" {
@@ -530,17 +480,6 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	t.publish()
 	return t.snapshotState(), nil
 }
-
-// keepInTab makes links and window.open stay in the session's one tab.
-const keepInTab = `(() => {
-  const own = (t) => !t || ['_self', '_top', '_parent'].includes(t)
-  document.addEventListener('click', (e) => {
-    const a = e.target && e.target.closest && e.target.closest('a[target]')
-    if (a && !own(a.target)) a.target = '_self'
-  }, true)
-  document.addEventListener('submit', (e) => { if (e.target && e.target.target && !own(e.target.target)) e.target.target = '_self' }, true)
-  window.open = (url) => { if (url) location.href = url; return window }
-})()`
 
 // windowLabel is the bracketed label before a window's title. Whitespace is collapsed the way document.title
 // collapses it, so the label read back from the page still matches and pageTitle can strip it.
@@ -633,142 +572,56 @@ func webAddress(s string) (string, error) {
 	return "https://" + s, nil
 }
 
-// Goto starts loading an address in the session's tab.
+// Goto starts loading an address in the session's active page.
 func (b *Browsers) Goto(ctx context.Context, id, address string) error {
 	t, err := b.need(id)
 	if err != nil {
 		return err
 	}
-	address, err = webAddress(address)
+	pg, err := t.activePage()
 	if err != nil {
 		return err
 	}
-	raw, err := t.call(ctx, "Page.navigate", map[string]any{"url": address})
-	if err != nil {
-		return err
-	}
-	var res struct {
-		ErrorText string `json:"errorText"`
-	}
-	_ = json.Unmarshal(raw, &res)
-	if res.ErrorText != "" {
-		return fmt.Errorf("could not open %s: %s", address, res.ErrorText)
-	}
-	return nil
+	return pg.goTo(ctx, address)
 }
 
-// Nav goes back or forward, reloads, or stops loading.
+// Nav goes back or forward, reloads, or stops loading the session's active page.
 func (b *Browsers) Nav(ctx context.Context, id, action string) error {
 	t, err := b.need(id)
 	if err != nil {
 		return err
 	}
+	pg, err := t.activePage()
+	if err != nil {
+		return err
+	}
 	switch action {
 	case "reload":
-		_, err = t.call(ctx, "Page.reload", nil)
+		_, err = pg.call(ctx, "Page.reload", nil)
 	case "stop":
-		_, err = t.call(ctx, "Page.stopLoading", nil)
+		_, err = pg.call(ctx, "Page.stopLoading", nil)
 	case "back", "forward":
-		err = t.step(ctx, map[string]int{"back": -1, "forward": 1}[action])
+		err = pg.step(ctx, map[string]int{"back": -1, "forward": 1}[action])
 	default:
 		err = fmt.Errorf("unknown navigation %q", action)
 	}
 	return err
 }
 
-type history struct {
-	Current int `json:"currentIndex"`
-	Entries []struct {
-		ID int `json:"id"`
-	} `json:"entries"`
-}
-
-func (t *tab) history(ctx context.Context) (history, error) {
-	raw, err := t.call(ctx, "Page.getNavigationHistory", nil)
-	var h history
-	if err == nil {
-		err = json.Unmarshal(raw, &h)
-	}
-	return h, err
-}
-
-func (t *tab) step(ctx context.Context, delta int) error {
-	h, err := t.history(ctx)
-	if err != nil {
-		return err
-	}
-	i := h.Current + delta
-	if i < 0 || i >= len(h.Entries) {
-		return errors.New("no page to go to")
-	}
-	_, err = t.call(ctx, "Page.navigateToHistoryEntry", map[string]any{"entryId": h.Entries[i].ID})
-	return err
-}
-
-// refreshMeta reads the title and address from the page: the browser reports a
-// title only as the address until the page has loaded, and not when a script changes it.
-func (t *tab) refreshMeta() {
-	ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-	defer cancel()
-	raw, err := t.eval(ctx, `document.title + "\n" + location.href`)
-	var both string
-	if err != nil || json.Unmarshal(raw, &both) != nil {
-		return
-	}
-	title, addr, _ := strings.Cut(both, "\n")
-	title = t.pageTitle(title)
-	t.mu.Lock()
-	changed := t.state.Title != title || (t.state.URL != addr && addr != "")
-	t.state.Title = title
-	if addr != "" {
-		t.state.URL = addr
-	}
-	t.mu.Unlock()
-	if changed {
-		t.publish()
-	}
-}
-
-// watch keeps the title current while the tab exists.
-func (t *tab) watch() {
-	tick := time.NewTicker(2 * time.Second)
-	defer tick.Stop()
-	for range tick.C {
-		if t.b.tab(t.id) != t {
-			return
-		}
-		t.refreshMeta()
-	}
-}
-
-// refreshHistory updates the back and forward flags.
-func (t *tab) refreshHistory() {
-	ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-	defer cancel()
-	h, err := t.history(ctx)
-	if err != nil {
-		return
-	}
-	t.mu.Lock()
-	changed := t.state.CanGoBack != (h.Current > 0) || t.state.CanGoForward != (h.Current < len(h.Entries)-1)
-	t.state.CanGoBack, t.state.CanGoForward = h.Current > 0, h.Current < len(h.Entries)-1
-	t.mu.Unlock()
-	if changed {
-		t.publish()
-	}
-}
-
-// Show brings the session's window to the front.
+// Show brings the window of the session's active page to the front.
 func (b *Browsers) Show(ctx context.Context, id string) error {
 	t, err := b.need(id)
 	if err != nil {
 		return err
 	}
-	_, err = t.proc.cdp.call(ctx, "", "Target.activateTarget", map[string]any{"targetId": t.targetID})
-	return err
+	pg, err := t.refreshActive(ctx)
+	if err != nil {
+		return err
+	}
+	return pg.activate(ctx)
 }
 
-// Close closes the session's tab, and the project's browser once its last tab has been closed for a while.
+// Close closes all the session's pages, and the project's browser once its last session has closed for a while.
 func (b *Browsers) Close(ctx context.Context, id string) {
 	b.mu.Lock()
 	t := b.tabs[id]
@@ -777,11 +630,18 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	if t == nil {
 		return
 	}
-	_, _ = t.proc.cdp.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": t.targetID})
+	t.mu.Lock()
+	pages := slices.Clone(t.pages)
+	t.mu.Unlock()
+	for _, pg := range pages {
+		_, _ = t.proc.cdp.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID})
+	}
 	t.mu.Lock()
 	t.state.Open = false
 	t.visible = false
-	t.stopDialog()
+	for _, pg := range pages {
+		pg.stopDialog()
+	}
 	t.mu.Unlock()
 	t.publish()
 	b.onTabs()
@@ -820,243 +680,6 @@ func (b *Browsers) CloseAll() {
 		p.kill()
 		<-p.gone
 	}
-}
-
-// event takes a protocol event. It runs in the connection's read loop, so it never waits for a reply.
-func (b *Browsers) event(p *browserProc, sessionID, method string, params json.RawMessage) {
-	if sessionID == "" {
-		if method == "Target.targetDestroyed" {
-			var ev struct {
-				TargetID string `json:"targetId"`
-			}
-			if json.Unmarshal(params, &ev) != nil {
-				return
-			}
-			b.mu.Lock()
-			for id, c := range b.tabs {
-				if c.targetID == ev.TargetID {
-					go func() {
-						ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-						defer cancel()
-						b.Close(ctx, id)
-					}()
-				}
-			}
-			b.mu.Unlock()
-			return
-		}
-		if method == "Target.targetInfoChanged" {
-			var ev struct {
-				TargetInfo struct {
-					TargetID string `json:"targetId"`
-					URL      string `json:"url"`
-					Title    string `json:"title"`
-				} `json:"targetInfo"`
-			}
-			if json.Unmarshal(params, &ev) != nil {
-				return
-			}
-			b.mu.Lock()
-			var t *tab
-			for _, c := range b.tabs {
-				if c.targetID == ev.TargetInfo.TargetID {
-					t = c
-				}
-			}
-			b.mu.Unlock()
-			if t != nil {
-				title := t.pageTitle(ev.TargetInfo.Title)
-				t.mu.Lock()
-				changed := t.state.URL != ev.TargetInfo.URL || t.state.Title != title
-				t.state.URL, t.state.Title = ev.TargetInfo.URL, title
-				t.mu.Unlock()
-				if changed {
-					t.publish()
-					go t.refreshHistory()
-				}
-			}
-		}
-		return
-	}
-	b.mu.Lock()
-	var t *tab
-	for _, c := range b.tabs {
-		if c.sessionID == sessionID {
-			t = c
-		}
-	}
-	b.mu.Unlock()
-	if t != nil {
-		t.event(method, params)
-	}
-}
-
-func (t *tab) event(method string, params json.RawMessage) {
-	switch method {
-	case "Page.frameNavigated":
-		var ev struct {
-			Frame struct {
-				ID       string `json:"id"`
-				ParentID string `json:"parentId"`
-			} `json:"frame"`
-		}
-		if json.Unmarshal(params, &ev) == nil && ev.Frame.ParentID == "" {
-			t.mu.Lock()
-			t.mainFrame = ev.Frame.ID
-			t.mu.Unlock()
-		}
-	case "Page.frameStartedLoading", "Page.frameStoppedLoading":
-		var ev struct {
-			FrameID string `json:"frameId"`
-		}
-		if json.Unmarshal(params, &ev) != nil {
-			return
-		}
-		t.mu.Lock()
-		if ev.FrameID != t.mainFrame && t.mainFrame != "" {
-			t.mu.Unlock()
-			return
-		}
-		loading := method == "Page.frameStartedLoading"
-		changed := t.state.Loading != loading
-		t.state.Loading = loading
-		t.mu.Unlock()
-		if changed {
-			t.publish()
-		}
-		if !loading {
-			go t.refreshHistory()
-			go t.refreshMeta()
-		}
-	case "Page.loadEventFired":
-		t.mu.Lock()
-		t.loadSeq++
-		t.state.LoadedAt = time.Now().UnixMilli()
-		t.mu.Unlock()
-		t.publish()
-	case "Page.screencastFrame":
-		t.frame(params)
-	case "Page.javascriptDialogOpening":
-		var ev struct {
-			Type    string `json:"type"`
-			Message string `json:"message"`
-		}
-		if json.Unmarshal(params, &ev) == nil {
-			t.dialogOpened(ev.Type, ev.Message)
-		}
-	case "Page.javascriptDialogClosed":
-		t.mu.Lock()
-		t.stopDialog()
-		t.mu.Unlock()
-	case "Runtime.consoleAPICalled":
-		var ev struct {
-			Type string `json:"type"`
-			Args []struct {
-				Value       json.RawMessage `json:"value"`
-				Description string          `json:"description"`
-			} `json:"args"`
-		}
-		if json.Unmarshal(params, &ev) == nil && ev.Type == "error" {
-			var parts []string
-			for _, a := range ev.Args {
-				var s string
-				if json.Unmarshal(a.Value, &s) == nil && s != "" {
-					parts = append(parts, s)
-				} else if a.Description != "" {
-					parts = append(parts, a.Description)
-				} else if len(a.Value) > 0 {
-					parts = append(parts, string(a.Value))
-				}
-			}
-			t.logConsole("console.error: " + strings.Join(parts, " "))
-		}
-	case "Runtime.exceptionThrown":
-		var ev struct {
-			ExceptionDetails struct {
-				Text      string `json:"text"`
-				Exception struct {
-					Description string `json:"description"`
-				} `json:"exception"`
-			} `json:"exceptionDetails"`
-		}
-		if json.Unmarshal(params, &ev) == nil {
-			msg := ev.ExceptionDetails.Exception.Description
-			if msg == "" {
-				msg = ev.ExceptionDetails.Text
-			}
-			t.logConsole("uncaught: " + util.FirstLine(msg))
-		}
-	case "Network.requestWillBeSent":
-		var ev struct {
-			RequestID string `json:"requestId"`
-			Request   struct {
-				URL    string `json:"url"`
-				Method string `json:"method"`
-			} `json:"request"`
-		}
-		if json.Unmarshal(params, &ev) == nil {
-			t.mu.Lock()
-			t.requests[ev.RequestID] = ev.Request.Method + " " + ev.Request.URL
-			t.mu.Unlock()
-		}
-	case "Network.responseReceived":
-		var ev struct {
-			RequestID string `json:"requestId"`
-			Response  struct {
-				URL    string `json:"url"`
-				Status int    `json:"status"`
-			} `json:"response"`
-		}
-		if json.Unmarshal(params, &ev) == nil && ev.Response.Status >= 400 {
-			t.mu.Lock()
-			req := t.requests[ev.RequestID]
-			t.mu.Unlock()
-			if req == "" {
-				req = ev.Response.URL
-			}
-			t.logConsole(fmt.Sprintf("request failed: %s -> %d", req, ev.Response.Status))
-		}
-	case "Network.loadingFailed":
-		var ev struct {
-			RequestID string `json:"requestId"`
-			ErrorText string `json:"errorText"`
-			Canceled  bool   `json:"canceled"`
-		}
-		if json.Unmarshal(params, &ev) == nil && !ev.Canceled {
-			t.mu.Lock()
-			req := t.requests[ev.RequestID]
-			t.mu.Unlock()
-			t.logConsole(fmt.Sprintf("request failed: %s -> %s", req, ev.ErrorText))
-		}
-	}
-}
-
-// stopDialog forgets the open dialog's timer. The tab's mutex must be held.
-func (t *tab) stopDialog() {
-	if t.dialog != nil {
-		t.dialog.Stop()
-		t.dialog = nil
-	}
-}
-
-// dialogOpened dismisses the dialog if nobody answers it within dialogWait.
-func (t *tab) dialogOpened(kind, message string) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	t.stopDialog()
-	wait := t.b.dialogWait
-	t.dialog = time.AfterFunc(wait, func() {
-		ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-		defer cancel()
-		if _, err := t.call(ctx, "Page.handleJavaScriptDialog", map[string]any{"accept": false}); err != nil {
-			return
-		}
-		line := util.FirstLine(message)
-		if r := []rune(line); len(r) > dialogShown {
-			line = string(r[:dialogShown]) + "..."
-		}
-		t.logConsole(fmt.Sprintf("dialog dismissed after %s: %s %q", wait, kind, line))
-	})
 }
 
 // View turns the live picture on or off. Frames are only produced while it is on.
@@ -1104,22 +727,6 @@ func (t *tab) sendFrame(data string) {
 	if visible {
 		t.b.emit("browser:frame", map[string]any{"id": t.id, "data": data, "width": w, "height": h})
 	}
-}
-
-func (t *tab) frame(params json.RawMessage) {
-	var ev struct {
-		Data      string `json:"data"`
-		SessionID int    `json:"sessionId"`
-	}
-	if json.Unmarshal(params, &ev) != nil {
-		return
-	}
-	t.sendFrame(ev.Data)
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), callLimit)
-		defer cancel()
-		_, _ = t.call(ctx, "Page.screencastFrameAck", map[string]any{"sessionId": ev.SessionID})
-	}()
 }
 
 // Resize sets the page viewport to the panel's size, in CSS pixels.
@@ -1228,15 +835,19 @@ func (t *tab) key(ctx context.Context, in BrowserInput) error {
 	return err
 }
 
-// Screenshot returns a PNG of the viewport or the whole page.
+// Screenshot returns a PNG of the viewport or the whole page of the session's active page.
 func (b *Browsers) Screenshot(ctx context.Context, id string, full bool) ([]byte, error) {
 	t, err := b.need(id)
 	if err != nil {
 		return nil, err
 	}
+	pg, err := t.refreshActive(ctx)
+	if err != nil {
+		return nil, err
+	}
 	params := map[string]any{"format": "png"}
 	if full {
-		raw, err := t.call(ctx, "Page.getLayoutMetrics", nil)
+		raw, err := pg.call(ctx, "Page.getLayoutMetrics", nil)
 		if err != nil {
 			return nil, err
 		}
@@ -1252,7 +863,7 @@ func (b *Browsers) Screenshot(ctx context.Context, id string, full bool) ([]byte
 		params["clip"] = map[string]any{"x": 0, "y": 0, "width": m.Size.Width, "height": min(m.Size.Height, 16000), "scale": 1}
 		params["captureBeyondViewport"] = true
 	}
-	raw, err := t.call(ctx, "Page.captureScreenshot", params)
+	raw, err := pg.call(ctx, "Page.captureScreenshot", params)
 	if err != nil {
 		return nil, err
 	}
@@ -1295,36 +906,6 @@ func stopStrayBrowser(profile string) {
 	for _, f := range []string{"SingletonLock", "SingletonSocket", "SingletonCookie"} {
 		_ = os.Remove(filepath.Join(profile, f))
 	}
-}
-
-// eval runs JavaScript in the page and returns its JSON result.
-func (t *tab) eval(ctx context.Context, expression string) (json.RawMessage, error) {
-	raw, err := t.call(ctx, "Runtime.evaluate", map[string]any{"expression": expression, "returnByValue": true, "awaitPromise": true})
-	if err != nil {
-		return nil, err
-	}
-	var res struct {
-		Result struct {
-			Value json.RawMessage `json:"value"`
-		} `json:"result"`
-		Exception *struct {
-			Text      string `json:"text"`
-			Exception struct {
-				Description string `json:"description"`
-			} `json:"exception"`
-		} `json:"exceptionDetails"`
-	}
-	if err := json.Unmarshal(raw, &res); err != nil {
-		return nil, fmt.Errorf("reading the result: %w", err)
-	}
-	if res.Exception != nil {
-		msg := util.FirstLine(res.Exception.Exception.Description)
-		if msg == "" {
-			msg = res.Exception.Text
-		}
-		return nil, errors.New(msg)
-	}
-	return res.Result.Value, nil
 }
 
 // Hook sets what the browsers ask of the app: the page a new tab opens first, the label that names a session in

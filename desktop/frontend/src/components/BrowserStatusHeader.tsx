@@ -29,6 +29,7 @@ export function BrowserStatusHeader({ id, state }: BrowserStatusHeaderProps) {
           ) : (
             <span className="flex-none">{state.loadedAt ? `· loaded ${ago(state.loadedAt, now)}` : ''}</span>
           )}
+          {state.pages > 1 && <span className="flex-none">· {state.pages} tabs</span>}
         </p>
       </div>
       <div className="flex flex-none items-center gap-1.5">

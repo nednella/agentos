@@ -546,6 +546,7 @@ export function createMock(params: URLSearchParams) {
       error: '',
       headed: false,
       loadedAt: 0,
+      pages: page ? 1 : 0,
       console: [],
     }
   }

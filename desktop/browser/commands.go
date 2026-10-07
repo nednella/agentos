@@ -33,7 +33,7 @@ func NewCommands(b *Browsers, a Asker, scene Scene, s *evidence.Store, c evidenc
 	return &Commands{browsers: b, asker: a, scene: scene, store: s, changes: c}
 }
 
-// Browser runs one agentos browser command (open, screenshot) for the asking session; without one it shows the browser view.
+// Browser runs one agentos browser command (open, tab, screenshot) for the asking session; without one it shows the browser view.
 func (c *Commands) Browser(ctx context.Context, req control.Request) (string, error) {
 	if len(req.Args) == 0 {
 		return c.scene.UI(req, "browser"), nil
@@ -42,7 +42,7 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 	if sub == "help" {
 		return prompts.BrowserHelp(), nil
 	}
-	if sub != "open" && sub != "screenshot" {
+	if sub != "open" && sub != "tab" && sub != "screenshot" {
 		return "", fmt.Errorf("unknown browser command %q: run agentos browser help", sub)
 	}
 	id, err := c.asker.AskerSession(req)
@@ -58,6 +58,11 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 			return "", errors.New("usage: agentos browser open <url> [--front]")
 		}
 		return c.browsers.AgentOpen(ctx, id, args[0], req.Opts["front"] != "")
+	case "tab":
+		if len(args) < 1 {
+			return "", errors.New("usage: agentos browser tab <url>")
+		}
+		return c.browsers.AgentTab(ctx, id, args[0])
 	}
 	if _, err := c.browsers.tabFor(ctx, id); err != nil {
 		return "", err

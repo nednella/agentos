@@ -145,7 +145,7 @@ func TestBrowserHelpWorksWithoutTheApp(t *testing.T) {
 	t.Setenv("AGENTOS_SOCKET", "/nonexistent/agentos.sock")
 	for _, args := range [][]string{{"browser", "help"}, {"browser", "--help"}} {
 		out, err := run(t, args...)
-		if err != nil || !strings.Contains(out, "open <url>") || !strings.Contains(out, "screenshot") {
+		if err != nil || !strings.Contains(out, "open <url>") || !strings.Contains(out, "tab <url>") || !strings.Contains(out, "screenshot") {
 			t.Errorf("agentos %v = %q, %v", args, out, err)
 		}
 	}
@@ -165,6 +165,7 @@ func TestBrowserCommandSendsItsWords(t *testing.T) {
 	}{
 		{[]string{"browser", "open", "https://example.com"}, []string{"open", "https://example.com"}, map[string]string{}, 75_000},
 		{[]string{"browser", "screenshot", "--caption", "the page", "--full"}, []string{"screenshot"}, map[string]string{"caption": "the page", "full": "1"}, 75_000},
+		{[]string{"browser", "tab", "https://example.com"}, []string{"tab", "https://example.com"}, map[string]string{}, 75_000},
 		{[]string{"browser", "open", "https://example.com", "--front"}, []string{"open", "https://example.com"}, map[string]string{"front": "1"}, 75_000},
 	}
 	for _, tt := range tests {
