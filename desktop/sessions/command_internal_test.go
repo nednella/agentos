@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/nednella/agentos/internal/agent"
@@ -46,10 +47,17 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			tt.proj.Dir = "/work/p"
 			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "")
 			prompt, config, denied := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config"), slices.Index(argv, "--disallowedTools")
-			if (prompt >= 0) != tt.want || (config >= 0) != tt.want || (denied >= 0) != tt.want {
+			if (config >= 0) != tt.want || (denied >= 0) != tt.want {
 				t.Fatalf("argv = %q", argv)
 			}
-			if tt.want && argv[prompt+1] != prompts.BrowserSession() {
+			_, claude := tt.agent.(agent.Claude)
+			if (prompt >= 0) != claude {
+				t.Fatalf("argv = %q", argv)
+			}
+			if claude && !strings.HasPrefix(argv[prompt+1], prompts.NewSession()) {
+				t.Errorf("system prompt = %q", argv[prompt+1])
+			}
+			if claude && strings.Contains(argv[prompt+1], prompts.BrowserSession()) != tt.want {
 				t.Errorf("system prompt = %q", argv[prompt+1])
 			}
 			if tt.want && argv[config+1] != wantMCPConfig {
