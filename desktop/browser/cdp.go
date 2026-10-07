@@ -16,6 +16,7 @@ import (
 type cdp struct {
 	conn    *websocket.Conn
 	onEvent func(sessionID, method string, params json.RawMessage)
+	done    chan struct{} // closed when the connection has dropped
 
 	wmu     sync.Mutex
 	mu      sync.Mutex
@@ -46,7 +47,7 @@ func dialCDP(ctx context.Context, url string, onEvent func(sessionID, method str
 		return nil, fmt.Errorf("connecting to the browser: %w", err)
 	}
 	conn.SetReadLimit(64 << 20)
-	c := &cdp{conn: conn, onEvent: onEvent, pending: map[int]chan cdpReply{}}
+	c := &cdp{conn: conn, onEvent: onEvent, done: make(chan struct{}), pending: map[int]chan cdpReply{}}
 	go c.read()
 	return c, nil
 }
@@ -62,6 +63,7 @@ func (c *cdp) read() {
 				delete(c.pending, id)
 			}
 			c.mu.Unlock()
+			close(c.done)
 			return
 		}
 		var m cdpMessage

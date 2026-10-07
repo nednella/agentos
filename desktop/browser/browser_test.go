@@ -57,6 +57,24 @@ func TestStartForgetsTheLastRunsPages(t *testing.T) {
 	}
 }
 
+func TestDroppedConnectionForgetsTheBrowser(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	b.tab("p/1").proc.cdp.close()
+	deadline := time.Now().Add(10 * time.Second)
+	for b.Has("p/1") {
+		if time.Now().After(deadline) {
+			t.Fatal("the session kept a browser whose connection dropped")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatalf("Open after the drop: %v", err)
+	}
+}
+
 func TestNoBrowserFound(t *testing.T) {
 	b := New(t.TempDir(), func(string, any) {})
 	b.binary = ""
