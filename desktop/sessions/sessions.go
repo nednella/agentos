@@ -153,6 +153,7 @@ type Browsers interface {
 	Available() bool
 	Has(id string) bool
 	Close(ctx context.Context, id string)
+	Port(projectKey string) int
 }
 
 // Awake holds off idle sleep.
@@ -1362,11 +1363,38 @@ func (s *Sessions) CloseShell(id string) error {
 	return nil
 }
 
+// chromeDevToolsMCP is the package of the MCP server that gives Claude the page tools, pinned so a new release
+// cannot change the tools under a running install.
+const (
+	chromeDevToolsMCPName    = "chrome-devtools-mcp"
+	chromeDevToolsMCPVersion = "1.10.1"
+)
+
+// browserMCPConfig is the --mcp-config JSON that adds the page tools as the MCP server "browser", attached to the
+// project's browser on port. workspace is the folder the tools may read upload files from.
+func browserMCPConfig(port int, workspace string) string {
+	type server struct {
+		Command string            `json:"command"`
+		Args    []string          `json:"args"`
+		Env     map[string]string `json:"env"`
+	}
+	config, _ := json.Marshal(map[string]map[string]server{"mcpServers": {"browser": {
+		Command: "npx",
+		Args: []string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion,
+			"--browser-url=http://127.0.0.1:" + strconv.Itoa(port), "--no-usage-statistics", "--no-performance-crux", "--workspace=" + workspace},
+		Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"},
+	}}})
+	return string(config)
+}
+
 // commandFor is the agent's command line. Claude learns about the browser when the project allows it and one exists.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation string) []string {
 	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
-	if _, ok := s.agent.(agent.Claude); ok && proj.BrowserOn() && s.browsers.Available() {
-		argv = append(argv, "--append-system-prompt", prompts.BrowserSession())
+	if _, ok := s.agent.(agent.Claude); !ok || !proj.BrowserOn() || !s.browsers.Available() {
+		return argv
+	}
+	if port := s.browsers.Port(name.Project); port != 0 {
+		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir), "--append-system-prompt", prompts.BrowserSession())
 	}
 	return argv
 }

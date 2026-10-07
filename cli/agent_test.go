@@ -145,7 +145,7 @@ func TestBrowserHelpWorksWithoutTheApp(t *testing.T) {
 	t.Setenv("AGENTOS_SOCKET", "/nonexistent/agentos.sock")
 	for _, args := range [][]string{{"browser", "help"}, {"browser", "--help"}} {
 		out, err := run(t, args...)
-		if err != nil || !strings.Contains(out, "snapshot") || !strings.Contains(out, "screenshot") {
+		if err != nil || !strings.Contains(out, "open <url>") || !strings.Contains(out, "screenshot") {
 			t.Errorf("agentos %v = %q, %v", args, out, err)
 		}
 	}
@@ -166,9 +166,6 @@ func TestBrowserCommandSendsItsWords(t *testing.T) {
 		{[]string{"browser", "open", "https://example.com"}, []string{"open", "https://example.com"}, map[string]string{}, 75_000},
 		{[]string{"browser", "screenshot", "--caption", "the page", "--full"}, []string{"screenshot"}, map[string]string{"caption": "the page", "full": "1"}, 75_000},
 		{[]string{"browser", "open", "https://example.com", "--front"}, []string{"open", "https://example.com"}, map[string]string{"front": "1"}, 75_000},
-		{[]string{"browser", "type", "e3", "hello", "--append"}, []string{"type", "e3", "hello"}, map[string]string{"append": "1"}, 75_000},
-		{[]string{"browser", "wait-for", "Saved", "--timeout", "2000"}, []string{"wait-for", "Saved"}, map[string]string{"timeout": "2000"}, 17_000},
-		{[]string{"browser", "wait", "500"}, []string{"wait", "500"}, map[string]string{}, 15_500},
 	}
 	for _, tt := range tests {
 		if out, err := run(t, tt.args...); err != nil || out != "done" {
@@ -183,8 +180,10 @@ func TestBrowserCommandSendsItsWords(t *testing.T) {
 			}
 		}
 	}
-	if _, err := run(t, "browser", "open", "--bogus"); err == nil {
-		t.Error("an unknown flag was accepted")
+	for _, flag := range []string{"--bogus", "--append", "--timeout"} {
+		if _, err := run(t, "browser", "open", flag); err == nil {
+			t.Errorf("the flag %s was accepted", flag)
+		}
 	}
 }
 

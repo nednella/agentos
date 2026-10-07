@@ -16,8 +16,13 @@ type fakeBrowsers struct{ available bool }
 func (f fakeBrowsers) Available() bool               { return f.available }
 func (f fakeBrowsers) Has(string) bool               { return false }
 func (f fakeBrowsers) Close(context.Context, string) {}
+func (f fakeBrowsers) Port(string) int               { return 23456 }
 
-func TestClaudeGetsTheBrowserPrompt(t *testing.T) {
+const wantMCPConfig = `{"mcpServers":{"browser":{"command":"npx","args":["-y","--prefer-offline","chrome-devtools-mcp@1.10.1",` +
+	`"--browser-url=http://127.0.0.1:23456","--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],` +
+	`"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
+
+func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 	off := false
 	tests := []struct {
 		name    string
@@ -34,10 +39,17 @@ func TestClaudeGetsTheBrowserPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
+			tt.proj.Dir = "/work/p"
 			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "")
-			i := slices.Index(argv, "--append-system-prompt")
-			if (i >= 0) != tt.want || (tt.want && argv[i+1] != prompts.BrowserSession()) {
-				t.Errorf("argv = %q", argv)
+			prompt, config := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config")
+			if (prompt >= 0) != tt.want || (config >= 0) != tt.want {
+				t.Fatalf("argv = %q", argv)
+			}
+			if tt.want && argv[prompt+1] != prompts.BrowserSession() {
+				t.Errorf("system prompt = %q", argv[prompt+1])
+			}
+			if tt.want && argv[config+1] != wantMCPConfig {
+				t.Errorf("mcp config = %s\nwant %s", argv[config+1], wantMCPConfig)
 			}
 		})
 	}

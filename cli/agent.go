@@ -108,7 +108,7 @@ func newShowCmd() *cobra.Command {
 func newBrowserCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:                "browser [command] [args]",
-		Short:              "Show the browser view, or drive this session's browser (agentos browser help)",
+		Short:              "Show the browser view, open pages in this session's browser window, or file a screenshot (agentos browser help)",
 		GroupID:            groupViews,
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -119,27 +119,17 @@ func newBrowserCmd() *cobra.Command {
 			if len(args) == 0 {
 				return askApp(cmd, control.Request{Cmd: "browser"})
 			}
-			pos, opts, err := parseFlags(args[1:], []string{"caption", "timeout"}, []string{"full", "append", "front"})
+			pos, opts, err := parseFlags(args[1:], []string{"caption"}, []string{"full", "front"})
 			if err != nil {
 				return err
 			}
-			return askApp(cmd, control.Request{Cmd: "browser", Args: append([]string{args[0]}, pos...), Opts: opts, TimeoutMs: browserTimeout(args[0], pos, opts)})
+			return askApp(cmd, control.Request{Cmd: "browser", Args: append([]string{args[0]}, pos...), Opts: opts, TimeoutMs: browserTimeoutMs})
 		},
 	}
 }
 
-// browserTimeout is how long the app may spend on a browser command: a page load
-// can take 30 seconds, and a wait takes the time it was asked for on top.
-func browserTimeout(sub string, pos []string, opts map[string]string) int {
-	waited := opts["timeout"]
-	if sub == "wait" && len(pos) > 0 {
-		waited = pos[0]
-	}
-	if ms, err := strconv.Atoi(waited); err == nil && ms > 0 {
-		return min(ms+15_000, 115_000)
-	}
-	return 75_000
-}
+// browserTimeoutMs is how long the app may spend on a browser command: a page load can take 30 seconds.
+const browserTimeoutMs = 75_000
 
 func newDigestCmd() *cobra.Command {
 	var run bool

@@ -17,19 +17,9 @@ const demoPage = `<!doctype html><html><head><title>Demo</title><style>
 body{margin:0;font:16px sans-serif} #pad{position:absolute;left:300px;top:400px;width:200px;height:100px;background:#ccd}
 #spacer{height:3000px}</style></head><body>
 <h1>Demo page</h1>
-<form onsubmit="return false">
-  <label for="email">Email</label><input id="email" type="email" placeholder="you@example.com">
-  <label for="color">Color</label><select id="color"><option value="r">Red</option><option value="g">Green</option><option value="b">Blue</option></select>
-  <label><input type="checkbox" id="sub"> Subscribe</label>
-  <button id="save" onclick="document.getElementById('status').textContent='Saved: '+document.getElementById('email').value+' / '+document.getElementById('color').selectedOptions[0].text">Save</button>
-  <button disabled>Nope</button>
-</form>
-<p id="status">not saved</p>
 <input id="q" aria-label="Search" onkeydown="if(event.key==='Enter')document.getElementById('entered').textContent='enter:'+this.value">
 <p id="entered"></p>
 <a href="/second" target="_blank">Second page</a>
-<button onclick="console.error('boom happened')">Boom</button>
-<button onclick="fetch('/nope')">Fetch</button>
 <div id="pad" onmousedown="window.__down=[event.clientX,event.clientY,event.button]"></div>
 <div id="spacer"></div>
 </body></html>`

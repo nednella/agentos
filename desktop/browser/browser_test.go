@@ -176,7 +176,7 @@ func TestWindowLabel(t *testing.T) {
 	}
 }
 
-func TestConsoleShownKeepsTheLastLinesAfterTheAgentDrains(t *testing.T) {
+func TestConsoleShownKeepsTheLastLines(t *testing.T) {
 	var mu sync.Mutex
 	events := 0
 	b := New(t.TempDir(), func(event string, _ any) {
@@ -192,9 +192,6 @@ func TestConsoleShownKeepsTheLastLinesAfterTheAgentDrains(t *testing.T) {
 	}
 	for i := range 25 {
 		tb.logConsole(strconv.Itoa(i))
-	}
-	if drained := tb.drainConsole(); len(drained) != 25 {
-		t.Fatalf("drained %d lines, want 25", len(drained))
 	}
 	got := tb.snapshotState().Console
 	if len(got) != consoleShown || got[0] != "5" || got[consoleShown-1] != "24" {
@@ -328,5 +325,18 @@ func TestDialogAnsweredInTimeIsLeftAlone(t *testing.T) {
 	}
 	if lines := dialogLines(b, "p/1"); strings.Contains(lines, "dismissed") {
 		t.Errorf("a dialog answered in time was reported dismissed: %q", lines)
+	}
+}
+
+func TestAgentOpenNamesThePage(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	b.tab("p/1").prefix = "[demo · 2 fix login]"
+	out, err := b.AgentOpen(ctx, "p/1", "data:text/html,<title>Hi</title>", false)
+	want := "page: [demo · 2 fix login] - find it in list_pages by this title prefix"
+	if err != nil || !strings.HasSuffix(out, "\n"+want) {
+		t.Errorf("AgentOpen = %q, %v; want the last line %q", out, err, want)
 	}
 }

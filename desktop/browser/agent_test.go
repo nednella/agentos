@@ -3,14 +3,12 @@ package browser_test
 import (
 	"bytes"
 	"errors"
-	"image"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -22,17 +20,14 @@ import (
 // browserCmd runs an agentos browser command the way the cli sends it: flags become options.
 func browserCmd(t *testing.T, h *apptest.Harness, session string, args ...string) (string, error) {
 	t.Helper()
-	if len(args) > 0 && args[0] == "browser" {
-		args = args[1:]
-	}
 	var pos []string
 	opts := map[string]string{}
 	for i := 0; i < len(args); i++ {
 		switch a := args[i]; a {
-		case "--caption", "--timeout":
+		case "--caption":
 			i++
 			opts[a[2:]] = args[i]
-		case "--full", "--append", "--front":
+		case "--full", "--front":
 			opts[a[2:]] = "1"
 		default:
 			pos = append(pos, a)
@@ -54,25 +49,8 @@ func mustBrowser(t *testing.T, h *apptest.Harness, session string, args ...strin
 	return out
 }
 
-func refOf(t *testing.T, snapshot, role, name string) string {
-	t.Helper()
-	m := regexp.MustCompile(`\[(e\d+)\] ` + regexp.QuoteMeta(role) + ` "` + regexp.QuoteMeta(name) + `"`).FindStringSubmatch(snapshot)
-	if m == nil {
-		t.Fatalf("no %s %q in the snapshot:\n%s", role, name, snapshot)
-	}
-	return m[1]
-}
-
 func profileRunning(profile string) bool {
 	return exec.Command("pgrep", "-f", profile).Run() == nil
-}
-
-func decodePNG(path string) (image.Image, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	return png.Decode(bytes.NewReader(data))
 }
 
 func TestBrowserAgentCLI(t *testing.T) {
@@ -87,73 +65,12 @@ func TestBrowserAgentCLI(t *testing.T) {
 	if got, _ := h.Session(s.ID); !got.Browser {
 		t.Error("the session does not show its browser")
 	}
-
-	snap := mustBrowser(t, h, s.ID, "snapshot")
-	for _, want := range []string{"# Demo page", `textbox "Email"`, `placeholder="you@example.com"`, `select "Color"`, `value="Red"`, "options=Red | Green | Blue",
-		`checkbox "Subscribe"`, `button "Save"`, `button "Nope" disabled`, `textbox "Search"`, `link "Second page" -> /second`, "not saved"} {
-		if !strings.Contains(snap, want) {
-			t.Errorf("snapshot lacks %q:\n%s", want, snap)
-		}
+	if out := mustBrowser(t, h, s.ID, "open", srv.URL+"/second", "--front"); !strings.Contains(out, "Second") {
+		t.Errorf("open --front printed %q", out)
 	}
-
-	email, color, save, sub := refOf(t, snap, "textbox", "Email"), refOf(t, snap, "select", "Color"), refOf(t, snap, "button", "Save"), refOf(t, snap, "checkbox", "Subscribe")
-	mustBrowser(t, h, s.ID, "type", email, "ned@example.com")
-	mustBrowser(t, h, s.ID, "select", color, "Green")
-	mustBrowser(t, h, s.ID, "click", sub)
-	mustBrowser(t, h, s.ID, "click", save)
-	mustBrowser(t, h, s.ID, "wait-for", "Saved: ned@example.com / Green")
-	mustBrowser(t, h, s.ID, "type", email, "new", "--append")
-	if v := mustBrowser(t, h, s.ID, "eval", "document.getElementById('email').value + '|' + document.getElementById('sub').checked"); v != `"ned@example.comnew|true"` {
-		t.Errorf("form state = %s", v)
-	}
-	mustBrowser(t, h, s.ID, "type", email, "fresh")
-	if v := mustBrowser(t, h, s.ID, "eval", "document.getElementById('email').value"); v != `"fresh"` {
-		t.Errorf("replaced value = %s", v)
-	}
-
-	q := refOf(t, snap, "textbox", "Search")
-	mustBrowser(t, h, s.ID, "type", q, "hello")
-	mustBrowser(t, h, s.ID, "press", "Enter")
-	mustBrowser(t, h, s.ID, "wait-for", "enter:hello")
-
-	if text := mustBrowser(t, h, s.ID, "text", save); text != "Save" {
-		t.Errorf("text of the button = %q", text)
-	}
-	if out := mustBrowser(t, h, s.ID, "scroll", "down", "1000"); !strings.Contains(out, "scrolled to 1000") {
-		t.Errorf("scroll = %q", out)
-	}
-	mustBrowser(t, h, s.ID, "scroll", "up", "5000")
-	mustBrowser(t, h, s.ID, "hover", save)
-
-	t.Run("console", func(t *testing.T) {
-		mustBrowser(t, h, s.ID, "click", refOf(t, snap, "button", "Boom"))
-		mustBrowser(t, h, s.ID, "click", refOf(t, snap, "button", "Fetch"))
-		var out string
-		eventually(t, "both console lines", func() bool {
-			out += "\n" + mustBrowser(t, h, s.ID, "console")
-			return strings.Contains(out, "console.error: boom happened") && strings.Contains(out, "/nope -> 404")
-		})
-		if again := mustBrowser(t, h, s.ID, "console"); !strings.Contains(again, "no console errors") {
-			t.Errorf("console after reading = %q", again)
-		}
-	})
-
-	t.Run("target blank link stays in the tab", func(t *testing.T) {
-		mustBrowser(t, h, s.ID, "click", refOf(t, snap, "link", "Second page"))
-		mustBrowser(t, h, s.ID, "wait-for", "Second page header")
-		if got := mustBrowser(t, h, s.ID, "url"); got != srv.URL+"/second\nSecond" {
-			t.Errorf("url = %q", got)
-		}
-		eventually(t, "back flag", func() bool { return h.BrowserState(s.ID).CanGoBack })
-		if got := mustBrowser(t, h, s.ID, "back"); !strings.Contains(got, srv.URL+"/") {
-			t.Errorf("back = %q", got)
-		}
-		if got := mustBrowser(t, h, s.ID, "reload"); !strings.Contains(got, "Demo") {
-			t.Errorf("reload = %q", got)
-		}
-	})
 
 	t.Run("screenshot becomes evidence", func(t *testing.T) {
+		mustBrowser(t, h, s.ID, "open", srv.URL)
 		before := h.Rec.Count("attention")
 		path := mustBrowser(t, h, s.ID, "screenshot", "--caption", "the demo page")
 		data, err := os.ReadFile(path)
@@ -182,39 +99,36 @@ func TestBrowserAgentCLI(t *testing.T) {
 		}
 
 		full := mustBrowser(t, h, s.ID, "screenshot", "--full")
-		if img, err := decodePNG(full); err != nil || img.Bounds().Dy() < 3000 {
-			t.Errorf("full page screenshot: %v %v", img, err)
+		data, err = os.ReadFile(full)
+		if err != nil {
+			t.Fatal(err)
 		}
-		save = refOf(t, mustBrowser(t, h, s.ID, "snapshot"), "button", "Save")
-		element := mustBrowser(t, h, s.ID, "screenshot", save)
-		if img, err := decodePNG(element); err != nil || img.Bounds().Dx() > 200 || img.Bounds().Dx() < 20 {
-			t.Errorf("element screenshot: %v %v", img, err)
+		if img, err := png.Decode(bytes.NewReader(data)); err != nil || img.Bounds().Dy() < 3000 {
+			t.Errorf("full page screenshot: %v %v", img, err)
 		}
 	})
 
 	t.Run("errors", func(t *testing.T) {
 		for _, args := range [][]string{
-			{"browser", "click", "e999"},
-			{"browser", "click", "nope"},
-			{"browser", "select", color, "Purple"},
-			{"browser", "wait-for", "never there", "--timeout", "300"},
-			{"browser", "frobnicate"},
-			{"browser", "type", "e1"},
-			{"browser", "eval", "throw new Error('bad js')"},
-			{"browser", "open", "javascript:alert(1)"},
-			{"browser", "open", "http://127.0.0.1:1"},
+			{"open"},
+			{"open", "javascript:alert(1)"},
+			{"open", "http://127.0.0.1:1"},
+			{"frobnicate"},
+			{"click", "e1"},
+			{"snapshot"},
+			{"eval", "1"},
 		} {
 			if out, err := browserCmd(t, h, s.ID, args...); err == nil {
-				t.Errorf("agentos %s succeeded: %q", strings.Join(args, " "), out)
+				t.Errorf("agentos browser %s succeeded: %q", strings.Join(args, " "), out)
 			}
 		}
-		if _, err := browserCmd(t, h, s.ID, "browser", "click", "e999"); err == nil || !strings.Contains(err.Error(), "run snapshot again") {
-			t.Errorf("unknown ref error = %v", err)
+		if _, err := browserCmd(t, h, s.ID, "click", "e1"); err == nil || !strings.Contains(err.Error(), "agentos browser help") {
+			t.Errorf("a removed command's error = %v", err)
 		}
-		if out, err := browserCmd(t, h, "", "browser", "url"); err == nil || !strings.Contains(err.Error(), "AGENTOS_SESSION") {
+		if out, err := browserCmd(t, h, "", "open", srv.URL); err == nil || !strings.Contains(err.Error(), "AGENTOS_SESSION") {
 			t.Errorf("without a session: %q, %v", out, err)
 		}
-		if out := mustBrowser(t, h, "", "help"); !strings.Contains(out, "snapshot") {
+		if out := mustBrowser(t, h, "", "help"); !strings.Contains(out, "list_pages") || strings.Contains(out, "snapshot") {
 			t.Errorf("help = %q", out)
 		}
 	})
@@ -238,7 +152,7 @@ func TestBrowserWithoutArgumentsShowsTheView(t *testing.T) {
 	if got := h.Rec.LastUI(); !resp.OK || resp.Out != "ok" || got.Name != "browser" || len(got.Args) != 0 {
 		t.Errorf("browser = %+v, ui %+v", resp, got)
 	}
-	if help := h.Ask(t, ctl.Request{Cmd: "browser", Args: []string{"help"}}); !help.OK || !strings.Contains(help.Out, "drive the session's browser") {
+	if help := h.Ask(t, ctl.Request{Cmd: "browser", Args: []string{"help"}}); !help.OK || !strings.Contains(help.Out, "your session's browser window") {
 		t.Errorf("browser help = %+v", help)
 	}
 }
