@@ -125,7 +125,7 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." centered />
 
   return (
-    <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-2">
+    <div ref={list} className="min-h-0 flex-1 overflow-y-auto pt-1.5 pb-2">
       {sections.map((section) => (
         <section key={section.name}>
           {section.name && (
