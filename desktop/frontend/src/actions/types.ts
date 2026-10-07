@@ -19,8 +19,6 @@ export type Action = {
   label: string
   group: ActionGroup
   shortcut?: Shortcut
-  keysLabel?: string
-  hidden?: boolean
   uiCommand?: string
   palette?: false | { prompt?: string; initial?: string }
   confirm?: boolean

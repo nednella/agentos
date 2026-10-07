@@ -108,21 +108,4 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
       return `Cleaned up ${describe(target)}`
     },
   },
-  ...Array.from({ length: 9 }, (_, i): Action => {
-    const n = i + 1
-    return {
-      id: `goto-${n}`,
-      label: `Open session ${n}`,
-      group: 'Sessions',
-      shortcut: { key: String(n) },
-      keysLabel: n === 1 ? '⌘1–9' : undefined,
-      hidden: n > 1,
-      palette: false,
-      run() {
-        const target = a.sessions.find((s) => s.n === n)
-        if (!target) throw `No session ${n}`
-        a.select(target.id)
-      },
-    }
-  }),
 ]

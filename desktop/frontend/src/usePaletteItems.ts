@@ -33,12 +33,11 @@ export function usePaletteItems(query: string): PaletteItem[] {
     label: `${s.n}  ${s.title}`,
     hint: s.detail,
     state: s.state,
-    keys: s.n <= 9 ? `⌘${s.n}` : undefined,
     run: () => a.select(s.id),
   }))
 
   const commands: PaletteItem[] = actions
-    .filter((action) => action.palette !== false && !action.hidden)
+    .filter((action) => action.palette !== false)
     .map((action) => ({
       key: `a-${action.id}`,
       group: 'Actions',
