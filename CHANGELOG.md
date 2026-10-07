@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.0](https://github.com/nednella/agentos/compare/v0.12.0...v0.13.0) (2026-10-07)
+
+
+### Features
+
+* **cli:** add --prompt to agentos new ([3c5ed3c](https://github.com/nednella/agentos/commit/3c5ed3c7d4a3d09052768e20e2d1511edf2bb064))
+* **desktop:** tell claude sessions how to start a session ([49b77dc](https://github.com/nednella/agentos/commit/49b77dcb5702aa71ac5b691de4f4246e7d6b3cf5))
+
 ## [0.12.0](https://github.com/nednella/agentos/compare/v0.11.1...v0.12.0) (2026-10-07)
 
 
