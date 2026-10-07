@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/nednella/agentos/compare/v0.11.0...v0.11.1) (2026-10-07)
+
+
+### Bug Fixes
+
+* **ui:** focus new shell once it exists ([3a59c16](https://github.com/nednella/agentos/commit/3a59c16736a6d932c95460d8bfd9206109c47c61))
+
 ## [0.11.0](https://github.com/nednella/agentos/compare/v0.10.2...v0.11.0) (2026-10-07)
 
 
