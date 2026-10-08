@@ -65,6 +65,8 @@ type Project = {
   needsYou: number      // sessions waiting; the same count the top bar shows
   working: number
   sessions: number      // all running sessions; ended ones do not count
+  needsSetup: boolean   // the project has no queue_sections: the queue offers to set it up, and the palette has Set up project
+  setupDismissed: boolean // the owner chose Not now; the queue stops offering, the palette still does
 }
 
 type Issue = {
@@ -206,6 +208,8 @@ type Digest = {
 | `AddProject()` | `Snapshot` | opens the folder picker, adds the folder (named after it, `-2` on a clash), saves the config, switches to it; unchanged snapshot on cancel |
 | `AddProjectDir(dir)` | `Snapshot` | the same without the picker; `~` is expanded; rejects a folder that does not exist |
 | `NewProject(name)` | `Snapshot` | opens the folder picker for the parent folder, creates `<parent>/<name>` with a README, `git init -b main` and a first commit, creates a public GitHub repo `<name>` as its `origin` with `gh repo create --push`, then adds and switches to it. Rejects a name outside letters, digits, `.`, `-`, `_` and a folder that exists; a failed git step removes the new folder, a failed `gh` step keeps it and says so; unchanged snapshot on cancel |
+| `SetUpProject()` | `Session` | sets the current project up: adds it to the config if the config lacks it, fills the keys it leaves empty with a basic block (`session_branch_fallback: "issue-{n}"`, a `session_cleanup_command` that removes the worktree and branch, `pr_review_command` and `pr_checks_command` that fix and push and never merge, mark ready or request reviewers, and one `Inbox` section, `labels: ["*"]`, with the action `Work`, `/work {n}`), then starts the session *Set up for agentos*, which runs `agentos setup help` and builds the repository side with the owner. The project's `session_prompt_send` decides whether that first message is sent. The front end then reads the snapshot and the issues again |
+| `DismissSetup()` | `Snapshot` | saves `setup_dismissed: true` on the current project, adding it to the config if the config lacks it |
 | `RemoveProject(name)` | `Snapshot` | forgets a configured project and ends its sessions; switches away if it was current, even when the config never listed it (the folder the app started in). Rejects while the project has live issue sessions (the message names them): their branch pattern and clean-up command come from the project. Editing the config file keeps its comments and `~` paths |
 
 ### Sessions (`sessions`)
@@ -392,7 +396,7 @@ folders are served. Use the URL in `<img src>`.
 
 ## Config file
 
-`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed and when a setting changes, and keeps every key below, its comments and its `~` paths.
+`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, when a setting changes and when a project is set up, and keeps every key below, its comments and its `~` paths.
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos. The settings panel writes it; the app reads it when it starts
@@ -420,6 +424,7 @@ projects:
     pr_poll_interval: 10s      # how often to poll the pull requests; at least 1s
     pr_review_command: ""      # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
     pr_checks_command: ""      # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
+    setup_dismissed: false     # the owner chose Not now on the offer to set the project up. The queue writes it
 ```
 
 ### Queue sections and actions
@@ -492,7 +497,7 @@ browser to drive), `AGENTOS_BROWSER_HEADLESS` (`1`, tests only: start the browse
 
 Every Claude session starts with `--append-system-prompt`: how to hand a topic to a new session with `agentos new --prompt`, a line that points to `agentos setup help`, then the browser lines when it has a browser.
 
-The texts given to agents (the digest run, the lines in a session's system prompt, `agentos browser help`, `agentos setup help`)
+The texts given to agents (the digest run, the lines in a session's system prompt, `agentos browser help`, `agentos setup help`, the set-up session's first message and the PR commands set-up writes)
 are Markdown files in `internal/prompts`.
 
 ## Command line
@@ -513,7 +518,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
-| Projects | `setup help` | prints what a project needs so that `/work` runs on its own: the issue template, the commands, the labels, the config block and what `CLAUDE.md` must say. Works with the app closed |
+| Projects | `setup help` | prints what a project's repository needs so that `/work` runs on its own: the issue template, the `/work` command and what `CLAUDE.md` must say. The app writes the config block (`SetUpProject`). Works with the app closed |
 | From inside a session | `browser open <url>`, `browser tab <url>`, `browser screenshot`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` explains how to use the browser |
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux (works with
