@@ -7,7 +7,7 @@ export function SetupOffer() {
       <div className="flex flex-col gap-1">
         <p className="text-body font-medium">Set up this project for agentos</p>
         <p className="text-small text-dim">
-          Adds an Inbox whose Work action runs <code className="mono">/work</code>, then starts a session to write the command, the issue template and CLAUDE.md with you.
+          Adds an Inbox whose Work action runs <code className="mono">/work</code>, then starts a session to write the command, the issue template and AGENTS.md with you.
         </p>
       </div>
       <div className="flex justify-end gap-1.5">

@@ -22,10 +22,12 @@ is missing with the owner. Ask before you write each file.
    marks the PR ready or requests reviewers.
    It starts with front matter: `description:` and `argument-hint: <issue number>`. $ARGUMENTS is the number.
 
-3. The project's CLAUDE.md
-   `/work` runs alone only when CLAUDE.md says:
-   - how to make a worktree for an issue: where it goes, from which branch, and any set-up it needs (dependencies,
-     env files, a build)
+3. AGENTS.md at the repository root
+   `/work` runs alone only when AGENTS.md says:
+   - where a worktree goes and the set-up it needs (dependencies, env files, a build); a worktree folder inside the
+     repository goes in .gitignore
    - how to run the tests, the linters and the build, as exact commands
    - how to check a change by hand, when tests are not enough
    - the commit message style, and any hard rules, such as what a session must never touch
+   Claude Code reads AGENTS.md only when the project has no CLAUDE.md. When it has one, ask the owner whether to move
+   it into AGENTS.md.
