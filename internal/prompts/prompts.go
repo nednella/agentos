@@ -14,6 +14,8 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
+	//go:embed setup-help.md
+	setupHelp string
 	//go:embed start-issue.md
 	startIssue string
 	//go:embed new-session.md
@@ -33,6 +35,9 @@ func NewSession() string { return body(newSession) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
+
+// SetupHelp is what agentos setup help prints.
+func SetupHelp() string { return body(setupHelp) }
 
 // StartIssue is what a session for an issue is started with when the project defines no action for it.
 // {n} is the issue number and {title} its title.
