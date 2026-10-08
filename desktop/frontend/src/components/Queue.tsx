@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import { filterIssues, isFiltering } from '../issueFilter'
@@ -11,6 +11,7 @@ import { IssueRow } from './IssueRow'
 import { Notice } from './Notice'
 import { QueueSectionHeader } from './QueueSectionHeader'
 import { QueueSearch } from './QueueSearch'
+import { QueueUnsortedHeader } from './QueueUnsortedHeader'
 import type { NavRef } from './Sidebar'
 
 type Item = { kind: 'section'; name: string; count: number } | { kind: 'issue'; issue: Issue }
@@ -18,6 +19,7 @@ type Item = { kind: 'section'; name: string; count: number } | { kind: 'issue'; 
 const itemKey = (item: Item) => (item.kind === 'section' ? `section:${item.name}` : `issue:${item.issue.number}`)
 
 const CLOSED_KEY = 'agentos.queue.closed'
+const UNSORTED_OPEN_KEY = 'agentos.queue.unsortedOpen'
 
 type QueueProps = { nav: NavRef }
 
@@ -50,29 +52,39 @@ type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 function QueueList({ nav, shown, filtering }: QueueListProps) {
   const { issues, issuesLoading, setOverlay } = useAgentos()
   const [closed, setClosed] = useState<Set<string>>(() => new Set(readStored<string[]>(CLOSED_KEY, [])))
+  const [unsortedOpen, setUnsortedOpen] = useState(() => readStored(UNSORTED_OPEN_KEY, false))
   const list = useRef<HTMLDivElement>(null)
 
-  // The core lists issues section by section; a project with no sections has one nameless group.
+  // The core lists issues section by section and the issues no section matches last, in a nameless group;
+  // a project with no sections has only that group, shown as a plain list.
+  const sorted = issues.some((issue) => issue.section)
+  const isClosed = useCallback((name: string) => (name ? closed.has(name) : sorted && !unsortedOpen), [closed, sorted, unsortedOpen])
+
   const sections = useMemo(() => {
     const groups: { name: string; issues: Issue[]; open: boolean }[] = []
     for (const issue of shown) {
       const group = groups.find((g) => g.name === issue.section)
       if (group) group.issues.push(issue)
-      else groups.push({ name: issue.section, issues: [issue], open: filtering || !closed.has(issue.section) })
+      else groups.push({ name: issue.section, issues: [issue], open: filtering || !isClosed(issue.section) })
     }
     return groups
-  }, [shown, filtering, closed])
+  }, [shown, filtering, isClosed])
 
   const items = useMemo<Item[]>(
     () =>
       sections.flatMap((section) => [
-        ...(section.name ? [{ kind: 'section' as const, name: section.name, count: section.issues.length }] : []),
+        ...(section.name || sorted ? [{ kind: 'section' as const, name: section.name, count: section.issues.length }] : []),
         ...(section.open ? section.issues.map((issue) => ({ kind: 'issue' as const, issue })) : []),
       ]),
-    [sections],
+    [sections, sorted],
   )
 
-  const toggle = (name: string, open: boolean) =>
+  const toggle = (name: string, open: boolean) => {
+    if (!name) {
+      setUnsortedOpen(open)
+      writeStored(UNSORTED_OPEN_KEY, open)
+      return
+    }
     setClosed((set) => {
       const next = new Set(set)
       if (open) next.delete(name)
@@ -80,13 +92,14 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
       writeStored(CLOSED_KEY, [...next])
       return next
     })
+  }
 
   const listNav = useListNav(items.map(itemKey), {
     onEnter(index) {
       const item = items[index]
       if (!item) return
       if (item.kind === 'section') {
-        toggle(item.name, closed.has(item.name))
+        toggle(item.name, isClosed(item.name))
         return
       }
       setOverlay({ issue: item.issue.number })
@@ -94,18 +107,18 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
     onSpace(index) {
       const item = items[index]
       if (item?.kind !== 'section' || filtering) return false
-      toggle(item.name, closed.has(item.name))
+      toggle(item.name, isClosed(item.name))
       return true
     },
     onLeft(index) {
       const item = items[index]
-      if (item?.kind !== 'section' || filtering || closed.has(item.name)) return false
+      if (item?.kind !== 'section' || filtering || isClosed(item.name)) return false
       toggle(item.name, false)
       return true
     },
     onRight(index) {
       const item = items[index]
-      if (item?.kind !== 'section' || filtering || !closed.has(item.name)) return false
+      if (item?.kind !== 'section' || filtering || !isClosed(item.name)) return false
       toggle(item.name, true)
       return true
     },
@@ -127,16 +140,26 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
   return (
     <div ref={list} className="min-h-0 flex-1 overflow-y-auto pt-1.5 pb-2">
       {sections.map((section) => (
-        <section key={section.name}>
-          {section.name && (
+        <section key={section.name} className={sorted && !section.name ? 'mt-2 border-t border-line pt-2' : undefined}>
+          {section.name ? (
             <QueueSectionHeader
               name={section.name}
               count={section.issues.length}
               open={section.open}
               cursor={listNav.cursorKey === `section:${section.name}`}
               locked={filtering}
-              onToggle={() => toggle(section.name, closed.has(section.name))}
+              onToggle={() => toggle(section.name, isClosed(section.name))}
             />
+          ) : (
+            sorted && (
+              <QueueUnsortedHeader
+                count={section.issues.length}
+                open={section.open}
+                cursor={listNav.cursorKey === 'section:'}
+                locked={filtering}
+                onToggle={() => toggle('', isClosed(''))}
+              />
+            )
           )}
           <Collapse open={section.open}>
             {section.issues.map((issue) => (
