@@ -71,7 +71,7 @@ type Issue = {
   number: number
   title: string
   type: 'bug' | 'feature' | 'refactor' | 'chore' | ''   // from a type:<x> label
-  section: string       // the queue section it is in (see config); "" when the project defines none
+  section: string       // the queue section it is in (see config); "" when no section matches it or the project defines none
   actions: string[]     // names of what can start a session for it; the first is the default
   url: string
   sessionId: string     // live session started for this issue, else ""
@@ -446,7 +446,7 @@ queue_sections:
 
 - An issue goes in the first section it matches: it has any of the section's `labels`, or the section's `labels` is empty and the issue has none, or the section's `labels` holds `"*"`, which matches every issue.
 - So a `"*"` section placed last takes every issue the sections above it did not. A section after it would never be reached, so a config with one does not load.
-- An issue no section matches goes in an `Other` section after the last, so no issue is hidden.
+- An issue no section matches goes after the last section with `section` `""` and the `Start` action, so no issue is hidden and no section name can clash with it. The front end shows these issues under one folded row, `<n> more issues match no section`, below a rule. A last `"*"` section is only needed to give those issues a name or other actions.
 - In a command, `{n}` is the issue number and `{title}` its title. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
 - With no `queue_sections` the queue is one list, `Issue.section` is `""`, and each issue has one action, `Start`, which types `Work on issue #<n>: <title>`. A section with no actions has that same action.

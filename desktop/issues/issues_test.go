@@ -28,7 +28,7 @@ func TestIssues(t *testing.T) {
 	for _, is := range got {
 		placed = append(placed, fmt.Sprintf("%d:%s:%s:%s", is.Number, is.Section, strings.Join(is.Actions, "+"), is.Type))
 	}
-	want := []string{"7:Ready:Work+Plan:bug", "8:Plan:Investigate:feature", "11:Inbox:Investigate:", "9:Other:Start:", "10:Other:Start:chore", "12:Other:Start:"}
+	want := []string{"7:Ready:Work+Plan:bug", "8:Plan:Investigate:feature", "11:Inbox:Investigate:", "9::Start:", "10::Start:chore", "12::Start:"}
 	if !slices.Equal(placed, want) {
 		t.Errorf("issues = %v, want %v", placed, want)
 	}
