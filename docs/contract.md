@@ -492,7 +492,7 @@ browser to drive), `AGENTOS_BROWSER_HEADLESS` (`1`, tests only: start the browse
 
 Every Claude session starts with `--append-system-prompt`: how to hand a topic to a new session with `agentos new --prompt`, then the browser lines when it has a browser.
 
-The texts given to agents (the digest run, the lines in a session's system prompt, `agentos browser help`)
+The texts given to agents (the digest run, the lines in a session's system prompt, `agentos browser help`, `agentos setup help`)
 are Markdown files in `internal/prompts`.
 
 ## Command line
@@ -513,6 +513,7 @@ happened ("started 2 sessions: #394 (3), #393 (4)"); view commands send a `ui:co
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
+| Projects | `setup help` | prints what a project needs so that `/work` runs on its own: the issue template, the commands, the labels, the config block and what `CLAUDE.md` must say. Works with the app closed |
 | From inside a session | `browser open <url>`, `browser tab <url>`, `browser screenshot`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` explains how to use the browser |
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux (works with
