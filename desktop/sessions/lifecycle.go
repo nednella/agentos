@@ -605,7 +605,7 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
 		"number,url,state,isDraft,headRefOid,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
 	if err != nil {
-		return nil, fmt.Errorf("finding the PR of %s: %w", branch, err)
+		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
 	return parsePR(out)
 }
