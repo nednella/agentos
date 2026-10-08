@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.15.0](https://github.com/nednella/agentos/compare/v0.14.1...v0.15.0) (2026-10-08)
+
+
+### Features
+
+* **cli:** add agentos setup help ([dbe09d9](https://github.com/nednella/agentos/commit/dbe09d91a2de66b13ca3242563c9d473ae41f22d))
+* **desktop:** point every session to agentos setup help ([dac6f61](https://github.com/nednella/agentos/commit/dac6f612016a3346dc29a70ecdc2ad389ebceceb))
+* **internal:** let queue section match every issue with "*" ([c1325b2](https://github.com/nednella/agentos/commit/c1325b2f40e74d7829db4acf3bc5a5d1c83a5ba0))
+* **internal:** put issues no queue section matches in no section ([85b223d](https://github.com/nednella/agentos/commit/85b223d26c6d10afffc14860c82026bf42431b17))
+* **internal:** reject queue section after "*" section ([503df36](https://github.com/nednella/agentos/commit/503df36c8787cd11c3964846d622873312a8b55a))
+* **ui:** fold issues that match no queue section ([3cc1eb7](https://github.com/nednella/agentos/commit/3cc1eb7ce0b3b2d57556aad89e5d92ece3bfd35f))
+* **ui:** zoom and pan images in evidence viewer ([2196142](https://github.com/nednella/agentos/commit/2196142376c2d2a334bb7b315caa826b65338d09))
+* **ui:** zoom evidence image with left and right click ([0a1de46](https://github.com/nednella/agentos/commit/0a1de469faa43b63b0d85459dec4316c47e316ed))
+
+
+### Bug Fixes
+
+* **desktop:** keep whole issue title in session title ([dfcc5fb](https://github.com/nednella/agentos/commit/dfcc5fb3cecc04ed9c0e86774d9bca6a0ca56c84)), closes [#237](https://github.com/nednella/agentos/issues/237)
+
 ## [0.14.1](https://github.com/nednella/agentos/compare/v0.14.0...v0.14.1) (2026-10-08)
 
 
