@@ -41,6 +41,8 @@ export type Project = {
   needsYou: number
   working: number
   sessions: number
+  needsSetup: boolean
+  setupDismissed: boolean
 }
 
 export type Note = {

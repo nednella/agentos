@@ -16,9 +16,12 @@ type MockSession = Session & {
   tools: number
 }
 
-type ProjectData = { name: string; dir: string; repo: string; notes: Note[]; issues: Issue[]; waits: Wait[]; cleanups: Cleanup[] }
+type ProjectData = { name: string; dir: string; repo: string; notes: Note[]; issues: Issue[]; waits: Wait[]; cleanups: Cleanup[]; needsSetup?: boolean; setupDismissed?: boolean }
 
 const minute = 60_000
+
+// A project that is not set up has no queue sections, so every issue sits in the nameless group.
+const unsorted = (issues: Issue[]) => issues.map((issue) => ({ ...issue, section: '', actions: ['Start'] }))
 const noteTexts = [
   'Retry banner when the websocket drops\nShow a thin bar under the header and retry with backoff. Maybe reuse the toast style so it does not feel like a third kind of notice.\nThe backoff should reset on the first successful frame, not on connect, because the proxy accepts and then drops.',
   'Ask Alex about the checkout button copy. They said something about "Buy now" vs "Pay" last week and I forgot which way it went.',
@@ -136,7 +139,7 @@ export function createMock(params: URLSearchParams) {
   const sessions: MockSession[] = []
   const data: ProjectData[] = [
     { name: 'storefront', dir: '~/code/acme/storefront', repo: 'acme/storefront', notes: seedNotes(noteTexts), issues: buildIssues('acme/storefront'), waits: seedWaits([['#454 product page split', 454], ['#444 checkout route', 444], ['#326 cart rounding', 326], ['#389 webhook retries', 389], ['checkout tests scratch', 0]]), cleanups: [{ at: Date.now() - 5 * 3_600_000, sessionTitle: '#371 old banner', issue: 371, pr: 440, merged: true, status: 'done', removed: ['worktree trees/issue-371', 'branch issue-371', 'temp files', 'session'], reason: '' }, { at: Date.now() - 26 * 3_600_000, sessionTitle: '#366 retry copy', issue: 366, pr: 431, merged: true, status: 'done', removed: ['worktree trees/issue-366', 'branch issue-366', 'session'], reason: '' }] },
-    { name: 'agentos', dir: '~/code/agentos', repo: 'nednella/agentos', notes: seedNotes(noteTexts.slice(0, 3)), issues: buildIssues('nednella/agentos'), waits: seedWaits([['#12 session memory', 12]]).slice(0, 12), cleanups: [] },
+    { name: 'agentos', dir: '~/code/agentos', repo: 'nednella/agentos', notes: seedNotes(noteTexts.slice(0, 3)), issues: unsorted(buildIssues('nednella/agentos')), waits: seedWaits([['#12 session memory', 12]]).slice(0, 12), cleanups: [], needsSetup: true },
     { name: 'scratch', dir: '~/scratch', repo: '', notes: [], issues: [], waits: [], cleanups: [] },
   ]
   let current = data[0]
@@ -195,6 +198,8 @@ export function createMock(params: URLSearchParams) {
       needsYou: own.filter((s) => s.state === 'waiting').length,
       working: own.filter((s) => s.state === 'working').length,
       sessions: own.length,
+      needsSetup: !!p.needsSetup,
+      setupDismissed: !!p.setupDismissed,
     }
   }
 
@@ -679,7 +684,7 @@ export function createMock(params: URLSearchParams) {
     },
     AddProject: async () => {
       const name = `picked-folder-${data.length}`
-      data.push({ name, dir: `~/code/${name}`, repo: '', notes: [], issues: [], waits: [], cleanups: [] })
+      data.push({ name, dir: `~/code/${name}`, repo: '', notes: [], issues: [], waits: [], cleanups: [], needsSetup: true })
       const snap = switchTo(data[data.length - 1])
       emit('projects', snap.projects)
       return snap
@@ -688,7 +693,7 @@ export function createMock(params: URLSearchParams) {
       if (!/^[~/]/.test(dir) || dir.includes('nope')) throw `Folder does not exist: ${dir}`
       const name = dir.replace(/\/+$/, '').split('/').pop() || dir
       if (data.some((p) => p.name === name)) throw `Project ${name} already exists`
-      data.push({ name, dir, repo: '', notes: [], issues: [], waits: [], cleanups: [] })
+      data.push({ name, dir, repo: '', notes: [], issues: [], waits: [], cleanups: [], needsSetup: true })
       const snap = switchTo(data[data.length - 1])
       emit('projects', snap.projects)
       return snap
@@ -696,7 +701,7 @@ export function createMock(params: URLSearchParams) {
     NewProject: async (name: string) => {
       if (!/^[\w.-]+$/.test(name)) throw `${name} is not a project name`
       if (data.some((p) => p.name === name)) throw `Project ${name} already exists`
-      data.push({ name, dir: `~/code/${name}`, repo: `ned/${name}`, notes: [], issues: [], waits: [], cleanups: [] })
+      data.push({ name, dir: `~/code/${name}`, repo: `ned/${name}`, notes: [], issues: [], waits: [], cleanups: [], needsSetup: true })
       const snap = switchTo(data[data.length - 1])
       emit('projects', snap.projects)
       return snap
@@ -707,6 +712,18 @@ export function createMock(params: URLSearchParams) {
       if (data.length === 1) throw 'Cannot remove the last project'
       data.splice(at, 1)
       const snap = current.name === name ? switchTo(data[0]) : snapshot()
+      emit('projects', snap.projects)
+      return snap
+    },
+    SetUpProject: async () => {
+      current.needsSetup = false
+      current.issues = current.issues.map((issue) => ({ ...issue, section: 'Inbox', actions: ['Work'] }))
+      emit('projects', data.map(projectView))
+      return startSessionFor('Set up for agentos', 0, 'Run `agentos setup help` and set up this project with me')
+    },
+    DismissSetup: async () => {
+      current.setupDismissed = true
+      const snap = snapshot()
       emit('projects', snap.projects)
       return snap
     },
