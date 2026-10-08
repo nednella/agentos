@@ -50,7 +50,7 @@ func newRootCmdWith(l launcher) *cobra.Command {
 		&cobra.Group{ID: groupProject, Title: "Projects:"},
 		&cobra.Group{ID: groupSession, Title: "From inside a session:"},
 	)
-	root.AddCommand(newBrowserCmd(), newDigestCmd(), newHookCmd(), newKillCmd(), newNoteCmd(), newSetupCmd(), newShowCmd(), newStatsCmd(), newTrackCmd(), newUpdateCmd(l), newVersionCmd())
+	root.AddCommand(newBrowserCmd(), newDigestCmd(), newHookCmd(), newKillCmd(), newNoteCmd(), newShowCmd(), newStatsCmd(), newTrackCmd(), newUpdateCmd(l), newVersionCmd())
 	root.AddCommand(newAppCmds()...)
 	return root
 }

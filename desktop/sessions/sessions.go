@@ -855,19 +855,26 @@ func (s *Sessions) IssueSessions() map[int]string {
 // Create starts the agent in the current project. A non-empty text is typed
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
-	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "")
+	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "")
+}
+
+// CreateBriefed is Create for a session with a job of its own: brief is added to the agent's system prompt, and the
+// project says whether text is sent.
+func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
+	proj := s.Current()
+	return s.createIn(proj, title, text, proj.SendsPrompt(), 0, project.Model{}, "", brief)
 }
 
 // CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
 // that is sent. The action and the issue's labels pick the model.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, project.Pick(action, labels), "")
+	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, project.Pick(action, labels), "", "")
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.
-// A conversation continues that of an earlier session.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation string) (Session, error) {
+// A conversation continues that of an earlier session; a brief is added to the agent's system prompt.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation, brief string) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -876,7 +883,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue, model, conversation); err != nil {
+	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
@@ -919,7 +926,7 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation string) error {
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief string) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
@@ -935,7 +942,7 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation), issue, model)
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief), issue, model)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
@@ -1036,7 +1043,7 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 		return
 	}
 	if t.ended {
-		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model, t.conversation); err != nil {
+		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model, t.conversation, ""); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 			return
 		}
@@ -1434,9 +1441,9 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 	return string(config)
 }
 
-// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
-// about the browser when the project allows it and one exists.
-func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation string) []string {
+// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app,
+// about the browser when the project allows it and one exists, and the brief when there is one.
+func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief string) []string {
 	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
 	if _, ok := s.agent.(agent.Claude); !ok {
 		return argv
@@ -1447,6 +1454,9 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
 			prompt += "\n\n" + prompts.BrowserSession()
 		}
+	}
+	if brief != "" {
+		prompt += "\n\n" + brief
 	}
 	return append(argv, "--append-system-prompt", prompt)
 }
