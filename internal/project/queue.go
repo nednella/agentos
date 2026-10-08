@@ -15,9 +15,6 @@ import (
 // DefaultPRPoll is how often pull requests are polled when pr_poll_interval is not set.
 const DefaultPRPoll = 10 * time.Second
 
-// OtherSection holds the issues no queue section matches.
-const OtherSection = "Other"
-
 // Action is a way to start a session for an issue: a command to type, run with its own model and effort.
 type Action struct {
 	Name    string `yaml:"name"`
@@ -35,8 +32,8 @@ type Section struct {
 }
 
 // Section is the index of the first section an issue with these labels goes in, and the section.
-// An issue no section takes goes in OtherSection, one place past the last. A project with no sections
-// has one nameless group of every issue.
+// An issue no section takes goes in a nameless section one place past the last, so no name in the config
+// can clash with it. A project with no sections has one nameless group of every issue.
 func (p Project) Section(labels []string) (int, Section) {
 	if len(p.QueueSections) == 0 {
 		return 0, Section{}
@@ -46,7 +43,7 @@ func (p Project) Section(labels []string) (int, Section) {
 			return i, s
 		}
 	}
-	return len(p.QueueSections), Section{Name: OtherSection}
+	return len(p.QueueSections), Section{}
 }
 
 func (s Section) takes(labels []string) bool {

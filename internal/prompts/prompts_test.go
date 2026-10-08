@@ -18,7 +18,7 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		{"new session", NewSession(), "a738a01d16332bb1c28d6c5a83b38a95525c5685ad226a59216e95e86d9acfb3"},
 		{"browser help", BrowserHelp(), "e03aad399bcfbeaf312fdae39f01dcd3543a5ad7de4de72a02490ebdedaa2631"},
 		{"setup session", SetupSession(), "341ba267d4dd5a2f3f5fa1c0036a9426c432ad11b7136de7d9c8b05969c2db79"},
-		{"setup help", SetupHelp(), "336ffc89c7cc08a2122bcfcca65a970cd65e7a5064523f6cb746cde5207f2fbd"},
+		{"setup help", SetupHelp(), "8930430e572628f949576b68d7a9056dd27f09c32a42f45b6de870b8b9d653ab"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

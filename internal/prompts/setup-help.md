@@ -59,9 +59,9 @@ Make each part in the project's repository, except the config block, which goes 
    session_cleanup_command  run in the project folder when the app cleans up a session, as after its PR merges, once
                             per branch; {branch}, {worktree}, {dir}, and {force}, which is --force when forced
    queue_sections           the groups of the queue, in order. An issue goes in the first section with one of its
-                            labels; `labels: []` takes the issues with no labels; the rest go in Other. Each action
-                            types its command, {n} the number and {title} the title, at its model and effort; the
-                            first action is the default; a section with none gets Start, which types
+                            labels; `labels: []` takes the issues with no labels; the rest go at the end, in no
+                            section. Each action types its command, {n} the number and {title} the title, at its model
+                            and effort; the first action is the default; a section with none gets Start, which types
                             "Work on issue #<n>: <title>". A project with no `/plan` leaves the Plan action out.
 
 5. The project's CLAUDE.md
