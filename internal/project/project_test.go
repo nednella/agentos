@@ -70,6 +70,7 @@ func TestLoad(t *testing.T) {
 		{name: "two sections of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A}, {name: A}]}\n"), wantErr: true},
 		{name: "action without a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{command: x}]}]}\n"), wantErr: true},
 		{name: "two actions of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
+		{name: "section after a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: Rest, labels: [\"*\"]}, {name: Ready, labels: [ready]}]}\n"), wantErr: true},
 		{name: "bad action effort", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
 		{name: "unknown prompt send", path: write("projects:\n  - {name: api, directory: /srv/api, session_prompt_send: later}\n"), wantErr: true},
 		{name: "theme", path: write("app_theme: dark\n"), want: Config{Theme: "dark"}},

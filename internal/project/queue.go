@@ -103,12 +103,15 @@ func (p Project) validateQueue() error {
 		return fmt.Errorf("session_prompt_send must be %s or %s, not %q", PromptAuto, PromptManual, p.SessionPromptSend)
 	}
 	var sections []string
-	for _, s := range p.QueueSections {
+	for i, s := range p.QueueSections {
 		if s.Name == "" {
 			return errors.New("queue_sections: a section needs a name")
 		}
 		if slices.Contains(sections, s.Name) {
 			return fmt.Errorf("queue_sections: two sections are named %q", s.Name)
+		}
+		if i > 0 && slices.Contains(p.QueueSections[i-1].Labels, "*") {
+			return fmt.Errorf("queue_sections.%s: a section after \"*\" is never reached", s.Name)
 		}
 		sections = append(sections, s.Name)
 		var actions []string
