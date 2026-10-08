@@ -6,6 +6,7 @@ import { useArmedConfirm } from '../useArmedConfirm'
 import type { Evidence } from '../types'
 import { ConfirmRow } from './ConfirmRow'
 import { Icon } from './Icon'
+import { FIT, ZoomableImage, zoomTo, type ImageView } from './ZoomableImage'
 
 type EvidenceViewerProps = {
   sessionId: string
@@ -21,6 +22,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
   const [id, setId] = useState(startId)
   const confirm = useArmedConfirm()
   const [copied, setCopied] = useState(false)
+  const [view, setView] = useState<ImageView>(FIT)
   const at = items.findIndex((i) => i.id === id)
   const item = items[at]
 
@@ -34,12 +36,14 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
 
   const step = (delta: number) => {
     confirm.disarm()
+    setView(FIT)
     setId(items[(at + delta + items.length) % items.length].id)
   }
 
   const remove = () => {
     const next = items[at + 1] ?? items[at - 1]
     confirm.disarm()
+    setView(FIT)
     if (next) setId(next.id)
     report(() => api.deleteEvidence(sessionId, item.id))
   }
@@ -57,13 +61,17 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
         if (e.key === 'Escape') onClose()
         if (e.key === 'ArrowLeft') step(-1)
         if (e.key === 'ArrowRight') step(1)
+        if (e.metaKey) return
+        if (e.key === '=' || e.key === '+') setView((v) => zoomTo(v, v.scale * 1.5))
+        if (e.key === '-') setView((v) => zoomTo(v, v.scale / 1.5))
+        if (e.key === '0') setView(FIT)
       }}
     >
-      <img src={item.url} alt={item.caption || 'Evidence image'} className="block max-h-[72vh] max-w-full rounded-md border border-line-strong object-contain" />
+      <ZoomableImage src={item.url} alt={item.caption || 'Evidence image'} view={view} onView={setView} onDismiss={onClose} />
       <div className="flex max-w-3xl flex-col items-center gap-2 text-center">
         {item.caption && <p className="text-body">{item.caption}</p>}
         <p className="mono text-small text-dim">
-          {at + 1} of {items.length} · {item.source === 'agent' ? 'agent' : 'you'} · {ago(item.at, now)}
+          {at + 1} of {items.length} · {item.source === 'agent' ? 'agent' : 'you'} · {ago(item.at, now)} · {Math.round(view.scale * 100)}%
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <button className="btn" onClick={() => step(-1)} aria-label="Previous image" disabled={items.length < 2}>
@@ -71,6 +79,15 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
           </button>
           <button className="btn" onClick={() => step(1)} aria-label="Next image" disabled={items.length < 2}>
             Next <Icon name="forward" />
+          </button>
+          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale / 1.5))} aria-label="Zoom out" disabled={view.scale === 1}>
+            −
+          </button>
+          <button className="btn" onClick={() => setView(FIT)} aria-label="Fit image" disabled={view.scale === 1}>
+            Fit
+          </button>
+          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale * 1.5))} aria-label="Zoom in">
+            +
           </button>
           <button
             className="btn"
