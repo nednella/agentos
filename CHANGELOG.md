@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.14.1](https://github.com/nednella/agentos/compare/v0.14.0...v0.14.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **desktop:** look up PR once per turn, not on every poll ([7210d90](https://github.com/nednella/agentos/commit/7210d9015be629d153124231f5d0befd109dac54))
+* **desktop:** warn once when PR lookups fail alike ([4adbb0b](https://github.com/nednella/agentos/commit/4adbb0bbe1ecb20b23646953948baa2842247332))
+* **ui:** show kill confirm below session stat bar ([6ac8d92](https://github.com/nednella/agentos/commit/6ac8d92d1b46c15804c933e63a9d6583785aafe3))
+* **ui:** show session kill button in danger colour ([fba5281](https://github.com/nednella/agentos/commit/fba528148caa33b55c13faca402dbe6103e5126f))
+
 ## [0.14.0](https://github.com/nednella/agentos/compare/v0.13.0...v0.14.0) (2026-10-07)
 
 
