@@ -16,72 +16,39 @@
 
 ## Install
 
-You need macOS on Apple silicon, plus:
+Needs macOS on Apple silicon, plus:
 
 - [tmux](https://github.com/tmux/tmux): `brew install tmux`
-- [GitHub CLI](https://cli.github.com), logged in: `brew install gh && gh auth login`
+- [GitHub CLI](https://cli.github.com), logged in: `brew install gh && gh auth login`; 2.99 or later to attach pictures when a note becomes an issue
 - [Claude Code](https://docs.claude.com/en/docs/claude-code)
-- optional: a Chromium browser (Brave, Chrome, Chromium or Edge) for the agent browser
+- optional: Brave, Chrome, Chromium or Edge, for the agent browser
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nednella/agentos/main/install.sh | bash
 ```
 
-This downloads the latest release, checks its sha256, puts `agentos.app` in `~/Applications`, links
-the `agentos` command into `~/.local/bin` and tells you what is missing. No sudo.
+The script puts `agentos.app` in `~/Applications` and the `agentos` command in `~/.local/bin`, then lists
+anything missing. No sudo.
 
-The app checks for updates when it starts and every hour; click `Update` in the top bar, or run
-`agentos update`. Your sessions live in tmux and survive.
+## Start
 
-## Use
+1. Open `agentos`.
+2. Add a project: `⌘P` → _Add project_, or `agentos project add` in its folder.
+3. Start a session: `⌘N`, or `Enter` on an issue in the queue to open it, then start one from it.
 
-Open `agentos`, add a project folder with `⌘P` → *Add project* (or run `agentos project add` in the
-folder), then press `⌘N` for a session or `Enter` on an issue to read it, then start a session from it.
+`⌘K` opens the command palette. `⌘/` lists every shortcut. `agentos --help` lists the commands.
 
-A project with no `queue_sections` shows a card, *Set up this project for agentos*, at the top of its queue.
-*Set up* writes a basic block into the project's config, filling only keys it does not set: an Inbox
-section of every issue whose action, *Work*, types `/work {n}`, the branch and clean-up commands, and
-the commands for PR reviews and failing checks. It then starts a session, *Set up for agentos*, that
-builds the repository side with you: the `/work` command, the issue template and `CLAUDE.md`. *Not now*
-saves `setup_dismissed: true` and hides the offer; `⌘K` → *Set up project* still works.
+## Set up a project
 
-Without set-up the queue is one list of open issues, and each issue has one action, *Start*, which
-types `Work on issue #<n>: <title>` into a new session. To group the queue by label and choose what
-each group offers, set `queue_sections` on the project, for example:
+A project with no queue sections shows _Set up this project for agentos_ at the top of its queue.
 
-```yaml
-queue_sections:
-  - name: Inbox
-    labels: []                  # issues with no labels
-    actions:
-      - {name: Plan, command: "/plan {n}", model: opus, effort: high}
-      - {name: Work, command: "/work {n}"}
-  - name: Ready
-    labels: [ready]
-    actions:
-      - {name: Work, command: "/work {n}"}
-```
+- **Set up** adds an Inbox whose _Work_ action runs `/work <n>`, plus branch, clean-up and PR commands.
+  If accepted, a session is started that adds the `/work` command, the issue template and `AGENTS.md` files for you.
+- **Not now** hides the offer. `⌘K` → _Set up project_ still works.
 
-agentos sets no model, effort or command of its own. `docs/contract.md` has the details.
+To change the config by hand, edit `~/.config/agentos/config.yaml` with the app closed.
+`docs/config.md` describes every key.
 
-A session's pull request that gets a review, a comment or failing checks flags its row. To also
-send the agent a command, set `pr_review_command` or `pr_checks_command` on the project, for example
-`pr_review_command: "/address-review {n}"`; `docs/contract.md` has the details.
+## Update
 
-When a session's pull request merges, the app removes the session. To also clean up git, set
-`session_cleanup_command` on the project, for example
-`session_cleanup_command: "git worktree remove {force} {worktree} && git branch -D {branch}"`. Without it,
-branches and folders stay as they are.
-
-`⌘K` opens the command palette and `⌘/` lists every shortcut. `agentos --help` lists the command.
-`docs/contract.md` describes the config file at `~/.config/agentos/config.yaml` and every key.
-
-## Develop
-
-```sh
-make desktop-app     # builds the front end and bin/agentos-dev.app
-go test -race ./... && go vet ./...
-```
-
-Conventional commits drive the releases. `docs/testing.md` says how to check a change without
-touching your live sessions.
+Click `Update` in the top bar, or run `agentos update`. Sessions keep running.
