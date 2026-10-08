@@ -1434,14 +1434,14 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 	return string(config)
 }
 
-// commandFor is the agent's command line. Claude learns how to start a session, where to read how to set up a
-// project, and about the browser when the project allows it and one exists.
+// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
+// about the browser when the project allows it and one exists.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation string) []string {
 	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
 	if _, ok := s.agent.(agent.Claude); !ok {
 		return argv
 	}
-	prompt := prompts.NewSession() + "\n\n" + prompts.SetupSession()
+	prompt := prompts.Session()
 	if proj.BrowserOn() && s.browsers.Available() {
 		if port := s.browsers.Port(name.Project); port != 0 {
 			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
