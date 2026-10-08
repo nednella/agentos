@@ -36,7 +36,7 @@ Work only inside that worktree. Never touch the tree the owner is sitting in.
 
 ## 4. Verify
 
-- `go vet ./...` and `go test ./...` for Go; `cd desktop/frontend && npm run build`
+- `go vet ./...` and `go test -race ./...` for Go; `cd desktop/frontend && npm run build`
   for the front end.
 - For anything visible, run the real app in browser mode and look at it, as
   `docs/testing.md` describes. Always set `AGENTOS_TMUX_SOCKET`, `AGENTOS_STATE_DIR`,
