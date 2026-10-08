@@ -6,7 +6,6 @@ import { DetachedState } from './DetachedState'
 import { EmptyState } from './EmptyState'
 import { EvidenceTab } from './EvidenceTab'
 import { Terminal } from './Terminal'
-import { Timeline } from './Timeline'
 import { ViewTabs } from './ViewTabs'
 import { ViewportActions } from './ViewportActions'
 import { ViewportHeader } from './ViewportHeader'
@@ -36,7 +35,6 @@ export function Viewport() {
       className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
     >
       <ViewportHeader key={selected.id} session={selected} />
-      <Timeline session={selected} size="full" />
       <ViewportActions session={selected} />
       <ViewTabs session={selected} view={view} />
       <div className="relative min-h-0 flex-1 border-t border-line bg-term">
