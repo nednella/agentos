@@ -236,7 +236,10 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 }
 
 func (b *Browsers) launchArgs(profile string, port int) []string {
-	args := []string{"--remote-debugging-port=" + strconv.Itoa(port), "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check"}
+	// Brave's updater would run as agentos's child and write into Brave's bundle, which macOS blocks and reports as
+	// "agentos was prevented from modifying apps". Other browsers ignore the flag.
+	args := []string{"--remote-debugging-port=" + strconv.Itoa(port), "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check",
+		"--disable-brave-update"}
 	if b.headless {
 		return append(args, "--headless=new", "--hide-scrollbars", "about:blank")
 	}
