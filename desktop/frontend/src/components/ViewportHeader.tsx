@@ -73,7 +73,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
             </button>
           </span>
         ) : (
-          <button className="btn btn-ghost" onClick={() => kill.arm()} title="Kill this session">
+          <button className="btn btn-ghost text-danger" onClick={() => kill.arm()} title="Kill this session">
             Kill
           </button>
         )}
