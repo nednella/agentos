@@ -14,8 +14,6 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
-	//go:embed setup-session.md
-	setupSession string
 	//go:embed setup-help.md
 	setupHelp string
 	//go:embed setup-start.md
@@ -26,8 +24,8 @@ var (
 	setupChecks string
 	//go:embed start-issue.md
 	startIssue string
-	//go:embed new-session.md
-	newSession string
+	//go:embed session.md
+	session string
 )
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
@@ -38,14 +36,11 @@ func Digest(dependencies []string) string {
 // BrowserSession is appended to a session's system prompt when it has a browser.
 func BrowserSession() string { return body(browserSession) }
 
-// NewSession is appended to every Claude session's system prompt: how to take a topic into a session of its own.
-func NewSession() string { return body(newSession) }
+// Session is appended to every Claude session's system prompt: where it runs and the commands that reach the app.
+func Session() string { return body(session) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
-
-// SetupSession is appended to every Claude session's system prompt: where to read how to set up a project.
-func SetupSession() string { return body(setupSession) }
 
 // SetupHelp is what agentos setup help prints.
 func SetupHelp() string { return body(setupHelp) }
