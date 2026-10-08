@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
@@ -57,6 +58,25 @@ func TestPRIsFoundWhenTheTurnEnds(t *testing.T) {
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the PR the agent opened during the turn", hasPR(h, s.ID))
+}
+
+func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	s := plainSession(h, t)
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the lookup of the turn", func() bool { return h.GH.Calls("pr list") > 0 })
+	time.Sleep(300 * time.Millisecond)
+
+	before := h.GH.Calls("pr list")
+	for range 3 {
+		h.Sessions().Refresh()
+	}
+	time.Sleep(300 * time.Millisecond)
+	if got := h.GH.Calls("pr list"); got != before {
+		t.Errorf("pr lookups after refreshes of an idle session = %d, want %d", got, before)
+	}
 }
 
 func TestPlainSessionFindsItsPR(t *testing.T) {
