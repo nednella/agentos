@@ -26,8 +26,8 @@ type Action struct {
 	Effort  string `yaml:"effort,omitempty"`
 }
 
-// Section is a group of the queue. It takes the issues that have any of its labels, or the issues that have
-// none when it names no labels.
+// Section is a group of the queue. It takes the issues that have any of its labels, the issues that have
+// none when it names no labels, or every issue when its labels hold "*".
 type Section struct {
 	Name    string   `yaml:"name"`
 	Labels  []string `yaml:"labels,omitempty"`
@@ -42,11 +42,21 @@ func (p Project) Section(labels []string) (int, Section) {
 		return 0, Section{}
 	}
 	for i, s := range p.QueueSections {
-		if len(s.Labels) == 0 && len(labels) == 0 || slices.ContainsFunc(labels, func(l string) bool { return slices.Contains(s.Labels, l) }) {
+		if s.takes(labels) {
 			return i, s
 		}
 	}
 	return len(p.QueueSections), Section{Name: OtherSection}
+}
+
+func (s Section) takes(labels []string) bool {
+	if slices.Contains(s.Labels, "*") {
+		return true
+	}
+	if len(s.Labels) == 0 {
+		return len(labels) == 0
+	}
+	return slices.ContainsFunc(labels, func(l string) bool { return slices.Contains(s.Labels, l) })
 }
 
 // StartAction is the only action of an issue whose section lists none: it types a line that names the issue.
