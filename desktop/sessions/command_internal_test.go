@@ -45,7 +45,7 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			t.Setenv("npm_config_cache", t.TempDir())
 			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
 			tt.proj.Dir = "/work/p"
-			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "")
+			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "", "")
 			prompt, config, denied := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config"), slices.Index(argv, "--disallowedTools")
 			if (config >= 0) != tt.want || (denied >= 0) != tt.want {
 				t.Fatalf("argv = %q", argv)
@@ -73,12 +73,12 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 func TestCommandResumesAConversation(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
 	claude := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
-	argv := claude.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc")
+	argv := claude.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc", "")
 	if i := slices.Index(argv, "--resume"); i < 0 || argv[i+1] != "abc" {
 		t.Errorf("argv = %q", argv)
 	}
 	plain := &Sessions{agent: agent.Plain{Argv: []string{"bash"}}, browsers: fakeBrowsers{}}
-	if argv := plain.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc"); !slices.Equal(argv, []string{"bash"}) {
+	if argv := plain.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc", ""); !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
 	}
 }
@@ -167,5 +167,14 @@ func TestNpmCacheDir(t *testing.T) {
 	home, _ := os.UserHomeDir()
 	if got := npmCacheDir(); got != filepath.Join(home, ".npm") {
 		t.Errorf("npmCacheDir without it = %q", got)
+	}
+}
+
+func TestCommandAddsTheBrief(t *testing.T) {
+	name := session.Name{Project: "p", Token: "a1"}
+	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
+	argv := s.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", "set it up")
+	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != prompts.Session()+"\n\nset it up" {
+		t.Errorf("argv = %q", argv)
 	}
 }

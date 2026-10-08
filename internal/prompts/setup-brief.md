@@ -1,8 +1,8 @@
 <!-- placeholders: none -->
 
-agentos setup: what a project's repository needs so that `/work <n>` runs with no help.
-The app writes the project's block in the agentos config when the owner chooses Set up; this covers the repository.
-Ask the owner before you write each file.
+The owner chose Set up for this project in agentos. The app has filled in the project's agentos config; your job is
+the repository side, so that `/work <n>` runs with no help. Check what the repository already has, then build what
+is missing with the owner. Ask before you write each file.
 
 1. Issue template, .github/ISSUE_TEMPLATE/issue.md
    One template, with only a `## Description` heading. A note filed as an issue gets the same body: `## Description`,

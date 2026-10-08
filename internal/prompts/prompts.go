@@ -14,8 +14,8 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
-	//go:embed setup-help.md
-	setupHelp string
+	//go:embed setup-brief.md
+	setupBrief string
 	//go:embed setup-start.md
 	setupStart string
 	//go:embed setup-review.md
@@ -42,8 +42,8 @@ func Session() string { return body(session) }
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
 
-// SetupHelp is what agentos setup help prints.
-func SetupHelp() string { return body(setupHelp) }
+// SetupBrief is added to the system prompt of the session that sets up a project's repository.
+func SetupBrief() string { return body(setupBrief) }
 
 // SetupStart is what the session that sets up a project's repository starts with.
 func SetupStart() string { return body(setupStart) }

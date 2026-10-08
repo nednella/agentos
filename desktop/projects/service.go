@@ -19,7 +19,7 @@ type Sessions interface {
 	Projects() []sessions.Project
 	List() []sessions.Session
 	ShellIDs() []string
-	Create(title, text string, send bool, issue int) (sessions.Session, error)
+	CreateBriefed(title, text, brief string) (sessions.Session, error)
 	SwitchProject(name string) (project.Project, error)
 	Forget(name string) (project.Project, error)
 }
@@ -143,7 +143,7 @@ func (s *Service) SetUpProject() (sessions.Session, error) {
 	if err := s.registry.SetUp(key); err != nil {
 		return sessions.Session{}, err
 	}
-	return s.sessions.Create("Set up for agentos", prompts.SetupStart(), s.sessions.Current().SendsPrompt(), 0)
+	return s.sessions.CreateBriefed("Set up for agentos", prompts.SetupStart(), prompts.SetupBrief())
 }
 
 // DismissSetup stops offering to set up the current project.

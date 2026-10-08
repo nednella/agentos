@@ -17,8 +17,8 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		{"browser session", BrowserSession(), "3ea7ca67b21930ac386b208c41767b8520f17f2d61f91d5e2a729e57834a0401"},
 		{"session", Session(), "9a042ae2fbf137bb5cf1d696344d10d1b90162ef07d14767d1f1499b6db3a343"},
 		{"browser help", BrowserHelp(), "e03aad399bcfbeaf312fdae39f01dcd3543a5ad7de4de72a02490ebdedaa2631"},
-		{"setup help", SetupHelp(), "6dec5944af9e80b5c3dcdb18dafd66b4acd42e76ffefb76ae2d1e726426e05f3"},
-		{"setup start", SetupStart(), "c8871af619bf6d2a82d2a23c2ac06f1a88b037ad130311c4377de22cf8135f1d"},
+		{"setup brief", SetupBrief(), "d08fa7a22a413c954e73748906cea84094999e5f7ad2ef78004ca924f0749345"},
+		{"setup start", SetupStart(), "cf5d8bdf29eda3fed3e8a7dd0fc7c5eb2129b3f810f26cf0df0da908a13e4606"},
 		{"setup review", SetupReview(), "6dc96647c3e24553864850e3a069dc7af5ad73d3cfaa0510c25952fd9f762ad7"},
 		{"setup checks", SetupChecks(), "e9a02eb963d84ac6f5638782a59dff307d11ced02b795140dee356c475c347a7"},
 	}

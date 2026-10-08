@@ -183,19 +183,6 @@ func TestBrowserHelpWorksWithoutTheApp(t *testing.T) {
 	}
 }
 
-func TestSetupHelpWorksWithoutTheApp(t *testing.T) {
-	t.Setenv("AGENTOS_SOCKET", "/nonexistent/agentos.sock")
-	out, err := run(t, "setup", "help")
-	if err != nil || !strings.Contains(out, ".github/ISSUE_TEMPLATE/issue.md") || !strings.Contains(out, ".claude/commands/work.md") {
-		t.Errorf("agentos setup help = %q, %v", out, err)
-	}
-	for _, bad := range [][]string{{"setup"}, {"setup", "now"}} {
-		if _, err := run(t, bad...); err == nil {
-			t.Errorf("agentos %v succeeded", bad)
-		}
-	}
-}
-
 func TestBrowserCommandSendsItsWords(t *testing.T) {
 	var got control.Request
 	fakeApp(t, func(_ context.Context, req control.Request) control.Response {

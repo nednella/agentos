@@ -128,20 +128,6 @@ func newBrowserCmd() *cobra.Command {
 	}
 }
 
-func newSetupCmd() *cobra.Command {
-	return &cobra.Command{
-		Use:       "setup help",
-		Short:     "Print what a project needs so that /work runs on its own",
-		GroupID:   groupProject,
-		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
-		ValidArgs: []string{"help"},
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			fmt.Fprintln(cmd.OutOrStdout(), prompts.SetupHelp())
-			return nil
-		},
-	}
-}
-
 // browserTimeoutMs is how long the app may spend on a browser command: a page load can take 30 seconds.
 const browserTimeoutMs = 75_000
 
