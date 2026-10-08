@@ -9,6 +9,7 @@ import (
 	"github.com/nednella/agentos/desktop/notes"
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/version"
 )
 
@@ -18,6 +19,7 @@ type Sessions interface {
 	Projects() []sessions.Project
 	List() []sessions.Session
 	ShellIDs() []string
+	Create(title, text string, send bool, issue int) (sessions.Session, error)
 	SwitchProject(name string) (project.Project, error)
 	Forget(name string) (project.Project, error)
 }
@@ -129,4 +131,39 @@ func (s *Service) RemoveProject(name string) (Snapshot, error) {
 	}
 	s.remember(p)
 	return s.Snapshot(), nil
+}
+
+// SetUpProject writes a basic agentos block into the current project's config and starts a session that sets up
+// the repository with the user.
+func (s *Service) SetUpProject() (sessions.Session, error) {
+	key, err := s.configure()
+	if err != nil {
+		return sessions.Session{}, err
+	}
+	if err := s.registry.SetUp(key); err != nil {
+		return sessions.Session{}, err
+	}
+	return s.sessions.Create("Set up for agentos", prompts.SetupStart(), s.sessions.Current().SendsPrompt(), 0)
+}
+
+// DismissSetup stops offering to set up the current project.
+func (s *Service) DismissSetup() (Snapshot, error) {
+	key, err := s.configure()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	if err := s.registry.DismissSetup(key); err != nil {
+		return Snapshot{}, err
+	}
+	return s.Snapshot(), nil
+}
+
+// configure is the current project's key, once the project is in the config: the folder the app started in may not be.
+func (s *Service) configure() (string, error) {
+	cur := s.sessions.Current()
+	if s.registry.Has(cur.Key()) {
+		return cur.Key(), nil
+	}
+	snap, err := s.AddProjectDir(cur.Dir)
+	return snap.Project.Key, err
 }

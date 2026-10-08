@@ -509,6 +509,7 @@ type Options struct {
 	Releases       string        // what the releases API answers; "" fails the check
 	Version        string        // the version the app believes it runs; "dev" by default
 	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DEV_DATA_DIR, and home in the state dir
+	NoProject      bool          // leave the project out of the config, so the app starts in a folder it does not know
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -561,6 +562,9 @@ func NewWith(t *testing.T, o Options) *Harness {
 		top += "data_dir: " + filepath.Join(state, "data") + "\n"
 	}
 	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), top, dir, branch, cleanup, queueSections, o.ProjectExtra)
+	if o.NoProject {
+		conf = fmt.Sprintf("agent_command: %s\n%sprojects: []\n", cmp.Or(o.Agent, "bash"), top)
+	}
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -779,6 +783,8 @@ func (h *Harness) NewProject(name string) (projects.Snapshot, error) {
 func (h *Harness) RemoveProject(name string) (projects.Snapshot, error) {
 	return h.projects.RemoveProject(name)
 }
+func (h *Harness) SetUpProject() (sessions.Session, error)  { return h.projects.SetUpProject() }
+func (h *Harness) DismissSetup() (projects.Snapshot, error) { return h.projects.DismissSetup() }
 
 func (h *Harness) NewSession(title, prefill string) (sessions.Session, error) {
 	return h.sessions.NewSession(title, prefill)

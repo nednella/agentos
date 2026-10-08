@@ -148,6 +148,22 @@ func (r *Registry) SetPromptSend(key, mode string) error {
 	})
 }
 
+// SetUp fills the project's empty keys with a basic agentos block.
+func (r *Registry) SetUp(key string) error {
+	return r.editProject(key, func(p *project.Project) error {
+		p.SetUp()
+		return nil
+	})
+}
+
+// DismissSetup saves that the owner turned down the offer to set the project up.
+func (r *Registry) DismissSetup(key string) error {
+	return r.editProject(key, func(p *project.Project) error {
+		p.SetupDismissed = true
+		return nil
+	})
+}
+
 // project is the configured project of the key, or the zero project.
 func (r *Registry) project(key string) project.Project {
 	r.mu.Lock()
@@ -182,6 +198,13 @@ func (r *Registry) editProject(key string, change func(*project.Project) error) 
 		c.Projects = slices.Clone(c.Projects)
 		return change(&c.Projects[i])
 	})
+}
+
+// Has says whether the config holds the project of the key.
+func (r *Registry) Has(key string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.index(key) >= 0
 }
 
 func (r *Registry) index(key string) int {
