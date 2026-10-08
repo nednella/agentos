@@ -27,6 +27,15 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     },
   },
   {
+    id: 'set-up-project',
+    label: 'Set up project',
+    group: 'Projects',
+    palette: a.project?.needsSetup ? undefined : false,
+    async run() {
+      await a.setUpProject()
+    },
+  },
+  {
     id: 'toggle-sidebar',
     label: 'Toggle queue and notes panel',
     group: 'Navigate',

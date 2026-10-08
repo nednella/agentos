@@ -12,6 +12,7 @@ import { Notice } from './Notice'
 import { QueueSectionHeader } from './QueueSectionHeader'
 import { QueueSearch } from './QueueSearch'
 import { QueueUnsortedHeader } from './QueueUnsortedHeader'
+import { SetupOffer } from './SetupOffer'
 import type { NavRef } from './Sidebar'
 
 type Item = { kind: 'section'; name: string; count: number } | { kind: 'issue'; issue: Issue }
@@ -24,6 +25,16 @@ const UNSORTED_OPEN_KEY = 'agentos.queue.unsortedOpen'
 type QueueProps = { nav: NavRef }
 
 export function Queue({ nav }: QueueProps) {
+  const { project } = useAgentos()
+  return (
+    <>
+      {project?.needsSetup && !project.setupDismissed && <SetupOffer />}
+      <QueueBody nav={nav} />
+    </>
+  )
+}
+
+function QueueBody({ nav }: QueueProps) {
   const { project, issues, issuesDisabled, issueFilter, report } = useAgentos()
   if (project && !project.repo) {
     return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} centered />

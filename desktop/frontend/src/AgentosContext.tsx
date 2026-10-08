@@ -68,6 +68,8 @@ export type Agentos = {
   addProject(dir?: string): Promise<void>
   newProject(name: string): Promise<void>
   removeProject(name: string): Promise<void>
+  setUpProject(): Promise<void>
+  dismissSetup(): Promise<void>
   refreshIssues(): Promise<void>
   addNote(text: string, images?: PendingImage[]): Promise<void>
   updateNote(id: string, text: string): Promise<void>
@@ -551,6 +553,18 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         if (epoch !== projectEpoch.current) return
         if (snap.project.name === projectRef.current?.name) setProjects(snap.projects)
         else enterProject(snap, ++projectEpoch.current)
+      },
+      async setUpProject() {
+        addSession(await api.setUpProject())
+        const snap = await api.snapshot()
+        setProject(snap.project)
+        setProjects(snap.projects)
+        await loadIssues(true)
+      },
+      async dismissSetup() {
+        const snap = await api.dismissSetup()
+        setProject(snap.project)
+        setProjects(snap.projects)
       },
       refreshIssues: () => loadIssues(true),
       viewOf: (id) => (id && views[id]) || 'terminal',
