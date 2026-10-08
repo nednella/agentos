@@ -38,7 +38,7 @@ The app checks for updates when it starts and every hour; click `Update` in the 
 Open `agentos`, add a project folder with `⌘P` → *Add project* (or run `agentos project add` in the
 folder), then press `⌘N` for a session or `Enter` on an issue to read it, then start a session from it.
 
-A project with no `queue_sections` shows *Set up this project for agentos?* at the top of its queue.
+A project with no `queue_sections` shows a card, *Set up this project for agentos*, at the top of its queue.
 *Set up* writes a basic block into the project's config, filling only keys it does not set: an Inbox
 section of every issue whose action, *Work*, types `/work {n}`, the branch and clean-up commands, and
 the commands for PR reviews and failing checks. It then starts a session, *Set up for agentos*, that
