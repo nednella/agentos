@@ -83,6 +83,9 @@ type Project struct {
 	NeedsYou int    `json:"needsYou"`
 	Working  int    `json:"working"`
 	Sessions int    `json:"sessions"`
+
+	NeedsSetup     bool `json:"needsSetup"`     // the project has no queue sections, so the app offers to set it up
+	SetupDismissed bool `json:"setupDismissed"` // the owner turned the offer down; it stays in the palette
 }
 
 // Sessions tracks the agents in the private tmux server and tells the front end when they change.
@@ -626,7 +629,7 @@ func (s *Sessions) announceIssues() {
 func (s *Sessions) projectViews() []Project {
 	var views []Project
 	for _, p := range s.projects() {
-		v := Project{Key: p.Key(), Name: p.Name, Dir: p.Dir, Repo: s.repoOf(p.Dir)}
+		v := Project{Key: p.Key(), Name: p.Name, Dir: p.Dir, Repo: s.repoOf(p.Dir), NeedsSetup: p.NeedsSetup(), SetupDismissed: p.SetupDismissed}
 		for _, in := range s.info {
 			if in.Name.Project != p.Key() {
 				continue
