@@ -287,7 +287,8 @@ func TestPollFailuresAreWarnedAboutOnce(t *testing.T) {
 	for _, w := range h.Rec.Warnings() {
 		bySource[w.Source] = append(bySource[w.Source], w.Message)
 	}
-	if got := bySource["pull requests"]; len(got) != 1 || !strings.Contains(got[0], "HTTP 502") || strings.Contains(got[0], "more detail") {
+	// The message leaves out the branch: lookups of several branches that fail alike make one warning.
+	if got := bySource["pull requests"]; len(got) != 1 || !strings.Contains(got[0], "HTTP 502") || strings.Contains(got[0], "more detail") || strings.Contains(got[0], "issue-7") {
 		t.Errorf("pull request warnings = %q", got)
 	}
 	if got := bySource["worktrees"]; len(got) != 1 || !strings.Contains(got[0], "not a git repository") {
