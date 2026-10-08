@@ -14,6 +14,8 @@ var (
 	browserSession string
 	//go:embed browser-help.md
 	browserHelp string
+	//go:embed setup-session.md
+	setupSession string
 	//go:embed setup-help.md
 	setupHelp string
 	//go:embed start-issue.md
@@ -35,6 +37,9 @@ func NewSession() string { return body(newSession) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
+
+// SetupSession is appended to every Claude session's system prompt: where to read how to set up a project.
+func SetupSession() string { return body(setupSession) }
 
 // SetupHelp is what agentos setup help prints.
 func SetupHelp() string { return body(setupHelp) }
