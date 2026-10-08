@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.16.0](https://github.com/nednella/agentos/compare/v0.15.0...v0.16.0) (2026-10-08)
+
+
+### Features
+
+* **desktop:** offer to set up project with no queue sections ([cbcc1ac](https://github.com/nednella/agentos/commit/cbcc1ac3012fa992c9c75909c9f72f86e27f63fc))
+* **internal:** add basic agentos block for project setup ([6dceeae](https://github.com/nednella/agentos/commit/6dceeae6d5f7cdb456a511e88e62e50b4d468bf3))
+* **ui:** explain setup offer in card ([52837b8](https://github.com/nednella/agentos/commit/52837b8358918fcff7c440367b82aee88eaec79c))
+* **ui:** show setup offer in queue and palette ([f9eacb1](https://github.com/nednella/agentos/commit/f9eacb1a98dd188a6d24188c99a3105ffb09a599))
+
+
+### Bug Fixes
+
+* **internal:** limit setup help to repository side ([b6d45ec](https://github.com/nednella/agentos/commit/b6d45ec0f8b7bb28caac98689e06de0e9a64cc64))
+
 ## [0.15.0](https://github.com/nednella/agentos/compare/v0.14.1...v0.15.0) (2026-10-08)
 
 
