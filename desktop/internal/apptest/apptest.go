@@ -354,7 +354,7 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			return nil, f.IssuesErr
 		}
 		return []byte(`[
-			{"number":7,"title":"Fix the thing","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
+			{"number":7,"title":"Fix the thing that breaks when the window is narrow","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
 			{"number":8,"title":"Plan it","url":"https://x/8","labels":[{"name":"needs-plan"},{"name":"type:feature"}]},
 			{"number":9,"title":"Human","url":"https://x/9","labels":[{"name":"needs-human"}]},
 			{"number":10,"title":"Maybe","url":"https://x/10","labels":[{"name":"idea"},{"name":"type:chore"}]},

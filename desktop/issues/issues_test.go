@@ -54,7 +54,7 @@ func TestIssues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Issue != 7 || s.Title != "#7 Fix the thing" {
+	if s.Issue != 7 || s.Title != "#7 Fix the thing that breaks when the window is narrow" {
 		t.Errorf("session = %+v", s)
 	}
 	// The agent is bash: a sent command fails, a typed one just sits on the prompt.

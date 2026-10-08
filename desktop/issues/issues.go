@@ -230,14 +230,6 @@ func typeOf(labels []string) string {
 	return ""
 }
 
-func (i Issue) sessionTitle() string {
-	title := []rune(i.Title)
-	if len(title) > 40 {
-		title = append(title[:39], '…')
-	}
-	return fmt.Sprintf("#%d %s", i.Number, string(title))
-}
-
 // CachedRepo is the repo of a folder if gh was asked before; it never runs gh.
 func (i *Issues) CachedRepo(dir string) string {
 	i.mu.Lock()
@@ -294,7 +286,7 @@ func (i *Issues) Start(ctx context.Context, number int, action string) (sessions
 		if !ok {
 			return sessions.Session{}, fmt.Errorf("issue #%d has no action %q", number, action)
 		}
-		return i.sessions.CreateIssue(is.sessionTitle(), act.Render(number, is.Title), number, act, is.Labels)
+		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels)
 	}
 	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
 }
