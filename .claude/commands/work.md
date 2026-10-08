@@ -4,14 +4,14 @@ argument-hint: <issue number>
 ---
 
 Work issue #$ARGUMENTS on `nednella/agentos`, start to finish, without waiting for
-Ned unless a decision is genuinely his. Read `CLAUDE.md` first; its hard rules apply.
+Ned unless a decision is genuinely his. Read `AGENTS.md` first; its hard rules apply.
 
 ## 1. Understand
 
 - `gh issue view $ARGUMENTS` and read every comment. The `## Description` is Ned's;
   never edit it.
-- Read the code the issue touches before planning. `docs/contract.md` is the source of
-  truth for how the front end and the Go core talk; `docs/testing.md` says how to verify.
+- Read the code the issue touches before planning. `AGENTS.md` says how the parts fit
+  together; `docs/testing.md` says how to verify.
 - If the issue allows more than one reasonable reading, pick the simplest and say so in
   your Agent Review (step 5); do not stop to ask.
 - If the task is clearly beyond your model, say so in your Agent Review and stop rather than grind.
@@ -31,7 +31,7 @@ Work only inside that worktree. Never touch the tree Ned is sitting in.
 
 - Smallest change that closes the issue. Match the code around it. No new
   dependencies without a reason in the PR.
-- Change `docs/contract.md` in the same change when the contract moves.
+- Change `docs/config.md` in the same change when a config key or command moves.
 - Tests beside the code they cover.
 
 ## 4. Verify
