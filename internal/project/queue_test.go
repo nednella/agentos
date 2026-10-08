@@ -23,6 +23,8 @@ func TestSection(t *testing.T) {
 		{"first section wins", p, []string{"needs-plan", "ready"}, "Ready", 1},
 		{"no section takes it", p, []string{"roadmap"}, OtherSection, 3},
 		{"labels never take the section without labels", Project{QueueSections: p.QueueSections[:1]}, []string{"ready"}, OtherSection, 1},
+		{"a * section takes labelled issues", Project{QueueSections: []Section{p.QueueSections[1], {Name: "Rest", Labels: []string{"*"}}}}, []string{"type:bug"}, "Rest", 1},
+		{"a * section takes issues without labels", Project{QueueSections: []Section{{Name: "Rest", Labels: []string{"*"}}}}, nil, "Rest", 0},
 		{"no sections", Project{}, []string{"ready"}, "", 0},
 		{"no sections, no labels", Project{}, nil, "", 0},
 	}
