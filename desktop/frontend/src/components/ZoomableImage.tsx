@@ -3,7 +3,9 @@ import { useEffect, useRef } from 'react'
 export type ImageView = { scale: number; x: number; y: number }
 
 export const FIT: ImageView = { scale: 1, x: 0, y: 0 }
+export const ZOOM_STEP = 1.5
 const MAX_SCALE = 8
+const CLICK_SLOP = 4
 
 type ZoomableImageProps = {
   src: string
@@ -36,18 +38,24 @@ export function ZoomableImage({ src, alt, view, onView, onDismiss }: ZoomableIma
     return () => el.removeEventListener('wheel', onWheel)
   }, [])
 
-  const startPan = (e: React.MouseEvent) => {
+  const press = (e: React.MouseEvent) => {
     if (e.button !== 0) return
-    if (shown.scale === 1) {
-      if (e.target === e.currentTarget) onDismiss()
+    if (shown.scale === 1 && e.target === e.currentTarget) {
+      onDismiss()
       return
     }
     e.preventDefault()
+    const el = e.currentTarget as HTMLElement
     const start = { mx: e.clientX, my: e.clientY, ...shown }
-    const move = (m: MouseEvent) => onView(clamp({ scale: start.scale, x: start.x + m.clientX - start.mx, y: start.y + m.clientY - start.my }, img.current))
-    const up = () => {
+    let dragged = false
+    const move = (m: MouseEvent) => {
+      dragged ||= Math.hypot(m.clientX - start.mx, m.clientY - start.my) > CLICK_SLOP
+      if (dragged && start.scale > 1) onView(clamp({ scale: start.scale, x: start.x + m.clientX - start.mx, y: start.y + m.clientY - start.my }, img.current))
+    }
+    const up = (u: MouseEvent) => {
       window.removeEventListener('mousemove', move)
       window.removeEventListener('mouseup', up)
+      if (!dragged) onView(clamp(zoomAt(start, start.scale * ZOOM_STEP, pointFromCentre(el, u)), img.current))
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
@@ -58,8 +66,11 @@ export function ZoomableImage({ src, alt, view, onView, onDismiss }: ZoomableIma
       ref={box}
       className="relative flex h-[72vh] w-full items-center justify-center overflow-hidden"
       style={{ cursor: shown.scale > 1 ? 'grab' : 'zoom-in' }}
-      onMouseDown={startPan}
-      onDoubleClick={(e) => box.current && onView(shown.scale > 1 ? FIT : zoomAt(shown, 2, pointFromCentre(box.current, e)))}
+      onMouseDown={press}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onView(clamp(zoomAt(shown, shown.scale / ZOOM_STEP, pointFromCentre(e.currentTarget, e)), img.current))
+      }}
     >
       <img
         ref={img}
