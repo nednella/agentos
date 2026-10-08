@@ -445,7 +445,7 @@ queue_sections:
 ```
 
 - An issue goes in the first section it matches: it has any of the section's `labels`, or the section's `labels` is empty and the issue has none, or the section's `labels` holds `"*"`, which matches every issue.
-- So a `"*"` section placed last takes every issue the sections above it did not. A section after it is never reached.
+- So a `"*"` section placed last takes every issue the sections above it did not. A section after it would never be reached, so a config with one does not load.
 - An issue no section matches goes in an `Other` section after the last, so no issue is hidden.
 - In a command, `{n}` is the issue number and `{title}` its title. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
