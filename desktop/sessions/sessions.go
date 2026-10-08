@@ -471,7 +471,7 @@ func (s *Sessions) take(rec session.Record) {
 	if _, ended := s.ended[rec.Session]; ended || s.dismissed[rec.Session] {
 		return
 	}
-	if prev, ok := s.records[rec.Session]; ok && prev.At.After(rec.At) {
+	if prev, ok := s.records[rec.Session]; ok && !rec.At.After(prev.At) {
 		return
 	}
 	s.records[rec.Session] = rec
