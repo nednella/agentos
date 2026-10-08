@@ -6,7 +6,7 @@ import { useArmedConfirm } from '../useArmedConfirm'
 import type { Evidence } from '../types'
 import { ConfirmRow } from './ConfirmRow'
 import { Icon } from './Icon'
-import { FIT, ZoomableImage, zoomTo, type ImageView } from './ZoomableImage'
+import { FIT, ZOOM_STEP, ZoomableImage, zoomTo, type ImageView } from './ZoomableImage'
 
 type EvidenceViewerProps = {
   sessionId: string
@@ -62,8 +62,8 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
         if (e.key === 'ArrowLeft') step(-1)
         if (e.key === 'ArrowRight') step(1)
         if (e.metaKey) return
-        if (e.key === '=' || e.key === '+') setView((v) => zoomTo(v, v.scale * 1.5))
-        if (e.key === '-') setView((v) => zoomTo(v, v.scale / 1.5))
+        if (e.key === '=' || e.key === '+') setView((v) => zoomTo(v, v.scale * ZOOM_STEP))
+        if (e.key === '-') setView((v) => zoomTo(v, v.scale / ZOOM_STEP))
         if (e.key === '0') setView(FIT)
       }}
     >
@@ -80,13 +80,13 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
           <button className="btn" onClick={() => step(1)} aria-label="Next image" disabled={items.length < 2}>
             Next <Icon name="forward" />
           </button>
-          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale / 1.5))} aria-label="Zoom out" disabled={view.scale === 1}>
+          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale / ZOOM_STEP))} aria-label="Zoom out" disabled={view.scale === 1}>
             −
           </button>
           <button className="btn" onClick={() => setView(FIT)} aria-label="Fit image" disabled={view.scale === 1}>
             Fit
           </button>
-          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale * 1.5))} aria-label="Zoom in">
+          <button className="btn" onClick={() => setView((v) => zoomTo(v, v.scale * ZOOM_STEP))} aria-label="Zoom in">
             +
           </button>
           <button
