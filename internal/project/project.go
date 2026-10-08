@@ -33,6 +33,7 @@ type Project struct {
 	KeepAwake          *bool     `yaml:"keep_mac_awake,omitempty"`          // overrides the config's keep_mac_awake for this project
 	OnReview           string    `yaml:"pr_review_command,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
 	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
+	SetupDismissed     bool      `yaml:"setup_dismissed,omitempty"`         // the owner turned down the offer to set the project up
 }
 
 // Present says whether the project's folder exists on this machine.
@@ -281,6 +282,14 @@ func formatScale(scale float64) string {
 	return strconv.FormatFloat(scale, 'f', -1, 64)
 }
 
+// formatFlag writes an omitempty flag: "true", or nothing.
+func formatFlag(b bool) string {
+	if !b {
+		return ""
+	}
+	return "true"
+}
+
 func formatBool(b *bool) string {
 	if b == nil {
 		return ""
@@ -322,21 +331,44 @@ func syncProjects(root *yaml.Node, want []Project) error {
 	return nil
 }
 
-// editInPlace updates the entry of p when only the settings the panel writes changed, so the rest of the entry keeps
+// editInPlace updates the entry of p when only the settings the app writes changed, so the rest of the entry keeps
 // its comments and layout. It returns the entry's index, or -1 when there is no such entry.
 func editInPlace(seq *yaml.Node, p Project) int {
 	i := slices.IndexFunc(seq.Content, func(n *yaml.Node) bool { f := field(n, "name"); return f != nil && f.Value == p.Name })
 	if i < 0 {
 		return -1
 	}
-	syncCleanup(seq.Content[i], p.CleanupMode)
-	syncScalar(seq.Content[i], "session_prompt_send", p.SessionPromptSend, nil)
-	syncScalar(seq.Content[i], "browser_enabled", formatBool(p.Browser), nil)
-	syncScalar(seq.Content[i], "digest_schedule", p.Digest, nil)
-	if !sameProject(seq.Content[i], p) {
+	entry := seq.Content[i]
+	keys := len(entry.Content)
+	syncCleanup(entry, p.CleanupMode)
+	syncScalar(entry, "session_prompt_send", p.SessionPromptSend, nil)
+	syncScalar(entry, "browser_enabled", formatBool(p.Browser), nil)
+	syncScalar(entry, "digest_schedule", p.Digest, nil)
+	syncScalar(entry, "session_branch_fallback", p.Branch, nil)
+	syncScalar(entry, "session_cleanup_command", p.CleanupCommand, nil)
+	syncScalar(entry, "pr_review_command", p.OnReview, nil)
+	syncScalar(entry, "pr_checks_command", p.OnChecks, nil)
+	syncScalar(entry, "setup_dismissed", formatFlag(p.SetupDismissed), nil)
+	if err := addQueue(entry, p.QueueSections); err != nil || !sameProject(entry, p) {
 		return -1
 	}
+	if len(entry.Content) > keys {
+		entry.Style &^= yaml.FlowStyle // a one-line entry that grows reads better as a block
+	}
 	return i
+}
+
+// addQueue gives an entry with no queue_sections the sections want; an entry that has some keeps them as written.
+func addQueue(project *yaml.Node, want []Section) error {
+	if field(project, "queue_sections") != nil || len(want) == 0 {
+		return nil
+	}
+	var node yaml.Node
+	if err := node.Encode(want); err != nil {
+		return err
+	}
+	project.Content = append(project.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "queue_sections"}, &node)
+	return nil
 }
 
 func syncCleanup(project *yaml.Node, want Cleanup) {

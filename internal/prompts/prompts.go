@@ -18,6 +18,12 @@ var (
 	setupSession string
 	//go:embed setup-help.md
 	setupHelp string
+	//go:embed setup-start.md
+	setupStart string
+	//go:embed setup-review.md
+	setupReview string
+	//go:embed setup-checks.md
+	setupChecks string
 	//go:embed start-issue.md
 	startIssue string
 	//go:embed new-session.md
@@ -43,6 +49,15 @@ func SetupSession() string { return body(setupSession) }
 
 // SetupHelp is what agentos setup help prints.
 func SetupHelp() string { return body(setupHelp) }
+
+// SetupStart is what the session that sets up a project's repository starts with.
+func SetupStart() string { return body(setupStart) }
+
+// SetupReview is the pr_review_command that setting up a project writes; {n} is the PR number.
+func SetupReview() string { return body(setupReview) }
+
+// SetupChecks is the pr_checks_command that setting up a project writes; {n} is the PR number.
+func SetupChecks() string { return body(setupChecks) }
 
 // StartIssue is what a session for an issue is started with when the project defines no action for it.
 // {n} is the issue number and {title} its title.
