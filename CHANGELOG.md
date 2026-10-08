@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.17.0](https://github.com/nednella/agentos/compare/v0.16.0...v0.17.0) (2026-10-08)
+
+
+### Features
+
+* **desktop:** brief setup session through its system prompt ([ee65935](https://github.com/nednella/agentos/commit/ee65935b7d8a3883073d0c9776ae49374dc7d3c6))
+* **internal:** give every session one base prompt ([aec16a6](https://github.com/nednella/agentos/commit/aec16a6daf7e70b555480adc82a3d48025445589))
+* **internal:** set new projects up with AGENTS.md ([f16786c](https://github.com/nednella/agentos/commit/f16786ce2215c1336365d5beebf70c733c59f020))
+* **ui:** offer set up project for every project ([e0879b3](https://github.com/nednella/agentos/commit/e0879b30d320868c9ac5f60416d2adc34c1bbfdc))
+
+
+### Bug Fixes
+
+* **build:** stop check script's Brave from triggering App Management denials ([3d4a39c](https://github.com/nednella/agentos/commit/3d4a39cc24bf45a79540ea980e9f5452f5a66c30))
+* **desktop:** stop Brave updater from triggering App Management denials ([e19849c](https://github.com/nednella/agentos/commit/e19849c8a37eca3c441fd74013bd44f5fa61cdbf))
+
 ## [0.16.0](https://github.com/nednella/agentos/compare/v0.15.0...v0.16.0) (2026-10-08)
 
 
