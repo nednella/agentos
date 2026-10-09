@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.20.0](https://github.com/nednella/agentos/compare/v0.19.1...v0.20.0) (2026-10-09)
+
+
+### Features
+
+* **cli:** add news command ([aa71ad2](https://github.com/nednella/agentos/commit/aa71ad2519dc5f1798f642ee3efb5ad5860e3a74))
+* **desktop:** fetch TLDR Dev newsletter in background ([97f7401](https://github.com/nednella/agentos/commit/97f7401df81778fe73283f009d40200538e7a032))
+* **desktop:** offer retry when new project's GitHub repo fails ([ee5ce09](https://github.com/nednella/agentos/commit/ee5ce096633be22451c31640521860be749cf061))
+* **desktop:** return full changelog ([02d03d5](https://github.com/nednella/agentos/commit/02d03d5b5beb0ec53a4ffdc434b029d115dd2ecd)), closes [#269](https://github.com/nednella/agentos/issues/269)
+* **ui:** add news view with index and source pages ([f11658a](https://github.com/nednella/agentos/commit/f11658aa751d45f1b0f9394f29ee282b812b70a2))
+* **ui:** reopen patch notes from palette and version ([2880664](https://github.com/nednella/agentos/commit/2880664526c6bf835552a4a0fcdf70a158262799)), closes [#269](https://github.com/nednella/agentos/issues/269)
+
+
+### Bug Fixes
+
+* **desktop:** say RemoveProject stops sessions ([2fdd8d9](https://github.com/nednella/agentos/commit/2fdd8d9e5e54707747138c6fdd72b0fbdad3195b))
+
 ## [0.19.1](https://github.com/nednella/agentos/compare/v0.19.0...v0.19.1) (2026-10-09)
 
 
