@@ -87,6 +87,9 @@ func New(runner run.Runner, sessions Sessions, emit func(string, any)) *Issues {
 // A folder with no GitHub repo is remembered; a failure that may pass is warned about and tried again later.
 func (i *Issues) Repo(ctx context.Context, dir string) string { return i.repo(ctx, dir, false) }
 
+// FreshRepo is Repo asked of gh again, for a folder whose repo may have just changed.
+func (i *Issues) FreshRepo(ctx context.Context, dir string) string { return i.repo(ctx, dir, true) }
+
 // repo answers from what gh said before unless fresh asks again. A known repo stays known
 // while gh is asked and when it fails, so no screen sees the folder lose its repo for a moment.
 func (i *Issues) repo(ctx context.Context, dir string, fresh bool) string {

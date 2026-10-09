@@ -788,10 +788,17 @@ export function createMock(params: URLSearchParams) {
     NewProject: async (name: string) => {
       if (!/^[\w.-]+$/.test(name)) throw `${name} is not a project name`
       if (data.some((p) => p.name === name)) throw `Project ${name} already exists`
-      data.push({ name, dir: `~/code/${name}`, repo: `ned/${name}`, notes: [], issues: [], waits: [], cleanups: [], needsSetup: true })
+      data.push({ name, dir: `~/code/${name}`, repo: '', notes: [], issues: [], waits: [], cleanups: [], needsSetup: true })
       const snap = switchTo(data[data.length - 1])
       emit('projects', snap.projects)
       return snap
+    },
+    CreateRepo: async (name: string) => {
+      const p = data.find((p) => p.name === name)
+      if (!p) throw `no project called ${name}`
+      if (name.includes('taken')) throw `${name} has no GitHub repo: name already exists`
+      p.repo = `ned/${name}`
+      return snapshot()
     },
     RemoveProject: async (name: string) => {
       const at = data.findIndex((p) => p.name === name)
