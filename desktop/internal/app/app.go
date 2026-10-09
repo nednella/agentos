@@ -43,6 +43,7 @@ type App struct {
 	terms    *terminal.Terms
 	notes    *notes.Notes
 	evidence *evidence.Store
+	events   *stats.Log
 	browsers *browser.Browsers
 	awake    *awake.Awake
 	digests  *digest.Manager
@@ -64,20 +65,20 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		return context.Background()
 	}
 	waits := stats.New(c.DataDir)
-	activity := stats.NewActivity(c.DataDir)
+	events := stats.NewLog(c.DataDir)
 	proofs := evidence.New(c.DataDir)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	stayAwake := awake.New(h.Awake, h.Emit)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
-		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, Activity: activity, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
+		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, Activity: events, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
 		Awake: stayAwake, KeepAwake: c.Registry.KeepAwake,
 	})
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit, iss)
 	store := notes.New(c.DataDir)
-	a.sessions, a.terms, a.notes, a.evidence, a.stateDir = sess, terms, store, proofs, c.StateDir
+	a.sessions, a.terms, a.notes, a.evidence, a.events, a.stateDir = sess, terms, store, proofs, events, c.StateDir
 	a.browsers, a.awake = browsers, stayAwake
 	a.media = media.Handler(c.DataDir)
 	browsers.Hook(func(id string) string {
@@ -149,7 +150,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		digest.NewService(mgr),
 		news.NewService(a.news),
 		awake.NewService(stayAwake),
-		stats.NewService(waits, sess, stats.NewBooks(activity, c.Registry)),
+		stats.NewService(waits, sess, stats.NewBooks(events, c.Registry)),
 		update.NewService(a.updates, ctx),
 		settings.NewService(c.Registry, sess, c.DataDir, c.DataDirFixed, h.PickDir, a.updates.Relaunch),
 	}
@@ -176,6 +177,7 @@ func (a *App) Services() []any { return a.services }
 func (a *App) Start(ctx context.Context) error {
 	a.ctx.Store(&ctx)
 	a.browsers.StopStrays()
+	go a.events.Load()
 	if err := a.sessions.Run(ctx); err != nil {
 		return err
 	}

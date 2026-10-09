@@ -12,7 +12,7 @@ import (
 
 // dataNames are what each project keeps in the data folder. The rest of a project's folder there may be
 // the local folder's, which never moves.
-var dataNames = []string{"notes.json", "notes-media", "evidence", "stats.jsonl", "activity.json", "digest.json"}
+var dataNames = []string{"notes.json", "notes-media", "evidence", "stats.jsonl", "events", "activity.json", "digest.json"}
 
 var errDataFixed = errors.New("AGENTOS_DEV_DATA_DIR sets the data folder, so it cannot change here")
 
