@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.25.0](https://github.com/nednella/agentos/compare/v0.24.0...v0.25.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** clean up each branch of a session as its PR finishes ([e364d19](https://github.com/nednella/agentos/commit/e364d19ffdda38394b08b446339d9a32e66170ff))
+* **desktop:** give setup session only its brief ([11171a1](https://github.com/nednella/agentos/commit/11171a1e96768845db5723f3e6b104677372284b))
+* **desktop:** name branch in clean-up block reasons ([740dd18](https://github.com/nednella/agentos/commit/740dd1812814ae3edabb520d10f5c20e9ee43712))
+* **desktop:** pick up config edits while app runs ([82bf5c7](https://github.com/nednella/agentos/commit/82bf5c780eb7363a4ef6b684a24fbd70793cbe2e))
+* **internal:** brief new users in set-up session ([20f685e](https://github.com/nednella/agentos/commit/20f685e82b83b1c1dcdd19ce4ae1f65fbc0019ab))
+* **internal:** explain APPLICATION_PROMPT in setup brief ([164af15](https://github.com/nednella/agentos/commit/164af15e4d4c7c168da6bfde6a016d4d89a20737))
+* **internal:** tell sessions to hand other topics to new session ([9518028](https://github.com/nednella/agentos/commit/9518028a3a47104d8c8a869b9514527307b3e4f7))
+
+
+### Bug Fixes
+
+* **desktop:** keep hand edits to config when app saves ([edecfe8](https://github.com/nednella/agentos/commit/edecfe874f931d4f285915cb2c752cfb75b6e26f))
+* **internal:** stop hard-wrapping browser help ([4ac8801](https://github.com/nednella/agentos/commit/4ac88010c63591447c275cbed29169bcb9f73bcf))
+* **internal:** unwrap work command template in setup brief ([aeebde4](https://github.com/nednella/agentos/commit/aeebde45bc1fe755177f4fa4e97ea8a7ebe223af))
+
 ## [0.24.0](https://github.com/nednella/agentos/compare/v0.23.0...v0.24.0) (2026-10-09)
 
 
