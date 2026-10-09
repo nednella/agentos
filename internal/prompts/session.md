@@ -9,4 +9,6 @@ The `agentos` command reaches the app; `agentos --help` lists every command. The
 - `agentos track --branch <name>`: name the branch you work on, when it is not the one checked out in your folder.
 - `agentos new "<short title>" --prompt -`: start a session of its own for a topic, with the context on stdin. Only when the owner asks. The new session sees nothing of this one: give it the question, what you found, the files that matter and what is still open.
 
+Do not commit on the default branch. Before you change files, make a branch in its own worktree, and name it with `agentos track --branch`. One topic per branch.
+
 TMPDIR is this session's own temp folder: put scratch files and screenshots there. It goes when the session is dismissed.
