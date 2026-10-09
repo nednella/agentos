@@ -33,11 +33,23 @@ jobs:
               - 'desktop/frontend/**'
               - '.github/workflows/ci.yml'
 
-  go:
-    name: Vet and test Go
+  go-test:
+    name: Test Go (${{ matrix.name }})
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      # sessions and browser take most of the time, so each gets a runner of its own.
+      matrix:
+        include:
+          - name: sessions
+            packages: ./desktop/sessions
+          - name: browser
+            packages: ./desktop/browser
+          - name: other
+            packages: $(go list -tags stub ./... | grep -vE '/desktop/(sessions|browser)$')
+            vet: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -45,11 +57,22 @@ jobs:
           go-version-file: go.mod
       # The tests' plain agent is bash; macOS's own 3.2 has no bracketed paste, so pasted line breaks would run.
       - run: brew install tmux bash
-      - run: go vet -tags stub ./...
+      - if: matrix.vet
+        run: go vet -tags stub ./...
       # -p 1: many packages' tests start a real tmux server, real PTYs or a real headless
       # browser; -p 2 still let a different one of them miss its budget each run on
       # macos-latest's few vCPUs. One package at a time trades minutes for reliability.
-      - run: go test -tags stub -race -p 1 ./...
+      - run: go test -tags stub -race -p 1 ${{ matrix.packages }}
+
+  # The ruleset on main requires a check by this name.
+  go:
+    name: Vet and test Go
+    needs: [changes, go-test]
+    if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    runs-on: ubuntu-latest
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
 
   frontend:
     name: Build front end
