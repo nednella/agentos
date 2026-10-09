@@ -85,8 +85,9 @@ waiting. An ended issue session gets a new session for its issue that resumes th
 **Clean-up.** When a session's PR merges (`auto` by default) or closes (`manual` by default), the app cleans
 up: safety checks first (no changes in the worktree, no commits missing from origin or, for a merged PR whose
 branch is gone, from the merged commit), then `session_cleanup_command` once per branch through `sh -c` in the
-project folder, then the session's temp files, evidence, browser tab and row. A failed check or command leaves
-the row `blocked` with the reason; the user can force it. A PR first seen already merged or closed sets
+project folder, then the session's temp files, evidence, browser tab and row. A PR on a branch the session moved
+on from cleans up only that branch, and the session goes on; another branch with an open PR blocks the session's
+own clean-up. A failed check or command leaves the row `blocked` with the reason; the user can force it. A PR first seen already merged or closed sets
 `cleanup: 'ask'`. Every run lands in `cleanups.json`.
 
 **Browser.** One Chromium browser per project, on its own profile and a fixed DevTools port saved in
