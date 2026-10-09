@@ -201,6 +201,11 @@ func (p Project) ChecksCommand(pr int) string {
 	return strings.ReplaceAll(p.OnChecks, "{n}", strconv.Itoa(pr))
 }
 
+// ConflictCommand is what a session whose PR conflicts with its base branch is sent, or "".
+func (p Project) ConflictCommand(pr int) string {
+	return strings.ReplaceAll(p.OnConflict, "{n}", strconv.Itoa(pr))
+}
+
 // BranchFor is the branch the work on an issue happens on, or "" when the project names none.
 func (p Project) BranchFor(number int) string {
 	return strings.ReplaceAll(p.Branch, "{n}", strconv.Itoa(number))

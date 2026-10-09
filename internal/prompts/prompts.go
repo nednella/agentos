@@ -22,6 +22,8 @@ var (
 	setupReview string
 	//go:embed setup-checks.md
 	setupChecks string
+	//go:embed setup-conflict.md
+	setupConflict string
 	//go:embed start-issue.md
 	startIssue string
 	//go:embed session.md
@@ -53,6 +55,9 @@ func SetupReview() string { return body(setupReview) }
 
 // SetupChecks is the pr_checks_command that setting up a project writes; {n} is the PR number.
 func SetupChecks() string { return body(setupChecks) }
+
+// SetupConflict is the pr_conflict_command that setting up a project writes; {n} is the PR number.
+func SetupConflict() string { return body(setupConflict) }
 
 // StartIssue is what a session for an issue is started with when the project defines no action for it.
 // {n} is the issue number and {title} its title.

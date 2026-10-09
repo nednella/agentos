@@ -33,6 +33,7 @@ type Project struct {
 	KeepAwake          *bool     `yaml:"keep_mac_awake,omitempty"`          // overrides the config's keep_mac_awake for this project
 	OnReview           string    `yaml:"pr_review_command,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
 	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
+	OnConflict         string    `yaml:"pr_conflict_command,omitempty"`     // typed into a session whose PR conflicts with its base branch; {n} is the PR number
 	SetupDismissed     bool      `yaml:"setup_dismissed,omitempty"`         // the owner turned down the offer to set the project up
 }
 
@@ -348,6 +349,7 @@ func editInPlace(seq *yaml.Node, p Project) int {
 	syncScalar(entry, "session_cleanup_command", p.CleanupCommand, nil)
 	syncScalar(entry, "pr_review_command", p.OnReview, nil)
 	syncScalar(entry, "pr_checks_command", p.OnChecks, nil)
+	syncScalar(entry, "pr_conflict_command", p.OnConflict, nil)
 	syncScalar(entry, "setup_dismissed", formatFlag(p.SetupDismissed), nil)
 	if err := addQueue(entry, p.QueueSections); err != nil || !sameProject(entry, p) {
 		return -1
