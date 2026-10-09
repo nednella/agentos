@@ -152,6 +152,13 @@ export type LedgerRow = {
   sessions: number
   issueSessions: number
   workMs: number
+  prsOpened: number
+  prsMerged: number
+  prsClosed: number
+  issuesFiled: number
+  issuesClosed: number
+  avgSessionMs: number
+  avgLeadMs: number
 }
 
 export type Ledger = {
