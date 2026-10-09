@@ -28,7 +28,7 @@ func TestSetUpProject(t *testing.T) {
 	}
 
 	created, err := h.SetUpProject()
-	if err != nil || created.Title != "Set up for agentos" {
+	if err != nil || created.Title != "agentos setup" {
 		t.Fatalf("SetUpProject = %+v, %v", created, err)
 	}
 	if snap := h.Snapshot(); snap.Project.NeedsSetup {
@@ -102,7 +102,7 @@ func TestSetUpProjectKeepsTheConfigOfAProjectWithSections(t *testing.T) {
 		t.Fatal(err)
 	}
 	created, err := h.SetUpProject()
-	if err != nil || created.Title != "Set up for agentos" {
+	if err != nil || created.Title != "agentos setup" {
 		t.Fatalf("SetUpProject = %+v, %v", created, err)
 	}
 	after, err := os.ReadFile(h.Conf)

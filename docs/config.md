@@ -57,7 +57,7 @@ queue_sections:
       - {name: Work, command: "/work {n}"}
 ```
 
-It then starts a session, *Set up for agentos*, that writes the repository side with you: the issue template, the `/work` command and `AGENTS.md`. The template and the command are the same in every project, and each file it writes starts with a comment saying agentos set it up, with a link to this repository. *Not now* saves `setup_dismissed: true`. `⌘K` → *Set up project* runs the same for a project with no `queue_sections`. For a project that has them, it writes nothing to the config and only starts the session, so one set up by hand can get the repository side too.
+It then starts a session, *agentos setup*, that writes the repository side with you: the issue template, the `/work` command and `AGENTS.md`. The template and the command are the same in every project, and each file it writes starts with a comment saying agentos set it up, with a link to this repository. *Not now* saves `setup_dismissed: true`. `⌘K` → *Set up project* runs the same for a project with no `queue_sections`. For a project that has them, it writes nothing to the config and only starts the session, so one set up by hand can get the repository side too.
 
 ### Queue sections and actions
 

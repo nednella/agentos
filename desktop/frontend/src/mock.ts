@@ -837,7 +837,7 @@ export function createMock(params: URLSearchParams) {
       if (current.needsSetup) current.issues = current.issues.map((issue) => ({ ...issue, section: 'Inbox', actions: ['Work'], moves: movesFrom('Inbox') }))
       current.needsSetup = false
       emit('projects', data.map(projectView))
-      return startSessionFor('Set up for agentos', 0, 'Set up this project for agentos with me.')
+      return startSessionFor('agentos setup', 0, 'Set up this project for agentos with me.')
     },
     DismissSetup: async () => {
       current.setupDismissed = true
