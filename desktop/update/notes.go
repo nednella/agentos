@@ -96,10 +96,10 @@ func (u *Updater) PatchNotes() ([]Release, error) {
 		return nil, err
 	}
 	seen := strings.TrimSpace(string(raw))
+	notes := []Release{}
 	if seen == u.current || u.current == "dev" {
-		return nil, nil
+		return notes, nil
 	}
-	var notes []Release
 	for _, r := range ParseChangelog(agentos.Changelog) {
 		since := update.Newer(seen, r.Version) && !update.Newer(u.current, r.Version)
 		if since || (seen == "" && r.Version == u.current) {

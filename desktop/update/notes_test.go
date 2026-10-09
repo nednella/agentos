@@ -58,6 +58,9 @@ func versions(t *testing.T, u *update.Updater) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if notes == nil {
+		t.Fatal("PatchNotes returned nil, which the front end reads as null")
+	}
 	var out []string
 	for _, r := range notes {
 		out = append(out, r.Version)
