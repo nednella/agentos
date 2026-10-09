@@ -60,3 +60,37 @@ func TestSetUpAddsAProjectMissingFromTheConfig(t *testing.T) {
 		t.Errorf("saved config = %+v, %v", cfg, err)
 	}
 }
+
+func TestSetUpLeavesAnotherMachinesProjectAlone(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		act  func(h *apptest.Harness) error
+	}{
+		{"set up", func(h *apptest.Harness) error { _, err := h.SetUpProject(); return err }},
+		{"not now", func(h *apptest.Harness) error { _, err := h.DismissSetup(); return err }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := apptest.NewWith(t, apptest.Options{NoProject: true, AbsentProject: "api"})
+			if err := tt.act(h); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := project.Load(h.Conf)
+			if err != nil || len(cfg.Projects) != 2 {
+				t.Fatalf("saved config = %+v, %v", cfg, err)
+			}
+			other, here := cfg.Projects[0], cfg.Projects[1]
+			if other.Dir != "/nonexistent/api" || !other.NeedsSetup() || other.SetupDismissed || other.Branch != "" {
+				t.Errorf("the other machine's project changed: %+v", other)
+			}
+			if here.Name != "api-2" || here.Dir != h.Dir {
+				t.Errorf("the added project = %+v", here)
+			}
+			if tt.name == "set up" && here.NeedsSetup() || tt.name == "not now" && !here.SetupDismissed {
+				t.Errorf("the added project was not edited: %+v", here)
+			}
+			if tt.name == "not now" && !h.Snapshot().Project.SetupDismissed {
+				t.Error("the offer is still shown after Not now")
+			}
+		})
+	}
+}

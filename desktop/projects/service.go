@@ -159,12 +159,19 @@ func (s *Service) DismissSetup() (Snapshot, error) {
 	return s.Snapshot(), nil
 }
 
-// configure is the current project's key, once the project is in the config: the folder the app started in may not be.
+// configure is the key of the config's entry for the current project's folder, adding the entry when the folder is
+// not in the config: the folder the app started in may not be. Another machine's project of the same name is not it.
 func (s *Service) configure() (string, error) {
 	cur := s.sessions.Current()
-	if s.registry.Has(cur.Key()) {
-		return cur.Key(), nil
+	if p, ok := s.registry.ByDir(cur.Dir); ok {
+		return p.Key(), nil
 	}
-	snap, err := s.AddProjectDir(cur.Dir)
-	return snap.Project.Key, err
+	p, err := s.registry.Add(cur.Dir)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.SwitchProject(p.Name); err != nil {
+		return "", err
+	}
+	return p.Key(), nil
 }
