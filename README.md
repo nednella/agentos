@@ -27,8 +27,7 @@ Needs macOS on Apple silicon, plus:
 curl -fsSL https://raw.githubusercontent.com/nednella/agentos/main/install.sh | bash
 ```
 
-The script puts `agentos.app` in `~/Applications` and the `agentos` command in `~/.local/bin`, then lists
-anything missing. No sudo.
+The script puts `agentos.app` in `~/Applications` and the `agentos` command in `~/.local/bin`, then lists anything missing. No sudo.
 
 ## Start
 
@@ -42,12 +41,10 @@ anything missing. No sudo.
 
 A project with no queue sections shows _Set up this project for agentos_ at the top of its queue.
 
-- **Set up** adds an Inbox whose _Work_ action runs `/work <n>`, plus branch, clean-up and PR commands.
-  If accepted, a session is started that writes the `/work` command, the issue template and `AGENTS.md` with you.
+- **Set up** adds an Inbox whose _Work_ action runs `/work <n>`, plus branch, clean-up and PR commands. If accepted, a session is started that writes the `/work` command, the issue template and `AGENTS.md` with you.
 - **Not now** hides the offer. `⌘K` → _Set up project_ still works.
 
-To change the config by hand, edit `~/.config/agentos/config.yaml`; the app picks the change up while it runs.
-`docs/config.md` describes every key.
+To change the config by hand, edit `~/.config/agentos/config.yaml`; the app picks the change up while it runs. `docs/config.md` describes every key.
 
 ## Update
 
