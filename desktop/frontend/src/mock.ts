@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Note, PR, Project, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -122,6 +122,46 @@ function toBase64(text: string): string {
   return btoa(binary)
 }
 
+const PATCH_NOTES: Release[] = [
+  {
+    version: '0.14.0',
+    date: '2026-10-07',
+    sections: [
+      { title: 'Features', changes: [{ scope: 'desktop', text: 'let agents close their browser window', issue: 218, url: 'https://github.com/nednella/agentos/issues/218' }] },
+      {
+        title: 'Bug Fixes',
+        changes: [
+          { scope: 'desktop', text: 'forget browser whose connection dropped', issue: 218, url: 'https://github.com/nednella/agentos/issues/218' },
+          { scope: 'desktop', text: "start browser without last run's pages", issue: 218, url: 'https://github.com/nednella/agentos/issues/218' },
+          { scope: 'desktop', text: 'stop browser once its last window closes', issue: 218, url: 'https://github.com/nednella/agentos/issues/218' },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.13.0',
+    date: '2026-10-07',
+    sections: [
+      {
+        title: 'Features',
+        changes: [
+          { scope: 'cli', text: 'add --prompt to agentos new', issue: 0, url: '' },
+          { scope: 'desktop', text: 'tell claude sessions how to start a session', issue: 0, url: '' },
+        ],
+      },
+    ],
+  },
+  {
+    version: '0.12.0',
+    date: '2026-10-07',
+    sections: [
+      { title: 'Features', changes: [{ scope: 'build', text: 'draw terminal prompt app icon', issue: 0, url: '' }] },
+      { title: 'Bug Fixes', changes: [{ scope: 'ui', text: 'pad top of queue list', issue: 0, url: '' }] },
+      { title: 'Performance Improvements', changes: [{ scope: 'desktop', text: 'start chrome-devtools-mcp straight from the npx cache', issue: 0, url: '' }] },
+    ],
+  },
+]
+
 export function createMock(params: URLSearchParams) {
   const flags = {
     empty: params.has('empty'),
@@ -133,6 +173,7 @@ export function createMock(params: URLSearchParams) {
     done: params.has('done'),
     warn: params.has('warn'),
     update: params.has('update'),
+    patchNotes: params.has('patchnotes'),
     fullDataDir: params.has('fulldata'),
   }
   const handlers = new Map<string, Set<Handler>>()
@@ -1046,6 +1087,7 @@ export function createMock(params: URLSearchParams) {
       await delay(undefined, 2500)
       throw 'The mock cannot relaunch'
     },
+    PatchNotes: async () => (flags.patchNotes ? PATCH_NOTES : []),
     OpenURL: async (url: string) => {
       window.open(url, '_blank')
     },

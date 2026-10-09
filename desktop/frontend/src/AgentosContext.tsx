@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Note, Project, Session, PromptSend, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Note, Project, Release, Session, PromptSend, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -18,7 +18,7 @@ export type Toast = {
 export type SessionView = 'terminal' | 'browser' | 'evidence'
 export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 
-export type Overlay = 'palette' | 'projects' | 'shortcuts' | 'settings' | { issue: number } | null
+export type Overlay = 'palette' | 'projects' | 'shortcuts' | 'settings' | 'patch-notes' | { issue: number } | null
 export type SidebarTab = 'queue' | 'notes'
 export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
 export type PendingImage = { base64: string; mime: string }
@@ -52,6 +52,7 @@ export type Agentos = {
   version: string
   update: string
   updating: boolean
+  patchNotes: Release[]
   openShell(): Promise<void>
   newShell(): Promise<void>
   closeShell(id: string): Promise<void>
@@ -164,6 +165,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [version, setVersion] = useState('')
   const [update, setUpdate] = useState('')
   const [updating, setUpdating] = useState(false)
+  const [patchNotes, setPatchNotes] = useState<Release[]>([])
   const [toasts, setToasts] = useState<Toast[]>([])
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
@@ -315,6 +317,12 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     report(() => enterFrom(api.snapshot()))
     report(async () => setAwake(await api.awake()))
     report(async () => setSettings(await api.settings()))
+    report(async () => {
+      const notes = await api.patchNotes()
+      if (notes.length === 0) return
+      setPatchNotes(notes)
+      setOverlay((current) => current ?? 'patch-notes')
+    })
   }, [enterFrom, report])
 
   // The project's settings follow the current project, which can change while the panel is shut.
@@ -474,6 +482,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       version,
       update,
       updating,
+      patchNotes,
       async applyUpdate() {
         setUpdating(true)
         try {
@@ -706,7 +715,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, selectId, detach, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

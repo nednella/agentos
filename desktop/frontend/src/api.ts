@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Ledger, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Ledger, Note, Release, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -56,6 +56,7 @@ type Backend = {
   DigestToNote(itemId: string): Promise<Note>
   DismissDigestItem(itemId: string): Promise<void>
   Update(): Promise<void>
+  PatchNotes(): Promise<Release[]>
   Awake(): Promise<boolean>
   Settings(): Promise<Settings>
   SetTheme(theme: ThemeSetting): Promise<Settings>
@@ -94,7 +95,7 @@ const namespaces = {
   evidence: ['Evidence', 'DeleteEvidence'],
   browser: ['BrowserOpen', 'BrowserGoto', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
-  update: ['Update'],
+  update: ['Update', 'PatchNotes'],
   awake: ['Awake'],
   settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule', 'PickDataDir', 'SetDataDir'],
 }
@@ -188,6 +189,7 @@ export const api = {
   digestToNote: (itemId: string) => backend.DigestToNote(itemId),
   dismissDigestItem: (itemId: string) => backend.DismissDigestItem(itemId),
   update: () => backend.Update(),
+  patchNotes: () => backend.PatchNotes(),
 }
 
 // The Go side used to call an idle wait "finished"; accept both.
