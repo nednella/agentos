@@ -64,8 +64,19 @@ queue_sections:
     actions:
       - {name: Plan, command: "/plan {n}", model: opus, effort: high}
       - {name: Work, command: "/work {n}"}
+  - name: Needs plan
+    labels: [plan]
+    draggable_from: [Inbox]     # only issues of these sections can be dropped here; unset takes any
+    actions:
+      - {name: Plan, command: "/plan {n}", model: opus, effort: high}
   - name: Ready
     labels: [ready]
+    draggable_from: []          # takes no drops: only a session adds "ready"
+    actions:
+      - {name: Work, command: "/work {n}"}
+  - name: Review
+    labels: [review]
+    draggable: false            # its issues can not be dragged out; on unless false
     actions:
       - {name: Work, command: "/work {n}"}
   - name: Rest
@@ -79,6 +90,10 @@ queue_sections:
 - An issue no section matches goes under one folded row below the last section, `<n> more issues match no section`, with the `Start` action. A last `"*"` section is only needed to give those issues a name or other actions.
 - In a command, `{n}` is the issue number and `{title}` its title. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
+- Dragging an issue to another section relabels it on GitHub: it loses the labels of the section it left and gains the first label of the section it enters. No session starts. A section with no labels takes an issue only when no label is left.
+- A move can be undone from the app; the app remembers the last move of each issue until it quits.
+- `draggable: false` keeps the issues of a section from being dragged out. `draggable_from` lists the sections whose issues may be dropped in; each must be a section other than this one. Issues no section takes count as one section that can be dragged out, and `draggable_from` never lists it.
+- A `"*"` section takes no drops, so it can not have `draggable_from`; a config that sets it does not load.
 - With no `queue_sections` the queue is one list, and each issue has one action, `Start`, which types `Work on issue #<n>: <title>`. A section with no actions has that same action.
 
 The old `lanes`, `commands`, `models`, `session_model` and `session_effort` keys are gone. They are not read, and the app removes `session_model` and `session_effort` from the file the next time it saves a setting.
