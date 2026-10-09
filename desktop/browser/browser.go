@@ -236,10 +236,11 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 }
 
 func (b *Browsers) launchArgs(profile string, port int) []string {
-	// Brave's updater would run as agentos's child and write into Brave's bundle, which macOS blocks and reports as
-	// "agentos was prevented from modifying apps". Other browsers ignore the flag.
+	// macOS blocks a child of agentos that writes into an app bundle and reports it as "agentos was prevented from
+	// modifying apps". Brave's updater installs into Brave's bundle, and the code sign clone that Chromium makes at
+	// each start hard-links the bundle's executable. Other browsers ignore the Brave flag.
 	args := []string{"--remote-debugging-port=" + strconv.Itoa(port), "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check",
-		"--disable-brave-update"}
+		"--disable-brave-update", "--disable-features=MacAppCodeSignClone"}
 	if b.headless {
 		return append(args, "--headless=new", "--hide-scrollbars", "about:blank")
 	}
