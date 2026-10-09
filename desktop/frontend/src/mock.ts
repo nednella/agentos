@@ -553,39 +553,27 @@ export function createMock(params: URLSearchParams) {
       return { day: dayKey(363 - i), count }
     })
     const scale = days === 0 ? 1 : days === 365 ? 0.8 : 0.12
-    const row = (project: string, prompts: number, gh: [number, number, number, number] | null): LedgerRow => ({
+    const row = (project: string, prompts: number): LedgerRow => ({
       project,
       prompts: Math.round(prompts * scale),
       sessions: Math.round(prompts * scale * 0.08),
       issueSessions: Math.round(prompts * scale * 0.045),
       workMs: Math.round(prompts * scale * 0.13 * 3_600_000),
-      prsMerged: gh && Math.round(gh[0] * scale),
-      prsClosed: gh && Math.round(gh[1] * scale),
-      issuesClosed: gh && Math.round(gh[2] * scale),
-      issuesOpen: gh && gh[3],
     })
     const projects = [
-      row('agentos', 3104, [181, 12, 170, 41]),
-      row('upscope-web', 1209, [52, 5, 49, 14]),
-      row('dotfiles', 499, [14, 2, 12, 3]),
-      row('scratch', 38, null),
+      row('agentos', 3104),
+      row('upscope-web', 1209),
+      row('dotfiles', 499),
+      row('scratch', 38),
     ]
-    const sum = (pick: (r: LedgerRow) => number | null) => {
-      const values = projects.map(pick).filter((v): v is number => v !== null)
-      return values.length ? values.reduce((a, b) => a + b, 0) : null
-    }
     const totals: LedgerRow = {
       project: '',
       prompts: projects.reduce((a, r) => a + r.prompts, 0),
       sessions: projects.reduce((a, r) => a + r.sessions, 0),
       issueSessions: projects.reduce((a, r) => a + r.issueSessions, 0),
       workMs: projects.reduce((a, r) => a + r.workMs, 0),
-      prsMerged: sum((r) => r.prsMerged),
-      prsClosed: sum((r) => r.prsClosed),
-      issuesClosed: sum((r) => r.issuesClosed),
-      issuesOpen: sum((r) => r.issuesOpen),
     }
-    return { days, since: dayKey(120), totals, projects, heat, github: 'scratch: no GitHub repository' }
+    return { days, since: dayKey(120), totals, projects, heat }
   }
 
   function finishCleanup(s: MockSession) {

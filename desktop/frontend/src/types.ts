@@ -152,10 +152,6 @@ export type LedgerRow = {
   sessions: number
   issueSessions: number
   workMs: number
-  prsMerged: number | null
-  prsClosed: number | null
-  issuesClosed: number | null
-  issuesOpen: number | null
 }
 
 export type Ledger = {
@@ -164,7 +160,6 @@ export type Ledger = {
   totals: LedgerRow
   projects: LedgerRow[]
   heat: { day: string; count: number }[]
-  github: string
 }
 
 export type Cleanup = {
