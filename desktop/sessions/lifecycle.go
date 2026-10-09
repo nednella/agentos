@@ -73,6 +73,9 @@ type target struct {
 	conversation string // the agent's id for its conversation, "" when unknown
 }
 
+// newest is the branch the session works on now.
+func (t target) newest() string { return t.branches[len(t.branches)-1] }
+
 // track is what is known about the pull request and clean-up of one session.
 type track struct {
 	branch    string // the branch the PR was found on, or the newest one when there is none
@@ -132,6 +135,7 @@ type Lifecycle struct {
 	files    map[string]*prsFile // by project key
 	etags    map[string]string   // by project key: the ETag of the last pull request list
 	watchers map[string]*watcher // by project key
+	finished map[string]bool     // session id and branch: an older branch whose clean-up a poll started
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -144,13 +148,26 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{}, finished: map[string]bool{},
 		stopped: stopped, stopClean: stop,
 	}
 }
 
-// autoCleanup cleans up after a session in the background, until ctx or stopCleanups ends it.
+// autoCleanup cleans up after a session in the background.
 func (l *Lifecycle) autoCleanup(ctx context.Context, id string) {
+	l.inBackground(ctx, func(ctx context.Context) { _ = l.Cleanup(ctx, id, false) })
+}
+
+// autoCleanupBranch cleans up in the background after an older branch of a session whose PR is done.
+func (l *Lifecycle) autoCleanupBranch(ctx context.Context, d done) {
+	l.inBackground(ctx, func(ctx context.Context) {
+		removed, reason := l.removeBranch(ctx, d.target, d.pr, d.branch, false)
+		l.logCleanup(ctx, d.target, d.pr, removed, reason)
+	})
+}
+
+// inBackground runs a clean-up until ctx or stopCleanups ends it.
+func (l *Lifecycle) inBackground(ctx context.Context, cleanup func(context.Context)) {
 	l.cleanMu.Lock()
 	defer l.cleanMu.Unlock()
 	if l.stopping {
@@ -160,7 +177,7 @@ func (l *Lifecycle) autoCleanup(ctx context.Context, id string) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		defer context.AfterFunc(l.stopped, cancel)()
-		_ = l.Cleanup(ctx, id, false)
+		cleanup(ctx)
 	})
 }
 
@@ -294,6 +311,7 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	trees, treeErr := l.worktrees(ctx, proj.Dir)
 	prs := map[string]*PR{} // by branch: two sessions of one issue share its PR
 	var auto []string
+	var older []done
 	var wakes []wake
 	reload := false
 	for _, t := range targets {
@@ -301,6 +319,11 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 			continue
 		}
 		branch, pr, err := l.latestPR(ctx, proj.Dir, t.branches, prs)
+		if err == nil {
+			var d []done
+			d, err = l.olderDone(ctx, t, branch, prs)
+			older = append(older, d...)
+		}
 		if err != nil {
 			prErr = cmp.Or(prErr, err)
 			continue
@@ -317,6 +340,9 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	for _, id := range auto {
 		l.autoCleanup(ctx, id)
 	}
+	for _, d := range older {
+		l.autoCleanupBranch(ctx, d)
+	}
 	for _, w := range wakes {
 		go l.sessions.wake(ctx, w.target, fromApp(w.prompt))
 	}
@@ -331,19 +357,60 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 // nil, with the newest branch. found caches the lookups by branch.
 func (l *Lifecycle) latestPR(ctx context.Context, dir string, branches []string, found map[string]*PR) (string, *PR, error) {
 	for _, branch := range slices.Backward(branches) {
-		pr, ok := found[branch]
-		if !ok {
-			var err error
-			if pr, err = l.findPR(ctx, dir, branch); err != nil {
-				return "", nil, err
-			}
-			found[branch] = pr
+		pr, err := l.cachedPR(ctx, dir, branch, found)
+		if err != nil {
+			return "", nil, err
 		}
 		if pr != nil {
 			return branch, pr, nil
 		}
 	}
 	return branches[len(branches)-1], nil, nil
+}
+
+func (l *Lifecycle) cachedPR(ctx context.Context, dir, branch string, found map[string]*PR) (*PR, error) {
+	if pr, ok := found[branch]; ok {
+		return pr, nil
+	}
+	pr, err := l.findPR(ctx, dir, branch)
+	if err == nil {
+		found[branch] = pr
+	}
+	return pr, err
+}
+
+// done is an older branch of a session whose PR merged or closed.
+type done struct {
+	target
+	branch string
+	pr     *PR
+}
+
+// olderDone are the branches the session moved on from whose PR merged or closed and that the project
+// cleans up on its own, each once. The branch of the session's PR is left to the session's own clean-up.
+func (l *Lifecycle) olderDone(ctx context.Context, t target, prBranch string, found map[string]*PR) ([]done, error) {
+	var out []done
+	for _, branch := range t.branches[:len(t.branches)-1] {
+		if branch == prBranch {
+			continue
+		}
+		pr, err := l.cachedPR(ctx, t.proj.Dir, branch, found)
+		if err != nil {
+			return nil, err
+		}
+		if pr == nil || pr.State == "draft" || pr.State == "open" || !wantsAuto(t.proj.CleanupMode, pr.State) {
+			continue
+		}
+		l.mu.Lock()
+		key := t.id + " " + branch
+		first := !l.finished[key]
+		l.finished[key] = true
+		l.mu.Unlock()
+		if first {
+			out = append(out, done{t, branch, pr})
+		}
+	}
+	return out, nil
 }
 
 // wake is a prompt to send a session.
@@ -708,7 +775,8 @@ func parsePR(data []byte) (*PR, error) {
 }
 
 // Cleanup removes a session's worktree, branch and temp files and ends the session.
-// Without force it first checks that nothing would be lost.
+// Without force it first checks that nothing would be lost. When the session's PR is on a branch
+// it moved on from, only that branch goes and the session keeps working.
 func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 	t, err := l.sessions.target(id)
 	if err != nil {
@@ -734,7 +802,29 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 	l.mu.Unlock()
 	l.sessions.changed()
 
-	removed, reason := l.removeAll(ctx, t, pr, prBranch, force)
+	movedOn := pr != nil && prBranch != t.newest()
+	var removed []string
+	var reason string
+	if movedOn {
+		removed, reason = l.removeBranch(ctx, t, pr, prBranch, force)
+	} else {
+		removed, reason = l.removeAll(ctx, t, pr, prBranch, force)
+	}
+	if reason = l.logCleanup(ctx, t, pr, removed, reason); reason != "" {
+		l.mu.Lock()
+		tr.cleanup, tr.reason = "blocked", reason
+		l.mu.Unlock()
+		l.sessions.changed()
+		return nil
+	}
+	if movedOn {
+		l.refreshOnly(ctx, t.proj, l.targetsOf(t.proj), []string{t.newest()})
+	}
+	return nil
+}
+
+// logCleanup adds a clean-up to the log and returns its reason, which says when the app closed during it.
+func (l *Lifecycle) logCleanup(ctx context.Context, t target, pr *PR, removed []string, reason string) string {
 	if reason != "" && ctx.Err() != nil {
 		reason = closedReason
 	}
@@ -744,18 +834,47 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 	}
 	if reason != "" {
 		entry.Status = "blocked"
-		l.mu.Lock()
-		tr.cleanup, tr.reason = "blocked", reason
-		l.mu.Unlock()
 	}
 	key := t.proj.Key()
 	if err := l.appendCleanup(key, entry); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: logging a clean-up: %v\n", err)
 	}
-	l.activity.Record(key, activity.Event{At: entry.At, Kind: activity.Cleanup, Session: id, Issue: t.issue, PR: entry.PR, Label: entry.Status})
+	l.activity.Record(key, activity.Event{At: entry.At, Kind: activity.Cleanup, Session: t.id, Issue: t.issue, PR: entry.PR, Label: entry.Status})
 	l.sessions.changed()
 	l.emit("cleanups", scoped.Of(key, l.Cleanups(key)))
-	return nil
+	return reason
+}
+
+// removeBranch cleans up one branch the session moved on from, and keeps the session.
+func (l *Lifecycle) removeBranch(ctx context.Context, t target, pr *PR, branch string, force bool) (removed []string, reason string) {
+	t.branches = []string{branch}
+	plan, reason := l.plan(ctx, t, pr, branch, force)
+	if reason != "" {
+		return []string{}, reason
+	}
+	removed, reason = l.runCleanupCommand(ctx, t, &plan)
+	if reason == "" {
+		l.dropBranch(t, branch)
+	}
+	return append([]string{}, removed...), reason
+}
+
+// dropBranch forgets a branch the session is done with. When it was the branch of the session's PR,
+// the session starts afresh on the branches it has left.
+func (l *Lifecycle) dropBranch(t target, branch string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.gone[t.id] {
+		return
+	}
+	key := t.proj.Key()
+	f := l.prs(key)
+	f.Branches[t.id] = slices.DeleteFunc(slices.Clone(f.Branches[t.id]), func(b string) bool { return b == branch })
+	if tr := l.tracks[t.id]; tr != nil && tr.branch == branch {
+		*tr = track{}
+		delete(f.Live, t.id)
+	}
+	l.savePRs(key)
 }
 
 // removeAll runs the clean-up steps in order. A non-empty reason means it stopped before the end.
@@ -791,7 +910,8 @@ type branchPlan struct {
 }
 
 // plan looks at the worktree and branch of each branch the session worked on, and unless forced,
-// says why cleaning them up could lose work. The PR counts only for the branch it was found on.
+// says why cleaning them up could lose work. Each other branch counts with its own PR, and one still
+// open stops the clean-up.
 func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string, force bool) (cleanupPlan, string) {
 	dir := t.proj.Dir
 	trees, err := l.worktrees(ctx, dir)
@@ -809,7 +929,10 @@ func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string,
 		}
 		branchPR := pr
 		if branch != prBranch {
-			branchPR = nil
+			var reason string
+			if branchPR, reason = l.otherPR(ctx, dir, branch); reason != "" {
+				return p, reason
+			}
 		}
 		if reason := l.unsafe(ctx, dir, b.worktree, branch, b.branchExists, branchPR); reason != "" {
 			return p, reason
@@ -880,6 +1003,19 @@ func (l *Lifecycle) removeSession(ctx context.Context, t target, _ *cleanupPlan)
 		return removed, fmt.Sprintf("removing the session failed: %v", err)
 	}
 	return append(removed, "session"), ""
+}
+
+// otherPR is the PR of a branch the clean-up is not for. One still open means the session has work
+// left on the branch.
+func (l *Lifecycle) otherPR(ctx context.Context, dir, branch string) (*PR, string) {
+	pr, err := l.findPR(ctx, dir, branch)
+	switch {
+	case err != nil:
+		return nil, fmt.Sprintf("could not look up the pull request of %s: %v", branch, err)
+	case pr != nil && (pr.State == "draft" || pr.State == "open"):
+		return nil, fmt.Sprintf("%s has an open pull request", branch)
+	}
+	return pr, ""
 }
 
 // unsafe says why removing the worktree and branch could lose work, or "".

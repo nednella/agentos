@@ -129,14 +129,20 @@ func repoFixture(t *testing.T, h *apptest.Harness) string {
 // issueWorktree adds a worktree on issue-7 with one pushed commit.
 func issueWorktree(t *testing.T, h *apptest.Harness) string {
 	t.Helper()
-	wt := filepath.Join(h.Dir, "trees", "issue-7")
-	gitIn(t, h.Dir, "worktree", "add", "-b", "issue-7", wt)
+	return branchWorktree(t, h, "issue-7")
+}
+
+// branchWorktree adds a worktree on branch with one pushed commit.
+func branchWorktree(t *testing.T, h *apptest.Harness, branch string) string {
+	t.Helper()
+	wt := filepath.Join(h.Dir, "trees", branch)
+	gitIn(t, h.Dir, "worktree", "add", "-b", branch, wt)
 	if err := os.WriteFile(filepath.Join(wt, "work.txt"), []byte("work\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	gitIn(t, wt, "add", "work.txt")
 	gitIn(t, wt, "commit", "-m", "work")
-	gitIn(t, wt, "push", "-u", "origin", "issue-7")
+	gitIn(t, wt, "push", "-u", "origin", branch)
 	return wt
 }
 
@@ -691,5 +697,133 @@ func TestCleanupCloseAutoAsksForAPRNeverSeenOpen(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(wt) {
 		t.Fatalf("an old closed PR: cleanup %q, worktree %v", got.Cleanup, exists(wt))
+	}
+}
+
+func numberedPR(n int, state string) string {
+	return strings.Replace(prJSON(state, false, "[]", 0, 0), `"number":12`, fmt.Sprintf(`"number":%d`, n), 1)
+}
+
+// twoBranchSession is a session of issue 7 that worked on side first and then on issue-7.
+func twoBranchSession(t *testing.T, h *apptest.Harness) (s sessions.Session, side, wt string) {
+	t.Helper()
+	repoFixture(t, h)
+	side = branchWorktree(t, h, "side")
+	wt = issueWorktree(t, h)
+	s = issueSession(h, t, 7)
+	onBranch := func(branch string) func() bool {
+		return func() bool { got, _ := h.Session(s.ID); return got.Branch == branch }
+	}
+	worksIn(h, t, s, side)
+	eventually(t, "the side branch", onBranch("side"))
+	worksIn(h, t, s, wt)
+	eventually(t, "the issue branch", onBranch("issue-7"))
+	return s, side, wt
+}
+
+func TestCleanupOfABranchTheSessionMovedOnFrom(t *testing.T) {
+	h := newHarness(t)
+	s, side, wt := twoBranchSession(t, h)
+	if err := os.WriteFile(filepath.Join(wt, "work.txt"), []byte("unfinished\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPRFor("issue-7", "[]")
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.RefreshPRs()
+	if got, _ := h.Session(s.ID); got.PR == nil || got.PR.Number != 20 {
+		t.Fatalf("session = %+v, want the PR of side", got)
+	}
+
+	h.GH.SetPRFor("side", numberedPR(20, "MERGED"))
+	h.RefreshPRs()
+	eventually(t, "the session back on its own branch", func() bool {
+		got, ok := h.Session(s.ID)
+		return ok && got.PR == nil && got.Branch == "issue-7" && got.Cleanup == ""
+	})
+	if exists(side) || gitIn(t, h.Dir, "branch", "--list", "side") != "" {
+		t.Error("the side branch is still there")
+	}
+	if !exists(wt) || branches(t, h.Dir) == "" {
+		t.Error("the branch the session works on was touched")
+	}
+	log := h.Cleanups()
+	if len(log) != 1 || log[0].Status != "done" || log[0].PR != 20 || !slices.Equal(log[0].Removed, []string{"clean-up command for side"}) {
+		t.Fatalf("log = %+v", log)
+	}
+
+	gitIn(t, wt, "commit", "-am", "finished")
+	gitIn(t, wt, "push")
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	h.RefreshPRs()
+	h.GH.SetPRFor("issue-7", numberedPR(21, "MERGED"))
+	h.RefreshPRs()
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) || branches(t, h.Dir) != "" {
+		t.Error("the issue branch is still there")
+	}
+}
+
+func TestOlderBranchIsCleanedUpWhenItsPRMerges(t *testing.T) {
+	h := newHarness(t)
+	s, side, wt := twoBranchSession(t, h)
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	h.RefreshPRs()
+
+	h.GH.SetPRFor("side", numberedPR(20, "MERGED"))
+	h.RefreshPRs()
+	eventually(t, "the side branch cleaned up", func() bool { return !exists(side) })
+	if got, ok := h.Session(s.ID); !ok || got.PR == nil || got.PR.Number != 21 || got.Cleanup != "" {
+		t.Errorf("session = %+v", got)
+	}
+	if !exists(wt) || branches(t, h.Dir) == "" {
+		t.Error("the branch the session works on was touched")
+	}
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if log := h.Cleanups(); len(log) != 1 || log[0].PR != 20 {
+		t.Errorf("log = %+v", log)
+	}
+}
+
+func TestCleanupBlockedByAnOlderBranchWithAnOpenPR(t *testing.T) {
+	h := newHarness(t)
+	s, side, wt := twoBranchSession(t, h)
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	h.RefreshPRs()
+
+	h.GH.SetPRFor("issue-7", numberedPR(21, "MERGED"))
+	h.RefreshPRs()
+	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if got, _ := h.Session(s.ID); got.CleanupReason != "side has an open pull request" {
+		t.Errorf("reason = %q", got.CleanupReason)
+	}
+	if !exists(side) || !exists(wt) || branches(t, h.Dir) == "" {
+		t.Error("something was removed although the session still has an open PR")
+	}
+}
+
+func TestClosedPROfABranchTheSessionMovedOnFromAsksThenCleansUpThatBranch(t *testing.T) {
+	h := newHarness(t)
+	s, side, wt := twoBranchSession(t, h)
+	h.GH.SetPRFor("issue-7", "[]")
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.RefreshPRs()
+	h.GH.SetPRFor("side", numberedPR(20, "CLOSED"))
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Cleanup != "ask" || !exists(side) {
+		t.Fatalf("a closed PR: cleanup %q, side exists %v", got.Cleanup, exists(side))
+	}
+
+	if err := h.Cleanup(s.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if got, ok := h.Session(s.ID); !ok || got.PR != nil || got.Branch != "issue-7" || got.Cleanup != "" {
+		t.Errorf("session = %+v", got)
+	}
+	if exists(side) || !exists(wt) {
+		t.Errorf("side exists %v, issue worktree exists %v", exists(side), exists(wt))
 	}
 }

@@ -285,18 +285,19 @@ type FakeGH struct {
 	mu            sync.Mutex
 	calls         []string
 	Repo          error
-	CreateRepoErr error         // what gh repo create fails with, if set
-	ExistingRepos []string      // the names gh repo view <name> finds; any other name is not found
-	ViewErr       error         // what gh repo view <name> fails with instead, if set
-	Create        string        // what gh issue create prints
-	CreateErr     error         // what gh issue create fails with, if set; it still prints Create
-	Delay         time.Duration // how long gh issue create takes
-	Releases      string        // what the releases API answers; "" fails the check
-	pr            string        // what gh pr list prints
-	PRErr         error         // what gh pr list fails with, if set
-	IssuesErr     error         // what gh issue list fails with, if set
-	pulls         string        // the body gh api prints for the repo's pull request list
-	etag          string        // its ETag: a request carrying it gets a 304
+	CreateRepoErr error             // what gh repo create fails with, if set
+	ExistingRepos []string          // the names gh repo view <name> finds; any other name is not found
+	ViewErr       error             // what gh repo view <name> fails with instead, if set
+	Create        string            // what gh issue create prints
+	CreateErr     error             // what gh issue create fails with, if set; it still prints Create
+	Delay         time.Duration     // how long gh issue create takes
+	Releases      string            // what the releases API answers; "" fails the check
+	pr            string            // what gh pr list prints
+	prByHead      map[string]string // what gh pr list --head <branch> prints instead, by branch
+	PRErr         error             // what gh pr list fails with, if set
+	IssuesErr     error             // what gh issue list fails with, if set
+	pulls         string            // the body gh api prints for the repo's pull request list
+	etag          string            // its ETag: a request carrying it gets a 304
 	hooks         []*io.PipeWriter
 	hooked        bool // gh webhook forward works
 }
@@ -323,6 +324,11 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 	case args[0] == "pr":
 		if f.PRErr != nil {
 			return nil, f.PRErr
+		}
+		if i := slices.Index(args, "--head"); i >= 0 {
+			if out, ok := f.prByHead[args[i+1]]; ok {
+				return []byte(out), nil
+			}
 		}
 		if f.pr == "" {
 			return []byte("[]"), nil
@@ -469,6 +475,16 @@ func (f *FakeGH) SetPR(out string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pr = out
+}
+
+// SetPRFor sets what gh pr list prints for the PR of one branch.
+func (f *FakeGH) SetPRFor(branch, out string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.prByHead == nil {
+		f.prByHead = map[string]string{}
+	}
+	f.prByHead[branch] = out
 }
 
 func (f *FakeGH) CallLog() []string {
