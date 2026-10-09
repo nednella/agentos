@@ -10,8 +10,8 @@ import { StatsInterruptions } from './StatsInterruptions'
 type Tab = 'interruptions' | 'work'
 
 const TABS = [
+  { value: 'work' as const, label: 'Stats' },
   { value: 'interruptions' as const, label: 'Interruptions' },
-  { value: 'work' as const, label: 'Your work' },
 ]
 const RANGES = [7, 14, 30].map((days) => ({ value: String(days), label: `${days} days` }))
 const WORK_RANGES = [
@@ -26,7 +26,7 @@ const WORK_RANGE_KEY = 'agentos.statsWorkDays'
 export function Stats() {
   const { focusRequest, project } = useAgentos()
   const { closeCentre } = useLayout()
-  const [tab, setTab] = useState<Tab>(() => readStored(TAB_KEY, 'interruptions'))
+  const [tab, setTab] = useState<Tab>(() => readStored(TAB_KEY, 'work'))
   const [days, setDays] = useState(() => readStored(RANGE_KEY, 7))
   const [workDays, setWorkDays] = useState(() => readStored(WORK_RANGE_KEY, 30))
   const panel = useRef<HTMLElement>(null)
@@ -57,12 +57,12 @@ export function Stats() {
       ref={panel}
       data-panel="terminal"
       tabIndex={-1}
-      aria-label={work ? 'Your work' : 'Interruption stats'}
+      aria-label={work ? 'Stats' : 'Interruption stats'}
       className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       onKeyDown={(e) => e.key === 'Escape' && closeCentre()}
     >
       <header className="panel-head flex flex-none flex-wrap items-center gap-3 border-b border-line px-4 py-2.5">
-        <h2 className="sr-only">{work ? 'Your work' : 'What interrupts you'}</h2>
+        <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
         <span className="text-small text-dim">{work ? 'all projects' : project?.name}</span>
         <div className="ml-auto">
