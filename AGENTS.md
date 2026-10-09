@@ -44,7 +44,7 @@ issue session, and `TMPDIR` and `CLAUDE_CODE_TMPDIR` set to its own temp folder,
 dismissed. Claude also gets `permissions.additionalDirectories` for the app's folders, `--model` and
 `--effort` when something picks them (see `docs/config.md`), and `--append-system-prompt` with the texts in
 `internal/prompts`: `session.md` (where it runs and the `agentos` commands it may use), `browser-session.md`
-when the project has a browser, and `setup-brief.md` for the session that sets a project up.
+when the project has a browser; the session that sets a project up gets only `setup-brief.md`.
 
 **The command talks to the app.** Most `agentos` commands go to
 the running app over the control socket (`control.sock`, beside the bus socket); each service that the command reaches registers a `Commands`

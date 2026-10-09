@@ -1503,12 +1503,15 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 	return string(config)
 }
 
-// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app,
-// about the browser when the project allows it and one exists, and the brief when there is one.
+// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
+// about the browser when the project allows it and one exists; a session with a brief learns only the brief.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief string) []string {
 	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation})
 	if _, ok := s.agent.(agent.Claude); !ok {
 		return argv
+	}
+	if brief != "" {
+		return append(argv, "--append-system-prompt", brief)
 	}
 	prompt := prompts.Session()
 	if proj.BrowserOn() && s.browsers.Available() {
@@ -1516,9 +1519,6 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
 			prompt += "\n\n" + prompts.BrowserSession()
 		}
-	}
-	if brief != "" {
-		prompt += "\n\n" + brief
 	}
 	return append(argv, "--append-system-prompt", prompt)
 }
