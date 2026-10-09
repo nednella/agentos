@@ -14,6 +14,7 @@ import (
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/media"
 	"github.com/nednella/agentos/desktop/internal/run"
+	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/desktop/news"
 	"github.com/nednella/agentos/desktop/notes"
@@ -50,6 +51,9 @@ type App struct {
 	news     *news.Manager
 	updates  *update.Updater
 	router   *control.Router
+	registry *projects.Registry
+	issues   *issues.Issues
+	warn     *warn.Warnings
 	media    http.Handler
 	stateDir string
 	services []any
@@ -77,6 +81,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	})
 	iss := issues.New(runner, sess, h.Emit)
 	sess.Hook(iss.CachedRepo, iss.Emit, iss)
+	a.registry, a.issues, a.warn = c.Registry, iss, warn.New(h.Emit)
 	store := notes.New(c.DataDir)
 	a.sessions, a.terms, a.notes, a.evidence, a.events, a.stateDir = sess, terms, store, proofs, events, c.StateDir
 	a.browsers, a.awake = browsers, stayAwake
@@ -185,7 +190,30 @@ func (a *App) Start(ctx context.Context) error {
 	go a.digests.Loop(ctx)
 	go a.news.Loop(ctx)
 	go a.updates.Loop(ctx)
+	go a.followConfig(ctx)
 	return nil
+}
+
+// followConfig picks up hand edits to the config file while the app runs.
+func (a *App) followConfig(ctx context.Context) {
+	tick := time.NewTicker(2 * time.Second)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-tick.C:
+		}
+		changed, err := a.registry.Reload()
+		if err != nil {
+			a.warn.Report("config", err.Error())
+			continue
+		}
+		a.warn.Clear("config")
+		if changed {
+			a.issues.Reload(ctx, a.sessions.Current())
+		}
+	}
 }
 
 // Stop closes the terminal streams and stops answering the command line.
