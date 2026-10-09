@@ -5,16 +5,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/project"
 )
 
-// NewRegistry keeps cfg, and saves it to path whenever a project is added or removed.
-func NewRegistry(path string, cfg project.Config) *Registry { return &Registry{path: path, cfg: cfg} }
+// NewRegistry keeps cfg, read from path, and saves it to path whenever a project is added or removed.
+func NewRegistry(path string, cfg project.Config) *Registry {
+	return &Registry{path: path, cfg: cfg, stamp: stampOf(path)}
+}
 
 const lastProjectFile = "last-project"
 
@@ -22,8 +26,45 @@ const lastProjectFile = "last-project"
 type Registry struct {
 	path string
 
-	mu  sync.Mutex
-	cfg project.Config
+	mu    sync.Mutex
+	cfg   project.Config
+	stamp stamp // the file as the app last read or wrote it
+}
+
+type stamp struct {
+	mod  time.Time
+	size int64
+}
+
+func stampOf(path string) stamp {
+	info, err := os.Stat(path)
+	if err != nil {
+		return stamp{}
+	}
+	return stamp{info.ModTime(), info.Size()}
+}
+
+// Reload reads the config file again when it changed since the app last read or wrote it, and says whether the
+// config changed. A file that does not load leaves the config as it was.
+func (r *Registry) Reload() (bool, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.reload()
+}
+
+func (r *Registry) reload() (bool, error) {
+	now := stampOf(r.path)
+	if now == r.stamp {
+		return false, nil
+	}
+	cfg, err := project.Load(r.path)
+	if err != nil {
+		return false, err
+	}
+	r.stamp = now
+	changed := !reflect.DeepEqual(cfg, r.cfg)
+	r.cfg = cfg
+	return changed, nil
 }
 
 // List is the configured projects whose folder exists here. The config may be shared with a
@@ -174,18 +215,28 @@ func (r *Registry) project(key string) project.Project {
 	return project.Project{}
 }
 
-// edit applies change to a copy of the config, saves it, and keeps it only when the save worked.
+// edit applies change to a copy of the config, saves it, and keeps it only when the save worked. It reads the file
+// first, so a hand edit made while the app runs is kept.
 func (r *Registry) edit(change func(*project.Config) error) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, err := r.reload(); err != nil {
+		return err
+	}
 	next := r.cfg
 	if err := change(&next); err != nil {
 		return err
 	}
+	return r.save(next)
+}
+
+// save writes next to the file and keeps it. It needs mu.
+func (r *Registry) save(next project.Config) error {
 	if err := project.Save(r.path, next); err != nil {
 		return err
 	}
 	r.cfg = next
+	r.stamp = stampOf(r.path)
 	return nil
 }
 
@@ -227,6 +278,9 @@ func (r *Registry) Add(dir string) (project.Project, error) {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, err := r.reload(); err != nil {
+		return project.Project{}, err
+	}
 	if i := slices.IndexFunc(r.cfg.Projects, func(p project.Project) bool { return p.Dir == dir }); i >= 0 {
 		return r.cfg.Projects[i], nil
 	}
@@ -238,10 +292,9 @@ func (r *Registry) Add(dir string) (project.Project, error) {
 	added := project.Project{Name: name, Dir: dir}
 	next := r.cfg
 	next.Projects = append(slices.Clone(r.cfg.Projects), added)
-	if err := project.Save(r.path, next); err != nil {
+	if err := r.save(next); err != nil {
 		return project.Project{}, err
 	}
-	r.cfg = next
 	return added, nil
 }
 
@@ -249,16 +302,18 @@ func (r *Registry) Add(dir string) (project.Project, error) {
 func (r *Registry) Remove(name string) (bool, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if _, err := r.reload(); err != nil {
+		return false, err
+	}
 	i := slices.IndexFunc(r.cfg.Projects, func(p project.Project) bool { return p.Name == name })
 	if i < 0 {
 		return false, nil
 	}
 	next := r.cfg
 	next.Projects = slices.Delete(slices.Clone(r.cfg.Projects), i, i+1)
-	if err := project.Save(r.path, next); err != nil {
+	if err := r.save(next); err != nil {
 		return false, err
 	}
-	r.cfg = next
 	return true, nil
 }
 
