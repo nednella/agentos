@@ -96,15 +96,16 @@ with `new_page` and `close_page` disallowed, and drives its own pages, which car
 those pages. A dialog nobody answers for 5 seconds is dismissed, because it blocks every later call.
 
 **Everything else.** Notes (`notes`, filed as issues with `## Description`), evidence an agent files with
-`agentos show` or a screenshot (`evidence`), the interruption tally (`stats`), a weekly digest of what changed
+`agentos show` or a screenshot (`evidence`), the interruption tally and the activity ledger (`stats`), a weekly digest of what changed
 in the project's dependencies, run by a locked-down `claude` with `internal/prompts/digest.md` (`digest`),
 self-update from GitHub releases (`update`), holding off idle sleep while a session works (`awake`) and the
 settings panel (`settings`). The config file and the command line are in `docs/config.md`.
 
-**Storage.** Notes, note images, evidence, stats, the activity record and the digest live in `data_dir` (default
+**Storage.** Notes, note images, evidence, stats, the activity event log and the digest live in `data_dir` (default
 `~/.local/share/agentos`), per project. PR tracking, the clean-up log, the browser profile and session temp
 folders are always under `~/.local/share/agentos/<key>/`. State files, sockets, the tmux config and the last
-project are in `~/.local/state/agentos`. Every file is written to a temp file and renamed into place.
+project are in `~/.local/state/agentos`. Every file is written to a temp file and renamed into place,
+except the event log: its lines are appended, since iCloud uploads a changed file whole.
 
 ## Code layout
 
@@ -116,7 +117,7 @@ project are in `~/.local/state/agentos`. Every file is written to a temp file an
 | `desktop/internal/run`     | runs commands; injected so tests never call the real `gh`, `git` or `claude`                                                                                                                          |
 | `desktop/frontend/`        | React 18, TypeScript strict, Tailwind, xterm.js                                                                                                                                                       |
 | `cli/`                     | the `agentos` commands agents and hooks call                                                                                                                                                          |
-| `internal/`                | shared packages: `session`, `project` (config), `bus`, `term`, `control`, `agent`, `update`, `prompts`                                                                                                |
+| `internal/`                | shared packages: `session`, `project` (config), `bus`, `term`, `control`, `agent`, `update`, `prompts`, `activity` (events)                                                                            |
 | `internal/prompts/*.md`    | every text agentos gives an agent                                                                                                                                                                     |
 | `install.sh`               | installs a release; release-please cuts them from conventional commits                                                                                                                                |
 

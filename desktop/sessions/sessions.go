@@ -18,6 +18,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/internal/warn"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
@@ -131,6 +132,7 @@ type Sessions struct {
 	repoOf     func(dir string) string
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
+	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
 	wakes      map[string]string        // prompts for sessions that were waiting on the user when their PR needed them
 	prefillFor time.Duration
 }
@@ -147,11 +149,9 @@ type Tally interface {
 	Closed(id string, at time.Time) bool
 }
 
-// Activity records what the user and the agents do.
+// Activity records what the user, the agents and the app do.
 type Activity interface {
-	Prompt(id string, at time.Time)
-	Session(id string, issue bool, at time.Time)
-	Worked(id string, ms int64, at time.Time)
+	Record(projectKey string, e activity.Event)
 }
 
 // Evidence is what the sessions need of the evidence store.
@@ -227,6 +227,7 @@ func newSessions(o Options) *Sessions {
 		seen:       map[string]session.State{},
 		history:    map[string][]Change{},
 		ready:      map[string]chan struct{}{},
+		resumed:    map[string]bool{},
 		wakes:      map[string]string{},
 		prefillFor: prefillWait,
 		ctx:        context.Background(),
@@ -477,7 +478,7 @@ func (s *Sessions) observe(rec session.Record) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if rec.Event == "UserPromptSubmit" {
-		s.activity.Prompt(rec.Session, rec.At)
+		s.record(rec.Session, activity.Event{At: rec.At.UnixMilli(), Kind: activity.Prompt})
 	}
 	s.take(rec)
 	s.sync()
@@ -533,8 +534,16 @@ func (s *Sessions) sync() {
 			state, at = rec.State, rec.At
 		}
 		prev, known := s.seen[id]
-		if !known && s.synced {
-			s.activity.Session(id, in.Issue != "", time.Now())
+		if !known {
+			if s.synced {
+				issue, _ := strconv.Atoi(in.Issue)
+				e := activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionStart, Issue: issue, Model: in.Model, Effort: in.Effort}
+				if s.resumed[id] {
+					e.Label = activity.Resumed
+				}
+				s.record(id, e)
+			}
+			delete(s.resumed, id)
 		}
 		opened := s.loaded && state == session.Idle && s.life.opened(id)
 		if opened {
@@ -581,6 +590,9 @@ func (s *Sessions) sync() {
 			if s.seen[id] == session.Working {
 				s.worked(id, time.Now())
 			}
+			if in := s.known[id]; !in.Created.IsZero() {
+				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionEnd, Ms: time.Since(in.Created).Milliseconds()})
+			}
 			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
@@ -610,8 +622,16 @@ func (s *Sessions) sync() {
 // worked counts the time since the session last changed state as time it spent working. It needs mu.
 func (s *Sessions) worked(id string, end time.Time) {
 	if h := s.history[id]; len(h) > 0 {
-		s.activity.Worked(id, end.UnixMilli()-h[len(h)-1].At, end)
+		if ms := end.UnixMilli() - h[len(h)-1].At; ms > 0 {
+			s.record(id, activity.Event{At: end.UnixMilli(), Kind: activity.Worked, Ms: ms})
+		}
 	}
+}
+
+// record adds an event of the session to the activity record.
+func (s *Sessions) record(id string, e activity.Event) {
+	e.Session = id
+	s.activity.Record(session.ProjectKey(id), e)
 }
 
 // holdAwake keeps the Mac awake while a session of a project that keeps awake is working. It needs mu.
@@ -919,7 +939,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		s.mu.Unlock()
 		return Session{}, err
 	}
-	view := s.register(name, title, proj, issue, model)
+	view := s.register(name, title, proj, issue, model, conversation != "")
 	if ready != nil {
 		go s.typeWhenReady(name, ready, text, send)
 	}
@@ -976,9 +996,12 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model) Session {
+func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, resumed bool) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if resumed {
+		s.resumed[name.String()] = true
+	}
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Created: time.Now()}
 	if _, ok := s.agent.(agent.Claude); ok {
 		in.Model, in.Effort = model.Model, model.Effort

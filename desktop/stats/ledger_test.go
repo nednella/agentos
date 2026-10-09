@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/project"
 )
 
@@ -17,17 +18,22 @@ func (f fakeProjects) List() []project.Project { return f }
 func TestLedger(t *testing.T) {
 	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
 	day := func(ago int) time.Time { return now.AddDate(0, 0, -ago) }
-	act := NewActivity(t.TempDir())
+	log := loaded(t, t.TempDir())
 	projects := fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}, {Name: "Gamma", Dir: "/g"}, {Name: "Delta", Dir: "/d"}}
 	record := func(p string, ago, prompts int, sessions int, issue bool, workMs int64) {
-		id := strings.ToLower(p) + "/aaaaaaaa"
+		key := strings.ToLower(p)
+		at := day(ago).UnixMilli()
 		for range prompts {
-			act.Prompt(id, day(ago))
+			log.Record(key, activity.Event{At: at, Kind: activity.Prompt})
 		}
 		for range sessions {
-			act.Session(id, issue, day(ago))
+			e := activity.Event{At: at, Kind: activity.SessionStart}
+			if issue {
+				e.Issue = 1
+			}
+			log.Record(key, e)
 		}
-		act.Worked(id, workMs, day(ago))
+		log.Record(key, activity.Event{At: at, Kind: activity.Worked, Ms: workMs})
 	}
 	record("Alpha", 0, 2, 1, true, 1000)
 	record("Alpha", 10, 1, 1, false, 500)
@@ -36,7 +42,7 @@ func TestLedger(t *testing.T) {
 	record("Beta", 400, 9, 3, false, 100)
 	record("Delta", 3, 3, 0, false, 0)
 
-	books := NewBooks(act, projects)
+	books := NewBooks(log, projects)
 	build := func(days int) Ledger {
 		t.Helper()
 		led, err := books.Ledger(days, now)
@@ -97,12 +103,44 @@ func TestLedger(t *testing.T) {
 
 func TestLedgerWithoutRecord(t *testing.T) {
 	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
-	books := NewBooks(NewActivity(t.TempDir()), fakeProjects{{Name: "Solo", Dir: "/s"}})
+	books := NewBooks(loaded(t, t.TempDir()), fakeProjects{{Name: "Solo", Dir: "/s"}})
 	led, err := books.Ledger(30, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if led.Since != "" || len(led.Heat) != 364 || len(led.Projects) != 1 || led.Totals.Prompts != 0 {
 		t.Errorf("since %q, heat %d, projects %d, totals %+v", led.Since, len(led.Heat), len(led.Projects), led.Totals)
+	}
+}
+
+func TestLedgerPullRequestsAndIssues(t *testing.T) {
+	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
+	at := func(ago int) int64 { return now.AddDate(0, 0, -ago).UnixMilli() }
+	log := loaded(t, t.TempDir())
+	for _, e := range []activity.Event{
+		{At: at(0), Kind: activity.PROpened},
+		{At: at(0), Kind: activity.PRMerged, Issue: 5, Ms: 1000},
+		{At: at(2), Kind: activity.PRMerged, Issue: 5, Ms: 3000},
+		{At: at(2), Kind: activity.PRMerged, Ms: 2000},
+		{At: at(1), Kind: activity.PRClosed, Ms: 9000},
+		{At: at(1), Kind: activity.IssueFiled},
+		{At: at(1), Kind: activity.SessionEnd, Ms: 100},
+		{At: at(1), Kind: activity.SessionEnd, Ms: 300},
+		{At: at(50), Kind: activity.PRMerged, Issue: 6, Ms: 5000},
+	} {
+		log.Record("alpha", e)
+	}
+	log.Record("beta", activity.Event{At: at(0), Kind: activity.PRMerged, Issue: 5, Ms: 4000})
+	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alpha := led.Projects[0]
+	want := LedgerRow{Project: "Alpha", PRsOpened: 1, PRsMerged: 3, PRsClosed: 1, IssuesFiled: 1, IssuesClosed: 1, AvgSessionMs: 200, AvgLeadMs: 2000}
+	if alpha != want {
+		t.Errorf("alpha = %+v, want %+v", alpha, want)
+	}
+	if tot := led.Totals; tot.PRsMerged != 4 || tot.IssuesClosed != 2 || tot.AvgLeadMs != 2500 || tot.AvgSessionMs != 200 {
+		t.Errorf("totals = %+v: issue 5 of each project counts once per project", tot)
 	}
 }
