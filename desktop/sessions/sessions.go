@@ -105,6 +105,7 @@ type Sessions struct {
 	project    project.Project
 	configured ProjectList
 	tally      Tally
+	activity   Activity
 	closeTerm  func(id string)
 	evidence   Evidence
 	browsers   Browsers
@@ -122,6 +123,7 @@ type Sessions struct {
 	seen       map[string]session.State
 	history    map[string][]Change
 	loaded     bool // the first refresh is in, so later changes may raise attention
+	synced     bool // the first refresh is synced, so a session seen from now on is a new one
 	lastSent   string
 	lastProjs  string
 	lastIssues string
@@ -143,6 +145,13 @@ type ProjectList interface {
 type Tally interface {
 	Opened(id, title string, issue int, model string, rec session.Record, at time.Time)
 	Closed(id string, at time.Time) bool
+}
+
+// Activity records what the user and the agents do.
+type Activity interface {
+	Prompt(id string, at time.Time)
+	Session(id string, issue bool, at time.Time)
+	Worked(id string, ms int64, at time.Time)
 }
 
 // Evidence is what the sessions need of the evidence store.
@@ -176,6 +185,7 @@ type Options struct {
 	Run           run.Runner
 	Stream        run.Streamer // long-running commands: gh webhook forward
 	Tally         Tally
+	Activity      Activity
 	CloseTerminal func(id string)
 	Evidence      Evidence
 	Browsers      Browsers
@@ -208,7 +218,7 @@ func (s *Sessions) Touch() { s.changed() }
 func newSessions(o Options) *Sessions {
 	return &Sessions{
 		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
-		project: o.Current, configured: o.Projects, tally: o.Tally, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
+		project: o.Current, configured: o.Projects, tally: o.Tally, activity: o.Activity, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		nums: map[string]int{}, lastNum: map[string]int{},
@@ -293,6 +303,7 @@ func (s *Sessions) Refresh() {
 	s.number()
 	s.loaded = true
 	s.sync()
+	s.synced = true
 }
 
 // revive takes back a session that tmux lists although it was marked ended. The saved
@@ -465,6 +476,9 @@ func (s *Sessions) Dismiss(id string) error {
 func (s *Sessions) observe(rec session.Record) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if rec.Event == "UserPromptSubmit" {
+		s.activity.Prompt(rec.Session, rec.At)
+	}
 	s.take(rec)
 	s.sync()
 }
@@ -519,6 +533,9 @@ func (s *Sessions) sync() {
 			state, at = rec.State, rec.At
 		}
 		prev, known := s.seen[id]
+		if !known && s.synced {
+			s.activity.Session(id, in.Issue != "", time.Now())
+		}
 		opened := s.loaded && state == session.Idle && s.life.opened(id)
 		if opened {
 			attention = append(attention, [2]string{id, "opened"})
@@ -527,6 +544,9 @@ func (s *Sessions) sync() {
 			continue
 		}
 		s.seen[id] = state
+		if known && prev == session.Working {
+			s.worked(id, at)
+		}
 		s.history[id] = append(s.history[id], Change{State: state, At: at.UnixMilli()})
 		if h := s.history[id]; len(h) > historyCap {
 			s.history[id] = slices.Clone(h[len(h)-historyCap:])
@@ -558,6 +578,9 @@ func (s *Sessions) sync() {
 			if s.tally.Closed(id, time.Now()) {
 				waitsChanged = true
 			}
+			if s.seen[id] == session.Working {
+				s.worked(id, time.Now())
+			}
 			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
 			delete(s.seen, id)
@@ -581,6 +604,13 @@ func (s *Sessions) sync() {
 	s.emit("sessions", scoped.Of(key, list))
 	for _, a := range attention {
 		s.emit("attention", map[string]string{"id": a[0], "state": a[1]})
+	}
+}
+
+// worked counts the time since the session last changed state as time it spent working. It needs mu.
+func (s *Sessions) worked(id string, end time.Time) {
+	if h := s.history[id]; len(h) > 0 {
+		s.activity.Worked(id, end.UnixMilli()-h[len(h)-1].At, end)
 	}
 }
 

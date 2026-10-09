@@ -61,13 +61,14 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		return context.Background()
 	}
 	waits := stats.New(c.DataDir)
+	activity := stats.NewActivity(c.DataDir)
 	proofs := evidence.New(c.DataDir)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	stayAwake := awake.New(h.Awake, h.Emit)
 	sess := sessions.New(sessions.Options{
 		Tmux: c.Tmux, Agent: c.Agent, StateDir: c.StateDir, LocalDir: c.LocalDir, Projects: c.Registry,
-		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
+		Current: c.Project, Emit: h.Emit, Run: runner, Stream: stream, Tally: waits, Activity: activity, CloseTerminal: terms.Close, Evidence: proofs, Browsers: browsers,
 		Awake: stayAwake, KeepAwake: c.Registry.KeepAwake,
 	})
 	iss := issues.New(runner, sess, h.Emit)
