@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.22.0](https://github.com/nednella/agentos/compare/v0.21.0...v0.22.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** record issues filed, clean-ups, evidence and waits ([802eeeb](https://github.com/nednella/agentos/commit/802eeeb7f84a6605af3d2532cd4add4cd00e0abd))
+* **desktop:** record pull request events ([b4caab8](https://github.com/nednella/agentos/commit/b4caab8ab19741bd69cc09cd54807778bbf367b4))
+* **stats:** append-only event log and in-memory rollup ([98f7f9d](https://github.com/nednella/agentos/commit/98f7f9de51b4a1076bec5e50532f5e60501807d9))
+* **stats:** gzip closed days of the event log ([ec69fdd](https://github.com/nednella/agentos/commit/ec69fdd0b200af50b2b2a9b38bb8b9de91ccc047))
+* **ui:** show pull requests, issues and session length in the ledger ([df25581](https://github.com/nednella/agentos/commit/df25581749fe7925b73f9110d4bda25d4676f693))
+
+
+### Bug Fixes
+
+* **build:** stop check script's Brave code sign clone from triggering App Management denials ([4de7859](https://github.com/nednella/agentos/commit/4de7859a919502f9eaad870f48973c1391a9e330))
+* **desktop:** stop Brave code sign clone from triggering App Management denials ([60af8e7](https://github.com/nednella/agentos/commit/60af8e7af6ececc998f70cd47a0c85fe2ab0fc49))
+* **ui:** drop back icon from news page header ([cc4723c](https://github.com/nednella/agentos/commit/cc4723c85b23fe573e588afbadc46100588d1ea2))
+
 ## [0.21.0](https://github.com/nednella/agentos/compare/v0.20.0...v0.21.0) (2026-10-09)
 
 
