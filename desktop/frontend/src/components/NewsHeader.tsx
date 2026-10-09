@@ -33,7 +33,7 @@ export function NewsHeader({
             title="Back to news (Esc)"
             onClick={closeNewsPage}
           >
-            <Icon name="back" size={13} />
+            <Icon name="chevron-left" size={13} />
             News
           </button>
           <span className="text-dim">/</span>
