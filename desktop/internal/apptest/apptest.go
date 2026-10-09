@@ -884,6 +884,8 @@ func (h *Harness) SetDataDir(dir string, withData bool) error {
 
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
 
+func (h *Harness) Ledger(days int) (stats.Ledger, error) { return h.stats.Ledger(days) }
+
 // PRJSON is what gh pr list prints for one pull request.
 func PRJSON(state string, draft bool, rollup string, comments, reviews int) string {
 	repeat := func(n int) string {
