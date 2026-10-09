@@ -3,13 +3,24 @@ import { useLayout } from '../LayoutContext'
 import { useFocusRequest } from '../useFocusRequest'
 import { Terminal } from './Terminal'
 
+// The last focus request that opened a shell, so a remount after the shell exited does not replay it.
+let openedFor = -1
+
 type ShellTerminalProps = { visible: boolean }
 
 export function ShellTerminal({ visible }: ShellTerminalProps) {
-  const { shellId, openShell, report, focus, project } = useAgentos()
+  const { shellId, openShell, report, focus, focusRequest, project } = useAgentos()
   const { returnToTerminal } = useLayout()
 
-  useFocusRequest('shell', () => !shellId && report(openShell), visible)
+  useFocusRequest(
+    'shell',
+    () => {
+      if (shellId || focusRequest.n <= openedFor) return
+      openedFor = focusRequest.n
+      report(openShell)
+    },
+    visible,
+  )
 
   if (!shellId) {
     return (
