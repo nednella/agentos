@@ -313,6 +313,36 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     [enterProject],
   )
 
+  // A failed GitHub step leaves the project in place; the user retries it or leaves the project local.
+  const createRepo = useCallback(
+    async (name: string) => {
+      const key = pushToast({ tone: 'info', text: `Creating the GitHub repo for ${name}…`, sticky: true })
+      try {
+        const snap = await api.createRepo(name)
+        if (snap.project.name !== projectRef.current?.name) return
+        setProject(snap.project)
+        setProjects(snap.projects)
+        await loadIssues(true)
+      } catch (err) {
+        const failed = pushToast({
+          tone: 'error',
+          text: errorMessage(err),
+          sticky: true,
+          action: {
+            label: 'Retry',
+            run() {
+              dismissToast(failed)
+              report(() => createRepo(name))
+            },
+          },
+        })
+      } finally {
+        dismissToast(key)
+      }
+    },
+    [dismissToast, loadIssues, pushToast, report],
+  )
+
   useEffect(() => {
     report(() => enterFrom(api.snapshot()))
     report(async () => setAwake(await api.awake()))
@@ -556,6 +586,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         } finally {
           dismissToast(key)
         }
+        await createRepo(name)
       },
       async removeProject(name) {
         const epoch = projectEpoch.current
@@ -715,7 +746,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestUnseen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

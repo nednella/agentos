@@ -29,8 +29,11 @@ func TestNewProject(t *testing.T) {
 	if !exists(filepath.Join(dir, ".git")) {
 		t.Error("no git repository")
 	}
-	if h.GH.Calls("repo create fresh --public --source . --push") != 1 {
-		t.Errorf("gh calls = %q", h.GH.CallLog())
+	if h.GH.Calls("repo create fresh --public --source . --push") != 0 {
+		t.Errorf("NewProject made the GitHub repo: gh calls = %q", h.GH.CallLog())
+	}
+	if _, err := h.CreateRepo("fresh"); err != nil || h.GH.Calls("repo create fresh --public --source . --push") != 1 {
+		t.Errorf("CreateRepo = %v; gh calls = %q", err, h.GH.CallLog())
 	}
 
 	t.Run("rejects a bad name before asking for a folder", func(t *testing.T) {
@@ -59,14 +62,29 @@ func TestNewProject(t *testing.T) {
 		}
 	})
 
-	t.Run("a GitHub failure keeps the local folder", func(t *testing.T) {
+	t.Run("a GitHub failure keeps the project and can be retried", func(t *testing.T) {
 		h.GH.CreateRepoErr = errors.New("name already exists")
-		_, err := h.NewProject("taken")
-		if err == nil || !strings.Contains(err.Error(), "name already exists") {
+		if snap, err := h.NewProject("taken"); err != nil || snap.Project.Name != "taken" {
+			t.Fatalf("NewProject = %+v, %v", snap.Project, err)
+		}
+		if _, err := h.CreateRepo("taken"); err == nil || !strings.Contains(err.Error(), "name already exists") {
 			t.Errorf("err = %v", err)
 		}
 		if !exists(filepath.Join(parent, "taken", "README.md")) {
 			t.Error("the local folder was removed")
+		}
+		h.GH.CreateRepoErr = nil
+		if snap, err := h.CreateRepo("taken"); err != nil || snap.Project.Name != "taken" {
+			t.Errorf("retry = %+v, %v", snap.Project, err)
+		}
+		if h.GH.Calls("repo create taken --public --source . --push") != 2 {
+			t.Errorf("gh calls = %q", h.GH.CallLog())
+		}
+	})
+
+	t.Run("an unknown project has no repo to create", func(t *testing.T) {
+		if _, err := h.CreateRepo("missing"); err == nil {
+			t.Error("CreateRepo of an unknown project succeeded")
 		}
 	})
 }

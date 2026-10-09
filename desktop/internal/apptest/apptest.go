@@ -780,6 +780,9 @@ func (h *Harness) AddProjectDir(dir string) (projects.Snapshot, error) {
 func (h *Harness) NewProject(name string) (projects.Snapshot, error) {
 	return h.projects.NewProject(name)
 }
+func (h *Harness) CreateRepo(name string) (projects.Snapshot, error) {
+	return h.projects.CreateRepo(name)
+}
 func (h *Harness) RemoveProject(name string) (projects.Snapshot, error) {
 	return h.projects.RemoveProject(name)
 }

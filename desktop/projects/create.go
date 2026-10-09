@@ -5,7 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
+
+	"github.com/nednella/agentos/desktop/sessions"
 )
 
 var repoName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
@@ -13,7 +16,7 @@ var repoName = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 const readmeTemplate = "<div align=\"center\">\n  <h3><b>%s</b></h3>\n</div>\n"
 
 // NewProject asks where to put a new folder called name, starts a git repository in it with a
-// README, creates the public GitHub repo as its origin, and makes it the current project.
+// README, and makes it the current project. CreateRepo then makes its GitHub repo.
 func (s *Service) NewProject(name string) (Snapshot, error) {
 	name = strings.TrimSpace(name)
 	if !repoName.MatchString(name) || strings.Trim(name, ".") == "" {
@@ -34,10 +37,22 @@ func (s *Service) NewProject(name string) (Snapshot, error) {
 		_ = os.RemoveAll(dir)
 		return Snapshot{}, err
 	}
-	if _, err := s.run(s.ctx(), dir, "gh", "repo", "create", name, "--public", "--source", ".", "--push"); err != nil {
-		return Snapshot{}, fmt.Errorf("%s is ready but its GitHub repo is not: %w", dir, err)
-	}
 	return s.AddProjectDir(dir)
+}
+
+// CreateRepo creates the public GitHub repo of the project called name as its origin and pushes it.
+func (s *Service) CreateRepo(name string) (Snapshot, error) {
+	projects := s.sessions.Projects()
+	i := slices.IndexFunc(projects, func(p sessions.Project) bool { return p.Name == name })
+	if i < 0 {
+		return Snapshot{}, fmt.Errorf("no project called %s", name)
+	}
+	dir := projects[i].Dir
+	if _, err := s.run(s.ctx(), dir, "gh", "repo", "create", filepath.Base(dir), "--public", "--source", ".", "--push"); err != nil {
+		return Snapshot{}, fmt.Errorf("%s has no GitHub repo: %w", name, err)
+	}
+	s.repos.FreshRepo(s.ctx(), dir)
+	return s.Snapshot(), nil
 }
 
 func (s *Service) initRepo(dir, name string) error {

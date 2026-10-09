@@ -32,6 +32,7 @@ type Notes interface {
 // Repos names the GitHub repo of a folder.
 type Repos interface {
 	Repo(ctx context.Context, dir string) string
+	FreshRepo(ctx context.Context, dir string) string
 }
 
 // Releases knows whether a newer release of the app is out.
