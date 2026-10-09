@@ -5,10 +5,12 @@ import { filterIssues, isFiltering } from '../issueFilter'
 import { readStored, writeStored } from '../storage'
 import type { Issue } from '../types'
 import { useListNav } from '../useListNav'
+import { useIssueDrag } from '../useIssueDrag'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
 import { IssueRow } from './IssueRow'
 import { Notice } from './Notice'
+import { QueueSection } from './QueueSection'
 import { QueueSectionHeader } from './QueueSectionHeader'
 import { QueueSearch } from './QueueSearch'
 import { QueueUnsortedHeader } from './QueueUnsortedHeader'
@@ -60,8 +62,11 @@ function QueueBody({ nav }: QueueProps) {
 
 type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 
-function QueueList({ nav, shown, filtering }: QueueListProps) {
-  const { issues, issuesLoading, setOverlay } = useAgentos()
+function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
+  const { issues: coreIssues, issuesLoading, setOverlay } = useAgentos()
+  const drag = useIssueDrag(coreIssues)
+  const issues = drag.place(coreIssues)
+  const shown = drag.place(coreShown)
   const [closed, setClosed] = useState<Set<string>>(() => new Set(readStored<string[]>(CLOSED_KEY, [])))
   const [unsortedOpen, setUnsortedOpen] = useState(() => readStored(UNSORTED_OPEN_KEY, false))
   const list = useRef<HTMLDivElement>(null)
@@ -151,7 +156,7 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
   return (
     <div ref={list} className="min-h-0 flex-1 overflow-y-auto pt-1.5 pb-2">
       {sections.map((section) => (
-        <section key={section.name} className={sorted && !section.name ? 'mt-2 border-t border-line pt-2' : undefined}>
+        <QueueSection key={section.name} name={section.name} drag={drag} className={sorted && !section.name ? 'mt-2 border-t border-line pt-2' : undefined}>
           {section.name ? (
             <QueueSectionHeader
               name={section.name}
@@ -174,10 +179,10 @@ function QueueList({ nav, shown, filtering }: QueueListProps) {
           )}
           <Collapse open={section.open}>
             {section.issues.map((issue) => (
-              <IssueRow key={issue.number} issue={issue} cursor={section.open && listNav.cursorKey === `issue:${issue.number}`} />
+              <IssueRow key={issue.number} issue={issue} drag={drag} cursor={section.open && listNav.cursorKey === `issue:${issue.number}`} />
             ))}
           </Collapse>
-        </section>
+        </QueueSection>
       ))}
     </div>
   )

@@ -284,6 +284,26 @@
     box-shadow: inset 0 0 0 1px var(--accent);
   }
 
+  [data-drop] {
+    transition: opacity 120ms, background-color 120ms;
+  }
+
+  [data-drop='target'],
+  [data-drop='over'] {
+    outline: 1px dashed var(--accent);
+    outline-offset: -1px;
+    border-radius: var(--radius-sm);
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+  }
+
+  [data-drop='over'] {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
+
+  [data-drop='refused'] {
+    opacity: 0.4;
+  }
+
   .row-pick:hover,
   .row-pick[data-selected='true'] {
     background: var(--bg-hover);

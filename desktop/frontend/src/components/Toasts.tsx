@@ -49,6 +49,11 @@ export function Toasts() {
                 {ACTION_LABEL[toast.tone] ?? 'Jump'}
               </button>
             )}
+            {toast.action && (
+              <button className="btn" onClick={toast.action.run}>
+                {toast.action.label}
+              </button>
+            )}
             <DismissButton onClick={() => dismissToast(toast.key)} />
           </div>
         )

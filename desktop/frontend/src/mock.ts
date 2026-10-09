@@ -1,4 +1,4 @@
-import { buildIssueDetail, buildIssues } from './mockIssues'
+import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } from './mockIssues'
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
@@ -21,7 +21,7 @@ type ProjectData = { name: string; dir: string; repo: string; notes: Note[]; iss
 const minute = 60_000
 
 // A project that is not set up has no queue sections, so every issue sits in the nameless group.
-const unsorted = (issues: Issue[]) => issues.map((issue) => ({ ...issue, section: '', actions: ['Start'] }))
+const unsorted = (issues: Issue[]) => issues.map((issue) => ({ ...issue, section: '', actions: ['Start'], moves: [] }))
 const noteTexts = [
   'Retry banner when the websocket drops\nShow a thin bar under the header and retry with backoff. Maybe reuse the toast style so it does not feel like a third kind of notice.\nThe backoff should reset on the first successful frame, not on connect, because the proxy accepts and then drops.',
   'Ask Alex about the checkout button copy. They said something about "Buy now" vs "Pay" last week and I forgot which way it went.',
@@ -208,6 +208,8 @@ export function createMock(params: URLSearchParams) {
       (a, b) => Number(a.archived) - Number(b.archived) || Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt,
     )
   }
+
+  const lastMoves = new Map<string, Issue>()
 
   function currentIssues(): Issue[] {
     return current.issues.map((issue) => ({
@@ -716,7 +718,7 @@ export function createMock(params: URLSearchParams) {
       return snap
     },
     SetUpProject: async () => {
-      if (current.needsSetup) current.issues = current.issues.map((issue) => ({ ...issue, section: 'Inbox', actions: ['Work'] }))
+      if (current.needsSetup) current.issues = current.issues.map((issue) => ({ ...issue, section: 'Inbox', actions: ['Work'], moves: movesFrom('Inbox') }))
       current.needsSetup = false
       emit('projects', data.map(projectView))
       return startSessionFor('Set up for agentos', 0, 'Set up this project for agentos with me.')
@@ -782,6 +784,7 @@ export function createMock(params: URLSearchParams) {
         type: '',
         section: 'Inbox',
         actions: ['Plan', 'Investigate', 'Work'],
+        moves: movesFrom('Inbox'),
         url: `https://github.com/${current.repo}/issues/${number}`,
         sessionId: '',
         author: 'nednella',
@@ -810,6 +813,26 @@ export function createMock(params: URLSearchParams) {
       const session = startSessionFor(`#${number} ${short}`, number, command)
       emit('issues', { project: current.name, items: currentIssues() })
       return session
+    },
+    MoveIssue: async (number: number, section: string) => {
+      const issue = current.issues.find((i) => i.number === number)
+      if (!issue) throw 'No such issue'
+      const moved = moveIssue(issue, section)
+      await delay(null, 500)
+      lastMoves.set(`${current.name}#${number}`, issue)
+      current.issues[current.issues.indexOf(issue)] = moved
+      sortBySection(current.issues)
+      emit('issues', { project: current.name, items: currentIssues() })
+    },
+    UndoMove: async (number: number) => {
+      const before = lastMoves.get(`${current.name}#${number}`)
+      const at = current.issues.findIndex((i) => i.number === number)
+      if (!before || at < 0) throw `nothing to undo for issue #${number}`
+      await delay(null, 500)
+      lastMoves.delete(`${current.name}#${number}`)
+      current.issues[at] = before
+      sortBySection(current.issues)
+      emit('issues', { project: current.name, items: currentIssues() })
     },
     IssueDetail: async (number: number) => {
       if (!current.issues.some((i) => i.number === number)) throw `reading issue #${number}: gh api: HTTP 404: Not Found`
