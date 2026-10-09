@@ -63,6 +63,7 @@ const moveTargets: Record<string, string[]> = {
   Inbox: ['Needs plan', 'Ideas'],
   'Needs plan': ['Inbox', 'Ideas'],
   Ideas: ['Inbox', 'Needs plan'],
+  '': ['Inbox', 'Needs plan', 'Ideas'],
 }
 
 export const sortBySection = (issues: Issue[]) => issues.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section))
