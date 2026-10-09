@@ -40,25 +40,6 @@ A session that works on more than one branch is cleaned up a branch at a time. W
 
 The text that the app types on its own, an issue action's `command`, the set-up session's start and the `pr_*_command`s, starts with `APPLICATION_PROMPT: `, so the agent knows it is not from you. A slash command is typed as it is, since Claude Code runs one only at the start of the prompt.
 
-### Setting up a project
-
-A project with no `queue_sections` shows an offer at the top of its queue. *Set up* adds the project to the config if it is missing, then fills each of these keys the project leaves empty:
-
-```yaml
-session_branch_fallback: "issue-{n}"
-session_cleanup_command: "{ [ -z {worktree} ] || git worktree remove {force} {worktree}; } && git branch -D {branch}"
-pr_review_command: "PR #{n} got a review or comment. Read it, fix what it asks, run the tests and push. Never merge the PR, mark it ready or request reviewers."
-pr_checks_command: "PR #{n} has failing checks. Find the cause, fix it, run the tests and push. Never merge the PR, mark it ready or request reviewers."
-pr_conflict_command: "PR #{n} conflicts with its base branch. Bring the base branch's changes into the PR's branch as this repository does it, resolve the conflicts, run the tests and push. Never merge the PR, mark it ready or request reviewers."
-queue_sections:
-  - name: Inbox
-    labels: ["*"]
-    actions:
-      - {name: Work, command: "/work {n}"}
-```
-
-It then starts a session, *agentos setup*, that writes the repository side with you: the issue template, the `/work` command and `AGENTS.md`. The template and the command are the same in every project, and each file it writes starts with a comment saying agentos set it up, with a link to this repository. *Not now* saves `setup_dismissed: true`. `⌘K` → *Set up project* runs the same for a project with no `queue_sections`. For a project that has them, it writes nothing to the config and only starts the session, so one set up by hand can get the repository side too.
-
 ### Queue sections and actions
 
 `queue_sections` groups the queue and says what a session can start from each group. Each section matches issues by label and lists actions.
