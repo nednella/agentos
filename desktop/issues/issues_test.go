@@ -137,7 +137,7 @@ func TestIssueOfNoSectionTypesTheStartLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	eventually(t, "start line typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "Work on issue #10: Maybe") })
+	eventually(t, "start line typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "APPLICATION_PROMPT: Work on issue #10: Maybe") })
 }
 
 func TestManualPromptSendTypesWithoutSending(t *testing.T) {

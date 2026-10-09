@@ -36,6 +36,8 @@ projects:
 
 `session_cleanup_command` runs through `sh -c` in the project folder, once per branch of the session that has a worktree or a local branch, after the safety checks. `{branch}`, `{worktree}` (the folder the branch is checked out in, `''` if none) and `{dir}` (the project folder) are shell-quoted. `{force}` is `--force` only when you force a clean-up, so `git worktree remove {force} {worktree}` removes a worktree with changes only then. A branch with no worktree has `{worktree}` `''`, which `git worktree remove` rejects; the command that *Set up* writes skips that step then. A command that fails blocks the clean-up with its error, unless the branch is already gone.
 
+The text that the app types on its own, an issue action's `command`, the set-up session's start and the `pr_*_command`s, starts with `APPLICATION_PROMPT: `, so the agent knows it is not from you. A slash command is typed as it is, since Claude Code runs one only at the start of the prompt.
+
 ### Setting up a project
 
 A project with no `queue_sections` shows an offer at the top of its queue. *Set up* adds the project to the config if it is missing, then fills each of these keys the project leaves empty:

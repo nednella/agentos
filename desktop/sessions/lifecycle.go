@@ -318,7 +318,7 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		l.autoCleanup(ctx, id)
 	}
 	for _, w := range wakes {
-		go l.sessions.wake(ctx, w.target, w.prompt)
+		go l.sessions.wake(ctx, w.target, fromApp(w.prompt))
 	}
 	l.sessions.changed()
 	if reload && ctx.Err() == nil {

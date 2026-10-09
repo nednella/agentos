@@ -86,6 +86,9 @@ func TestReviewWakesTheSession(t *testing.T) {
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 1))
 	h.RefreshPRs()
 	eventually(t, "the review prompt in the session", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+	if strings.Contains(h.Pane(t, s.ID), "APPLICATION_PROMPT") {
+		t.Error("a slash command got the app's prefix, so Claude Code would not run it")
+	}
 	h.RefreshPRs()
 	time.Sleep(500 * time.Millisecond)
 	if n := strings.Count(h.Pane(t, s.ID), "/address-review 12"); n != 1 {
@@ -100,6 +103,16 @@ func TestReviewWakesTheSession(t *testing.T) {
 			t.Errorf("the prompt appears %d times after a restart, want once", n)
 		}
 	})
+}
+
+func TestPlainReviewPromptIsMarkedFromTheApp(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"Read PR {n}\"\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 1))
+	h.RefreshPRs()
+	eventually(t, "the marked review prompt", func() bool { return strings.Contains(h.Pane(t, s.ID), "APPLICATION_PROMPT: Read PR 12") })
 }
 
 func TestFailingChecksWakeOncePerCommit(t *testing.T) {
