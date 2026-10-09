@@ -70,6 +70,7 @@ The window itself cannot be screenshotted by a session (macOS blocks it); `docs/
 - Agent-facing texts live in `internal/prompts/*.md`, never inline in Go.
 - Front end: one component per file, props typed inline as `{Name}Props`, early returns, every colour a token in `tokens.css`, one shared action registry drives shortcuts, palette and command line. Keep `types.ts` and `api.ts` in step with the Go `Service` structs, and `mock.ts` acting like the real thing. No new dependencies without a reason in the PR.
 - Change `docs/config.md` in the same PR as a config key or command.
+- Markdown is never hard-wrapped: each paragraph and each list item is one line.
 - Minimal, clear UI: flat surfaces, colour only for meaning (state, issue type, focus).
 
 ## Workflow
