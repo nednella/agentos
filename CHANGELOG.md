@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.21.0](https://github.com/nednella/agentos/compare/v0.20.0...v0.21.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** fetch every tracked PR each minute ([2109022](https://github.com/nednella/agentos/commit/21090225ab6b8e652840d186929e849c48b88754))
+* **desktop:** wake session when its PR conflicts with base ([6ffb9e2](https://github.com/nednella/agentos/commit/6ffb9e28844ef406ab8300ca2934bb8a443490a6))
+* **internal:** add pr_conflict_command config key ([fbe7535](https://github.com/nednella/agentos/commit/fbe75353be5945d40f3351edf5c5e6fea2c4f5cb))
+
 ## [0.20.0](https://github.com/nednella/agentos/compare/v0.19.1...v0.20.0) (2026-10-09)
 
 
