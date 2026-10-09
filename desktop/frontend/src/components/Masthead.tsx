@@ -11,7 +11,7 @@ export function Masthead() {
           </button>
         )}
       </h1>
-      <p className="text-soft">Integrate your project's work queue seamlessly with coding-agent sessions</p>
+      <p className="text-soft">One desktop window for every coding-agent session you run</p>
     </>
   )
 }
