@@ -73,12 +73,12 @@ basic block (`project.SetUp`) and starts a session briefed to write the reposito
 `agentos track`, else the one checked out in its working folder, else the project's `session_branch_fallback`.
 A session without one collects every branch it was seen on (other repos, a detached head and the default
 branch are ignored), remembered in `prs.json`; its PR is the one on its newest branch that has one. The app
-fetches every tracked PR every 5 minutes. Between those, each project with a session on a branch has a
+fetches every tracked PR every minute. Between those, each project with a session on a branch has a
 watcher: `gh webhook forward` by default, falling back to polling the PR list every `pr_poll_interval` with
 `If-None-Match`. A session's Stop hook also looks its branch's PR up at once, so a PR opened during a turn
 shows when the turn ends. A new comment or review types `pr_review_command` into the session; failing checks
 on a new commit type `pr_checks_command`; a new commit that conflicts with the base types
-`pr_conflict_command`, found at the 5-minute fetch, since a base that moves does not touch the PR. A session waiting on the owner gets the command once it stops
+`pr_conflict_command`, found at the one-minute fetch, since a base that moves does not touch the PR. A session waiting on the owner gets the command once it stops
 waiting. An ended issue session gets a new session for its issue that resumes the old conversation
 (`claude --resume`); an ended session with no issue gets nothing.
 
