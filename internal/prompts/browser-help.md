@@ -3,7 +3,8 @@
 agentos browser: your session's browser window.
 
   open <url> [--front]        open a page in your window, wait for it to load, print its title and your page label;
-                              --front also raises the window, for when the owner must see it (to log in, say)
+                              the window opens behind the owner's; --front raises it: use it every time the owner
+                              should look at the page (a design, or to log in), never for your own checks
   tab <url>                   open a page in a new tab of your window, wait for it to load, print its title and label
   screenshot [--caption <text>] [--full]
                               save a PNG as evidence for this session and print its path (of the tab that is showing)
