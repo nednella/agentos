@@ -130,3 +130,14 @@ func TestSaveSetUpFillsAnEmptyQueueSections(t *testing.T) {
 		})
 	}
 }
+
+func TestSaveLeavesOutAnEmptyAgentCommand(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := Save(path, Config{Projects: []Project{{Name: "api", Dir: "/srv/api"}}}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(path)
+	if strings.Contains(string(got), "agent_command") {
+		t.Errorf("a fresh config holds an empty agent_command:\n%s", got)
+	}
+}
