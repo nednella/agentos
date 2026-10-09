@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Note, PR, Project, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Note, PR, Project, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -503,6 +503,50 @@ export function createMock(params: URLSearchParams) {
     }
   }
 
+  function ledgerFor(days: number): Ledger {
+    const dayKey = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString().slice(0, 10)
+    const heat = Array.from({ length: 364 }, (_, i) => {
+      const weekday = (i + 3) % 7
+      const wave = Math.sin(i / 9) + 1.2
+      const count = weekday > 4 || i % 11 === 0 ? 0 : Math.round(wave * ((i * 37) % 23))
+      return { day: dayKey(363 - i), count }
+    })
+    const scale = days === 0 ? 1 : days === 365 ? 0.8 : 0.12
+    const row = (project: string, prompts: number, gh: [number, number, number, number] | null): LedgerRow => ({
+      project,
+      prompts: Math.round(prompts * scale),
+      sessions: Math.round(prompts * scale * 0.08),
+      issueSessions: Math.round(prompts * scale * 0.045),
+      workMs: Math.round(prompts * scale * 0.13 * 3_600_000),
+      prsMerged: gh && Math.round(gh[0] * scale),
+      prsClosed: gh && Math.round(gh[1] * scale),
+      issuesClosed: gh && Math.round(gh[2] * scale),
+      issuesOpen: gh && gh[3],
+    })
+    const projects = [
+      row('agentos', 3104, [181, 12, 170, 41]),
+      row('upscope-web', 1209, [52, 5, 49, 14]),
+      row('dotfiles', 499, [14, 2, 12, 3]),
+      row('scratch', 38, null),
+    ]
+    const sum = (pick: (r: LedgerRow) => number | null) => {
+      const values = projects.map(pick).filter((v): v is number => v !== null)
+      return values.length ? values.reduce((a, b) => a + b, 0) : null
+    }
+    const totals: LedgerRow = {
+      project: '',
+      prompts: projects.reduce((a, r) => a + r.prompts, 0),
+      sessions: projects.reduce((a, r) => a + r.sessions, 0),
+      issueSessions: projects.reduce((a, r) => a + r.issueSessions, 0),
+      workMs: projects.reduce((a, r) => a + r.workMs, 0),
+      prsMerged: sum((r) => r.prsMerged),
+      prsClosed: sum((r) => r.prsClosed),
+      issuesClosed: sum((r) => r.issuesClosed),
+      issuesOpen: sum((r) => r.issuesOpen),
+    }
+    return { days, since: dayKey(120), totals, projects, heat, github: 'scratch: no GitHub repository' }
+  }
+
   function finishCleanup(s: MockSession) {
     const target = owner(s)
     target.cleanups.unshift({
@@ -891,6 +935,7 @@ export function createMock(params: URLSearchParams) {
       if (s) s.opened = false
     },
     Stats: async (days: number) => delay(statsFor(days), 150),
+    Ledger: async (days: number) => delay(ledgerFor(days), 300),
     RefreshPRs: async () => delay(undefined, 500),
     AckPR: async (id: string) => {
       find(id).prAttention = ''
