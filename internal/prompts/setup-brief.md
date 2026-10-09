@@ -29,5 +29,7 @@ is missing with the owner. Ask before you write each file.
    - how to run the tests, the linters and the build, as exact commands
    - how to check a change by hand, when tests are not enough
    - the commit message style, and any hard rules, such as what a session must never touch
+   - how a branch takes the base branch's changes, rebase or merge, and how it pushes after (for example
+     `--force-with-lease` after a rebase); a session whose pull request conflicts with its base follows this
    Claude Code reads AGENTS.md only when the project has no CLAUDE.md. When it has one, ask the owner whether to move
    it into AGENTS.md.
