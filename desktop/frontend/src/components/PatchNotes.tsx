@@ -36,14 +36,14 @@ function PatchNotesSheet({ releases, onClose }: PatchNotesSheetProps) {
   }, [releases.length])
 
   return (
-    <Overlay align="center" size="wide" label="Patch notes" onClose={onClose}>
+    <Overlay align="center" size="reading" label="Patch notes" onClose={onClose}>
       <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2.5">
         <h2 className="flex-none text-title font-semibold">{several ? 'Patch notes' : `What's new in ${release.version}`}</h2>
         {several && <span className="min-w-0 flex-1 truncate text-small text-dim">{releases.length} releases since you last opened agentos</span>}
         <span className="flex-1" />
         <Keycap>Esc</Keycap>
       </div>
-      <div className="flex h-[min(32rem,70vh)] min-h-0">
+      <div className="flex h-[min(26rem,60vh)] min-h-0">
         {several && (
           <ul className="w-40 flex-none overflow-y-auto border-r border-line py-2" aria-label="Releases">
             {releases.map((r, i) => (
