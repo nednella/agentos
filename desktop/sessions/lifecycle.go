@@ -19,6 +19,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/internal/warn"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
@@ -119,6 +120,7 @@ type Lifecycle struct {
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
 	sessions *Sessions
+	activity Activity
 	repos    Repos
 
 	pollMu sync.Mutex // one reconcile at a time
@@ -138,10 +140,10 @@ type Lifecycle struct {
 	stopClean context.CancelFunc
 }
 
-func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir string, s *Sessions, emit func(string, any)) *Lifecycle {
+func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir string, s *Sessions, activity Activity, emit func(string, any)) *Lifecycle {
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
-		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, emit: emit, warn: warn.New(emit), repos: noRepos{},
+		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
 		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{},
 		stopped: stopped, stopClean: stop,
 	}
@@ -397,13 +399,17 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 		l.prs(key).Live[t.id] = true
 		l.savePRs(key)
 	}
+	l.recordState(t, pr)
 	attention := l.attentionFor(key, pr)
 	if attention != "" && attention != tr.attention {
 		l.emit("attention", map[string]string{"id": t.id, "state": "pr"})
 	}
 	tr.attention = attention
 	if live {
-		o.wake = l.nudgeFor(t.proj, pr)
+		var kind string
+		if o.wake, kind = l.nudgeFor(t.proj, pr); o.wake != "" {
+			l.record(t, pr, activity.Event{Kind: kind})
+		}
 	}
 	o.queue = !live && (prev == nil || prev.State != pr.State)
 	switch {
@@ -422,6 +428,39 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 	return o
 }
 
+// recordState records a PR first seen open, and one seen open before that merged or closed, once
+// each however many sessions work on it. It needs mu.
+func (l *Lifecycle) recordState(t target, pr *PR) {
+	key := t.proj.Key()
+	opened := l.prs(key).Opened
+	n := strconv.Itoa(pr.Number)
+	at, known := opened[n]
+	now := time.Now().UnixMilli()
+	live := pr.State == "draft" || pr.State == "open"
+	switch {
+	case live && !known:
+		opened[n] = now
+		l.record(t, pr, activity.Event{Kind: activity.PROpened})
+	case !live && known:
+		delete(opened, n)
+		kind := activity.PRClosed
+		if pr.State == "merged" {
+			kind = activity.PRMerged
+		}
+		l.record(t, pr, activity.Event{Kind: kind, Ms: now - at})
+	default:
+		return
+	}
+	l.savePRs(key)
+}
+
+// record adds an event about the session's PR to the activity record.
+func (l *Lifecycle) record(t target, pr *PR, e activity.Event) {
+	e.At = time.Now().UnixMilli()
+	e.Session, e.Issue, e.PR, e.Model, e.Effort = t.id, t.issue, pr.Number, t.model.Model, t.model.Effort
+	l.activity.Record(t.proj.Key(), e)
+}
+
 func wantsAuto(c project.Cleanup, state string) bool {
 	if state == "merged" {
 		return c.OnMerge() == "auto"
@@ -437,6 +476,7 @@ type prsFile struct {
 	Acks   map[string]ack   `json:"acks"`   // PR number -> ack
 	Live   map[string]bool  `json:"live"`   // session id -> its PR was seen draft or open
 	Nudged map[string]nudge `json:"nudged"` // PR number -> nudge
+	Opened map[string]int64 `json:"opened"` // PR number -> when it was first seen open, until it merges or closes
 
 	Branches map[string][]string `json:"branches"` // session id -> the branches it worked on, oldest first
 }
@@ -458,6 +498,9 @@ func (l *Lifecycle) prs(key string) *prsFile {
 	}
 	if f.Nudged == nil {
 		f.Nudged = map[string]nudge{}
+	}
+	if f.Opened == nil {
+		f.Opened = map[string]int64{}
 	}
 	if f.Branches == nil {
 		f.Branches = map[string][]string{}
@@ -502,12 +545,12 @@ func (l *Lifecycle) attentionFor(key string, pr *PR) string {
 	return ""
 }
 
-// nudgeFor is the prompt the PR's session should get: once per new comment or review, once
-// per commit whose checks fail, and once per commit that conflicts with the base. Comments a PR
-// had when first seen are not news. A project that sets no command for an event gets no prompt,
-// but the event still counts as seen.
+// nudgeFor is the prompt the PR's session should get, and its kind of event: once per new comment
+// or review, once per commit whose checks fail, and once per commit that conflicts with the base.
+// Comments a PR had when first seen are not news. A project that sets no command for an event gets
+// no prompt, but the event still counts as seen.
 // It needs mu.
-func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) string {
+func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string) {
 	key := proj.Key()
 	nudged := l.prs(key).Nudged
 	n := strconv.Itoa(pr.Number)
@@ -516,23 +559,22 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) string {
 		seen = nudge{Comments: pr.Comments}
 	}
 	head := cmp.Or(pr.HeadOid, "unknown")
-	prompt := ""
 	switch {
 	case pr.Comments > seen.Comments:
 		seen.Comments = pr.Comments
-		prompt = proj.ReviewCommand(pr.Number)
+		prompt, kind = proj.ReviewCommand(pr.Number), activity.Review
 	case pr.Checks == "failing" && seen.Head != head:
 		seen.Head = head
-		prompt = proj.ChecksCommand(pr.Number)
+		prompt, kind = proj.ChecksCommand(pr.Number), activity.Checks
 	case pr.Conflicting && seen.Conflict != head:
 		seen.Conflict = head
-		prompt = proj.ConflictCommand(pr.Number)
+		prompt, kind = proj.ConflictCommand(pr.Number), activity.Conflict
 	}
 	if !known || prompt != "" {
 		nudged[n] = seen
 		l.savePRs(key)
 	}
-	return prompt
+	return prompt, kind
 }
 
 // Ack marks the session's PR comments and failing checks as seen.

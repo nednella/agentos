@@ -196,7 +196,7 @@ type Options struct {
 // New tracks the sessions of o.Tmux, and follows their pull requests.
 func New(o Options) *Sessions {
 	s := newSessions(o)
-	s.life = newLifecycle(o.Run, o.Stream, o.LocalDir, o.StateDir, s, o.Emit)
+	s.life = newLifecycle(o.Run, o.Stream, o.LocalDir, o.StateDir, s, o.Activity, o.Emit)
 	return s
 }
 
