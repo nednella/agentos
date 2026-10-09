@@ -7,6 +7,7 @@ import (
 	"cmp"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -35,6 +36,7 @@ import (
 	"github.com/nednella/agentos/desktop/settings"
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/bus"
 	ctl "github.com/nednella/agentos/internal/control"
 )
@@ -889,6 +891,32 @@ func (h *Harness) SetDataDir(dir string, withData bool) error {
 func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
 
 func (h *Harness) Ledger(days int) (stats.Ledger, error) { return h.stats.Ledger(days) }
+
+// Events are the main project's recorded events of the kind given, oldest first.
+func (h *Harness) Events(t *testing.T, kind string) []activity.Event {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(h.State, "data", "main", "events", "*.jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []activity.Event
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for line := range strings.Lines(string(data)) {
+			var e activity.Event
+			if err := json.Unmarshal([]byte(line), &e); err != nil {
+				t.Fatalf("%s: %v", f, err)
+			}
+			if e.Kind == kind {
+				out = append(out, e)
+			}
+		}
+	}
+	return out
+}
 
 // PRJSON is what gh pr list prints for one pull request.
 func PRJSON(state string, draft bool, rollup string, comments, reviews int) string {

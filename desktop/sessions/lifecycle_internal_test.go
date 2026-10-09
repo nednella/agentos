@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/project"
 )
 
@@ -58,8 +59,12 @@ func TestParseWorktrees(t *testing.T) {
 	}
 }
 
+type noActivity struct{}
+
+func (noActivity) Record(string, activity.Event) {}
+
 func TestPollResultForAForgottenSessionIsDropped(t *testing.T) {
-	l := newLifecycle(nil, nil, t.TempDir(), t.TempDir(), nil, func(string, any) {})
+	l := newLifecycle(nil, nil, t.TempDir(), t.TempDir(), nil, noActivity{}, func(string, any) {})
 	proj := project.Project{Name: "p"}
 	for _, tt := range []struct {
 		name   string

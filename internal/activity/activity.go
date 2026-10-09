@@ -13,6 +13,7 @@ const (
 	PRClosed     = "pr_closed" // ms is the time from first seen open
 	Review       = "review"    // a review command was typed into the session
 	Checks       = "checks"    // a checks command was typed into the session
+	Conflict     = "conflict"  // a conflict command was typed into the session
 	IssueFiled   = "issue_filed"
 	Cleanup      = "cleanup" // label done or blocked
 	Evidence     = "evidence"
