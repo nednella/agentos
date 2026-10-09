@@ -71,6 +71,10 @@ func TestLoad(t *testing.T) {
 		{name: "action without a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{command: x}]}]}\n"), wantErr: true},
 		{name: "two actions of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X}, {name: X}]}]}\n"), wantErr: true},
 		{name: "section after a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: Rest, labels: [\"*\"]}, {name: Ready, labels: [ready]}]}\n"), wantErr: true},
+		{name: "draggable_from names itself", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, draggable_from: [A]}]}\n"), wantErr: true},
+		{name: "draggable_from names no section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, draggable_from: [B]}]}\n"), wantErr: true},
+		{name: "draggable_from on a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A}, {name: Rest, labels: [\"*\"], draggable_from: [A]}]}\n"), wantErr: true},
+		{name: "empty draggable_from on a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: Rest, labels: [\"*\"], draggable_from: []}]}\n"), wantErr: true},
 		{name: "bad action effort", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
 		{name: "unknown prompt send", path: write("projects:\n  - {name: api, directory: /srv/api, session_prompt_send: later}\n"), wantErr: true},
 		{name: "theme", path: write("app_theme: dark\n"), want: Config{Theme: "dark"}},
@@ -287,5 +291,33 @@ func TestLoadTextScale(t *testing.T) {
 		if _, err := Load(path); (err == nil) != ok {
 			t.Errorf("app_text_scale %s: err = %v, want ok = %v", scale, err, ok)
 		}
+	}
+}
+
+func TestLoadDraggable(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "c.yaml")
+	yaml := "projects:\n  - name: api\n    directory: /srv/api\n    queue_sections:\n" +
+		"      - {name: A}\n" +
+		"      - {name: B, labels: [b], draggable: false, draggable_from: []}\n" +
+		"      - {name: C, labels: [c], draggable_from: [A, B]}\n"
+	if err := os.WriteFile(path, []byte(yaml), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a, b, c := cfg.Projects[0].QueueSections[0], cfg.Projects[0].QueueSections[1], cfg.Projects[0].QueueSections[2]
+	if a.Draggable != nil || a.DraggableFrom != nil {
+		t.Errorf("omitted keys = %v %v, want unset", a.Draggable, a.DraggableFrom)
+	}
+	if b.Draggable == nil || *b.Draggable {
+		t.Errorf("draggable: false = %v", b.Draggable)
+	}
+	if b.DraggableFrom == nil || len(*b.DraggableFrom) != 0 {
+		t.Errorf("draggable_from: [] = %v, want set and empty", b.DraggableFrom)
+	}
+	if c.DraggableFrom == nil || !reflect.DeepEqual(*c.DraggableFrom, []string{"A", "B"}) {
+		t.Errorf("draggable_from = %v", c.DraggableFrom)
 	}
 }
