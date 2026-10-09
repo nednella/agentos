@@ -108,6 +108,12 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
     run: layout.toggleNews,
   },
   {
+    id: 'patch-notes',
+    label: 'Patch notes',
+    group: 'App',
+    run: () => a.setOverlay('changelog'),
+  },
+  {
     id: 'shortcuts',
     label: 'Keyboard shortcuts',
     group: 'App',

@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import type { IssueType, Release } from '../types'
+import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 import { TypeMark } from './TypeMark'
@@ -12,17 +13,29 @@ const shortDate = (date: string) => (date ? new Date(`${date}T12:00:00`).toLocal
 
 export function PatchNotes() {
   const { overlay, setOverlay, patchNotes } = useAgentos()
+  const close = () => setOverlay(null)
+  if (overlay === 'changelog') return <Changelog onClose={close} />
   if (overlay !== 'patch-notes' || patchNotes.length === 0) return null
-  return <PatchNotesSheet releases={patchNotes} onClose={() => setOverlay(null)} />
+  return <PatchNotesSheet releases={patchNotes} sinceLastRun onClose={close} />
 }
 
-type PatchNotesSheetProps = { releases: Release[]; onClose(): void }
+function Changelog({ onClose }: { onClose(): void }) {
+  const { report } = useAgentos()
+  const [releases, setReleases] = useState<Release[]>([])
+  useEffect(() => report(async () => setReleases(await api.changelog())), [report])
+  if (releases.length === 0) return null
+  return <PatchNotesSheet releases={releases} onClose={onClose} />
+}
 
-function PatchNotesSheet({ releases, onClose }: PatchNotesSheetProps) {
+type PatchNotesSheetProps = { releases: Release[]; sinceLastRun?: boolean; onClose(): void }
+
+function PatchNotesSheet({ releases, sinceLastRun, onClose }: PatchNotesSheetProps) {
   const { report } = useAgentos()
   const [index, setIndex] = useState(0)
   const release = releases[index]
   const several = releases.length > 1
+  const list = useRef<HTMLUListElement>(null)
+  useScrollCursorIntoView(list, index)
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -39,17 +52,18 @@ function PatchNotesSheet({ releases, onClose }: PatchNotesSheetProps) {
     <Overlay align="center" size="reading" label="Patch notes" onClose={onClose}>
       <div className="flex flex-none items-center gap-3 border-b border-line px-4 py-2.5">
         <h2 className="flex-none text-title font-semibold">{several ? 'Patch notes' : `What's new in ${release.version}`}</h2>
-        {several && <span className="min-w-0 flex-1 truncate text-small text-dim">{releases.length} releases since you last opened agentos</span>}
+        {several && sinceLastRun && <span className="min-w-0 flex-1 truncate text-small text-dim">{releases.length} releases since you last opened agentos</span>}
         <span className="flex-1" />
         <Keycap>Esc</Keycap>
       </div>
       <div className="flex h-[min(26rem,60vh)] min-h-0">
         {several && (
-          <ul className="w-40 flex-none overflow-y-auto border-r border-line py-2" aria-label="Releases">
+          <ul ref={list} className="w-40 flex-none overflow-y-auto border-r border-line py-2" aria-label="Releases">
             {releases.map((r, i) => (
               <li key={r.version}>
                 <button
                   aria-current={i === index}
+                  data-cursor={i === index}
                   className={`flex w-full items-baseline justify-between px-3.5 py-1.5 text-left ${i === index ? 'bg-hover text-ink shadow-[inset_2px_0_0_var(--accent)]' : 'text-soft hover:bg-hover'}`}
                   onClick={() => setIndex(i)}
                 >

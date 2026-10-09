@@ -60,6 +60,7 @@ type Backend = {
   RefreshNews(): Promise<void>
   Update(): Promise<void>
   PatchNotes(): Promise<Release[]>
+  Changelog(): Promise<Release[]>
   Awake(): Promise<boolean>
   Settings(): Promise<Settings>
   SetTheme(theme: ThemeSetting): Promise<Settings>
@@ -99,7 +100,7 @@ const namespaces = {
   browser: ['BrowserOpen', 'BrowserGoto', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
   news: ['News', 'RefreshNews'],
-  update: ['Update', 'PatchNotes'],
+  update: ['Update', 'PatchNotes', 'Changelog'],
   awake: ['Awake'],
   settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule', 'PickDataDir', 'SetDataDir'],
 }
@@ -197,6 +198,7 @@ export const api = {
   refreshNews: () => backend.RefreshNews(),
   update: () => backend.Update(),
   patchNotes: () => backend.PatchNotes(),
+  changelog: () => backend.Changelog(),
 }
 
 // The Go side used to call an idle wait "finished"; accept both.

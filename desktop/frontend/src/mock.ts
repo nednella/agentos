@@ -1129,6 +1129,7 @@ export function createMock(params: URLSearchParams) {
       throw 'The mock cannot relaunch'
     },
     PatchNotes: async () => (flags.patchNotes ? PATCH_NOTES : []),
+    Changelog: async () => PATCH_NOTES,
     OpenURL: async (url: string) => {
       window.open(url, '_blank')
     },
