@@ -46,7 +46,7 @@ A project with no queue sections shows _Set up this project for agentos_ at the 
   If accepted, a session is started that writes the `/work` command, the issue template and `AGENTS.md` with you.
 - **Not now** hides the offer. `⌘K` → _Set up project_ still works.
 
-To change the config by hand, edit `~/.config/agentos/config.yaml` with the app closed.
+To change the config by hand, edit `~/.config/agentos/config.yaml`; the app picks the change up while it runs.
 `docs/config.md` describes every key.
 
 ## Update
