@@ -402,7 +402,7 @@ export function createMock(params: URLSearchParams) {
     byIssue(454).pr = pr(457, 'draft', 'pending')
     Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
     Object.assign(byIssue(326), { pr: pr(449, 'open', 'passing', 3), prAttention: 'comments' })
-    Object.assign(byIssue(412), { pr: pr(441, 'merged', 'passing'), cleanup: 'blocked', cleanupReason: 'the worktree has uncommitted changes' })
+    Object.assign(byIssue(412), { pr: pr(441, 'merged', 'passing'), cleanup: 'blocked', cleanupReason: 'the worktree of issue-412 has uncommitted changes' })
     Object.assign(byIssue(437), { pr: pr(445, 'merged', 'passing'), cleanup: 'pending' })
     Object.assign(byIssue(430), { pr: pr(447, 'closed', 'failing'), cleanup: 'ask' })
     seed('#12 session memory', 12, 'waiting', [['working', 30], ['waiting', 7]], data[1])

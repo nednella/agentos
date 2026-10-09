@@ -191,19 +191,19 @@ func TestCleanupBlocked(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(wt, "work.txt"), []byte("changed\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
-		}, "the worktree has uncommitted changes"},
+		}, "the worktree of issue-7 has uncommitted changes"},
 		{"untracked file", func(t *testing.T, wt string) {
 			if err := os.WriteFile(filepath.Join(wt, "new.txt"), []byte("x\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
-		}, "the worktree has uncommitted changes"},
+		}, "the worktree of issue-7 has uncommitted changes"},
 		{"unpushed commit", func(t *testing.T, wt string) {
 			if err := os.WriteFile(filepath.Join(wt, "more.txt"), []byte("x\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			gitIn(t, wt, "add", "more.txt")
 			gitIn(t, wt, "commit", "-m", "unpushed")
-		}, "the branch has a commit that is not on origin"},
+		}, "issue-7 has a commit that is not on origin"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -298,10 +298,10 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 			gitIn(t, wt, "add", "later.txt")
 			gitIn(t, wt, "commit", "-m", "after the merge")
 			return head
-		}, "the branch has commits that are not in the merged pull request"},
+		}, "issue-7 has commits that are not in the merged pull request"},
 		{"a head git does not know", func(t *testing.T, h *apptest.Harness, wt string) string {
 			return strings.Repeat("0", 40)
-		}, "git could not compare the branch with the merged pull request"},
+		}, "git could not compare issue-7 with the merged pull request"},
 		{"no head from GitHub", func(t *testing.T, h *apptest.Harness, wt string) string { return "" },
 			"GitHub did not say which commit the merged pull request ended on"},
 	}
