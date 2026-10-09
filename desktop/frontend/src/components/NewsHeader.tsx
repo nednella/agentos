@@ -19,11 +19,11 @@ export function NewsHeader({
   onRun,
   children,
 }: NewsHeaderProps) {
-  const { closeNewsPage } = useLayout();
+  const { closeNewsPage, closeCentre } = useLayout();
 
   return (
     <>
-      <header className="panel-head flex flex-none items-center gap-2 border-b border-line px-4 py-2">
+      <header className="panel-head flex flex-none items-center gap-2 border-b border-line px-4 py-2.5">
         <nav
           aria-label="Breadcrumb"
           className="flex min-w-0 items-center gap-2 text-body"
@@ -54,6 +54,14 @@ export function NewsHeader({
           >
             <Icon name="refresh" size={13} />
           </span>
+        </button>
+        <button
+          className="btn btn-ghost h-7 w-7 flex-none justify-center px-0"
+          title="Close"
+          aria-label="Close news"
+          onClick={closeCentre}
+        >
+          <Icon name="close" />
         </button>
       </header>
       <p className="flex-none border-b border-line px-6 py-2.5 text-small text-dim">
