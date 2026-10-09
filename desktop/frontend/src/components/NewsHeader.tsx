@@ -23,20 +23,16 @@ export function NewsHeader({
 
   return (
     <>
-      <header className="panel-head flex flex-none items-center gap-2 border-b border-line px-3 py-2">
-        <button
-          className="btn btn-ghost h-7 w-7 flex-none justify-center px-0"
-          title="Back to news (Esc)"
-          aria-label="Back to news"
-          onClick={closeNewsPage}
-        >
-          <Icon name="chevron-left" />
-        </button>
+      <header className="panel-head flex flex-none items-center gap-2 border-b border-line px-4 py-2">
         <nav
           aria-label="Breadcrumb"
           className="flex min-w-0 items-center gap-2 text-body"
         >
-          <button className="text-soft hover:text-ink" onClick={closeNewsPage}>
+          <button
+            className="text-soft hover:text-ink"
+            title="Back to news (Esc)"
+            onClick={closeNewsPage}
+          >
             News
           </button>
           <span className="text-dim">/</span>
