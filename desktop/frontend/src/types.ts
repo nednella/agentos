@@ -253,7 +253,7 @@ export type News = {
 export type ProjectList<T> = { project: string; items: T[] }
 
 export type Warning = {
-  source: 'tmux' | 'github' | 'pull requests' | 'worktrees'
+  source: 'tmux' | 'github' | 'pull requests' | 'worktrees' | 'config'
   message: string
 }
 
