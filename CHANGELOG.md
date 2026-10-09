@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/nednella/agentos/compare/v0.17.0...v0.17.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **desktop:** end browsers left by earlier run when app starts ([7ecfe27](https://github.com/nednella/agentos/commit/7ecfe27445c572cf58402feb0ea882dae0d7287d)), closes [#249](https://github.com/nednella/agentos/issues/249)
+* **ui:** keep exited shell closed when panel reopens ([6b04c74](https://github.com/nednella/agentos/commit/6b04c74ccee4a9b9fdb72b6916117eeb00c2baae))
+
 ## [0.17.0](https://github.com/nednella/agentos/compare/v0.16.0...v0.17.0) (2026-10-08)
 
 
