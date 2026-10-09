@@ -267,3 +267,106 @@ func TestIssueDetail(t *testing.T) {
 		t.Errorf("unknown issue: err = %v", err)
 	}
 }
+
+func TestIssueMoves(t *testing.T) {
+	h := newHarness(t)
+	got, err := h.Issues(false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	moves := map[int][]string{}
+	for _, is := range got {
+		moves[is.Number] = is.Moves
+	}
+	want := map[int][]string{7: {"Plan"}, 8: {"Ready"}, 11: {"Ready", "Plan"}, 9: {"Ready", "Plan"}}
+	for number, w := range want {
+		if !slices.Equal(moves[number], w) {
+			t.Errorf("moves of #%d = %v, want %v", number, moves[number], w)
+		}
+	}
+	if raw, _ := json.Marshal(got[0]); !strings.Contains(string(raw), `"moves":["Plan"]`) {
+		t.Errorf("issue 7 json = %s", raw)
+	}
+}
+
+func TestMoveIssue(t *testing.T) {
+	tests := []struct {
+		name    string
+		number  int
+		section string
+		wantGH  string
+		wantErr string
+	}{
+		{"swap a label", 7, "Plan", "issue edit 7 --add-label needs-plan --remove-label ready", ""},
+		{"from the section without labels", 11, "Ready", "issue edit 11 --add-label ready", ""},
+		{"section not in its moves", 7, "Inbox", "", `issue #7 can not move to "Inbox"`},
+		{"unknown section", 7, "Nope", "", `issue #7 can not move to "Nope"`},
+		{"issue not open", 999, "Plan", "", "issue #999 is not open in this project"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			err := h.MoveIssue(tt.number, tt.section)
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("err = %v, want %q", err, tt.wantErr)
+				}
+				if n := h.GH.Calls("issue edit"); n != 0 {
+					t.Errorf("gh issue edit ran %d times", n)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if n := h.GH.Calls(tt.wantGH); n != 1 {
+				t.Errorf("%q ran %d times in %v", tt.wantGH, n, h.GH.CallLog())
+			}
+			if n := h.GH.IssueCalls(); n != 2 {
+				t.Errorf("gh issue list ran %d times, want 2: the queue was not read again", n)
+			}
+		})
+	}
+}
+
+func TestUndoMove(t *testing.T) {
+	tests := []struct {
+		name    string
+		number  int
+		section string
+		wantGH  string
+	}{
+		{"swap of labels", 7, "Plan", "issue edit 7 --add-label ready --remove-label needs-plan"},
+		{"move that only adds", 11, "Ready", "issue edit 11 --remove-label ready"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			if err := h.MoveIssue(tt.number, tt.section); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.UndoMove(tt.number); err != nil {
+				t.Fatal(err)
+			}
+			if n := h.GH.Calls(tt.wantGH); n != 1 {
+				t.Errorf("%q ran %d times in %v", tt.wantGH, n, h.GH.CallLog())
+			}
+			if n := h.GH.IssueCalls(); n != 3 {
+				t.Errorf("gh issue list ran %d times, want 3", n)
+			}
+			if err := h.UndoMove(tt.number); err == nil || err.Error() != fmt.Sprintf("issue #%d has no move to undo", tt.number) {
+				t.Errorf("second undo: err = %v", err)
+			}
+		})
+	}
+
+	t.Run("nothing remembered", func(t *testing.T) {
+		h := newHarness(t)
+		if err := h.UndoMove(7); err == nil || err.Error() != "issue #7 has no move to undo" {
+			t.Errorf("err = %v", err)
+		}
+		if n := h.GH.Calls("issue edit"); n != 0 {
+			t.Errorf("gh issue edit ran %d times", n)
+		}
+	})
+}

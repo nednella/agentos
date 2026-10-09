@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -35,6 +36,7 @@ type Issue struct {
 	Type      string   `json:"type"`
 	Section   string   `json:"section"`
 	Actions   []string `json:"actions"` // names of what can start a session for it, the default first
+	Moves     []string `json:"moves"`   // names of the sections it can be dropped into, in queue order
 	URL       string   `json:"url"`
 	SessionID string   `json:"sessionId"`
 	Author    string   `json:"author"`
@@ -56,6 +58,18 @@ type Issues struct {
 	repos      map[string]string
 	repoFailed map[string]time.Time // when gh last failed to name a folder's repo for a reason that may pass
 	lists      map[string][]Issue
+	moved      map[moveKey]relabel // the last move of each issue, for UndoMove
+}
+
+type moveKey struct {
+	dir    string
+	number int
+}
+
+// relabel is the label change a move made.
+type relabel struct {
+	removed []string
+	added   string
 }
 
 // ErrIssuesDisabled is what List fails with when the repo has issues turned off; the front end matches its text.
@@ -66,7 +80,7 @@ const repoRetry = 30 * time.Second
 
 // New reads issues through run.
 func New(runner run.Runner, sessions Sessions, emit func(string, any)) *Issues {
-	return &Issues{run: runner, sessions: sessions, emit: emit, warn: warn.New(emit), repos: map[string]string{}, repoFailed: map[string]time.Time{}, lists: map[string][]Issue{}}
+	return &Issues{run: runner, sessions: sessions, emit: emit, warn: warn.New(emit), repos: map[string]string{}, repoFailed: map[string]time.Time{}, lists: map[string][]Issue{}, moved: map[moveKey]relabel{}}
 }
 
 // Repo is "owner/name" of the folder's GitHub repository, or "" when it has none or gh cannot say.
@@ -200,7 +214,7 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 		}
 		at, section := proj.Section(labels)
 		list = append(list, placed{at, Issue{
-			Number: r.Number, Title: r.Title, URL: r.URL, Section: section.Name, Actions: actionNames(section), Type: typeOf(labels),
+			Number: r.Number, Title: r.Title, URL: r.URL, Section: section.Name, Actions: actionNames(section), Moves: proj.Moves(labels), Type: typeOf(labels),
 			Author: r.Author.Login, Assignees: assignees, Labels: labels,
 			CreatedAt: util.Millis(r.CreatedAt), UpdatedAt: util.Millis(r.UpdatedAt),
 		}})
@@ -289,6 +303,66 @@ func (i *Issues) Start(ctx context.Context, number int, action string) (sessions
 		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels)
 	}
 	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
+}
+
+// Move relabels the issue on GitHub so that it falls in the section, then reads the queue again.
+func (i *Issues) Move(ctx context.Context, number int, section string) error {
+	proj := i.sessions.Current()
+	list, err := i.List(ctx, proj, false)
+	if err != nil {
+		return err
+	}
+	at := slices.IndexFunc(list, func(is Issue) bool { return is.Number == number })
+	if at < 0 {
+		return fmt.Errorf("issue #%d is not open in this project", number)
+	}
+	remove, add, ok := proj.Relabel(list[at].Labels, section)
+	if !ok {
+		return fmt.Errorf("issue #%d can not move to %q", number, section)
+	}
+	if err := i.editLabels(ctx, proj.Dir, number, []string{add}, remove); err != nil {
+		return fmt.Errorf("moving issue #%d: %w", number, err)
+	}
+	i.mu.Lock()
+	i.moved[moveKey{proj.Dir, number}] = relabel{removed: remove, added: add}
+	i.mu.Unlock()
+	i.Reload(ctx, proj)
+	return nil
+}
+
+// UndoMove reverses the last move of the issue, whatever the moves of its section now allow.
+func (i *Issues) UndoMove(ctx context.Context, number int) error {
+	proj := i.sessions.Current()
+	key := moveKey{proj.Dir, number}
+	i.mu.Lock()
+	last, ok := i.moved[key]
+	i.mu.Unlock()
+	if !ok {
+		return fmt.Errorf("issue #%d has no move to undo", number)
+	}
+	if err := i.editLabels(ctx, proj.Dir, number, last.removed, []string{last.added}); err != nil {
+		return fmt.Errorf("undoing move of issue #%d: %w", number, err)
+	}
+	i.mu.Lock()
+	delete(i.moved, key)
+	i.mu.Unlock()
+	i.Reload(ctx, proj)
+	return nil
+}
+
+// editLabels adds and removes labels of the issue on GitHub; an empty label is skipped.
+func (i *Issues) editLabels(ctx context.Context, dir string, number int, add, remove []string) error {
+	args := []string{"issue", "edit", strconv.Itoa(number)}
+	if add = slices.DeleteFunc(slices.Clone(add), func(l string) bool { return l == "" }); len(add) > 0 {
+		args = append(args, "--add-label", strings.Join(add, ","))
+	}
+	if remove = slices.DeleteFunc(slices.Clone(remove), func(l string) bool { return l == "" }); len(remove) > 0 {
+		args = append(args, "--remove-label", strings.Join(remove, ","))
+	}
+	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
+	defer cancel()
+	_, err := i.run(ctx, dir, "gh", args...)
+	return err
 }
 
 // pickAction is the action of the section with the name given, or its default for "".

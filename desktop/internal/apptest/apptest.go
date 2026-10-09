@@ -817,6 +817,10 @@ func (h *Harness) StartIssue(number int) (sessions.Session, error) {
 func (h *Harness) StartIssueWith(number int, action string) (sessions.Session, error) {
 	return h.issues.StartIssue(number, action)
 }
+func (h *Harness) MoveIssue(number int, section string) error {
+	return h.issues.MoveIssue(number, section)
+}
+func (h *Harness) UndoMove(number int) error { return h.issues.UndoMove(number) }
 func (h *Harness) IssueDetail(number int) (issues.IssueDetail, error) {
 	return h.issues.IssueDetail(number)
 }
