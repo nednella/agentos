@@ -155,5 +155,5 @@ has the full method and what only the owner can check by eye.
 Issues on `nednella/agentos` are the queue. One issue → branch `issue-<n>` in its own
 worktree → one draft PR → the owner merges → the app cleans up. Conventional commits, one
 logical change each. Manual issues follow `.github/ISSUE_TEMPLATE/issue.md`: a
-`## Description` written by a human, never edited by a session; a session appends its
-findings below it under `## Agent Review`.
+`## Description` written by a human. A session never edits the issue body; it posts its
+plans and reviews as comments, a review headed `## Agent Review`.

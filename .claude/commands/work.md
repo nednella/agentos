@@ -8,7 +8,7 @@ the owner unless a decision is genuinely theirs. Read `AGENTS.md` first; its har
 
 ## 1. Understand
 
-- `gh issue view $ARGUMENTS` and read every comment. The `## Description` is the owner's;
+- `gh issue view $ARGUMENTS` and read every comment. The issue body is the owner's;
   never edit it.
 - Read the code the issue touches before planning. `AGENTS.md` says how the parts fit
   together; `docs/testing.md` says how to verify.
@@ -49,9 +49,9 @@ Work only inside that worktree. Never touch the tree the owner is sitting in.
 - Commits: conventional, scoped by layer (`internal`, `cli`, `desktop`, `ui`, `docs`,
   `build`), imperative subject with no "the" or "a", one logical change each, a short
   body saying why.
-- Append to the issue, below the owner's text, a section headed `## Agent Review`: what you
-  found, what you changed and why, what you verified and how, anything you chose
-  between. Short, plain sentences.
+- Post a comment on the issue headed `## Agent Review`, with
+  `gh issue comment $ARGUMENTS --body-file -`: what you found, what you changed and why,
+  what you verified and how, anything you chose between. Short, plain sentences.
 - `git push -u origin issue-$ARGUMENTS`, then
   `gh pr create --draft --assignee @me --title "<subject>" --body "<Description heading, then the summary; Closes #$ARGUMENTS>"`.
 - Never `gh pr merge`, never `gh pr ready`, never request reviewers. The owner merges.
