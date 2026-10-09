@@ -40,6 +40,32 @@ func TestStrayBrowserIsReplaced(t *testing.T) {
 	}
 }
 
+func TestStopStraysEndsTheLastRunsBrowsers(t *testing.T) {
+	dir, err := os.MkdirTemp("", "aosb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	first := New(dir, func(string, any) {})
+	if !first.Available() {
+		t.Skip("no Chromium based browser installed")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	defer first.CloseAll()
+	if _, err := first.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	gone := first.tab("p/1").proc.gone
+	// The app was killed: a new one starts while the old browser still runs.
+	New(dir, func(string, any) {}).StopStrays()
+	select {
+	case <-gone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the last run's browser still runs")
+	}
+}
+
 func TestStartForgetsTheLastRunsPages(t *testing.T) {
 	b, ctx := newTestBrowsers(t)
 	saved := filepath.Join(b.dataDir, "p", "browser", "Default", "Sessions", "Session_1")
