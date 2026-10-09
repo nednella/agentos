@@ -165,7 +165,7 @@ func TestPlainSessionCleanupBlockedByChangesInTheProjectFolder(t *testing.T) {
 	h.RefreshPRs()
 	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
 
-	if got, _ := h.Session(s.ID); got.CleanupReason != "the worktree has uncommitted changes" {
+	if got, _ := h.Session(s.ID); got.CleanupReason != "the worktree of my-fix has uncommitted changes" {
 		t.Errorf("reason = %q", got.CleanupReason)
 	}
 	if got := gitIn(t, h.Dir, "branch", "--show-current"); got != "my-fix" {

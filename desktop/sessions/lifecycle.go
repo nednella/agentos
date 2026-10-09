@@ -888,9 +888,9 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 		out, err := l.git(ctx, dir, "-C", worktree, "status", "--porcelain")
 		switch {
 		case err != nil:
-			return fmt.Sprintf("git could not read the worktree: %v", err)
+			return fmt.Sprintf("git could not read the worktree of %s: %v", branch, err)
 		case strings.TrimSpace(string(out)) != "":
-			return "the worktree has uncommitted changes"
+			return fmt.Sprintf("the worktree of %s has uncommitted changes", branch)
 		}
 	}
 	if !branchExists {
@@ -903,13 +903,13 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 		// GitHub deletes the remote branch on merge, so compare with what the PR merged instead.
 		return l.afterMergedHead(ctx, dir, branch, pr.HeadOid)
 	case err != nil:
-		return "the branch has no copy on origin to compare with"
+		return branch + " has no copy on origin to compare with"
 	}
 	switch n := len(strings.Fields(string(out))); {
 	case n == 1:
-		return "the branch has a commit that is not on origin"
+		return branch + " has a commit that is not on origin"
 	case n > 1:
-		return fmt.Sprintf("the branch has %d commits that are not on origin", n)
+		return fmt.Sprintf("%s has %d commits that are not on origin", branch, n)
 	}
 	return ""
 }
@@ -925,9 +925,9 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 	case err == nil:
 		return ""
 	case errors.As(err, &exit) && exit.ExitCode() == 1:
-		return "the branch has commits that are not in the merged pull request"
+		return branch + " has commits that are not in the merged pull request"
 	}
-	return fmt.Sprintf("git could not compare the branch with the merged pull request: %v", err)
+	return fmt.Sprintf("git could not compare %s with the merged pull request: %v", branch, err)
 }
 
 func (l *Lifecycle) runProjectCommand(ctx context.Context, proj project.Project, b branchPlan, force bool) error {
