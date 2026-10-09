@@ -2,7 +2,7 @@ import type { LedgerRow } from '../types'
 
 type LedgerTableProps = { projects: LedgerRow[] }
 
-const HEADS = ['Prompts', 'Sessions']
+const HEADS = ['Prompts', 'Sessions', 'PRs merged', 'Issues closed']
 
 export function LedgerTable({ projects }: LedgerTableProps) {
   return (
@@ -23,6 +23,8 @@ export function LedgerTable({ projects }: LedgerTableProps) {
               <td className="py-1.5">{p.project}</td>
               <td className="mono py-1.5 text-right">{p.prompts.toLocaleString()}</td>
               <td className="mono py-1.5 text-right">{p.sessions.toLocaleString()}</td>
+              <td className="mono py-1.5 text-right">{p.prsMerged.toLocaleString()}</td>
+              <td className="mono py-1.5 text-right">{p.issuesClosed.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>

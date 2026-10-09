@@ -559,6 +559,13 @@ export function createMock(params: URLSearchParams) {
       sessions: Math.round(prompts * scale * 0.08),
       issueSessions: Math.round(prompts * scale * 0.045),
       workMs: Math.round(prompts * scale * 0.13 * 3_600_000),
+      prsOpened: Math.round(prompts * scale * 0.05),
+      prsMerged: Math.round(prompts * scale * 0.04),
+      prsClosed: Math.round(prompts * scale * 0.005),
+      issuesFiled: Math.round(prompts * scale * 0.02),
+      issuesClosed: Math.round(prompts * scale * 0.035),
+      avgSessionMs: prompts > 100 ? 52 * 60_000 : 0,
+      avgLeadMs: prompts > 100 ? 5 * 3_600_000 : 0,
     })
     const projects = [
       row('agentos', 3104),
@@ -572,6 +579,13 @@ export function createMock(params: URLSearchParams) {
       sessions: projects.reduce((a, r) => a + r.sessions, 0),
       issueSessions: projects.reduce((a, r) => a + r.issueSessions, 0),
       workMs: projects.reduce((a, r) => a + r.workMs, 0),
+      prsOpened: projects.reduce((a, r) => a + r.prsOpened, 0),
+      prsMerged: projects.reduce((a, r) => a + r.prsMerged, 0),
+      prsClosed: projects.reduce((a, r) => a + r.prsClosed, 0),
+      issuesFiled: projects.reduce((a, r) => a + r.issuesFiled, 0),
+      issuesClosed: projects.reduce((a, r) => a + r.issuesClosed, 0),
+      avgSessionMs: 52 * 60_000,
+      avgLeadMs: 5 * 3_600_000,
     }
     return { days, since: dayKey(120), totals, projects, heat }
   }
