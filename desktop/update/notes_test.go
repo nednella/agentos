@@ -9,6 +9,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/update"
+	internalupdate "github.com/nednella/agentos/internal/update"
 )
 
 const changelog = `# Changelog
@@ -92,5 +93,17 @@ func TestADevBuildHasNoPatchNotes(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{UpdateTick: time.Hour})
 	if got := versions(t, h.App.Updates()); got != nil {
 		t.Errorf("dev build = %v, want none", got)
+	}
+}
+
+func TestChangelogListsEveryShippedReleaseNewestFirst(t *testing.T) {
+	releases := update.NewService(nil, nil).Changelog()
+	if len(releases) < 2 {
+		t.Fatalf("Changelog has %d releases, want the whole history", len(releases))
+	}
+	for i := 1; i < len(releases); i++ {
+		if !internalupdate.Newer(releases[i].Version, releases[i-1].Version) {
+			t.Errorf("%s comes before %s", releases[i-1].Version, releases[i].Version)
+		}
 	}
 }
