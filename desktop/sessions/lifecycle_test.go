@@ -13,6 +13,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/activity"
 	ctl "github.com/nednella/agentos/internal/control"
 )
 
@@ -165,6 +166,9 @@ func TestCleanupMerged(t *testing.T) {
 	if want := []string{"clean-up command for issue-7", "temp files", "evidence", "session"}; !slices.Equal(log[0].Removed, want) {
 		t.Errorf("removed = %q, want %q", log[0].Removed, want)
 	}
+	if got := h.Events(t, activity.Cleanup); len(got) != 1 || got[0].Label != "done" || got[0].Issue != 7 || got[0].PR != 12 || got[0].Session != s.ID {
+		t.Errorf("cleanup events = %+v", got)
+	}
 	if got := h.Rec.ProjectOf("cleanups"); got != "main" || len(h.Rec.LastCleanups()) != 1 {
 		t.Errorf("cleanups event: project %q, %d entries", got, len(h.Rec.LastCleanups()))
 	}
@@ -236,6 +240,9 @@ func TestCleanupBlocked(t *testing.T) {
 			}
 			if log := h.Cleanups(); len(log) != 2 || log[0].Status != "done" {
 				t.Errorf("log after force = %+v", log)
+			}
+			if ev := h.Events(t, activity.Cleanup); len(ev) != 2 || ev[0].Label != "blocked" || ev[1].Label != "done" {
+				t.Errorf("cleanup events = %+v", ev)
 			}
 		})
 	}

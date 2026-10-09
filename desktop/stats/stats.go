@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
 )
@@ -91,13 +92,14 @@ func firstWords(s string, n int) []string {
 // Waits records when sessions wait on the user: open ones in memory, finished ones in a file per project.
 type Waits struct {
 	dir string
+	log *Log
 
 	mu   sync.Mutex
 	open map[string]Wait // by session id
 }
 
-// New keeps the tally under dir.
-func New(dir string) *Waits { return &Waits{dir: dir, open: map[string]Wait{}} }
+// New keeps the tally under dir, and records each wait in log too.
+func New(dir string, log *Log) *Waits { return &Waits{dir: dir, log: log, open: map[string]Wait{}} }
 
 func (w *Waits) path(key string) string { return filepath.Join(w.dir, key, "stats.jsonl") }
 
@@ -118,9 +120,11 @@ func (w *Waits) End(id string, at time.Time) bool {
 		return false
 	}
 	wait.WaitedMs = max(at.UnixMilli()-wait.StartedAt, 1)
-	if err := w.append(session.ProjectKey(id), wait); err != nil {
+	key := session.ProjectKey(id)
+	if err := w.append(key, wait); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: recording a wait: %v\n", err)
 	}
+	w.log.Record(key, activity.Event{At: at.UnixMilli(), Kind: activity.Wait, Session: id, Issue: wait.Issue, Model: wait.Model, Ms: wait.WaitedMs, Label: wait.Kind})
 	return true
 }
 

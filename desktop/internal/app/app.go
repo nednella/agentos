@@ -64,9 +64,9 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		}
 		return context.Background()
 	}
-	waits := stats.New(c.DataDir)
 	events := stats.NewLog(c.DataDir)
-	proofs := evidence.New(c.DataDir)
+	waits := stats.New(c.DataDir, events)
+	proofs := evidence.New(c.DataDir, events)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
 	stayAwake := awake.New(h.Awake, h.Emit)
@@ -144,7 +144,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		sessSvc,
 		terminal.NewService(terms),
 		issues.NewService(iss, ctx),
-		notes.NewService(store, sess, sess, iss, runner, h.Emit, ctx),
+		notes.NewService(store, sess, sess, iss, events, runner, h.Emit, ctx),
 		evidence.NewService(proofs, changes),
 		browser.NewService(browsers, proofs, changes, ctx),
 		digest.NewService(mgr),

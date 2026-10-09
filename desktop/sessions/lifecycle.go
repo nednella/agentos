@@ -748,11 +748,12 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 		tr.cleanup, tr.reason = "blocked", reason
 		l.mu.Unlock()
 	}
-	if err := l.appendCleanup(t.proj.Key(), entry); err != nil {
+	key := t.proj.Key()
+	if err := l.appendCleanup(key, entry); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: logging a clean-up: %v\n", err)
 	}
+	l.activity.Record(key, activity.Event{At: entry.At, Kind: activity.Cleanup, Session: id, Issue: t.issue, PR: entry.PR, Label: entry.Status})
 	l.sessions.changed()
-	key := t.proj.Key()
 	l.emit("cleanups", scoped.Of(key, l.Cleanups(key)))
 	return nil
 }

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/media"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
 )
@@ -34,15 +35,21 @@ type Evidence struct {
 
 // Store keeps each session's evidence in its own folder of the data dir.
 type Store struct {
-	dir string
+	dir      string
+	activity Activity
 
 	mu    sync.Mutex
 	items map[string][]Evidence // by session id
 }
 
-// New keeps the evidence under dataDir.
-func New(dataDir string) *Store {
-	return &Store{dir: dataDir, items: map[string][]Evidence{}}
+// Activity records what the app does.
+type Activity interface {
+	Record(projectKey string, e activity.Event)
+}
+
+// New keeps the evidence under dataDir, and records each item filed.
+func New(dataDir string, a Activity) *Store {
+	return &Store{dir: dataDir, activity: a, items: map[string][]Evidence{}}
 }
 
 // File is the file behind the URL of a picture, or "".
@@ -172,6 +179,9 @@ func (e *Store) add(id string, item Evidence, file string) (Evidence, error) {
 	}
 	if err != nil && file != "" {
 		_ = os.Remove(file)
+	}
+	if err == nil {
+		e.activity.Record(session.ProjectKey(id), activity.Event{At: time.Now().UnixMilli(), Kind: activity.Evidence, Session: id, Label: item.Kind})
 	}
 	return item, err
 }
