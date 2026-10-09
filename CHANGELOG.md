@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/nednella/agentos/compare/v0.19.0...v0.19.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **internal:** tell agents to raise browser window for owner ([1bedce7](https://github.com/nednella/agentos/commit/1bedce79b238fc7d5354681fa8b29b98096ec732))
+
 ## [0.19.0](https://github.com/nednella/agentos/compare/v0.18.0...v0.19.0) (2026-10-09)
 
 
