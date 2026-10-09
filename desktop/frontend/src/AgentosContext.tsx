@@ -318,6 +318,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       const epoch = ++projectEpoch.current
       const snap = await request
       if (epoch === projectEpoch.current) enterProject(snap, epoch)
+      return snap
     },
     [enterProject],
   )
@@ -611,12 +612,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async newProject(name) {
         const key = pushToast({ tone: 'info', text: `Creating ${name}…`, sticky: true })
+        const before = projectRef.current?.dir
+        let snap: Snapshot
         try {
-          await enterFrom(api.newProject(name))
+          snap = await enterFrom(api.newProject(name))
         } finally {
           dismissToast(key)
         }
-        await createRepo(name)
+        if (snap.project.dir !== before) await createRepo(snap.project.name)
       },
       async removeProject(name) {
         const epoch = projectEpoch.current
