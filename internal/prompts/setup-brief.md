@@ -6,19 +6,19 @@ is missing with the owner. Ask before you write each file.
 
 1. Issue template, .github/ISSUE_TEMPLATE/issue.md
    One template, with only a `## Description` heading. A note filed as an issue gets the same body: `## Description`,
-   then the note. The Description is the owner's; a session never edits it and appends its findings below it.
+   then the note. The issue body is the owner's; a session never edits it and posts its plans and reviews as comments.
 
      ---
      name: Issue
-     about: Describe what you want or what is wrong; a session appends its findings below
+     about: Describe what you want or what is wrong; sessions post their plans and reviews as comments
      ---
 
      ## Description
 
 2. Command, .claude/commands/work.md
    For `/work <n>`: read issue n and its comments, make a worktree on branch `issue-<n>` from the default branch on
-   origin, build the smallest change, run the tests and check the change, append `## Agent Review` below the
-   Description (what it found, changed and verified), push, and open a draft PR that closes the issue. It never merges,
+   origin, build the smallest change, run the tests and check the change, post a comment on the issue headed
+   `## Agent Review` (what it found, changed and verified), push, and open a draft PR that closes the issue. It never merges,
    marks the PR ready or requests reviewers.
    It starts with front matter: `description:` and `argument-hint: <issue number>`. $ARGUMENTS is the number.
 
