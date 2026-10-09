@@ -46,7 +46,7 @@ type Settings struct {
 	Prompt    string          `json:"promptSend"`     // the current project's: auto or manual
 	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
 	Digest    string          `json:"digestSchedule"` // the current project's: weekly or off
-	DataDir   string          `json:"dataDir"`        // the folder the running app keeps notes, evidence, stats and digests in
+	DataDir   string          `json:"dataDir"`        // the folder the running app keeps notes, evidence, stats, activity and digests in
 	DataFixed bool            `json:"dataDirFixed"`   // AGENTOS_DEV_DATA_DIR sets the folder, so it cannot change here
 }
 

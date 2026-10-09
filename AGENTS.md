@@ -100,7 +100,7 @@ in the project's dependencies, run by a locked-down `claude` with `internal/prom
 self-update from GitHub releases (`update`), holding off idle sleep while a session works (`awake`) and the
 settings panel (`settings`). The config file and the command line are in `docs/config.md`.
 
-**Storage.** Notes, note images, evidence, stats and the digest live in `data_dir` (default
+**Storage.** Notes, note images, evidence, stats, the activity record and the digest live in `data_dir` (default
 `~/.local/share/agentos`), per project. PR tracking, the clean-up log, the browser profile and session temp
 folders are always under `~/.local/share/agentos/<key>/`. State files, sockets, the tmux config and the last
 project are in `~/.local/state/agentos`. Every file is written to a temp file and renamed into place.
