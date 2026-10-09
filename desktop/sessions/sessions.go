@@ -912,14 +912,23 @@ func (s *Sessions) Create(title, text string, send bool, issue int) (Session, er
 // project says whether text is sent.
 func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, proj.SendsPrompt(), 0, project.Model{}, "", brief)
+	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief)
 }
 
 // CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
 // that is sent. The action and the issue's labels pick the model.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, text, proj.SendsPrompt(), issue, project.Pick(action, labels), "", "")
+	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", "")
+}
+
+// fromApp marks text the app writes to the agent, so the agent does not take it for the owner's. A slash command
+// stays as it is: Claude Code runs one only when it starts the prompt.
+func fromApp(text string) string {
+	if text == "" || strings.HasPrefix(text, "/") {
+		return text
+	}
+	return "APPLICATION_PROMPT: " + text
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.
