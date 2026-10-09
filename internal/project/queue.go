@@ -29,6 +29,9 @@ type Section struct {
 	Name    string   `yaml:"name"`
 	Labels  []string `yaml:"labels,omitempty"`
 	Actions []Action `yaml:"actions,omitempty"` // the first is the default
+
+	Draggable     *bool     `yaml:"draggable,omitempty"`      // false keeps its issues from being dragged out; on unless false
+	DraggableFrom *[]string `yaml:"draggable_from,omitempty"` // the sections whose issues may be dropped in; unset takes any, [] takes none
 }
 
 // Section is the index of the first section an issue with these labels goes in, and the section.
@@ -44,6 +47,50 @@ func (p Project) Section(labels []string) (int, Section) {
 		}
 	}
 	return len(p.QueueSections), Section{}
+}
+
+// Relabel is the label change that moves an issue with these labels to the section named target: the labels
+// to remove and the label to add, "" for none. It is false when the issue can not be dropped there.
+func (p Project) Relabel(labels []string, target string) (remove []string, add string, ok bool) {
+	at, from := p.Section(labels)
+	to := slices.IndexFunc(p.QueueSections, func(s Section) bool { return s.Name == target })
+	if to < 0 || to == at {
+		return nil, "", false
+	}
+	if from.Draggable != nil && !*from.Draggable {
+		return nil, "", false
+	}
+	dest := p.QueueSections[to]
+	if slices.Contains(dest.Labels, "*") || dest.DraggableFrom != nil && !slices.Contains(*dest.DraggableFrom, from.Name) {
+		return nil, "", false
+	}
+	var kept []string
+	for _, l := range labels {
+		if slices.Contains(from.Labels, l) {
+			remove = append(remove, l)
+		} else {
+			kept = append(kept, l)
+		}
+	}
+	if len(dest.Labels) > 0 && !slices.Contains(kept, dest.Labels[0]) {
+		add = dest.Labels[0]
+		kept = append(kept, add)
+	}
+	if now, _ := p.Section(kept); now != to {
+		return nil, "", false
+	}
+	return remove, add, true
+}
+
+// Moves is the names of the sections an issue with these labels can be dropped into, in queue order.
+func (p Project) Moves(labels []string) []string {
+	moves := []string{}
+	for _, s := range p.QueueSections {
+		if _, _, ok := p.Relabel(labels, s.Name); ok {
+			moves = append(moves, s.Name)
+		}
+	}
+	return moves
 }
 
 func (s Section) takes(labels []string) bool {
@@ -111,6 +158,9 @@ func (p Project) validateQueue() error {
 			return fmt.Errorf("queue_sections.%s: a section after \"*\" is never reached", s.Name)
 		}
 		sections = append(sections, s.Name)
+		if s.DraggableFrom != nil && slices.Contains(s.Labels, "*") {
+			return fmt.Errorf("queue_sections.%s: a \"*\" section takes no drops, so it can not have draggable_from", s.Name)
+		}
 		var actions []string
 		for _, a := range s.Actions {
 			if a.Name == "" {
@@ -122,6 +172,19 @@ func (p Project) validateQueue() error {
 			actions = append(actions, a.Name)
 			if err := (Model{Model: a.Model, Effort: a.Effort}).Validate(); err != nil {
 				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
+			}
+		}
+	}
+	for _, s := range p.QueueSections {
+		if s.DraggableFrom == nil {
+			continue
+		}
+		for _, from := range *s.DraggableFrom {
+			if from == s.Name {
+				return fmt.Errorf("queue_sections.%s: draggable_from names the section itself", s.Name)
+			}
+			if !slices.Contains(sections, from) {
+				return fmt.Errorf("queue_sections.%s: draggable_from names %q, which is not a section", s.Name, from)
 			}
 		}
 	}

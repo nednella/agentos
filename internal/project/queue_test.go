@@ -1,6 +1,7 @@
 package project
 
 import (
+	"slices"
 	"testing"
 	"time"
 )
@@ -160,6 +161,68 @@ func TestPRCommands(t *testing.T) {
 	} {
 		if tt.got != tt.want {
 			t.Errorf("%s: got %q, want %q", tt.name, tt.got, tt.want)
+		}
+	}
+}
+
+func TestMoves(t *testing.T) {
+	no, from := false, func(names ...string) *[]string { return &names }
+	inbox := Section{Name: "Inbox"}
+	ready := Section{Name: "Ready", Labels: []string{"ready", "go"}}
+	plan := Section{Name: "Plan", Labels: []string{"needs-plan"}}
+	tests := []struct {
+		name     string
+		sections []Section
+		labels   []string
+		want     []string
+	}{
+		{"every other section", []Section{ready, plan}, []string{"ready"}, []string{"Plan"}},
+		{"no sections", nil, []string{"ready"}, []string{}},
+		{"not draggable", []Section{{Name: "Ready", Labels: ready.Labels, Draggable: &no}, plan}, []string{"ready"}, []string{}},
+		{"draggable_from restricts", []Section{ready, plan, {Name: "Done", Labels: []string{"done"}, DraggableFrom: from("Plan")}}, []string{"ready"}, []string{"Plan"}},
+		{"empty draggable_from takes none", []Section{ready, {Name: "Plan", Labels: plan.Labels, DraggableFrom: from()}}, []string{"ready"}, []string{}},
+		{"a * section is never a target", []Section{ready, {Name: "Rest", Labels: []string{"*"}}}, []string{"ready"}, []string{}},
+		{"inbox only when no label remains", []Section{inbox, ready, plan}, []string{"ready"}, []string{"Inbox", "Plan"}},
+		{"inbox not offered while other labels remain", []Section{inbox, ready, plan}, []string{"ready", "type:bug"}, []string{"Plan"}},
+		{"an added label that an earlier section takes lands there, not in the target", []Section{{Name: "Early", Labels: []string{"x"}}, {Name: "Ready", Labels: []string{"ready"}}, {Name: "Plan", Labels: []string{"x", "y"}}}, []string{"ready"}, []string{"Early"}},
+		{"from the other section", []Section{ready, plan}, []string{"roadmap"}, []string{"Ready", "Plan"}},
+		{"from the other section, draggable_from names a section", []Section{ready, {Name: "Plan", Labels: plan.Labels, DraggableFrom: from("Ready")}}, []string{"roadmap"}, []string{"Ready"}},
+	}
+	for _, tt := range tests {
+		got := Project{QueueSections: tt.sections}.Moves(tt.labels)
+		if got == nil || !slices.Equal(got, tt.want) {
+			t.Errorf("%s: Moves(%v) = %#v, want %#v", tt.name, tt.labels, got, tt.want)
+		}
+	}
+}
+
+func TestRelabel(t *testing.T) {
+	p := Project{QueueSections: []Section{
+		{Name: "Inbox"},
+		{Name: "Ready", Labels: []string{"ready", "go"}},
+		{Name: "Plan", Labels: []string{"needs-plan"}},
+	}}
+	tests := []struct {
+		name       string
+		labels     []string
+		target     string
+		wantRemove []string
+		wantAdd    string
+		wantOK     bool
+	}{
+		{"swap labels", []string{"ready", "go", "type:bug"}, "Plan", []string{"ready", "go"}, "needs-plan", true},
+		{"to the section without labels", []string{"ready"}, "Inbox", []string{"ready"}, "", true},
+		{"from the section without labels", nil, "Ready", nil, "ready", true},
+		{"from the other section", []string{"roadmap"}, "Plan", nil, "needs-plan", true},
+		{"its own section", []string{"ready"}, "Ready", nil, "", false},
+		{"unknown section", []string{"ready"}, "Nope", nil, "", false},
+		{"inbox with other labels left", []string{"ready", "type:bug"}, "Inbox", nil, "", false},
+		{"target label already there", []string{"ready", "needs-plan"}, "Plan", []string{"ready"}, "", true},
+	}
+	for _, tt := range tests {
+		remove, add, ok := p.Relabel(tt.labels, tt.target)
+		if ok != tt.wantOK || add != tt.wantAdd || !slices.Equal(remove, tt.wantRemove) {
+			t.Errorf("%s: Relabel(%v, %q) = %v %q %v, want %v %q %v", tt.name, tt.labels, tt.target, remove, add, ok, tt.wantRemove, tt.wantAdd, tt.wantOK)
 		}
 	}
 }
