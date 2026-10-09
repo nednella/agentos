@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.24.0](https://github.com/nednella/agentos/compare/v0.23.0...v0.24.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** mark prompts the app types into a session ([0fd0475](https://github.com/nednella/agentos/commit/0fd0475f1928924879872d0d56e3608d12a941f9))
+* **internal:** tell sessions how to branch and what the app sends ([b63c49e](https://github.com/nednella/agentos/commit/b63c49ee37a3724a81b84aa19642bb7e1b288ab4))
+* **internal:** tell sessions to work on a branch ([4e6fdba](https://github.com/nednella/agentos/commit/4e6fdba0b2c6f335ea58406e23c1aabf1ee3e9fb))
+* **ui:** keep close button in place on news pages ([d5b23a6](https://github.com/nednella/agentos/commit/d5b23a65d7058afd04e417f5a1c96000dabb3cf6))
+* **ui:** show back icon beside News in news pages ([3f5a210](https://github.com/nednella/agentos/commit/3f5a210e0735953150f96422af190ce6b0f1a41c))
+
+
+### Bug Fixes
+
+* **ui:** use chevron for back icon beside News ([732a158](https://github.com/nednella/agentos/commit/732a15806f3c45fb11361cf1c7053b257b4728d6))
+
 ## [0.23.0](https://github.com/nednella/agentos/compare/v0.22.1...v0.23.0) (2026-10-09)
 
 
