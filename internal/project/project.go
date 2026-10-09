@@ -46,7 +46,7 @@ func (p Project) Present() bool {
 // Config is the optional ~/.config/agentos/config.yaml.
 type Config struct {
 	DataDir   string    `yaml:"data_dir,omitempty"` // where notes, stats and digests live; may sit in a synced folder
-	Agent     string    `yaml:"agent_command"`
+	Agent     string    `yaml:"agent_command,omitempty"`
 	KeepAwake *bool     `yaml:"keep_mac_awake,omitempty"` // hold off idle sleep while a session works; on unless false
 	Theme     string    `yaml:"app_theme,omitempty"`      // light or dark; unset follows the system
 	TextScale float64   `yaml:"app_text_scale,omitempty"` // size of the app's text, between MinTextScale and MaxTextScale; unset is 1
