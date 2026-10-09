@@ -94,3 +94,19 @@ func TestSetUpLeavesAnotherMachinesProjectAlone(t *testing.T) {
 		})
 	}
 }
+
+func TestSetUpProjectKeepsTheConfigOfAProjectWithSections(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"\"\n"})
+	before, err := os.ReadFile(h.Conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := h.SetUpProject()
+	if err != nil || created.Title != "Set up for agentos" {
+		t.Fatalf("SetUpProject = %+v, %v", created, err)
+	}
+	after, err := os.ReadFile(h.Conf)
+	if err != nil || string(after) != string(before) {
+		t.Errorf("the config changed:\n%s\nwas:\n%s", after, before)
+	}
+}

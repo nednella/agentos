@@ -67,7 +67,7 @@ model and effort the action and the issue's `model:`/`effort:` labels pick, then
 once the agent is ready and sends it, unless `session_prompt_send` is `manual`. An issue with a live session
 gets that session back. A project with no `queue_sections` gets an offer to set it up: `SetUpProject` fills a
 basic block (`project.SetUp`) and starts a session briefed to write the repository side; `DismissSetup` saves
-`setup_dismissed`. The palette's *Set up project* runs `SetUpProject` for any project.
+`setup_dismissed`. The palette's *Set up project* runs `SetUpProject` for any project; one that has queue sections keeps its config and only gets the session.
 
 **Pull requests.** A session with an issue works on the issue's branch: the one it reported with
 `agentos track`, else the one checked out in its working folder, else the project's `session_branch_fallback`.
