@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.22.1](https://github.com/nednella/agentos/compare/v0.22.0...v0.22.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* **desktop:** check names before creating new project ([ed30908](https://github.com/nednella/agentos/commit/ed30908bc9bd7298862ae2c35369b4b4bd9f5b47))
+* **desktop:** keep config of set-up project with sections ([1ece786](https://github.com/nednella/agentos/commit/1ece7863c89bd58ee4e1a1a3bc600cc2d2703759))
+* **desktop:** set up the entry of the current folder ([e321a5f](https://github.com/nednella/agentos/commit/e321a5f0644c8a849049145e52a7876f3302d879))
+* **internal:** ask set-up sessions how branches take base changes ([f447e73](https://github.com/nednella/agentos/commit/f447e73c0c66522e84f008b36071b4dcaec0dacc))
+* **internal:** delete branch with no worktree in default clean-up ([80d4321](https://github.com/nednella/agentos/commit/80d432104b41c4568e0df3460b0cfdc515d676fc))
+* **internal:** fill empty queue_sections when setting up ([85a6a6a](https://github.com/nednella/agentos/commit/85a6a6a7673fccb5bd358617a6d72bcfea59fcbb))
+* **internal:** leave out empty agent_command when saving ([c697a29](https://github.com/nednella/agentos/commit/c697a299c13db769f22d5176fabd19fd7cc92aa5))
+* **internal:** tell set-up sessions to check for a GitHub origin ([085fd73](https://github.com/nednella/agentos/commit/085fd7379aaddef16ce52b06fedf76dd37b40b4c))
+* **ui:** create GitHub repo only for project just made ([7fcb97e](https://github.com/nednella/agentos/commit/7fcb97ed7aa90c2c61399ecfbfdba199088e34b2))
+* **ui:** start one set-up session per click ([47c83fe](https://github.com/nednella/agentos/commit/47c83feb07269bac23f18c9583a19350c687215d))
+
 ## [0.22.0](https://github.com/nednella/agentos/compare/v0.21.0...v0.22.0) (2026-10-09)
 
 
