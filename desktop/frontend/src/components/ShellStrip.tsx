@@ -75,7 +75,7 @@ export function ShellStrip() {
           aria-label="Open the shell"
           onClick={() => {
             setShellOpen(true)
-            focus('shell')
+            if (shellId) focus('shell')
           }}
         >
           <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
