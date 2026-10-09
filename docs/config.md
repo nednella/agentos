@@ -132,7 +132,7 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | Work | `issue <n...>` | starts a session per issue; an issue with a live session is reported as already running |
 | Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` types its text (`-` reads stdin) into the new session once the agent is ready, sent unless `session_prompt_send` is `manual` |
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
-| Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
+| Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `news`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
 | From inside a session | `browser open <url>`, `browser tab <url>`, `browser screenshot`, `browser close`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` | `agentos browser help` explains the browser |
 
