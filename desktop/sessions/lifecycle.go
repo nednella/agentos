@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	reconcileEvery = 5 * time.Minute // a full look at every pull request, in case a watcher missed something
+	reconcileEvery = time.Minute // a full look at every pull request: for what a watcher missed, and for conflicts, which no watcher sees
 	cleanupsKept   = 100
 	gitTimeout     = 30 * time.Second
 
