@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.0](https://github.com/nednella/agentos/compare/v0.17.1...v0.18.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** relabel issue dropped on another section ([f73aa4d](https://github.com/nednella/agentos/commit/f73aa4dc3e59c373b7eb4668d3ff27e7834897a2)), closes [#231](https://github.com/nednella/agentos/issues/231)
+* **internal:** let queue sections limit drag and drop ([b0f387c](https://github.com/nednella/agentos/commit/b0f387c885203e3a5bc06c9335c5599f50160f44)), closes [#231](https://github.com/nednella/agentos/issues/231)
+* **ui:** drag issues between queue sections ([6132b19](https://github.com/nednella/agentos/commit/6132b192f1c281f440edb744ec18b6dc0c15077f)), closes [#231](https://github.com/nednella/agentos/issues/231)
+
 ## [0.17.1](https://github.com/nednella/agentos/compare/v0.17.0...v0.17.1) (2026-10-09)
 
 
