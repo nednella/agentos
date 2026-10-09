@@ -360,14 +360,22 @@ func editInPlace(seq *yaml.Node, p Project) int {
 	return i
 }
 
-// addQueue gives an entry with no queue_sections the sections want; an entry that has some keeps them as written.
+// addQueue gives an entry with no queue_sections, or an empty or null one, the sections want; an entry that has some
+// keeps them as written.
 func addQueue(project *yaml.Node, want []Section) error {
-	if field(project, "queue_sections") != nil || len(want) == 0 {
+	if len(want) == 0 {
 		return nil
 	}
 	var node yaml.Node
 	if err := node.Encode(want); err != nil {
 		return err
+	}
+	if have := field(project, "queue_sections"); have != nil {
+		if (have.Kind == yaml.SequenceNode && len(have.Content) == 0) || have.Tag == "!!null" {
+			node.LineComment, node.HeadComment = have.LineComment, have.HeadComment
+			*have = node
+		}
+		return nil
 	}
 	project.Content = append(project.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "queue_sections"}, &node)
 	return nil
