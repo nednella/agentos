@@ -17,7 +17,7 @@ func TestSetUpFillsOnlyEmptyKeys(t *testing.T) {
 	if p.NeedsSetup() || p.Branch != "feat/{n}" || p.OnChecks != "/fix {n}" {
 		t.Errorf("SetUp changed what the project set: %+v", p)
 	}
-	if p.CleanupCommand == "" || !strings.Contains(p.OnReview, "PR #{n}") {
+	if p.CleanupCommand == "" || !strings.Contains(p.OnReview, "PR #{n}") || !strings.Contains(p.OnConflict, "PR #{n}") {
 		t.Errorf("SetUp left keys empty: %+v", p)
 	}
 	inbox := Section{Name: "Inbox", Labels: []string{"*"}, Actions: []Action{{Name: "Work", Command: "/work {n}"}}}

@@ -30,6 +30,7 @@ projects:
     pr_poll_interval: 10s      # how often to poll the pull requests; at least 1s
     pr_review_command: ""      # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing
     pr_checks_command: ""      # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
+    pr_conflict_command: ""    # typed into a session whose PR conflicts with its base branch, {n} the PR number; "" sends nothing
     setup_dismissed: false     # Not now was chosen on the offer to set the project up; the queue writes it
 ```
 
@@ -44,6 +45,7 @@ session_branch_fallback: "issue-{n}"
 session_cleanup_command: "git worktree remove {force} {worktree} && git branch -D {branch}"
 pr_review_command: "PR #{n} got a review or comment. Read it, fix what it asks, run the tests and push. Never merge the PR, mark it ready or request reviewers."
 pr_checks_command: "PR #{n} has failing checks. Find the cause, fix it, run the tests and push. Never merge the PR, mark it ready or request reviewers."
+pr_conflict_command: "PR #{n} conflicts with its base branch. Bring the base branch's changes into the PR's branch as this repository does it, resolve the conflicts, run the tests and push. Never merge the PR, mark it ready or request reviewers."
 queue_sections:
   - name: Inbox
     labels: ["*"]
