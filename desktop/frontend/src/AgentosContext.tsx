@@ -629,11 +629,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         else enterProject(snap, ++projectEpoch.current)
       },
       async setUpProject() {
-        addSession(await api.setUpProject())
-        const snap = await api.snapshot()
-        setProject(snap.project)
-        setProjects(snap.projects)
-        await loadIssues(true)
+        try {
+          addSession(await api.setUpProject())
+        } finally {
+          const snap = await api.snapshot()
+          setProject(snap.project)
+          setProjects(snap.projects)
+          await loadIssues(true)
+        }
       },
       async dismissSetup() {
         const snap = await api.dismissSetup()
