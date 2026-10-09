@@ -146,7 +146,7 @@ func (s *Service) SetUpProject() (sessions.Session, error) {
 			return sessions.Session{}, err
 		}
 	}
-	return s.sessions.CreateBriefed("Set up for agentos", prompts.SetupStart(), prompts.SetupBrief())
+	return s.sessions.CreateBriefed("agentos setup", prompts.SetupStart(), prompts.SetupBrief())
 }
 
 // DismissSetup stops offering to set up the current project.
