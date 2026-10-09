@@ -95,3 +95,38 @@ func TestSetUpOpensAOneLineEntry(t *testing.T) {
 		t.Errorf("the entry stayed on one line:\n%s", got)
 	}
 }
+
+func TestSaveSetUpFillsAnEmptyQueueSections(t *testing.T) {
+	for _, tt := range []struct{ name, queue string }{
+		{"empty list", "    queue_sections: [] # none yet\n"},
+		{"null", "    queue_sections:\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "config.yaml")
+			original := "projects:\n  # the main one\n  - name: api\n    directory: ~/code/api # work\n" + tt.queue + "    note_session_command: x # ours\n"
+			if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			cfg, err := Load(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cfg.Projects[0].SetUp()
+			if err := Save(path, cfg); err != nil {
+				t.Fatal(err)
+			}
+			got, _ := os.ReadFile(path)
+			for _, want := range []string{"# the main one", "directory: ~/code/api # work", "x # ours", "- name: Inbox"} {
+				if !strings.Contains(string(got), want) {
+					t.Errorf("the saved file lacks %q:\n%s", want, got)
+				}
+			}
+			if strings.Count(string(got), "queue_sections:") != 1 {
+				t.Errorf("queue_sections appears more than once:\n%s", got)
+			}
+			if reloaded, err := Load(path); err != nil || len(reloaded.Projects[0].QueueSections) != 1 {
+				t.Errorf("reload = %+v, %v", reloaded.Projects, err)
+			}
+		})
+	}
+}
