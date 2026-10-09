@@ -3,6 +3,7 @@ import { Divider } from './components/Divider'
 import { IssueDialog } from './components/IssueDialog'
 import { MobileTabs } from './components/MobileTabs'
 import { Palette } from './components/Palette'
+import { PatchNotes } from './components/PatchNotes'
 import { ProjectPanel } from './components/ProjectPanel'
 import { SessionsPanel } from './components/SessionsPanel'
 import { SettingsPanel } from './components/SettingsPanel'
@@ -51,6 +52,7 @@ export function App() {
       <IssueDialog />
       <ShortcutsSheet />
       <SettingsPanel />
+      <PatchNotes />
       <Toasts />
     </div>
   )

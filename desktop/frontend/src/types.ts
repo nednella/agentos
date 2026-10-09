@@ -219,6 +219,12 @@ export type Digest = {
   items: DigestItem[]
 }
 
+export type Change = { scope: string; text: string; issue: number; url: string }
+
+export type ReleaseSection = { title: string; changes: Change[] }
+
+export type Release = { version: string; date: string; sections: ReleaseSection[] }
+
 export type ProjectList<T> = { project: string; items: T[] }
 
 export type Warning = {
