@@ -16,6 +16,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/notes"
+	"github.com/nednella/agentos/internal/activity"
 )
 
 func TestNotes(t *testing.T) {
@@ -121,6 +122,9 @@ func TestNoteToIssue(t *testing.T) {
 	if got := h.Rec.LastNotes(); len(got) != 0 {
 		t.Errorf("notes event = %+v", got)
 	}
+	if got := h.Events(t, activity.IssueFiled); len(got) != 1 || got[0].Issue != 55 {
+		t.Errorf("issue_filed = %+v", got)
+	}
 
 	h.GH.Create = "something odd\n"
 	odd, _ := h.AddNote("odd")
@@ -129,6 +133,9 @@ func TestNoteToIssue(t *testing.T) {
 	}
 	if _, err := h.Notes().Get("main", odd.ID); err != nil {
 		t.Error("a failed filing deleted the note")
+	}
+	if got := h.Events(t, activity.IssueFiled); len(got) != 1 {
+		t.Errorf("a failed filing was recorded: %+v", got)
 	}
 }
 

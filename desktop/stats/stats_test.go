@@ -2,6 +2,8 @@ package stats
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -9,7 +11,8 @@ import (
 )
 
 func TestStatsSummary(t *testing.T) {
-	w := New(t.TempDir())
+	dir := t.TempDir()
+	w := New(dir, NewLog(dir))
 	now := time.Date(2026, 10, 2, 15, 0, 0, 0, time.Local)
 	at := func(daysAgo int) int64 { return now.AddDate(0, 0, -daysAgo).UnixMilli() }
 	for i, wait := range []Wait{
@@ -74,5 +77,23 @@ func TestCauseOf(t *testing.T) {
 		if kind, label := CauseOf(tt.rec); kind != tt.kind || label != tt.label {
 			t.Errorf("%s: got %s/%q, want %s/%q", tt.name, kind, label, tt.kind, tt.label)
 		}
+	}
+}
+
+func TestWaitIsRecordedAsAnEvent(t *testing.T) {
+	dir := t.TempDir()
+	log := NewLog(dir)
+	w := New(dir, log)
+	start := time.Now().Add(-time.Second)
+	w.Begin("p/aaaaaaaa", Wait{Issue: 3, Model: "opus", Kind: "permission", Label: "Edit", StartedAt: start.UnixMilli()})
+	w.End("p/aaaaaaaa", start.Add(1500*time.Millisecond))
+	w.End("p/aaaaaaaa", time.Now())
+	data, err := os.ReadFile(filepath.Join(dir, "p", "events", time.Now().Format(time.DateOnly)+".jsonl"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fmt.Sprintf(`{"at":%d,"kind":"wait","session":"p/aaaaaaaa","issue":3,"model":"opus","ms":1500,"label":"permission"}`+"\n", start.Add(1500*time.Millisecond).UnixMilli())
+	if string(data) != want {
+		t.Errorf("events = %s, want %s", data, want)
 	}
 }

@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nednella/agentos/internal/activity"
 )
 
 var onePixelPNG, _ = base64.StdEncoding.DecodeString("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==")
@@ -15,8 +17,17 @@ func exists(path string) bool {
 	return err == nil
 }
 
+type events []activity.Event
+
+func (e *events) Record(key string, ev activity.Event) {
+	if key == "main" {
+		*e = append(*e, ev)
+	}
+}
+
 func TestEvidenceStore(t *testing.T) {
-	e := New(t.TempDir())
+	var recorded events
+	e := New(t.TempDir(), &recorded)
 	id := "main/3"
 	img, err := e.AddImage(id, onePixelPNG, "c", "user")
 	if err != nil || !strings.HasPrefix(img.URL, "/media/main/evidence/3/") {
@@ -28,7 +39,10 @@ func TestEvidenceStore(t *testing.T) {
 	if _, err := e.AddText(id, "words", "", "agent"); err != nil {
 		t.Fatal(err)
 	}
-	again := New(e.dir)
+	if len(recorded) != 2 || recorded[0].Kind != activity.Evidence || recorded[0].Session != id || recorded[0].Label != "image" || recorded[1].Label != "text" {
+		t.Errorf("events = %+v, want one per item filed", recorded)
+	}
+	again := New(e.dir, &recorded)
 	if got := again.List(id); len(got) != 2 || got[0].ID != img.ID || got[1].Text != "words" {
 		t.Errorf("after reload: %+v", got)
 	}

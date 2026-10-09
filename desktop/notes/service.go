@@ -6,12 +6,15 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/project"
 )
 
@@ -31,12 +34,18 @@ type Issues interface {
 	Reload(ctx context.Context, proj project.Project)
 }
 
+// Activity records what the app does.
+type Activity interface {
+	Record(projectKey string, e activity.Event)
+}
+
 // Service is bound to the front end.
 type Service struct {
 	notes    *Notes
 	project  Projects
 	sessions Sessions
 	issues   Issues
+	activity Activity
 	run      run.Runner
 	emit     func(event string, payload any)
 	ctx      func() context.Context
@@ -45,8 +54,8 @@ type Service struct {
 	filing   map[string]bool // "<project key>/<note id>" of notes being filed as issues
 }
 
-func NewService(n *Notes, p Projects, s Sessions, i Issues, runner run.Runner, emit func(string, any), ctx func() context.Context) *Service {
-	return &Service{notes: n, project: p, sessions: s, issues: i, run: runner, emit: emit, ctx: ctx, filing: map[string]bool{}}
+func NewService(n *Notes, p Projects, s Sessions, i Issues, a Activity, runner run.Runner, emit func(string, any), ctx func() context.Context) *Service {
+	return &Service{notes: n, project: p, sessions: s, issues: i, activity: a, run: runner, emit: emit, ctx: ctx, filing: map[string]bool{}}
 }
 
 func (s *Service) emitNotes() {
@@ -159,6 +168,8 @@ func (s *Service) NoteToIssue(id string) error {
 	if url == "" {
 		return fmt.Errorf("gh did not print an issue address: %q", strings.TrimSpace(string(out)))
 	}
+	number, _ := strconv.Atoi(url[strings.LastIndex(url, "/")+1:])
+	s.activity.Record(cur.Key(), activity.Event{At: time.Now().UnixMilli(), Kind: activity.IssueFiled, Issue: number})
 	if err != nil {
 		// gh filed the issue but some pictures did not upload; the note stays so they are not lost.
 		s.issues.Reload(s.ctx(), cur)
