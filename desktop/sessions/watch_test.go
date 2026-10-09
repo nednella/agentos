@@ -122,6 +122,32 @@ func TestFailingChecksWakeOncePerCommit(t *testing.T) {
 	})
 }
 
+func TestConflictWakesOncePerCommit(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_conflict_command: \"/rebase {n}\"\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(apptest.WithMergeable(apptest.WithHead(prJSON("OPEN", false, "[]", 0, 0), "aaa"), "UNKNOWN"))
+	h.RefreshPRs()
+	time.Sleep(500 * time.Millisecond)
+	if strings.Contains(h.Pane(t, s.ID), "/rebase") {
+		t.Fatal("a PR whose mergeability GitHub has not worked out woke the session")
+	}
+
+	h.GH.SetPR(apptest.WithMergeable(apptest.WithHead(prJSON("OPEN", false, "[]", 0, 0), "aaa"), "CONFLICTING"))
+	h.RefreshPRs()
+	eventually(t, "the conflict prompt", func() bool { return strings.Contains(h.Pane(t, s.ID), "/rebase 12") })
+	h.RefreshPRs()
+	h.RefreshPRs()
+	time.Sleep(500 * time.Millisecond)
+	if n := strings.Count(h.Pane(t, s.ID), "/rebase 12"); n != 1 {
+		t.Fatalf("the same conflict woke the session %d times, want once", n)
+	}
+	h.GH.SetPR(apptest.WithMergeable(apptest.WithHead(prJSON("OPEN", false, "[]", 0, 0), "bbb"), "CONFLICTING"))
+	h.RefreshPRs()
+	eventually(t, "a second conflict prompt for the new commit", func() bool {
+		return strings.Count(h.Pane(t, s.ID), "/rebase 12") == 2
+	})
+}
+
 func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)

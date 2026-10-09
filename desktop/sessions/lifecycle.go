@@ -43,7 +43,8 @@ type PR struct {
 	Comments  int    `json:"comments"`
 	UpdatedAt int64  `json:"updatedAt"`
 
-	HeadOid string `json:"-"` // the commit the PR's branch ended on
+	HeadOid     string `json:"-"` // the commit the PR's branch ended on
+	Conflicting bool   `json:"-"` // the branch does not merge cleanly into its base
 }
 
 // Cleanup is one entry of the clean-up log.
@@ -93,7 +94,8 @@ type ack struct {
 // nudge is how much of a PR its session has been woken for.
 type nudge struct {
 	Comments int    `json:"comments"`
-	Head     string `json:"head"` // the commit whose failing checks the session was told about
+	Head     string `json:"head"`     // the commit whose failing checks the session was told about
+	Conflict string `json:"conflict"` // the commit whose conflict with the base the session was told about
 }
 
 // Repos is what the lifecycle needs of the issues: a project's repo, and a fresh queue when a PR merges or closes.
@@ -500,9 +502,10 @@ func (l *Lifecycle) attentionFor(key string, pr *PR) string {
 	return ""
 }
 
-// nudgeFor is the prompt the PR's session should get: once per new comment or review, and once
-// per commit whose checks fail. Comments a PR had when first seen are not news. A project
-// that sets no on_review or on_checks gets no prompt, but the event still counts as seen.
+// nudgeFor is the prompt the PR's session should get: once per new comment or review, once
+// per commit whose checks fail, and once per commit that conflicts with the base. Comments a PR
+// had when first seen are not news. A project that sets no command for an event gets no prompt,
+// but the event still counts as seen.
 // It needs mu.
 func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) string {
 	key := proj.Key()
@@ -521,6 +524,9 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) string {
 	case pr.Checks == "failing" && seen.Head != head:
 		seen.Head = head
 		prompt = proj.ChecksCommand(pr.Number)
+	case pr.Conflicting && seen.Conflict != head:
+		seen.Conflict = head
+		prompt = proj.ConflictCommand(pr.Number)
 	}
 	if !known || prompt != "" {
 		nudged[n] = seen
@@ -603,7 +609,7 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
-		"number,url,state,isDraft,headRefOid,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
+		"number,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
 	if err != nil {
 		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
@@ -612,12 +618,13 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 
 func parsePR(data []byte) (*PR, error) {
 	var raw []struct {
-		Number  int    `json:"number"`
-		URL     string `json:"url"`
-		State   string `json:"state"`
-		IsDraft bool   `json:"isDraft"`
-		HeadOid string `json:"headRefOid"`
-		Rollup  []struct {
+		Number    int    `json:"number"`
+		URL       string `json:"url"`
+		State     string `json:"state"`
+		IsDraft   bool   `json:"isDraft"`
+		HeadOid   string `json:"headRefOid"`
+		Mergeable string `json:"mergeable"`
+		Rollup    []struct {
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 			State      string `json:"state"`
@@ -633,7 +640,7 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments) + len(r.Reviews), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid}
+	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments) + len(r.Reviews), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
 	switch {
 	case r.State == "MERGED":
 		pr.State = "merged"
