@@ -43,7 +43,7 @@ anything missing. No sudo.
 A project with no queue sections shows _Set up this project for agentos_ at the top of its queue.
 
 - **Set up** adds an Inbox whose _Work_ action runs `/work <n>`, plus branch, clean-up and PR commands.
-  If accepted, a session is started that adds the `/work` command, the issue template and `AGENTS.md` files for you.
+  If accepted, a session is started that writes the `/work` command, the issue template and `AGENTS.md` with you.
 - **Not now** hides the offer. `⌘K` → _Set up project_ still works.
 
 To change the config by hand, edit `~/.config/agentos/config.yaml` with the app closed.
