@@ -588,7 +588,8 @@ func NewWith(t *testing.T, o Options) *Harness {
 	if first == 0 {
 		first, tick = time.Hour, time.Hour
 	}
-	h.App.Digests().SetLoop(first, tick) // a test must never start the real claude
+	h.App.Digests().SetLoop(first, tick)       // a test must never start the real claude
+	h.App.News().SetLoop(time.Hour, time.Hour) // nor fetch the real newsletter
 	if o.UpdateTick == 0 {
 		h.App.Updates().SetLoop(time.Hour, time.Hour)
 	} else {
