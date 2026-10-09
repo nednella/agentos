@@ -123,7 +123,7 @@ func (s *Service) AddProjectDir(dir string) (Snapshot, error) {
 	return s.SwitchProject(p.Name)
 }
 
-// RemoveProject forgets a configured project; its sessions keep running.
+// RemoveProject forgets a configured project and stops its sessions.
 func (s *Service) RemoveProject(name string) (Snapshot, error) {
 	p, err := s.sessions.Forget(name)
 	if err != nil {
