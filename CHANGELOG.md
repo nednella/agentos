@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.0](https://github.com/nednella/agentos/compare/v0.22.1...v0.23.0) (2026-10-09)
+
+
+### Features
+
+* **internal:** give set-up sessions fixed templates marked by agentos ([572629d](https://github.com/nednella/agentos/commit/572629d47f21d2b113fbc8e2704c37b46b94d786))
+
+
+### Bug Fixes
+
+* **internal:** fence dependency list and command in digest prompt ([a1cd43e](https://github.com/nednella/agentos/commit/a1cd43eea9315d801f738ec503611a5400a652c3))
+* **ui:** match empty state description to README ([b0cbc1b](https://github.com/nednella/agentos/commit/b0cbc1b4a7471ec9f257172f5dd21618765eb199))
+
 ## [0.22.1](https://github.com/nednella/agentos/compare/v0.22.0...v0.22.1) (2026-10-09)
 
 
