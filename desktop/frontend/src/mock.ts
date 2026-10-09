@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
 
 type Handler = (payload: never) => void
 
@@ -738,6 +738,28 @@ export function createMock(params: URLSearchParams) {
   let digest: Digest = { running: false, lastRunAt: Date.now() - 2 * 86_400_000, nextRunAt: Date.now() + 5 * 86_400_000, error: '', project: data[0].name, items: seedDigest() }
   const pushDigest = () => emit('digest', { ...digest, items: digest.items.map((i) => ({ ...i })) })
 
+  const seedNews = (): NewsIssue[] => {
+    const day = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString().slice(0, 10)
+    const story = (date: string, n: number, title: string, readTime: string, summary: string) => ({ id: `${date}-${n}`, title, readTime, summary, url: `https://example.com/news/${date}/${n}` })
+    const titles = ["ChatGPT's intelligent UI 🧩, cost of open source 💲, software judgment 🧠", 'Claude Sonnet 5.5 🔥, GPT-6 goes interactive 🧩, Postgres text search 🔎', 'Next.js 16.4 🔥, how to read code 📝, SQLite in the browser 🗄️']
+    return titles.map((title, i) => {
+      const date = day(i)
+      return {
+        date,
+        title,
+        url: `https://tldr.tech/dev/${date}`,
+        fetchedAt: Date.now() - (i === 0 ? 30 : 600 + i * 1440) * 60_000,
+        items: [
+          story(date, 0, "We built our own cloud agents runtime. Here's what we learned", '11 minute read', 'A tour of the shared runtime behind desktop, Slack and web agents, built around Temporal workflows, VM sandboxes, snapshots and resumable run logs. The lessons cover queued follow-ups and network controls.'),
+          story(date, 1, 'When code is cheap, judgement becomes the job', '11 minute read', 'As AI makes code production cheap, the scarce work shifts to choosing priorities, reviewing product behavior and owning outcomes in production.'),
+          story(date, 2, 'Postgres full-text search without a second service', '', 'A short post on tsvector columns and GIN indexes.'),
+        ],
+      }
+    })
+  }
+  let news: News = { running: false, lastFetchAt: Date.now() - 40 * 60_000, error: '', issues: seedNews() }
+  const pushNews = () => emit('news', { ...news })
+
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
   let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '~/.local/share/agentos', dataDirFixed: false }
@@ -1056,6 +1078,18 @@ export function createMock(params: URLSearchParams) {
     DismissDigestItem: async (itemId: string) => {
       digest = { ...digest, items: digest.items.filter((i) => i.id !== itemId) }
       pushDigest()
+    },
+    News: async () => ({ ...news }),
+    RefreshNews: async () => {
+      if (news.running) throw 'The news are already being fetched'
+      news = { ...news, running: true, error: '' }
+      pushNews()
+      setTimeout(() => {
+        const date = new Date(Date.now() + (news.issues.length - 2) * 86_400_000).toISOString().slice(0, 10)
+        const story = { id: `${date}-0`, title: 'Fresh from the last refresh', readTime: '3 minute read', summary: 'A story that arrived while the view was open.', url: `https://example.com/news/${date}/0` }
+        news = { ...news, running: false, lastFetchAt: Date.now(), issues: [{ date, title: 'Refreshed issue', url: `https://tldr.tech/dev/${date}`, fetchedAt: Date.now(), items: [story] }, ...news.issues] }
+        pushNews()
+      }, 2000)
     },
     Settings: async () => settings,
     SetTheme: async (theme: ThemeSetting) => {
