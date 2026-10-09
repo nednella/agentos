@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.19.0](https://github.com/nednella/agentos/compare/v0.18.0...v0.19.0) (2026-10-09)
+
+
+### Features
+
+* **desktop:** add Ledger to stats service ([33af077](https://github.com/nednella/agentos/commit/33af0776a9cf266be089d1745a9ab4be51279ffa))
+* **desktop:** record prompts, sessions and agent time per project ([934e92a](https://github.com/nednella/agentos/commit/934e92a57057ecca4c6ed3272a924ec2b983d75e))
+* **desktop:** return release notes since last run ([b986196](https://github.com/nednella/agentos/commit/b98619642b2ab10cfca72cf2fa022179f6718af5)), closes [#255](https://github.com/nednella/agentos/issues/255)
+* **ui:** open stats view on stats tab, interruptions second ([31fd254](https://github.com/nednella/agentos/commit/31fd2542286055b6f97176070c47684ee4d3aedf))
+* **ui:** show patch notes once after update ([091a8a9](https://github.com/nednella/agentos/commit/091a8a9c74305e34f74afc0e454fddc9f7789826)), closes [#255](https://github.com/nednella/agentos/issues/255)
+* **ui:** show your work across projects in stats view ([4ad150f](https://github.com/nednella/agentos/commit/4ad150f733a570fcfab28dd36f01e7d2865929ae))
+
+
+### Bug Fixes
+
+* **desktop:** return empty patch notes as a list ([83e5454](https://github.com/nednella/agentos/commit/83e54544cb065aee582fcb82aa1856d8e98b7851)), closes [#255](https://github.com/nednella/agentos/issues/255)
+* **ui:** shrink patch notes sheet ([5b768f7](https://github.com/nednella/agentos/commit/5b768f78212650941361e9c800c167cd7d438018)), closes [#255](https://github.com/nednella/agentos/issues/255)
+
 ## [0.18.0](https://github.com/nednella/agentos/compare/v0.17.1...v0.18.0) (2026-10-09)
 
 
