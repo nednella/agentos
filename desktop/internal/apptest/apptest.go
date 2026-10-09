@@ -512,6 +512,7 @@ type Options struct {
 	Version        string        // the version the app believes it runs; "dev" by default
 	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DEV_DATA_DIR, and home in the state dir
 	NoProject      bool          // leave the project out of the config, so the app starts in a folder it does not know
+	AbsentProject  string        // with NoProject: the folder is named so, and the config holds a project of that name whose folder is missing here
 }
 
 // Harness is an app with a plain bash as its agent.
@@ -550,6 +551,12 @@ func NewWith(t *testing.T, o Options) *Harness {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
+	if o.AbsentProject != "" {
+		dir = filepath.Join(dir, o.AbsentProject)
+		if err := os.Mkdir(dir, 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
 	confPath := filepath.Join(state, "config.yaml")
 	branch := "    session_branch_fallback: \"issue-{n}\"\n"
 	if o.NoBranch {
@@ -566,6 +573,9 @@ func NewWith(t *testing.T, o Options) *Harness {
 	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), top, dir, branch, cleanup, queueSections, o.ProjectExtra)
 	if o.NoProject {
 		conf = fmt.Sprintf("agent_command: %s\n%sprojects: []\n", cmp.Or(o.Agent, "bash"), top)
+		if o.AbsentProject != "" {
+			conf = fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: %s\n    directory: /nonexistent/%[3]s\n", cmp.Or(o.Agent, "bash"), top, o.AbsentProject)
+		}
 	}
 	if err := os.WriteFile(confPath, []byte(conf), 0o600); err != nil {
 		t.Fatal(err)

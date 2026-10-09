@@ -200,11 +200,15 @@ func (r *Registry) editProject(key string, change func(*project.Project) error) 
 	})
 }
 
-// Has says whether the config holds the project of the key.
-func (r *Registry) Has(key string) bool {
+// ByDir is the configured project whose folder is dir.
+func (r *Registry) ByDir(dir string) (project.Project, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.index(key) >= 0
+	i := slices.IndexFunc(r.cfg.Projects, func(p project.Project) bool { return p.Dir == dir })
+	if i < 0 {
+		return project.Project{}, false
+	}
+	return r.cfg.Projects[i], true
 }
 
 func (r *Registry) index(key string) int {
