@@ -135,14 +135,16 @@ func (s *Service) RemoveProject(name string) (Snapshot, error) {
 }
 
 // SetUpProject writes a basic agentos block into the current project's config and starts a session that sets up
-// the repository with the user.
+// the repository with the user. A project that has queue sections keeps its config: only the session starts.
 func (s *Service) SetUpProject() (sessions.Session, error) {
 	key, err := s.configure()
 	if err != nil {
 		return sessions.Session{}, err
 	}
-	if err := s.registry.SetUp(key); err != nil {
-		return sessions.Session{}, err
+	if s.registry.project(key).NeedsSetup() {
+		if err := s.registry.SetUp(key); err != nil {
+			return sessions.Session{}, err
+		}
 	}
 	return s.sessions.CreateBriefed("Set up for agentos", prompts.SetupStart(), prompts.SetupBrief())
 }
