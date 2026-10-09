@@ -169,6 +169,7 @@ func (a *App) Services() []any { return a.services }
 // Start begins following the sessions; it runs until ctx ends.
 func (a *App) Start(ctx context.Context) error {
 	a.ctx.Store(&ctx)
+	a.browsers.StopStrays()
 	if err := a.sessions.Run(ctx); err != nil {
 		return err
 	}

@@ -705,6 +705,15 @@ func stopStrayBrowser(profile string) {
 	}
 }
 
+// StopStrays ends the browsers that an earlier run of the app left on any project's profile. Left alone, one runs
+// until its project opens a browser again, with the launch flags of the app that started it.
+func (b *Browsers) StopStrays() {
+	profiles, _ := filepath.Glob(filepath.Join(b.dataDir, "*", "browser"))
+	for _, profile := range profiles {
+		stopStrayBrowser(profile)
+	}
+}
+
 // Hook sets what the browsers ask of the app: the page a new tab opens first, the label that names a session in
 // its window's title, and a nudge when a tab opens or closes.
 func (b *Browsers) Hook(urlFor, labelFor func(sessionID string) string, onTabs func()) {
