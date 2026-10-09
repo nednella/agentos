@@ -29,10 +29,11 @@ export function NewsHeader({
           className="flex min-w-0 items-center gap-2 text-body"
         >
           <button
-            className="text-soft hover:text-ink"
+            className="inline-flex items-center gap-1 text-soft hover:text-ink"
             title="Back to news (Esc)"
             onClick={closeNewsPage}
           >
+            <Icon name="back" size={13} />
             News
           </button>
           <span className="text-dim">/</span>
