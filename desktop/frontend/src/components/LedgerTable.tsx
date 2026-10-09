@@ -2,8 +2,7 @@ import type { LedgerRow } from '../types'
 
 type LedgerTableProps = { projects: LedgerRow[] }
 
-const num = (n: number | null) => (n === null ? '—' : n.toLocaleString())
-const HEADS = ['Prompts', 'Sessions', 'PRs merged', 'Issues closed']
+const HEADS = ['Prompts', 'Sessions']
 
 export function LedgerTable({ projects }: LedgerTableProps) {
   return (
@@ -22,10 +21,8 @@ export function LedgerTable({ projects }: LedgerTableProps) {
           {projects.map((p) => (
             <tr key={p.project} className="border-t border-line">
               <td className="py-1.5">{p.project}</td>
-              <td className="mono py-1.5 text-right">{num(p.prompts)}</td>
-              <td className="mono py-1.5 text-right">{num(p.sessions)}</td>
-              <td className="mono py-1.5 text-right">{num(p.prsMerged)}</td>
-              <td className="mono py-1.5 text-right">{num(p.issuesClosed)}</td>
+              <td className="mono py-1.5 text-right">{p.prompts.toLocaleString()}</td>
+              <td className="mono py-1.5 text-right">{p.sessions.toLocaleString()}</td>
             </tr>
           ))}
         </tbody>
