@@ -12,7 +12,7 @@ export function DigestItemRow({ item }: DigestItemRowProps) {
     <li className="flex flex-col gap-1 px-4 py-3">
       <div className="flex items-baseline gap-2">
         <span className="flex-none rounded-sm border border-line-strong px-1.5 text-label text-soft">{item.source}</span>
-        <button className="link min-w-0 truncate text-left text-body font-medium" title={item.url} onClick={() => report(() => api.openURL(item.url))}>
+        <button className="headline min-w-0 truncate text-left text-body font-medium" title={item.url} onClick={() => report(() => api.openURL(item.url))}>
           {item.title}
         </button>
       </div>

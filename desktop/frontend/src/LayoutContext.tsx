@@ -38,6 +38,8 @@ type AllPrefs = Record<Band, BandPrefs>
 
 const fresh = (band: Band): BandPrefs => ({ sidebarOpen: true, sessionsOpen: band !== 'compact', shellOpen: true, sidebar: null, sessions: null, shell: null })
 
+export type NewsPage = 'index' | 'tldr' | 'digest'
+
 export type Layout = {
   mode: LayoutMode
   width: number
@@ -53,7 +55,8 @@ export type Layout = {
   widths: Record<SidePanel, number>
   peekWidths: Record<SidePanel, number>
   statsOpen: boolean
-  digestOpen: boolean
+  newsOpen: boolean
+  newsPage: NewsPage
   zoom(step: -1 | 0 | 1): void
   setMobilePanel(panel: MobilePanel): void
   setWidth(panel: SidePanel, rem: number, commit: boolean): void
@@ -68,6 +71,9 @@ export type Layout = {
   showSidebarTab(tab: SidebarTab): void
   toggleStats(): void
   toggleDigest(): void
+  toggleNews(): void
+  openNews(page: NewsPage): void
+  closeNewsPage(): void
   closeCentre(): void
   closePeek(): void
   returnToTerminal(): void
@@ -141,7 +147,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
   const [peek, setPeek] = useState<SidePanel | null>(null)
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('session')
   const [statsOpen, setStatsOpen] = useState(devFlags.view === 'stats')
-  const [digestOpen, setDigestOpen] = useState(devFlags.view === 'digest')
+  const [newsOpen, setNewsOpen] = useState(devFlags.view === 'news' || devFlags.view === 'digest')
+  const [newsPage, setNewsPage] = useState<NewsPage>(devFlags.view === 'digest' ? 'digest' : 'index')
   const zoomToast = useRef<number | null>(null)
 
   useLayoutEffect(() => {
@@ -176,7 +183,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
     previousSelected.current = selectedId
     if (first) return
     setStatsOpen(false)
-    setDigestOpen(false)
+    setNewsOpen(false)
     setPeek(null)
     if (narrow) setMobilePanel('session')
   }, [selectedId, narrow])
@@ -245,7 +252,8 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
         sessions: Math.min(Math.max(fullWidths.sessions, 18), (0.8 * width) / (16 * scale)),
       },
       statsOpen,
-      digestOpen,
+      newsOpen,
+      newsPage,
       zoom(step) {
         const at = SCALES.indexOf(scale)
         const next = step === 0 ? DEFAULT_SCALE : SCALES[Math.min(Math.max((at < 0 ? 2 : at) + step, 0), SCALES.length - 1)]
@@ -277,19 +285,37 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       showSidebarTab,
       toggleStats() {
         setStatsOpen(!statsOpen)
-        setDigestOpen(false)
+        setNewsOpen(false)
         setPeek(null)
         if (!statsOpen && narrow) setMobilePanel('session')
       },
-      toggleDigest() {
-        setDigestOpen(!digestOpen)
+      toggleNews() {
+        const close = newsOpen && newsPage === 'index'
+        setNewsPage('index')
+        setNewsOpen(!close)
         setStatsOpen(false)
         setPeek(null)
-        if (!digestOpen && narrow) setMobilePanel('session')
+        if (!close && narrow) setMobilePanel('session')
       },
+      toggleDigest() {
+        const close = newsOpen && newsPage === 'digest'
+        setNewsPage('digest')
+        setNewsOpen(!close)
+        setStatsOpen(false)
+        setPeek(null)
+        if (!close && narrow) setMobilePanel('session')
+      },
+      openNews(page) {
+        setNewsPage(page)
+        setNewsOpen(true)
+        setStatsOpen(false)
+        setPeek(null)
+        if (narrow) setMobilePanel('session')
+      },
+      closeNewsPage: () => setNewsPage('index'),
       closeCentre() {
         setStatsOpen(false)
-        setDigestOpen(false)
+        setNewsOpen(false)
       },
       closePeek: () => setPeek(null),
       returnToTerminal() {
@@ -298,7 +324,7 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       },
       focusPanel,
     }),
-    [mode, width, scale, theme, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, digestOpen, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus, report, setTextScale],
+    [mode, width, scale, theme, sidebarOpen, sessionsOpen, narrow, prefs.sidebarOpen, prefs.shellOpen, prefs.shell, peek, mobilePanel, fittedWidths.sidebar, fittedWidths.sessions, fullWidths.sidebar, fullWidths.sessions, height, statsOpen, newsOpen, newsPage, band, setSidebarOpen, setSessionsOpen, showSidebarTab, focusPanel, updatePrefs, focus, report, setTextScale],
   )
 
   return <LayoutContext.Provider value={value}>{children}</LayoutContext.Provider>

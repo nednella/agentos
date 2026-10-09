@@ -28,8 +28,8 @@ function Count({ state, count, label }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseen, report, update, updating, applyUpdate } = useAgentos()
-  const { width, statsOpen, digestOpen } = useLayout()
+  const { project, projects, sessions, setOverlay, digestUnseenCount, newsUnseen, report, update, updating, applyUpdate } = useAgentos()
+  const { width, statsOpen, newsOpen } = useLayout()
   const actions = useActions()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
@@ -39,6 +39,7 @@ export function TopBar() {
   const keys = (id: string) => formatShortcut(find(id).shortcut!)
   const iconButton = 'btn btn-ghost h-8 w-8 justify-center px-0'
   const badge = width < DOTS_MIN
+  const unseen = digestUnseenCount + newsUnseen
 
   return (
     <header
@@ -99,14 +100,18 @@ export function TopBar() {
             </button>
             <button
               className={`${iconButton} relative`}
-              style={{ color: digestOpen ? 'var(--accent)' : undefined }}
-              title={`Weekly digest (${keys('digest')})${digestUnseen ? ', new items' : ''}`}
-              aria-label={digestUnseen ? 'Weekly digest, new items' : 'Weekly digest'}
-              aria-pressed={digestOpen}
-              onClick={() => find('digest').run([])}
+              style={{ color: newsOpen ? 'var(--accent)' : undefined }}
+              title={`News (${keys('news')})${unseen ? `, ${unseen} new` : ''}`}
+              aria-label={unseen ? `News, ${unseen} new` : 'News'}
+              aria-pressed={newsOpen}
+              onClick={() => find('news').run([])}
             >
-              <Icon name="digest" />
-              {digestUnseen && <span className="dot absolute top-1.5 right-1.5" style={{ ['--c' as string]: 'var(--accent)' }} />}
+              <Icon name="news" />
+              {unseen > 0 && (
+                <span className="mono absolute -top-0.5 -right-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-label font-semibold text-app">
+                  {unseen > 9 ? '9+' : unseen}
+                </span>
+              )}
             </button>
           </>
         )}

@@ -350,6 +350,15 @@
     text-underline-offset: 2px;
   }
 
+  .headline {
+    color: var(--text);
+    text-underline-offset: 3px;
+  }
+  .headline:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+
   .markdown {
     line-height: 1.55;
     overflow-wrap: anywhere;

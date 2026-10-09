@@ -14,7 +14,7 @@ const GROUPS: Group[] = [
   { title: 'Navigate', ids: ['panel-sidebar', 'focus-shell', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'switch-project', 'open-repo', 'palette', 'shortcuts'] },
   { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
-  { title: 'Views', ids: ['stats', 'digest', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
+  { title: 'Views', ids: ['stats', 'digest', 'news', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
   {
     title: 'Shell',
     ids: [],
