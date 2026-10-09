@@ -63,6 +63,7 @@ export type Issue = {
   type: IssueType
   section: string
   actions: string[]
+  moves: string[]
   url: string
   sessionId: string
   author: string

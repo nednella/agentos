@@ -25,6 +25,8 @@ type Backend = {
   NoteToSession(id: string): Promise<Session>
   Issues(refresh: boolean): Promise<Issue[]>
   StartIssue(number: number, action: string): Promise<Session>
+  MoveIssue(number: number, section: string): Promise<void>
+  UndoMove(number: number): Promise<void>
   IssueDetail(number: number): Promise<IssueDetail>
   ShellOpen(): Promise<{ id: string }>
   ShellNew(): Promise<{ id: string }>
@@ -85,7 +87,7 @@ const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'RemoveProject', 'SetUpProject', 'DismissSetup'],
   sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
-  issues: ['Issues', 'StartIssue', 'IssueDetail'],
+  issues: ['Issues', 'StartIssue', 'MoveIssue', 'UndoMove', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
   stats: ['Stats'],
   evidence: ['Evidence', 'DeleteEvidence'],
@@ -141,6 +143,8 @@ export const api = {
   noteToSession: (id: string) => backend.NoteToSession(id),
   issues: (refresh: boolean) => backend.Issues(refresh),
   startIssue: (number: number, action: string) => backend.StartIssue(number, action),
+  moveIssue: (number: number, section: string) => backend.MoveIssue(number, section),
+  undoMove: (number: number) => backend.UndoMove(number),
   issueDetail: (number: number) => backend.IssueDetail(number),
   shellOpen: () => backend.ShellOpen(),
   shellNew: () => backend.ShellNew(),

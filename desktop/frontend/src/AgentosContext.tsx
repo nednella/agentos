@@ -12,6 +12,7 @@ export type Toast = {
   sessionId?: string
   view?: SessionView
   sticky?: boolean
+  action?: { label: string; run(): void }
 }
 
 export type SessionView = 'terminal' | 'browser' | 'evidence'

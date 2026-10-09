@@ -54,9 +54,28 @@ const sections: Record<Lane, { name: string; actions: string[] }> = {
   ready: { name: 'Ready', actions: ['Work'] },
   plan: { name: 'Needs plan', actions: ['Investigate'] },
   you: { name: '', actions: ['Start'] },
-  idea: { name: '', actions: ['Start'] },
+  idea: { name: 'Ideas', actions: ['Start'] },
 }
-const sectionOrder = ['Inbox', 'Ready', 'Needs plan', '']
+const sectionOrder = ['Inbox', 'Ready', 'Needs plan', 'Ideas', '']
+
+// Ready is refused both ways, as if the core only lets an issue out of the triage sections.
+const moveTargets: Record<string, string[]> = {
+  Inbox: ['Needs plan', 'Ideas'],
+  'Needs plan': ['Inbox', 'Ideas'],
+  Ideas: ['Inbox', 'Needs plan'],
+}
+
+export const sortBySection = (issues: Issue[]) => issues.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section))
+
+export const movesFrom = (section: string) => moveTargets[section] ?? []
+
+export function moveIssue(issue: Issue, section: string): Issue {
+  const lane = (Object.keys(sections) as Lane[]).find((l) => sections[l].name === section)
+  if (!movesFrom(issue.section).includes(section) || !lane) throw `issue #${issue.number} cannot move to ${section}`
+  const laneLabels = Object.keys(sections).map((l) => labelFor(l as Lane))
+  const labels = [...issue.labels.filter((l) => !laneLabels.includes(l)), labelFor(lane)].filter(Boolean)
+  return { ...issue, section, actions: sections[lane].actions, moves: movesFrom(section), labels }
+}
 
 export function buildIssues(repo: string): Issue[] {
   const now = Date.now()
@@ -68,6 +87,7 @@ export function buildIssues(repo: string): Issue[] {
       type,
       section: sections[lane].name,
       actions: sections[lane].actions,
+      moves: movesFrom(sections[lane].name),
       url: `https://github.com/${repo}/issues/${number}`,
       sessionId: '',
       author,
@@ -77,7 +97,7 @@ export function buildIssues(repo: string): Issue[] {
       updatedAt: now - (i % 5) * day,
     }
   })
-  return issues.sort((a, b) => sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section))
+  return sortBySection(issues)
 }
 
 const html = (parts: string[]) => parts.join('\n')
