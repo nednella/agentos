@@ -54,11 +54,49 @@ func TestNewProject(t *testing.T) {
 
 	t.Run("an existing folder is left alone", func(t *testing.T) {
 		h.Rec.SetPick(parent)
-		if _, err := h.NewProject("fresh"); err == nil {
-			t.Error("a folder that exists was accepted")
+		_, err := h.NewProject("fresh")
+		if err == nil || err.Error() != dir+" already exists" {
+			t.Errorf("err = %v", err)
+		}
+		if h.GH.Calls("repo view fresh") != 1 {
+			t.Errorf("the repo was looked up for a folder that exists: gh calls = %q", h.GH.CallLog())
 		}
 		if !exists(filepath.Join(dir, "README.md")) {
 			t.Error("the existing folder lost its README")
+		}
+	})
+
+	t.Run("an existing GitHub repo creates nothing", func(t *testing.T) {
+		h.GH.ExistingRepos = []string{"online"}
+		t.Cleanup(func() { h.GH.ExistingRepos = nil })
+		_, err := h.NewProject("online")
+		if err == nil || err.Error() != "a GitHub repo called online already exists" {
+			t.Errorf("err = %v", err)
+		}
+		if exists(filepath.Join(parent, "online")) {
+			t.Error("the folder was created")
+		}
+		if h.GH.Calls("repo create online --public --source . --push") != 0 {
+			t.Errorf("gh calls = %q", h.GH.CallLog())
+		}
+	})
+
+	t.Run("a repo that is not found does not block", func(t *testing.T) {
+		if snap, err := h.NewProject("unseen"); err != nil || snap.Project.Name != "unseen" {
+			t.Errorf("NewProject = %+v, %v", snap.Project, err)
+		}
+	})
+
+	t.Run("a failed repo lookup does not block", func(t *testing.T) {
+		h.GH.ViewErr = errors.New("gh: not logged in")
+		t.Cleanup(func() { h.GH.ViewErr = nil })
+		if snap, err := h.NewProject("offline"); err != nil || snap.Project.Name != "offline" {
+			t.Fatalf("NewProject = %+v, %v", snap.Project, err)
+		}
+		h.GH.CreateRepoErr = errors.New("not logged in")
+		t.Cleanup(func() { h.GH.CreateRepoErr = nil })
+		if _, err := h.CreateRepo("offline"); err == nil || !strings.Contains(err.Error(), "not logged in") {
+			t.Errorf("CreateRepo err = %v", err)
 		}
 	})
 

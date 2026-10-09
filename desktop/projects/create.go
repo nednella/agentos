@@ -30,6 +30,12 @@ func (s *Service) NewProject(name string) (Snapshot, error) {
 		return s.Snapshot(), nil
 	}
 	dir := filepath.Join(parent, name)
+	if _, err := os.Lstat(dir); err == nil {
+		return Snapshot{}, fmt.Errorf("%s already exists", dir)
+	}
+	if s.repoExists(name) {
+		return Snapshot{}, fmt.Errorf("a GitHub repo called %s already exists", name)
+	}
 	if err := os.Mkdir(dir, 0o755); err != nil {
 		return Snapshot{}, fmt.Errorf("creating the folder: %w", err)
 	}
@@ -38,6 +44,13 @@ func (s *Service) NewProject(name string) (Snapshot, error) {
 		return Snapshot{}, err
 	}
 	return s.AddProjectDir(dir)
+}
+
+// repoExists reports whether the signed-in GitHub account has a repo called name. A failed
+// lookup, whatever the cause, counts as no: CreateRepo reports a broken gh later, where it can be retried.
+func (s *Service) repoExists(name string) bool {
+	_, err := s.run(s.ctx(), "", "gh", "repo", "view", name)
+	return err == nil
 }
 
 // CreateRepo creates the public GitHub repo of the project called name as its origin and pushes it.

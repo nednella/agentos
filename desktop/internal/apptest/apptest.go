@@ -286,6 +286,8 @@ type FakeGH struct {
 	calls         []string
 	Repo          error
 	CreateRepoErr error         // what gh repo create fails with, if set
+	ExistingRepos []string      // the names gh repo view <name> finds; any other name is not found
+	ViewErr       error         // what gh repo view <name> fails with instead, if set
 	Create        string        // what gh issue create prints
 	CreateErr     error         // what gh issue create fails with, if set; it still prints Create
 	Delay         time.Duration // how long gh issue create takes
@@ -328,6 +330,14 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		return []byte(f.pr), nil
 	case args[0] == "repo" && args[1] == "create":
 		return nil, f.CreateRepoErr
+	case args[0] == "repo" && args[1] == "view" && len(args) == 3:
+		if f.ViewErr != nil {
+			return nil, f.ViewErr
+		}
+		if slices.Contains(f.ExistingRepos, args[2]) {
+			return []byte("name: me/" + args[2]), nil
+		}
+		return nil, fmt.Errorf("gh repo: exit status 1: GraphQL: Could not resolve to a Repository with the name 'me/%s'. (repository)", args[2])
 	case args[0] == "repo":
 		if f.Repo != nil {
 			return nil, f.Repo
