@@ -2,6 +2,8 @@ package stats
 
 import (
 	"bufio"
+	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +17,7 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/internal/activity"
+	"github.com/nednella/agentos/internal/atomicfile"
 )
 
 const eventsFolder = "events"
@@ -70,13 +73,16 @@ func appendLine(path string, line []byte) error {
 	return errors.Join(err, f.Close())
 }
 
-// Load builds the rollup from every project's files. The days before today are read first, without the
-// lock, since nothing writes to them; then today's, under the lock, so an event recorded meanwhile is
-// counted once.
+// Load gzips the files of the days before yesterday, then builds the rollup from every project's files.
+// The days before today are read first, without the lock, since nothing writes to them; then today's,
+// under the lock, so an event recorded meanwhile is counted once.
 func (l *Log) Load() {
-	today := localDay(time.Now())
+	now := time.Now()
+	today := localDay(now)
+	yesterday := localDay(now.AddDate(0, 0, -1))
 	days := map[string]map[string]*Day{}
 	for _, key := range l.keys() {
+		l.compress(key, yesterday)
 		l.read(days, key, func(day string) bool { return day < today })
 	}
 	l.mu.Lock()
@@ -104,6 +110,40 @@ func (l *Log) keys() []string {
 	return out
 }
 
+// compress gzips the project's files of the days before the day given, about ten times smaller.
+func (l *Log) compress(key, before string) {
+	entries, err := os.ReadDir(l.folder(key))
+	if err != nil {
+		return
+	}
+	for _, e := range entries {
+		if day, ok := strings.CutSuffix(e.Name(), ".jsonl"); ok && day < before {
+			if err := gzipFile(filepath.Join(l.folder(key), e.Name())); err != nil {
+				fmt.Fprintf(os.Stderr, "agentos: compressing events: %v\n", err)
+			}
+		}
+	}
+}
+
+func gzipFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	if _, err := zw.Write(data); err != nil {
+		return err
+	}
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	if err := atomicfile.Write(path+".gz", buf.Bytes(), 0o600); err != nil {
+		return err
+	}
+	return os.Remove(path)
+}
+
 // read adds the project's files of the days that match to days.
 func (l *Log) read(days map[string]map[string]*Day, key string, match func(day string) bool) {
 	entries, err := os.ReadDir(l.folder(key))
@@ -111,18 +151,43 @@ func (l *Log) read(days map[string]map[string]*Day, key string, match func(day s
 		return
 	}
 	for _, e := range entries {
-		day, ok := strings.CutSuffix(e.Name(), ".jsonl")
-		if !ok || !match(day) {
+		path := filepath.Join(l.folder(key), e.Name())
+		day, zipped := strings.CutSuffix(e.Name(), ".jsonl.gz")
+		if !zipped {
+			var ok bool
+			if day, ok = strings.CutSuffix(e.Name(), ".jsonl"); !ok {
+				continue
+			}
+			if _, err := os.Stat(path + ".gz"); err == nil {
+				continue // a gzip that stopped before it removed the plain file
+			}
+		}
+		if !match(day) {
 			continue
 		}
-		f, err := os.Open(filepath.Join(l.folder(key), e.Name()))
-		if err != nil {
+		if err := readFile(path, zipped, func(ev activity.Event) { apply(days, key, ev) }); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: reading events: %v\n", err)
-			continue
 		}
-		readEvents(f, func(ev activity.Event) { apply(days, key, ev) })
-		f.Close()
 	}
+}
+
+func readFile(path string, zipped bool, each func(activity.Event)) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	var r io.Reader = f
+	if zipped {
+		zr, err := gzip.NewReader(f)
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		defer zr.Close()
+		r = zr
+	}
+	readEvents(r, each)
+	return nil
 }
 
 // readEvents calls each for every event in r. It skips lines that do not parse.

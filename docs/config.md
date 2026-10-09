@@ -121,7 +121,7 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | What | Where |
 |---|---|
 | notes, note images, evidence, stats, digest | `<data_dir>/<key>/` (`data_dir` defaults to `~/.local/share/agentos`) |
-| the activity record: one file of events per day | `<data_dir>/<key>/events/YYYY-MM-DD.jsonl` |
+| the activity record: one file of events per day, gzipped from the day before yesterday | `<data_dir>/<key>/events/YYYY-MM-DD.jsonl[.gz]` |
 | news (TLDR Dev) | `<data_dir>/news.json` |
 | PR tracking, clean-up log, browser profile, session temp folders | `~/.local/share/agentos/<key>/` |
 | state files, sockets, tmux config, last project, release check | `~/.local/state/agentos` |
