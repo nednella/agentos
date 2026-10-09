@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -119,5 +120,53 @@ func TestLogReadsActivityBeforeTheFirstEvent(t *testing.T) {
 func TestLogOfNoProjectIsEmpty(t *testing.T) {
 	if got := loaded(t, t.TempDir()).Days("none"); len(got) != 0 {
 		t.Errorf("days = %v", got)
+	}
+}
+
+func TestLogGzipsDaysBeforeYesterday(t *testing.T) {
+	dir := t.TempDir()
+	folder := filepath.Join(dir, "proj", "events")
+	if err := os.MkdirAll(folder, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	write := func(ago int, name string) {
+		t.Helper()
+		line := fmt.Sprintf(`{"at":%d,"kind":"prompt"}`+"\n", now.AddDate(0, 0, -ago).UnixMilli())
+		if err := os.WriteFile(filepath.Join(folder, name), []byte(line), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	day := func(ago int) string { return now.AddDate(0, 0, -ago).Format(time.DateOnly) }
+	write(3, day(3)+".jsonl")
+	write(2, day(2)+".jsonl")
+	write(1, day(1)+".jsonl")
+	write(0, day(0)+".jsonl")
+
+	count := func() int {
+		t.Helper()
+		n := 0
+		for _, d := range loaded(t, dir).Days("proj") {
+			n += d.Prompts
+		}
+		return n
+	}
+	if n := count(); n != 4 {
+		t.Errorf("prompts = %d, want 4", n)
+	}
+	var names []string
+	entries, _ := os.ReadDir(folder)
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	want := []string{day(3) + ".jsonl.gz", day(2) + ".jsonl.gz", day(1) + ".jsonl", day(0) + ".jsonl"}
+	slices.Sort(want)
+	if !slices.Equal(names, want) {
+		t.Errorf("files = %v, want %v", names, want)
+	}
+
+	write(3, day(3)+".jsonl") // as if a gzip stopped before it removed the plain file
+	if n := count(); n != 4 {
+		t.Errorf("prompts with a day both plain and gzipped = %d, want 4", n)
 	}
 }
