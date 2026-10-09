@@ -2,7 +2,8 @@
 
 The owner chose Set up for this project in agentos. The app has filled in the project's agentos config; your job is
 the repository side, so that `/work <n>` runs with no help. Check what the repository already has, then build what
-is missing with the owner. Ask before you write each file.
+is missing with the owner. Ask before you write each file. `/work` and the app's pull request tracking need the
+repository on GitHub as `origin`; when it has none, tell the owner before anything else.
 
 1. Issue template, .github/ISSUE_TEMPLATE/issue.md
    One template, with only a `## Description` heading. A note filed as an issue gets the same body: `## Description`,
