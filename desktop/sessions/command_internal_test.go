@@ -170,11 +170,11 @@ func TestNpmCacheDir(t *testing.T) {
 	}
 }
 
-func TestCommandAddsTheBrief(t *testing.T) {
+func TestCommandGivesABriefedSessionOnlyTheBrief(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
-	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
+	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{available: true}}
 	argv := s.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", "set it up")
-	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != prompts.Session()+"\n\nset it up" {
+	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != "set it up" || slices.Contains(argv, "--mcp-config") {
 		t.Errorf("argv = %q", argv)
 	}
 }
