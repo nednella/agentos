@@ -119,12 +119,13 @@ func TestNoBrowserFound(t *testing.T) {
 func TestLaunchArgsPerMode(t *testing.T) {
 	b := New(t.TempDir(), func(string, any) {})
 	b.headless = true
-	if args := b.launchArgs("/p", 24680); !slices.Contains(args, "--headless=new") || !slices.Contains(args, "--hide-scrollbars") || !slices.Contains(args, "--disable-brave-update") {
+	if args := b.launchArgs("/p", 24680); !slices.Contains(args, "--headless=new") || !slices.Contains(args, "--hide-scrollbars") || !slices.Contains(args, "--disable-brave-update") ||
+		!slices.Contains(args, "--disable-features=MacAppCodeSignClone") {
 		t.Errorf("headless args = %v", args)
 	}
 	b.headless = false
 	args := b.launchArgs("/p", 24680)
-	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-brave-update", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
+	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-brave-update", "--disable-features=MacAppCodeSignClone", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
 		if !slices.Contains(args, want) {
 			t.Errorf("args lack %s: %v", want, args)
 		}
