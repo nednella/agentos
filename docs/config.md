@@ -18,7 +18,7 @@ projects:
     note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
     session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter. The settings panel writes it
     session_branch_fallback: "" # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
-    session_cleanup_command: "" # shell command that cleans up the git side of a session; {branch}, {worktree}, {dir}, {force} (--force when forced, else empty), e.g. "git worktree remove {force} {worktree} && git branch -D {branch}"; "" leaves branches and folders alone
+    session_cleanup_command: "" # shell command that cleans up the git side of a session; {branch}, {worktree}, {dir}, {force} (--force when forced, else empty), e.g. "{ [ -z {worktree} ] || git worktree remove {force} {worktree}; } && git branch -D {branch}"; "" leaves branches and folders alone
     session_cleanup_mode:      # does the app clean up by itself? The settings panel writes it
       merge: auto              # auto or manual: after the pull request merged; auto needs the session to have seen it open
       close: manual            # auto or manual: after the pull request closed unmerged; auto needs the session to have seen it open
@@ -34,7 +34,7 @@ projects:
     setup_dismissed: false     # Not now was chosen on the offer to set the project up; the queue writes it
 ```
 
-`session_cleanup_command` runs through `sh -c` in the project folder, once per branch of the session that has a worktree or a local branch, after the safety checks. `{branch}`, `{worktree}` (the folder the branch is checked out in, `''` if none) and `{dir}` (the project folder) are shell-quoted. `{force}` is `--force` only when you force a clean-up, so `git worktree remove {force} {worktree}` removes a worktree with changes only then. A command that fails blocks the clean-up with its error, unless the branch is already gone.
+`session_cleanup_command` runs through `sh -c` in the project folder, once per branch of the session that has a worktree or a local branch, after the safety checks. `{branch}`, `{worktree}` (the folder the branch is checked out in, `''` if none) and `{dir}` (the project folder) are shell-quoted. `{force}` is `--force` only when you force a clean-up, so `git worktree remove {force} {worktree}` removes a worktree with changes only then. A branch with no worktree has `{worktree}` `''`, which `git worktree remove` rejects; the command that *Set up* writes skips that step then. A command that fails blocks the clean-up with its error, unless the branch is already gone.
 
 ### Setting up a project
 
@@ -42,7 +42,7 @@ A project with no `queue_sections` shows an offer at the top of its queue. *Set 
 
 ```yaml
 session_branch_fallback: "issue-{n}"
-session_cleanup_command: "git worktree remove {force} {worktree} && git branch -D {branch}"
+session_cleanup_command: "{ [ -z {worktree} ] || git worktree remove {force} {worktree}; } && git branch -D {branch}"
 pr_review_command: "PR #{n} got a review or comment. Read it, fix what it asks, run the tests and push. Never merge the PR, mark it ready or request reviewers."
 pr_checks_command: "PR #{n} has failing checks. Find the cause, fix it, run the tests and push. Never merge the PR, mark it ready or request reviewers."
 pr_conflict_command: "PR #{n} conflicts with its base branch. Bring the base branch's changes into the PR's branch as this repository does it, resolve the conflicts, run the tests and push. Never merge the PR, mark it ready or request reviewers."
