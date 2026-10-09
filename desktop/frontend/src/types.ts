@@ -146,6 +146,27 @@ export type Stats = {
   recent: Wait[]
 }
 
+export type LedgerRow = {
+  project: string
+  prompts: number
+  sessions: number
+  issueSessions: number
+  workMs: number
+  prsMerged: number | null
+  prsClosed: number | null
+  issuesClosed: number | null
+  issuesOpen: number | null
+}
+
+export type Ledger = {
+  days: number
+  since: string
+  totals: LedgerRow
+  projects: LedgerRow[]
+  heat: { day: string; count: number }[]
+  github: string
+}
+
 export type Cleanup = {
   at: number
   sessionTitle: string

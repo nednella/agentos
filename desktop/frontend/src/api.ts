@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Ledger, Note, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -37,6 +37,7 @@ type Backend = {
   TermClose(id: string): Promise<void>
   OpenURL(url: string): Promise<void>
   Stats(days: number): Promise<Stats>
+  Ledger(days: number): Promise<Ledger>
   RefreshPRs(): Promise<void>
   AckPR(id: string): Promise<void>
   TypeInto(id: string, text: string): Promise<void>
@@ -89,7 +90,7 @@ const namespaces = {
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'MoveIssue', 'UndoMove', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
-  stats: ['Stats'],
+  stats: ['Stats', 'Ledger'],
   evidence: ['Evidence', 'DeleteEvidence'],
   browser: ['BrowserOpen', 'BrowserGoto', 'BrowserShow', 'BrowserState', 'BrowserScreenshot', 'BrowserClose'],
   digest: ['Digest', 'RunDigest', 'DigestToNote', 'DismissDigestItem'],
@@ -157,6 +158,7 @@ export const api = {
   termClose: (id: string) => backend.TermClose(id),
   openURL: (url: string) => backend.OpenURL(url),
   stats: (days: number) => backend.Stats(days).then(readIdleKinds),
+  ledger: (days: number) => backend.Ledger(days),
   refreshPRs: () => backend.RefreshPRs(),
   ackPR: (id: string) => backend.AckPR(id),
   typeInto: (id: string, text: string) => backend.TypeInto(id, text),

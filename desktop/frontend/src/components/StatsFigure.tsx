@@ -5,7 +5,7 @@ type StatsFigureProps = { stats: Stats }
 
 type FigureProps = { label: string; value: string; hint: string }
 
-function Figure({ label, value, hint }: FigureProps) {
+export function Figure({ label, value, hint }: FigureProps) {
   return (
     <div className="flex min-w-0 flex-1 basis-36 flex-col gap-0.5 rounded-md border border-line bg-surface px-4 py-3">
       <span className="label">{label}</span>
