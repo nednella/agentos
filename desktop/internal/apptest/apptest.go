@@ -904,6 +904,11 @@ func WithHead(prJSON, oid string) string {
 	return strings.Replace(prJSON, `"isDraft"`, fmt.Sprintf(`"headRefOid":%q,"isDraft"`, oid), 1)
 }
 
+// WithMergeable adds whether the PR merges into its base, as GitHub says it, to what PRJSON printed.
+func WithMergeable(prJSON, mergeable string) string {
+	return strings.Replace(prJSON, `"isDraft"`, fmt.Sprintf(`"mergeable":%q,"isDraft"`, mergeable), 1)
+}
+
 // Ask sends a command to the app's control socket, as the agentos command does.
 func (h *Harness) Ask(t *testing.T, req ctl.Request) ctl.Response {
 	t.Helper()

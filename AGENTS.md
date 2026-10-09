@@ -77,7 +77,8 @@ fetches every tracked PR every 5 minutes. Between those, each project with a ses
 watcher: `gh webhook forward` by default, falling back to polling the PR list every `pr_poll_interval` with
 `If-None-Match`. A session's Stop hook also looks its branch's PR up at once, so a PR opened during a turn
 shows when the turn ends. A new comment or review types `pr_review_command` into the session; failing checks
-on a new commit type `pr_checks_command`. A session waiting on the owner gets the command once it stops
+on a new commit type `pr_checks_command`; a new commit that conflicts with the base types
+`pr_conflict_command`, found at the 5-minute fetch, since a base that moves does not touch the PR. A session waiting on the owner gets the command once it stops
 waiting. An ended issue session gets a new session for its issue that resumes the old conversation
 (`claude --resume`); an ended session with no issue gets nothing.
 
