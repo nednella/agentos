@@ -80,7 +80,7 @@ function SidebarPanel({ panel, nav, overlay, full, widthRem }: SidebarPanelProps
         {!full && (
           <button
             className="btn btn-ghost my-1 mr-1 ml-[0.3125rem] h-8 w-8 flex-none justify-center px-0"
-            title={overlay ? 'Close (Esc)' : 'Collapse queue and notes (⌘B)'}
+            title={overlay ? 'Close (Esc)' : 'Collapse queue and notes (⌘⇧A)'}
             aria-label={overlay ? 'Close queue and notes' : 'Collapse queue and notes'}
             onClick={() => setSidebarOpen(false)}
           >
