@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.26.0](https://github.com/nednella/agentos/compare/v0.25.0...v0.26.0) (2026-10-10)
+
+
+### Features
+
+* **stats:** read interruptions from event log ([9565910](https://github.com/nednella/agentos/commit/9565910d013c6a034c0bc0670e41a75cb7f80b9a))
+* **stats:** write event log per machine, re-read changed files ([05b2c20](https://github.com/nednella/agentos/commit/05b2c20e7a5bfd82d2f11d531113a92129abd50a))
+* **ui:** add shortcut to collapse all panels ([bfe1fc4](https://github.com/nednella/agentos/commit/bfe1fc40220ba16c01c83a1c232979a3a53e1d25))
+* **ui:** move stats and news shortcuts to option ([e722b25](https://github.com/nednella/agentos/commit/e722b25b8cc7b0b085b93449be55550191ecf560))
+* **ui:** toggle all panels with cmd+b ([3516562](https://github.com/nednella/agentos/commit/35165628d78e32bc969eab8c4af25cd9de4ddb99))
+* **ui:** toggle each panel with shift on its focus key ([7ab315b](https://github.com/nednella/agentos/commit/7ab315b98cec57658dca50b4835a3ebc968007cf))
+
+
+### Bug Fixes
+
+* **desktop:** replace machine id of wrong shape ([6bb9691](https://github.com/nednella/agentos/commit/6bb9691e43504aef850bec8843b5647b64237887))
+
 ## [0.25.0](https://github.com/nednella/agentos/compare/v0.24.0...v0.25.0) (2026-10-09)
 
 
