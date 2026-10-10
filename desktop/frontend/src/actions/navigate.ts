@@ -38,14 +38,14 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     id: 'toggle-sidebar',
     label: 'Toggle queue and notes panel',
     group: 'Navigate',
-    shortcut: { key: 'b' },
+    shortcut: { key: 'a', shift: true },
     run: layout.toggleSidebar,
   },
   {
     id: 'toggle-sessions',
     label: 'Toggle sessions panel',
     group: 'Navigate',
-    shortcut: { key: 'b', code: 'KeyB', alt: true },
+    shortcut: { key: 'd', shift: true },
     run: layout.toggleSessions,
   },
   {

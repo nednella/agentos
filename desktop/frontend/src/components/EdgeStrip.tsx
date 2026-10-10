@@ -17,7 +17,7 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
     >
       <button
         className="btn btn-ghost h-8 w-8 flex-none justify-center px-0"
-        title={left ? 'Show queue and notes (⌘B)' : 'Show sessions (⌘⌥B)'}
+        title={left ? 'Show queue and notes (⌘⇧A)' : 'Show sessions (⌘⇧D)'}
         aria-label={left ? 'Show queue and notes' : 'Show sessions'}
         onClick={() => (left ? setSidebarOpen(true) : setSessionsOpen(true))}
       >
