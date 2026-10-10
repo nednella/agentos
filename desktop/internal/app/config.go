@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/nednella/agentos/desktop/projects"
+	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
@@ -107,7 +108,7 @@ func Load() (Config, error) {
 func machineID(stateDir string) (string, error) {
 	path := filepath.Join(stateDir, "machine-id")
 	b, err := os.ReadFile(path)
-	if id := strings.TrimSpace(string(b)); err == nil && id != "" {
+	if id := strings.TrimSpace(string(b)); err == nil && stats.ValidMachine(id) {
 		return id, nil
 	}
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {

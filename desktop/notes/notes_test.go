@@ -16,6 +16,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/app"
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/notes"
+	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/internal/activity"
 )
 
@@ -364,6 +365,12 @@ func TestNotesLiveInTheDataDir(t *testing.T) {
 	}
 	if again, _ := app.Load(); cfg.Machine == "" || again.Machine != cfg.Machine {
 		t.Errorf("machine id = %q then %q, want one id that stays", cfg.Machine, again.Machine)
+	}
+	if err := os.WriteFile(filepath.Join(root, "state", "machine-id"), []byte("my mac\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if fixed, _ := app.Load(); !stats.ValidMachine(fixed.Machine) {
+		t.Errorf("machine id = %q after a hand edit, want a new valid one", fixed.Machine)
 	}
 	a := app.New(cfg, app.Host{Emit: func(string, any) {}, Clipboard: func(string) {}}, apptest.NoGH, apptest.NoStream, apptest.NoClaude)
 	if _, err := addNote(a, "kept in the synced folder"); err != nil {
