@@ -122,13 +122,14 @@ func parseName(name string) (day, machine string, zipped, ok bool) {
 	if _, err := time.Parse(time.DateOnly, day); err != nil {
 		return "", "", false, false
 	}
-	if machine != "" && !validMachine(machine) {
+	if machine != "" && !ValidMachine(machine) {
 		return "", "", false, false
 	}
 	return day, machine, zipped, true
 }
 
-func validMachine(id string) bool {
+// ValidMachine says whether id has the shape of a machine id: 8 characters, a-z and 2-7.
+func ValidMachine(id string) bool {
 	return len(id) == 8 && strings.Trim(id, "abcdefghijklmnopqrstuvwxyz234567") == ""
 }
 
