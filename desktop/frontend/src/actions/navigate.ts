@@ -49,11 +49,11 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     run: layout.toggleSessions,
   },
   {
-    id: 'collapse-panels',
-    label: 'Collapse all panels',
+    id: 'toggle-panels',
+    label: 'Toggle all panels',
     group: 'Navigate',
-    shortcut: { key: 'b', shift: true },
-    run: layout.collapsePanels,
+    shortcut: { key: 'b' },
+    run: layout.togglePanels,
   },
   {
     id: 'panel-sidebar',
