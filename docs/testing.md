@@ -8,7 +8,7 @@ Twice a test that used the default tmux socket killed the owner's live sessions.
 S=$(mktemp -d "${TMPDIR:-/tmp}/aos.XXXX")
 export AGENTOS_TMUX_SOCKET=aos-test-$$      # never "agentos", the owner's socket
 export AGENTOS_STATE_DIR=$S                 # never ~/.local/state/agentos
-export AGENTOS_DEV_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and stats)
+export AGENTOS_DEV_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and the event log)
 export AGENTOS_CONFIG=$S/config.yaml        # never ~/.config/agentos/config.yaml
 ```
 
