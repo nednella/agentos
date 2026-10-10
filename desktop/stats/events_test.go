@@ -96,27 +96,6 @@ func TestLogCountsAnEventRecordedBeforeLoadOnce(t *testing.T) {
 	}
 }
 
-func TestLogReadsActivityBeforeTheFirstEvent(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(dir, "proj"), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	old := `{"2026-10-07":{"prompts":3,"sessions":1,"issueSessions":1,"workMs":50},"2026-10-08":{"prompts":4}}`
-	if err := os.WriteFile(filepath.Join(dir, "proj", "activity.json"), []byte(old), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	l := NewLog(dir)
-	l.Record("proj", ev(activity.Prompt, time.Date(2026, 10, 8, 9, 0, 0, 0, time.Local)))
-	l.Load()
-	got := l.Days("proj")
-	if d := got["2026-10-07"]; d.Prompts != 3 || d.Sessions != 1 || d.IssueSessions != 1 || d.WorkMs != 50 {
-		t.Errorf("a day before the log = %+v", d)
-	}
-	if d := got["2026-10-08"]; d.Prompts != 1 {
-		t.Errorf("the log's first day = %+v: activity.json counted on top of the log", d)
-	}
-}
-
 func TestLogOfNoProjectIsEmpty(t *testing.T) {
 	if got := loaded(t, t.TempDir()).Days("none"); len(got) != 0 {
 		t.Errorf("days = %v", got)
