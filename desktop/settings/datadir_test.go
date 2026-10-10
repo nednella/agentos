@@ -77,12 +77,12 @@ func TestSetDataDirCopiesTheData(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{DataDirConfig: true})
 	old := filepath.Join(h.State, "data")
 	files := map[string]string{
-		"main/notes.json":            `[{"id":"n1"}]`,
-		"main/notes-media/a.png":     "png",
-		"main/evidence/tok/shot.png": "shot",
-		"main/stats.jsonl":           "{}\n",
-		"main/digest.json":           "{}",
-		"other/notes.json":           "[]",
+		"main/notes.json":              `[{"id":"n1"}]`,
+		"main/notes-media/a.png":       "png",
+		"main/evidence/tok/shot.png":   "shot",
+		"main/events/2026-10-01.jsonl": "{}\n",
+		"main/digest.json":             "{}",
+		"other/notes.json":             "[]",
 	}
 	for name, data := range files {
 		write(t, filepath.Join(old, name), data, 0o600)
@@ -150,7 +150,7 @@ func TestSetDataDirRejectsTheCurrentFolder(t *testing.T) {
 func TestFailedCopyLeavesTheFolderEmpty(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{DataDirConfig: true})
 	write(t, filepath.Join(h.State, "data", "main", "notes.json"), "[]", 0o600)
-	write(t, filepath.Join(h.State, "data", "main", "stats.jsonl"), "{}\n", 0o000)
+	write(t, filepath.Join(h.State, "data", "main", "events", "2026-10-01.jsonl"), "{}\n", 0o000)
 	to := t.TempDir()
 	write(t, filepath.Join(to, ".DS_Store"), "", 0o600)
 

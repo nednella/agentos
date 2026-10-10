@@ -144,8 +144,8 @@ func gzipFile(path string) error {
 	return os.Remove(path)
 }
 
-// read adds the project's files of the days that match to days.
-func (l *Log) read(days map[string]map[string]*Day, key string, match func(day string) bool) {
+// walk calls each for every event in the project's files of the days that match.
+func (l *Log) walk(key string, match func(day string) bool, each func(activity.Event)) {
 	entries, err := os.ReadDir(l.folder(key))
 	if err != nil {
 		return
@@ -165,10 +165,22 @@ func (l *Log) read(days map[string]map[string]*Day, key string, match func(day s
 		if !match(day) {
 			continue
 		}
-		if err := readFile(path, zipped, func(ev activity.Event) { apply(days, key, ev) }); err != nil {
+		if err := readFile(path, zipped, each); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: reading events: %v\n", err)
 		}
 	}
+}
+
+// read adds the project's files of the days that match to days.
+func (l *Log) read(days map[string]map[string]*Day, key string, match func(day string) bool) {
+	l.walk(key, match, func(e activity.Event) { apply(days, key, e) })
+}
+
+// Since calls each for every event in the project's files from the local day given on.
+func (l *Log) Since(key, from string, each func(activity.Event)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.walk(key, func(day string) bool { return day >= from }, each)
 }
 
 func readFile(path string, zipped bool, each func(activity.Event)) error {
