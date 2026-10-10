@@ -2,20 +2,13 @@
 package stats
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/fs"
-	"os"
-	"path/filepath"
+	"cmp"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/nednella/agentos/internal/activity"
-	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
 )
 
@@ -89,19 +82,16 @@ func firstWords(s string, n int) []string {
 	return w[:min(len(w), n)]
 }
 
-// Waits records when sessions wait on the user: open ones in memory, finished ones in a file per project.
+// Waits records when sessions wait on the user: open ones in memory, finished ones in the event log.
 type Waits struct {
-	dir string
 	log *Log
 
 	mu   sync.Mutex
 	open map[string]Wait // by session id
 }
 
-// New keeps the tally under dir, and records each wait in log too.
-func New(dir string, log *Log) *Waits { return &Waits{dir: dir, log: log, open: map[string]Wait{}} }
-
-func (w *Waits) path(key string) string { return filepath.Join(w.dir, key, "stats.jsonl") }
+// New records each finished wait in log.
+func New(log *Log) *Waits { return &Waits{log: log, open: map[string]Wait{}} }
 
 // Begin opens a wait for the session.
 func (w *Waits) Begin(id string, wait Wait) {
@@ -120,57 +110,23 @@ func (w *Waits) End(id string, at time.Time) bool {
 		return false
 	}
 	wait.WaitedMs = max(at.UnixMilli()-wait.StartedAt, 1)
-	key := session.ProjectKey(id)
-	if err := w.append(key, wait); err != nil {
-		fmt.Fprintf(os.Stderr, "agentos: recording a wait: %v\n", err)
-	}
-	w.log.Record(key, activity.Event{At: at.UnixMilli(), Kind: activity.Wait, Session: id, Issue: wait.Issue, Model: wait.Model, Ms: wait.WaitedMs, Label: wait.Kind})
+	w.log.Record(session.ProjectKey(id), activity.Event{At: at.UnixMilli(), Kind: activity.Wait, Session: id, Issue: wait.Issue, Model: wait.Model, Ms: wait.WaitedMs, Label: wait.Kind, Title: wait.SessionTitle, Cause: wait.Label})
 	return true
-}
-
-// append adds a line to the project's file. The file is replaced whole, so a
-// synced folder never holds half a line.
-func (w *Waits) append(key string, wait Wait) error {
-	line, err := json.Marshal(wait)
-	if err != nil {
-		return fmt.Errorf("encoding wait: %w", err)
-	}
-	old, err := os.ReadFile(w.path(key))
-	if err != nil && !errors.Is(err, fs.ErrNotExist) {
-		return fmt.Errorf("reading stats file: %w", err)
-	}
-	return atomicfile.Write(w.path(key), append(append(old, line...), '\n'), 0o600)
-}
-
-func (w *Waits) read(key string) ([]Wait, error) {
-	f, err := os.Open(w.path(key))
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("reading stats: %w", err)
-	}
-	defer f.Close()
-	var out []Wait
-	sc := bufio.NewScanner(f)
-	sc.Buffer(nil, 1<<20)
-	for sc.Scan() {
-		var wait Wait
-		if json.Unmarshal(sc.Bytes(), &wait) == nil {
-			out = append(out, wait)
-		}
-	}
-	return out, sc.Err()
 }
 
 // Stats sums up a project's waits over the last days days, today included.
 func (w *Waits) Stats(key string, days int, now time.Time) (Stats, error) {
 	days = max(days, 1)
 	st := Stats{Days: days, ByCause: []CauseCount{}, ByDay: []DayCount{}, Recent: []Wait{}}
-	waits, err := w.read(key)
-	if err != nil {
-		return st, err
-	}
+	y, m, d := now.Date()
+	from := time.Date(y, m, d-(days-1), 0, 0, 0, 0, now.Location())
+	var waits []Wait
+	w.log.Since(key, localDay(from), func(e activity.Event) {
+		if e.Kind != activity.Wait {
+			return
+		}
+		waits = append(waits, Wait{SessionTitle: e.Title, Issue: e.Issue, Model: e.Model, Kind: e.Label, Label: cmp.Or(e.Cause, e.Label), StartedAt: e.At - e.Ms, WaitedMs: e.Ms})
+	})
 	w.mu.Lock()
 	for id, wait := range w.open {
 		if session.ProjectKey(id) == key {
@@ -180,8 +136,6 @@ func (w *Waits) Stats(key string, days int, now time.Time) (Stats, error) {
 	}
 	w.mu.Unlock()
 
-	y, m, d := now.Date()
-	from := time.Date(y, m, d-(days-1), 0, 0, 0, 0, now.Location())
 	perDay := map[string]int{}
 	causes := map[[2]string]*CauseCount{}
 	var closed []int64

@@ -60,7 +60,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	if h.Rec.Count("stats") < 4 {
 		t.Errorf("stats events = %d", h.Rec.Count("stats"))
 	}
-	if _, err := os.Stat(filepath.Join(h.State, "data", "main", "stats.jsonl")); err != nil {
-		t.Errorf("stats file: %v", err)
+	if entries, err := os.ReadDir(filepath.Join(h.State, "data", "main", "events")); err != nil || len(entries) == 0 {
+		t.Errorf("events folder: %v, %v", entries, err)
 	}
 }

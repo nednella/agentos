@@ -69,7 +69,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		return context.Background()
 	}
 	events := stats.NewLog(c.DataDir)
-	waits := stats.New(c.DataDir, events)
+	waits := stats.New(events)
 	proofs := evidence.New(c.DataDir, events)
 	browsers := browser.New(c.LocalDir, h.Emit)
 	terms := terminal.New(c.Tmux, h.Emit, h.Clipboard)
