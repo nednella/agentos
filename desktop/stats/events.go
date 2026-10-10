@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -88,7 +87,6 @@ func (l *Log) Load() {
 	l.mu.Lock()
 	for _, key := range l.keys() {
 		l.read(days, key, func(day string) bool { return day >= today })
-		l.addActivity(days, key)
 	}
 	l.days, l.loaded = days, true
 	l.mu.Unlock()
@@ -214,22 +212,21 @@ func readEvents(r io.Reader, each func(activity.Event)) {
 	}
 }
 
-// addActivity adds the days of the project's activity.json that come before its first event.
-func (l *Log) addActivity(days map[string]map[string]*Day, key string) {
-	old, err := readActivity(l.dir, key)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "agentos: %v\n", err)
-		return
-	}
-	first := ""
-	if len(days[key]) > 0 {
-		first = slices.Min(slices.Collect(maps.Keys(days[key])))
-	}
-	for day, d := range old {
-		if first == "" || day < first {
-			dayOf(days, key, day).add(d)
-		}
-	}
+// Day is what one project's agents did on one local day.
+type Day struct {
+	Prompts       int
+	Sessions      int
+	IssueSessions int   // of Sessions, those started from an issue
+	WorkMs        int64 // time sessions spent working
+
+	Ended        int   // sessions that ended
+	SessionMs    int64 // how long the ended sessions ran
+	PRsOpened    int
+	PRsMerged    int
+	PRsClosed    int   // closed without a merge
+	LeadMs       int64 // of the merged PRs, the time from first seen open to merged
+	IssuesFiled  int
+	ClosedIssues []int // the issues whose session's PR merged
 }
 
 func dayOf(days map[string]map[string]*Day, key, day string) *Day {
