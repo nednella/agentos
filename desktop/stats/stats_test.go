@@ -14,7 +14,7 @@ import (
 
 func TestStatsSummary(t *testing.T) {
 	dir := t.TempDir()
-	w := New(NewLog(dir))
+	w := New(NewLog(dir, mine))
 	now := time.Date(2026, 10, 2, 15, 0, 0, 0, time.Local)
 	at := func(daysAgo int) int64 { return now.AddDate(0, 0, -daysAgo).UnixMilli() }
 	for i, wait := range []Wait{
@@ -75,7 +75,7 @@ func TestStatsLabelsAnEventWithoutCauseByItsKind(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 10, 2, 15, 0, 0, 0, time.Local)
 	writeWait(t, dir, "p", Wait{Kind: "idle", StartedAt: now.UnixMilli(), WaitedMs: 5})
-	st, err := New(NewLog(dir)).Stats("p", 1, now)
+	st, err := New(NewLog(dir, mine)).Stats("p", 1, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,13 +108,13 @@ func TestCauseOf(t *testing.T) {
 
 func TestWaitIsRecordedAsAnEvent(t *testing.T) {
 	dir := t.TempDir()
-	log := NewLog(dir)
+	log := NewLog(dir, mine)
 	w := New(log)
 	start := time.Now().Add(-time.Second)
 	w.Begin("p/aaaaaaaa", Wait{SessionTitle: "#3 work", Issue: 3, Model: "opus", Kind: "permission", Label: "Edit", StartedAt: start.UnixMilli()})
 	w.End("p/aaaaaaaa", start.Add(1500*time.Millisecond))
 	w.End("p/aaaaaaaa", time.Now())
-	data, err := os.ReadFile(filepath.Join(dir, "p", "events", time.Now().Format(time.DateOnly)+".jsonl"))
+	data, err := os.ReadFile(filepath.Join(dir, "p", "events", time.Now().Format(time.DateOnly)+"."+mine+".jsonl"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -5,16 +5,20 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/nednella/agentos/desktop/projects"
 	"github.com/nednella/agentos/internal/agent"
+	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
 )
 
@@ -25,6 +29,7 @@ type Config struct {
 	Registry     *projects.Registry
 	Project      project.Project
 	StateDir     string
+	Machine      string // names this machine's event files in a data folder other machines share
 	DataDir      string // notes, evidence and stats: may be a synced folder
 	LocalDir     string // PR tracking and the clean-up log: never synced
 	DataDirFixed bool   // AGENTOS_DEV_DATA_DIR sets the data folder, so the settings cannot change it
@@ -49,6 +54,10 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("loading config: %w", err)
 	}
 	stateDir, err := bus.DefaultDir()
+	if err != nil {
+		return Config{}, err
+	}
+	machine, err := machineID(stateDir)
 	if err != nil {
 		return Config{}, err
 	}
@@ -91,7 +100,24 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
+	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, Machine: machine, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
+}
+
+// machineID is this machine's id, made on first use and kept in the state folder, which is never synced.
+func machineID(stateDir string) (string, error) {
+	path := filepath.Join(stateDir, "machine-id")
+	b, err := os.ReadFile(path)
+	if id := strings.TrimSpace(string(b)); err == nil && id != "" {
+		return id, nil
+	}
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("reading machine id: %w", err)
+	}
+	id := session.NewToken()
+	if err := atomicfile.Write(path, []byte(id+"\n"), 0o600); err != nil {
+		return "", fmt.Errorf("saving machine id: %w", err)
+	}
+	return id, nil
 }
 
 // pickAgent builds the agent adapter. Without the agentos command on PATH the
