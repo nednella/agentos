@@ -49,6 +49,13 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     run: layout.toggleSessions,
   },
   {
+    id: 'collapse-panels',
+    label: 'Collapse all panels',
+    group: 'Navigate',
+    shortcut: { key: 'b', shift: true },
+    run: layout.collapsePanels,
+  },
+  {
     id: 'panel-sidebar',
     label: 'Left panel: queue and notes',
     group: 'Navigate',
