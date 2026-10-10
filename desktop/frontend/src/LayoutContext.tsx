@@ -66,7 +66,7 @@ export type Layout = {
   resetShellHeight(): void
   toggleSidebar(): void
   toggleSessions(): void
-  collapsePanels(): void
+  togglePanels(): void
   setSidebarOpen(open: boolean): void
   setSessionsOpen(open: boolean): void
   showSidebarTab(tab: SidebarTab): void
@@ -281,11 +281,15 @@ export function LayoutProvider({ children }: LayoutProviderProps) {
       resetShellHeight: () => updatePrefs({ shell: null }),
       toggleSidebar: () => setSidebarOpen(!sidebarOpen),
       toggleSessions: () => setSessionsOpen(!sessionsOpen),
-      collapsePanels() {
+      togglePanels() {
         setPeek(null)
-        if (narrow) setMobilePanel('session')
-        else updatePrefs({ sidebarOpen: false, sessionsOpen: false, shellOpen: false })
-        focus('terminal')
+        if (narrow) {
+          setMobilePanel('session')
+          return
+        }
+        const open = !sidebarOpen && !sessionsOpen && !prefs.shellOpen
+        updatePrefs({ sidebarOpen: open, sessionsOpen: open, shellOpen: open })
+        if (!open) focus('terminal')
       },
       setSidebarOpen,
       setSessionsOpen,
