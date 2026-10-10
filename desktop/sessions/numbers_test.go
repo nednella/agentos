@@ -84,7 +84,7 @@ func TestNewSessionSeesNothingOfADismissedOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := evidence.New(filepath.Join(h.State, "data"), stats.NewLog(filepath.Join(h.State, "data")))
+	store := evidence.New(filepath.Join(h.State, "data"), stats.NewLog(filepath.Join(h.State, "data"), "testtest"))
 	if _, err := store.AddText(old.ID, "proof", "", "agent"); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestExpiredEndedRowGoesWithItsEvidenceAndPRs(t *testing.T) {
 	if err := bus.WriteState(h.State, rec); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := evidence.New(filepath.Join(h.State, "data"), stats.NewLog(filepath.Join(h.State, "data"))).AddText(id, "proof", "", "agent"); err != nil {
+	if _, err := evidence.New(filepath.Join(h.State, "data"), stats.NewLog(filepath.Join(h.State, "data"), "testtest")).AddText(id, "proof", "", "agent"); err != nil {
 		t.Fatal(err)
 	}
 	prs := filepath.Join(h.State, "data", "main", "prs.json")

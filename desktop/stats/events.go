@@ -21,28 +21,34 @@ import (
 
 const eventsFolder = "events"
 
-// Log records what the app does as events, a file per project and local day, and keeps a rollup per
-// day in memory so the ledger never reads the files.
+// Log records what the app does as events, a file per project, machine and local day. A file has one
+// writer, so a data folder two Macs share through iCloud never has both appending to one file.
 //
-// Lines are appended in place, not by a temp file and rename: the data folder can be in iCloud, which
-// uploads a changed file whole. A crash can leave a broken last line, which the reader skips.
+// Lines are appended in place, not by a temp file and rename: iCloud uploads a changed file whole.
+// A crash can leave a broken last line, which the reader skips.
 type Log struct {
-	dir   string
-	ready chan struct{} // closed when Load has built the rollup
+	dir     string
+	machine string
 
-	mu     sync.Mutex
-	loaded bool
-	days   map[string]map[string]*Day // by project key, then local day
+	mu    sync.Mutex
+	cache map[string]map[string]fileDays // by project key, then file path
 }
 
-// NewLog keeps the events under dir. Nothing is read until Load.
-func NewLog(dir string) *Log {
-	return &Log{dir: dir, ready: make(chan struct{}), days: map[string]map[string]*Day{}}
+// fileDays is what one event file added up to when it had this size and mod time.
+type fileDays struct {
+	size int64
+	mod  time.Time
+	days map[string]*Day // by local day
+}
+
+// NewLog keeps the events under dir, in the files of the machine given. Nothing is read until Load or Days.
+func NewLog(dir, machine string) *Log {
+	return &Log{dir: dir, machine: machine, cache: map[string]map[string]fileDays{}}
 }
 
 func (l *Log) folder(key string) string { return filepath.Join(l.dir, key, eventsFolder) }
 
-// Record appends the event to the project's file of today and adds it to the rollup.
+// Record appends the event to the project's file of today.
 func (l *Log) Record(key string, e activity.Event) {
 	line, err := json.Marshal(e)
 	if err != nil {
@@ -51,12 +57,9 @@ func (l *Log) Record(key string, e activity.Event) {
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if err := appendLine(filepath.Join(l.folder(key), localDay(time.Now())+".jsonl"), line); err != nil {
+	name := localDay(time.Now()) + "." + l.machine + ".jsonl"
+	if err := appendLine(filepath.Join(l.folder(key), name), line); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: recording an event: %v\n", err)
-		return
-	}
-	if l.loaded {
-		apply(l.days, key, e)
 	}
 }
 
@@ -72,25 +75,15 @@ func appendLine(path string, line []byte) error {
 	return errors.Join(err, f.Close())
 }
 
-// Load gzips the files of the days before yesterday, then builds the rollup from every project's files.
-// The days before today are read first, without the lock, since nothing writes to them; then today's,
-// under the lock, so an event recorded meanwhile is counted once.
+// Load gzips this machine's files of the days before yesterday, then reads every project's files.
 func (l *Log) Load() {
-	now := time.Now()
-	today := localDay(now)
-	yesterday := localDay(now.AddDate(0, 0, -1))
-	days := map[string]map[string]*Day{}
+	yesterday := localDay(time.Now().AddDate(0, 0, -1))
+	l.mu.Lock()
+	defer l.mu.Unlock()
 	for _, key := range l.keys() {
 		l.compress(key, yesterday)
-		l.read(days, key, func(day string) bool { return day < today })
+		l.refresh(key)
 	}
-	l.mu.Lock()
-	for _, key := range l.keys() {
-		l.read(days, key, func(day string) bool { return day >= today })
-	}
-	l.days, l.loaded = days, true
-	l.mu.Unlock()
-	close(l.ready)
 }
 
 // keys are the projects that have a folder in dir.
@@ -108,17 +101,74 @@ func (l *Log) keys() []string {
 	return out
 }
 
-// compress gzips the project's files of the days before the day given, about ten times smaller.
-func (l *Log) compress(key, before string) {
+// eventFile is an event file of a project.
+type eventFile struct {
+	path    string
+	day     string
+	machine string // "" for a file from before each machine had its own
+	zipped  bool
+	info    os.FileInfo
+}
+
+// parseName reads "<day>.jsonl", "<day>.<machine>.jsonl" and either with ".gz". Any other name, such
+// as an iCloud conflict copy "<day> 2.jsonl", is not an event file.
+func parseName(name string) (day, machine string, zipped, ok bool) {
+	rest, zipped := strings.CutSuffix(name, ".gz")
+	rest, ok = strings.CutSuffix(rest, ".jsonl")
+	if !ok {
+		return "", "", false, false
+	}
+	day, machine, _ = strings.Cut(rest, ".")
+	if _, err := time.Parse(time.DateOnly, day); err != nil {
+		return "", "", false, false
+	}
+	if machine != "" && !validMachine(machine) {
+		return "", "", false, false
+	}
+	return day, machine, zipped, true
+}
+
+func validMachine(id string) bool {
+	return len(id) == 8 && strings.Trim(id, "abcdefghijklmnopqrstuvwxyz234567") == ""
+}
+
+// files lists the project's event files of the days that match.
+func (l *Log) files(key string, match func(day string) bool) []eventFile {
 	entries, err := os.ReadDir(l.folder(key))
 	if err != nil {
+		return nil
+	}
+	var out []eventFile
+	for _, e := range entries {
+		day, machine, zipped, ok := parseName(e.Name())
+		if !ok || !match(day) {
+			continue
+		}
+		path := filepath.Join(l.folder(key), e.Name())
+		if _, err := os.Stat(path + ".gz"); !zipped && err == nil {
+			continue // a gzip that stopped before it removed the plain file
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		out = append(out, eventFile{path: path, day: day, machine: machine, zipped: zipped, info: info})
+	}
+	return out
+}
+
+// compress gzips this machine's files of the days before the day given, about ten times smaller.
+// Another machine's files are left to it: two gzips of one file would conflict.
+func (l *Log) compress(key, before string) {
+	if l.machine == "" {
 		return
 	}
-	for _, e := range entries {
-		if day, ok := strings.CutSuffix(e.Name(), ".jsonl"); ok && day < before {
-			if err := gzipFile(filepath.Join(l.folder(key), e.Name())); err != nil {
-				fmt.Fprintf(os.Stderr, "agentos: compressing events: %v\n", err)
-			}
+	for _, f := range l.files(key, func(day string) bool { return day < before }) {
+		if f.machine != l.machine || f.zipped {
+			continue
+		}
+		if err := gzipFile(f.path); err != nil {
+			fmt.Fprintf(os.Stderr, "agentos: compressing events: %v\n", err)
 		}
 	}
 }
@@ -142,43 +192,35 @@ func gzipFile(path string) error {
 	return os.Remove(path)
 }
 
-// walk calls each for every event in the project's files of the days that match.
-func (l *Log) walk(key string, match func(day string) bool, each func(activity.Event)) {
-	entries, err := os.ReadDir(l.folder(key))
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		path := filepath.Join(l.folder(key), e.Name())
-		day, zipped := strings.CutSuffix(e.Name(), ".jsonl.gz")
-		if !zipped {
-			var ok bool
-			if day, ok = strings.CutSuffix(e.Name(), ".jsonl"); !ok {
-				continue
-			}
-			if _, err := os.Stat(path + ".gz"); err == nil {
-				continue // a gzip that stopped before it removed the plain file
-			}
-		}
-		if !match(day) {
-			continue
-		}
-		if err := readFile(path, zipped, each); err != nil {
+// Since calls each for every event in the project's files from the local day given on.
+func (l *Log) Since(key, from string, each func(activity.Event)) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, f := range l.files(key, func(day string) bool { return day >= from }) {
+		if err := readFile(f.path, f.zipped, each); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: reading events: %v\n", err)
 		}
 	}
 }
 
-// read adds the project's files of the days that match to days.
-func (l *Log) read(days map[string]map[string]*Day, key string, match func(day string) bool) {
-	l.walk(key, match, func(e activity.Event) { apply(days, key, e) })
-}
-
-// Since calls each for every event in the project's files from the local day given on.
-func (l *Log) Since(key, from string, each func(activity.Event)) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.walk(key, func(day string) bool { return day >= from }, each)
+// refresh reads the project's files that are new or changed since the last time, and forgets the
+// ones that are gone, such as a plain file its gzip replaced. The caller holds l.mu.
+func (l *Log) refresh(key string) {
+	old := l.cache[key]
+	cur := map[string]fileDays{}
+	for _, f := range l.files(key, func(string) bool { return true }) {
+		if c, ok := old[f.path]; ok && c.size == f.info.Size() && c.mod.Equal(f.info.ModTime()) {
+			cur[f.path] = c
+			continue
+		}
+		days := map[string]*Day{}
+		if err := readFile(f.path, f.zipped, func(e activity.Event) { apply(days, e) }); err != nil {
+			fmt.Fprintf(os.Stderr, "agentos: reading events: %v\n", err)
+			continue
+		}
+		cur[f.path] = fileDays{size: f.info.Size(), mod: f.info.ModTime(), days: days}
+	}
+	l.cache[key] = cur
 }
 
 func readFile(path string, zipped bool, each func(activity.Event)) error {
@@ -229,19 +271,6 @@ type Day struct {
 	ClosedIssues []int // the issues whose session's PR merged
 }
 
-func dayOf(days map[string]map[string]*Day, key, day string) *Day {
-	if days[key] == nil {
-		days[key] = map[string]*Day{}
-	}
-	d := days[key][day]
-	if d == nil {
-		d = &Day{}
-		days[key][day] = d
-	}
-	return d
-}
-
-// add adds o to d, all but the closed issues.
 func (d *Day) add(o Day) {
 	d.Prompts += o.Prompts
 	d.Sessions += o.Sessions
@@ -257,8 +286,13 @@ func (d *Day) add(o Day) {
 }
 
 // apply adds the event to its day. Kinds the rollup does not count are skipped.
-func apply(days map[string]map[string]*Day, key string, e activity.Event) {
-	d := dayOf(days, key, localDay(time.UnixMilli(e.At)))
+func apply(days map[string]*Day, e activity.Event) {
+	day := localDay(time.UnixMilli(e.At))
+	d := days[day]
+	if d == nil {
+		d = &Day{}
+		days[day] = d
+	}
 	switch e.Kind {
 	case activity.Prompt:
 		d.Prompts++
@@ -289,16 +323,23 @@ func apply(days map[string]map[string]*Day, key string, e activity.Event) {
 
 func localDay(t time.Time) string { return t.In(time.Local).Format(time.DateOnly) }
 
-// Days is the project's rollup by local day. It waits for Load.
+// Days is the project's rollup by local day, from the files as they are now.
 func (l *Log) Days(key string) map[string]Day {
-	<-l.ready
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	out := make(map[string]Day, len(l.days[key]))
-	for day, d := range l.days[key] {
-		c := *d
-		c.ClosedIssues = slices.Clone(d.ClosedIssues)
-		out[day] = c
+	l.refresh(key)
+	out := map[string]Day{}
+	for _, f := range l.cache[key] {
+		for day, d := range f.days {
+			sum := out[day]
+			sum.add(*d)
+			for _, n := range d.ClosedIssues {
+				if !slices.Contains(sum.ClosedIssues, n) {
+					sum.ClosedIssues = append(sum.ClosedIssues, n)
+				}
+			}
+			out[day] = sum
+		}
 	}
 	return out
 }
