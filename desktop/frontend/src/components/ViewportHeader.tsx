@@ -84,12 +84,11 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
       <div className="short:hidden flex items-center gap-3 px-4 pt-2.5 pb-0.5">
         <StateBadge state={session.state} chat={session.chat} />
         {session.chat && <ChatTag />}
-        <ModelTag model={session.model} effort={session.effort} />
-        {session.tokens > 0 && (
-          <span className="mono flex-none text-small whitespace-nowrap text-dim" title="Tokens so far and their cost, estimated at API list prices">
-            {tokenCount(session.tokens)} tokens · ~{dollars(session.cost)}
-          </span>
-        )}
+        <ModelTag
+          model={session.model}
+          effort={session.effort}
+          spend={session.tokens > 0 ? `${tokenCount(session.tokens)} tokens · ~${dollars(session.cost)}` : ''}
+        />
       </div>
       {!session.chat && <Timeline session={session} size="full" />}
       {kill.armed && (
