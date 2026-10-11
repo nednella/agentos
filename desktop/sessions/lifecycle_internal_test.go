@@ -61,7 +61,8 @@ func TestParseWorktrees(t *testing.T) {
 
 type noActivity struct{}
 
-func (noActivity) Record(string, activity.Event) {}
+func (noActivity) Record(string, activity.Event)              {}
+func (noActivity) Since(string, string, func(activity.Event)) {}
 
 func TestPollResultForAForgottenSessionIsDropped(t *testing.T) {
 	l := newLifecycle(nil, nil, t.TempDir(), t.TempDir(), nil, noActivity{}, func(string, any) {})

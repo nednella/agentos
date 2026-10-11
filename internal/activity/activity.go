@@ -1,6 +1,8 @@
 // Package activity is what the app records of what it does, one event at a time.
 package activity
 
+import "github.com/nednella/agentos/internal/usage"
+
 // The kinds of event.
 const (
 	Prompt       = "prompt"
@@ -17,7 +19,11 @@ const (
 	IssueFiled   = "issue_filed"
 	Cleanup      = "cleanup" // label done or blocked
 	Evidence     = "evidence"
+	Usage        = "usage" // the tokens one model used since the last count; label "subagent" for a session's subagents
 )
+
+// Subagent is the label of usage by a session's subagents.
+const Subagent = "subagent"
 
 // Resumed is the label of a session that continues an earlier session's conversation.
 const Resumed = "resumed"
@@ -33,6 +39,8 @@ type Event struct {
 	Effort  string `json:"effort,omitempty"`
 	Ms      int64  `json:"ms,omitempty"`
 	Label   string `json:"label,omitempty"`
-	Title   string `json:"title,omitempty"` // the session title, on a wait
+	Title   string `json:"title,omitempty"` // the session title, on a wait and on usage
 	Cause   string `json:"cause,omitempty"` // why a session waited, in the words the Stats view groups by
+
+	usage.Tokens // on usage; At is the time of the latest message counted
 }
