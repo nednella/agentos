@@ -93,7 +93,7 @@ export function Stats() {
           </div>
         </div>
       </header>
-      <div data-scroll className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+      <div data-scroll className="min-h-0 flex-1 overflow-y-auto p-4 @[39rem]:px-6">
         {work ? <LedgerView days={workDays} project={project} /> : <StatsInterruptions days={days} project={project} />}
       </div>
     </section>
