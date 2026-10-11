@@ -33,8 +33,8 @@ export function CleanupsMenu() {
       <button
         className="btn btn-ghost h-7 gap-1 px-2"
         aria-expanded={open}
-        title="Cleaned up sessions"
-        aria-label={`Cleaned up sessions, ${cleanups.length}`}
+        title="Cleaned up tasks"
+        aria-label={`Cleaned up tasks, ${cleanups.length}`}
         onClick={(e) => {
           const rect = e.currentTarget.getBoundingClientRect()
           setAnchor({ top: rect.bottom + 4, right: window.innerWidth - rect.right })
@@ -49,7 +49,7 @@ export function CleanupsMenu() {
           className="fade-in fixed max-h-96 w-[min(24rem,92vw)] overflow-y-auto rounded-md border border-line-strong bg-raised shadow-2xl"
           style={{ zIndex: 'var(--z-popup)', top: anchor.top, right: Math.max(anchor.right, 8) }}
           role="dialog"
-          aria-label="Cleaned up sessions"
+          aria-label="Cleaned up tasks"
         >
           <div className="label border-b border-line px-4 py-2">Cleaned up</div>
           {cleanups.length === 0 && <p className="px-4 py-4 text-small text-dim">Nothing cleaned up yet.</p>}
