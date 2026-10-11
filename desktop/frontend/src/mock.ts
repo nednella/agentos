@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, Wait, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, UsageRow, Wait, WaitKind, WorkRow } from './types'
 
 type Handler = (payload: never) => void
 
@@ -220,6 +220,8 @@ export function createMock(params: URLSearchParams) {
       browser: s.browser,
       evidence: s.evidence,
       chat: s.chat,
+      tokens: s.tokens,
+      cost: s.cost,
     }
   }
 
@@ -339,6 +341,12 @@ export function createMock(params: URLSearchParams) {
     }
   }
 
+  function usageFor(chat: boolean, createdAt: number) {
+    if (chat) return { tokens: 0, cost: 0 }
+    const tokens = 180_000 + (Math.floor(createdAt / 1000) % 7) * 410_000
+    return { tokens, cost: tokens * 0.0000021 }
+  }
+
   function create(
     title: string,
     issue: number,
@@ -368,6 +376,7 @@ export function createMock(params: URLSearchParams) {
       browser: false,
       evidence: 0,
       chat,
+      ...usageFor(chat, createdAt),
       project: owner.name,
       buffer: term.banner(owner.dir) + term.diffBlock('app-frontend/src/js/pages/[slug]/Index.tsx') + term.paragraphs[0] + '\r\n\r\n',
       opened: false,
@@ -571,6 +580,8 @@ export function createMock(params: URLSearchParams) {
       issuesClosed: Math.round(prompts * scale * 0.035),
       avgSessionMs: prompts > 100 ? 52 * 60_000 : 0,
       avgLeadMs: prompts > 100 ? 5 * 3_600_000 : 0,
+      tokens: Math.round(prompts * scale * 61_000),
+      cost: prompts * scale * 0.083,
     })
     const projects = [
       row('agentos', 3104),
@@ -591,8 +602,39 @@ export function createMock(params: URLSearchParams) {
       issuesClosed: projects.reduce((a, r) => a + r.issuesClosed, 0),
       avgSessionMs: 52 * 60_000,
       avgLeadMs: 5 * 3_600_000,
+      tokens: projects.reduce((a, r) => a + r.tokens, 0),
+      cost: projects.reduce((a, r) => a + r.cost, 0),
     }
-    return { days, since: dayKey(120), totals, projects, heat }
+    const usageRow = (model: string, effort: string, share: number, sessions: number): UsageRow => {
+      const tokens = Math.round(totals.tokens * share)
+      return {
+        model,
+        effort,
+        sessions,
+        tokens,
+        input: Math.round(tokens * 0.002),
+        output: Math.round(tokens * 0.018),
+        cacheRead: Math.round(tokens * 0.9),
+        cacheWrite: Math.round(tokens * 0.08),
+        thinking: Math.round(tokens * 0.006),
+        cost: totals.cost * share,
+      }
+    }
+    const byModel = [
+      usageRow('claude-opus-5-5', 'high', 0.62, Math.round(totals.sessions * 0.6)),
+      usageRow('claude-opus-5-5', '', 0.21, Math.round(totals.sessions * 0.3)),
+      usageRow('claude-sonnet-5-5', 'medium', 0.12, Math.round(totals.sessions * 0.1)),
+      usageRow('claude-haiku-5-5', '', 0.05, Math.round(totals.sessions * 0.4)),
+    ]
+    const hoursAgo = (h: number) => Date.now() - h * 3_600_000
+    const work: WorkRow[] = [
+      { project: 'agentos', issue: 320, session: '', title: '#320 Token usage and estimated cost per issue', sessions: 2, tokens: 18_400_000, cost: 9.12, lastAt: hoursAgo(0.2) },
+      { project: 'agentos', issue: 316, session: '', title: '#316 Switch task and chat shortcuts', sessions: 1, tokens: 2_100_000, cost: 1.04, lastAt: hoursAgo(3) },
+      { project: 'upscope-web', issue: 0, session: 'upscope-web/k3j2h4g5', title: 'Look into the flaky login test', sessions: 1, tokens: 6_700_000, cost: 3.31, lastAt: hoursAgo(26) },
+      { project: 'agentos', issue: 309, session: '', title: '#309 Empty states for session groups', sessions: 3, tokens: 31_900_000, cost: 15.6, lastAt: hoursAgo(50) },
+    ]
+    const usage = { totals: usageRow('', '', 1, totals.sessions), byModel, pricesAsOf: '2026-10-06' }
+    return { days, since: dayKey(120), totals, projects, heat, usage, work }
   }
 
   function finishCleanup(s: MockSession) {
