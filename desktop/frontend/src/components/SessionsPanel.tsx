@@ -6,6 +6,7 @@ import { useLayout } from '../LayoutContext'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { useToggleAnimation } from '../useToggleAnimation'
+import { SessionGroupEmpty } from './SessionGroupEmpty'
 import { SessionGroupHeader } from './SessionGroupHeader'
 import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
@@ -86,12 +87,12 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         {chats.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {chats.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No chats yet</p>}
+        {chats.length === 0 && <SessionGroupEmpty icon="chat" title="No chats yet" hint="Ask about the project without changing it." />}
         <SessionGroupHeader label="Tasks" count={work.length} />
         {work.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {work.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No tasks yet</p>}
+        {work.length === 0 && <SessionGroupEmpty icon="branch" title="No tasks yet" hint="Work on an issue or an idea, in its own branch." />}
       </div>
       <NewSessionRow cursor={nav.cursorKey === NEW_SESSION_KEY} compact={compact} />
     </aside>
