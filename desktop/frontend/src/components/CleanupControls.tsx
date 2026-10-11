@@ -23,7 +23,7 @@ export function CleanupControls({ session }: CleanupControlsProps) {
   if (cleanup === 'ask' && kept) return null
 
   if (remove.armed) {
-    const what = `${worktree ? `the worktree ${tail(worktree)}, ` : ''}${branch ? `the branch ${branch}, ` : ''}temp files and the session`
+    const what = `${worktree ? `the worktree ${tail(worktree)}, ` : ''}${branch ? `the branch ${branch}, ` : ''}temp files and the task`
     return (
       <ConfirmRow
         danger

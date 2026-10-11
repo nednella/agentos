@@ -24,6 +24,9 @@ export function EmptyState() {
             </>
           )}
         </span>
+        <span className="flex items-center gap-1.5 text-small text-dim">
+          <Keycap>⌘M</Keycap> starts a read-only chat
+        </span>
       </div>
     </div>
   )
