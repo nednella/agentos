@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.28.0](https://github.com/nednella/agentos/compare/v0.27.2...v0.28.0) (2026-10-11)
+
+
+### Features
+
+* **desktop:** record token usage of each turn ([8ce67ad](https://github.com/nednella/agentos/commit/8ce67ad683b51ef37038f8505f3fa3069cd58343))
+* **desktop:** sum token usage in ledger ([9ad7317](https://github.com/nednella/agentos/commit/9ad7317f1b1dcb14b28427a3c0a1c2e876eef319))
+* **internal:** keep transcript path from hook events ([f655973](https://github.com/nednella/agentos/commit/f6559734980e566d243e68d1cad2c8875a31b9a8))
+* **internal:** read token usage and cost from Claude transcripts ([7e260e5](https://github.com/nednella/agentos/commit/7e260e549c500d281b64147320a977796aa312da))
+* **ui:** draw loader as app icon prompt typing ([9eb1d90](https://github.com/nednella/agentos/commit/9eb1d90c7e99c9c69a5db0f3f7ce41efecc5b2c3))
+* **ui:** draw loader at 22px ([f7d3858](https://github.com/nednella/agentos/commit/f7d38589205b4f81ef5bfce2e5dce9eff91900ed))
+* **ui:** hold loader for a second on first load ([9291aa8](https://github.com/nednella/agentos/commit/9291aa8ece824329f072dbec11ace6d2f639308a))
+* **ui:** show centred spinner while views load ([d2a8256](https://github.com/nednella/agentos/commit/d2a825652be2bfe494d024274d8a654c0a1a6b40)), closes [#325](https://github.com/nednella/agentos/issues/325)
+* **ui:** show splash with icon's prompt when app opens ([3cc31c0](https://github.com/nednella/agentos/commit/3cc31c0f402d23ff62e46f4a11832e829cadefc4)), closes [#329](https://github.com/nednella/agentos/issues/329)
+* **ui:** show tokens and cost in session header ([73fdc64](https://github.com/nednella/agentos/commit/73fdc64303d2a3873823facc72ebfadaadc57c79))
+* **ui:** show tokens and estimated cost ([88b697b](https://github.com/nednella/agentos/commit/88b697bdab5b25f90c42a7c365206e0fc61eaff7)), closes [#320](https://github.com/nednella/agentos/issues/320)
+
+
+### Bug Fixes
+
+* **browser:** start Brave with a mock keychain ([e7fad58](https://github.com/nednella/agentos/commit/e7fad5815566d48c8b5590ee15fd2aad2d31aa80))
+* **desktop:** leave branch another session works on to that session ([0ea05ad](https://github.com/nednella/agentos/commit/0ea05ada7bd7933d762731a494eab91290b239a6)), closes [#330](https://github.com/nednella/agentos/issues/330)
+* **scripts:** stop Brave on every exit of cdp.mjs ([e66c557](https://github.com/nednella/agentos/commit/e66c557c01d32230ac4cf143e4e62377dbf52a51))
+* **ui:** separate effort from spend on session row and header ([7f536ba](https://github.com/nednella/agentos/commit/7f536ba8f5dd89076bb341c4d553ce5ed196ee8b))
+* **ui:** show model, effort and cost on session row ([5ce61e8](https://github.com/nednella/agentos/commit/5ce61e8098a2e896c927912f63798f6706a5e7e4))
+* **ui:** show Thinking for busy chat ([99ece80](https://github.com/nednella/agentos/commit/99ece80e3590c458934ebcbbe01728b425e5757a)), closes [#319](https://github.com/nednella/agentos/issues/319)
+
 ## [0.27.2](https://github.com/nednella/agentos/compare/v0.27.1...v0.27.2) (2026-10-11)
 
 
