@@ -1,22 +1,19 @@
 import { useState } from 'react'
 import { dollars, tokenCount } from '../spend'
-import { ago, useNow } from '../time'
 import type { WorkRow } from '../types'
 
 type LedgerWorkProps = { work: WorkRow[]; limit?: number }
 
-type SortKey = 'lastAt' | 'sessions' | 'tokens' | 'cost'
+type SortKey = 'sessions' | 'tokens' | 'cost'
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'sessions', label: 'Tasks' },
   { key: 'tokens', label: 'Tokens' },
   { key: 'cost', label: 'Est. cost' },
-  { key: 'lastAt', label: 'Last' },
 ]
 
 export function LedgerWork({ work, limit }: LedgerWorkProps) {
-  const now = useNow()
-  const [sortKey, setSortKey] = useState<SortKey>('lastAt')
+  const [sortKey, setSortKey] = useState<SortKey>('cost')
   const rows = [...work].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, limit)
   return (
     <table className="w-full text-body">
@@ -53,7 +50,6 @@ export function LedgerWork({ work, limit }: LedgerWorkProps) {
             <td className="mono py-1.5 pl-4 text-right">{w.sessions}</td>
             <td className="mono py-1.5 pl-4 text-right whitespace-nowrap">{tokenCount(w.tokens)}</td>
             <td className="mono py-1.5 pl-4 text-right whitespace-nowrap">~{dollars(w.cost)}</td>
-            <td className="mono py-1.5 pl-4 text-right whitespace-nowrap text-dim">{ago(w.lastAt, now)}</td>
           </tr>
         ))}
       </tbody>
