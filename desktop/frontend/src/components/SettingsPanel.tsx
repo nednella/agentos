@@ -72,7 +72,7 @@ export function SettingsPanel() {
             </button>
           </div>
         </SettingRow>
-        <SettingRow label="Keep Mac awake" hint="Stops the Mac idle-sleeping while an agent works. A project that sets its own in the config file keeps it.">
+        <SettingRow label="Keep Mac awake" hint="Stops the Mac idle-sleeping while a session works. A project that sets its own in the config file keeps it.">
           <SegmentedControl label="Keep Mac awake" options={SWITCH} value={settings.keepAwake ? 'on' : 'off'} onChange={(value) => report(() => setKeepAwake(value === 'on'))} />
         </SettingRow>
         {project && (
