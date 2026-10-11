@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.30.0](https://github.com/nednella/agentos/compare/v0.29.0...v0.30.0) (2026-10-11)
+
+
+### Features
+
+* **cli:** add --prompt to agentos issue ([f4d6a89](https://github.com/nednella/agentos/commit/f4d6a89f67bb12db6fb9e093e349a5af3521438c))
+* **desktop:** count chat usage by model instead of in a Chats row ([42b3b9c](https://github.com/nednella/agentos/commit/42b3b9cf60ffbf9bd8dffda9d7f1dd94221726bb))
+* **desktop:** count chat usage in total cost and its own row ([bcbeaa6](https://github.com/nednella/agentos/commit/bcbeaa622fa29218555738ee791d295759dc6442))
+* **desktop:** give issue session handover from session that asked ([7d229b8](https://github.com/nednella/agentos/commit/7d229b85ba14613061690fc2becba8fc1af0c85f))
+* **desktop:** record usage of chats as chat_usage events ([3d80d55](https://github.com/nednella/agentos/commit/3d80d559be717049979c228b7aec4268c6cd34ee))
+* **internal:** tell tasks to start issue work with agentos issue ([2aba077](https://github.com/nednella/agentos/commit/2aba07764834100ed7dfae6ed3333c6147f2b7cc)), closes [#332](https://github.com/nednella/agentos/issues/332)
+* **ui:** move to line start and end with Cmd+Left and Cmd+Right in the terminal ([70019f0](https://github.com/nednella/agentos/commit/70019f06329cd3869f7fea580d7498d77a7245f9))
+* **ui:** select and clear name before splash fades ([b449981](https://github.com/nednella/agentos/commit/b44998162918fa81ca9186b54ada04e749f4637d))
+* **ui:** show chat cost in spend ([e838740](https://github.com/nednella/agentos/commit/e83874094963ce1192ea132957bf96a0b7ee8aef))
+* **ui:** show chats in spend model rows as sessions ([d29c8aa](https://github.com/nednella/agentos/commit/d29c8aa062c10f1ebee185b19e0b223ab3ab2c6d))
+
+
+### Bug Fixes
+
+* **ui:** drop window button space in full screen ([e7a4723](https://github.com/nednella/agentos/commit/e7a47239cc15257e7cd42c3fa816a49bd2eade9d))
+* **ui:** keep top bar 40px high at every text size ([78dd237](https://github.com/nednella/agentos/commit/78dd23769c8e4ccf22d1474d7cfa11eee7a23b2b))
+
 ## [0.29.0](https://github.com/nednella/agentos/compare/v0.28.0...v0.29.0) (2026-10-11)
 
 
