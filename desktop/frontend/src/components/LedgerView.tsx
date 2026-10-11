@@ -110,9 +110,9 @@ export function LedgerView({ days, project }: LedgerViewProps) {
 
   if (full !== null) {
     return (
-      <div ref={content} className="mx-auto flex max-w-5xl flex-col gap-4">
+      <div ref={content} className="mx-auto flex max-w-5xl flex-col gap-4 pt-2">
         <div className="flex items-center gap-3">
-          <button className="btn btn-ghost h-7 gap-1.5 px-2" onClick={() => back(full)}>
+          <button className="btn btn-ghost -ml-2 h-7 gap-1.5 px-2" onClick={() => back(full)}>
             <Icon name="back" /> Back
           </button>
           <h2 className="text-title font-semibold">{tables[full].title}</h2>
@@ -125,9 +125,9 @@ export function LedgerView({ days, project }: LedgerViewProps) {
 
   return (
     <div className="@container">
-      <div className="mx-auto flex max-w-5xl flex-col gap-6 @xl:grid @xl:grid-cols-[7.5rem_minmax(0,1fr)] @xl:gap-6">
+      <div className="mx-auto flex max-w-5xl flex-col gap-6 @xl:grid @xl:grid-cols-[7.5rem_minmax(0,1fr)] @xl:gap-8 @xl:pt-2">
         <LedgerRail sections={sections} active={active} onPick={pick} />
-        <div ref={content} className="flex min-w-0 flex-col gap-8">
+        <div ref={content} className="flex min-w-0 flex-col gap-8 @xl:gap-10">
           <LedgerSection id="activity" title="Activity" hint={`since ${ledger.since}`}>
             <LedgerFigures
               figures={[
