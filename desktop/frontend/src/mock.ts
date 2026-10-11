@@ -632,7 +632,10 @@ export function createMock(params: URLSearchParams) {
       usageRow('claude-haiku-5-5', '', 0.05, Math.round(totals.sessions * 0.4)),
     ]
     const hoursAgo = (h: number) => Date.now() - h * 3_600_000
+    const titles = ['Retry banner on websocket drop', 'Postcode match ignores case', 'Rename Catalogue to Shop', 'Weekly sales sparkline', 'Dark mode for emails', 'Order export as CSV', 'Faster product search', 'Gift card balance check', 'Stock alerts by email', 'Split the admin bundle']
+    const older: WorkRow[] = titles.map((title, i) => ({ project: 'storefront', issue: 400 + i, session: '', title: `#${400 + i} ${title}`, sessions: 1 + (i % 3), tokens: (i + 1) * 1_300_000, cost: (i + 1) * 0.64, lastAt: hoursAgo(60 + i * 20) }))
     const work: WorkRow[] = [
+      ...older,
       { project: 'agentos', issue: 320, session: '', title: '#320 Token usage and estimated cost per issue', sessions: 2, tokens: 18_400_000, cost: 9.12, lastAt: hoursAgo(0.2) },
       { project: 'agentos', issue: 316, session: '', title: '#316 Switch task and chat shortcuts', sessions: 1, tokens: 2_100_000, cost: 1.04, lastAt: hoursAgo(3) },
       { project: 'storefront', issue: 0, session: 'storefront/k3j2h4g5', title: 'Look into the flaky login test', sessions: 1, tokens: 6_700_000, cost: 3.31, lastAt: hoursAgo(26) },

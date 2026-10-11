@@ -3,7 +3,7 @@ import { dollars, tokenCount } from '../spend'
 import { ago, useNow } from '../time'
 import type { WorkRow } from '../types'
 
-type LedgerWorkProps = { work: WorkRow[] }
+type LedgerWorkProps = { work: WorkRow[]; limit?: number }
 
 type SortKey = 'lastAt' | 'sessions' | 'tokens' | 'cost'
 
@@ -14,10 +14,10 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'lastAt', label: 'Last' },
 ]
 
-export function LedgerWork({ work }: LedgerWorkProps) {
+export function LedgerWork({ work, limit }: LedgerWorkProps) {
   const now = useNow()
   const [sortKey, setSortKey] = useState<SortKey>('lastAt')
-  const rows = [...work].sort((a, b) => b[sortKey] - a[sortKey])
+  const rows = [...work].sort((a, b) => b[sortKey] - a[sortKey]).slice(0, limit)
   return (
     <table className="w-full text-body">
       <thead>

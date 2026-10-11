@@ -1,20 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { api } from '../api'
 import { useAgentos } from '../AgentosContext'
 import { dollars, priceNote, tokenCount } from '../spend'
 import { duration } from '../time'
 import { useMinimumLoading } from '../useMinimumLoading'
 import type { Ledger } from '../types'
+import { Icon } from './Icon'
 import { LedgerFigures } from './LedgerFigures'
 import { LedgerHeatmap } from './LedgerHeatmap'
 import { LedgerRail } from './LedgerRail'
 import { LedgerSection } from './LedgerSection'
+import { LedgerShowAll } from './LedgerShowAll'
 import { LedgerTable } from './LedgerTable'
 import { LedgerUsage } from './LedgerUsage'
 import { LedgerWork } from './LedgerWork'
 import { Loading } from './Loading'
 
 type LedgerViewProps = { days: number; project: string }
+
+type Table = 'projects' | 'spend' | 'work'
 
 const SECTIONS = [
   { id: 'activity', title: 'Activity' },
@@ -23,6 +27,8 @@ const SECTIONS = [
   { id: 'spend', title: 'Spend' },
   { id: 'work', title: 'Work' },
 ]
+
+const ROWS = 10
 
 const average = (ms: number) => (ms ? duration(ms) : '—')
 const hours = (ms: number) => {
@@ -34,6 +40,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
   const { report } = useAgentos()
   const [ledger, setLedger] = useState<Ledger | null>(null)
   const [active, setActive] = useState(SECTIONS[0].id)
+  const [full, setFull] = useState<Table | null>(null)
   const content = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -48,7 +55,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
   }, [days, project, report])
   const loading = useMinimumLoading(ledger === null)
 
-  const loaded = !loading && ledger !== null && ledger.since !== ''
+  const loaded = !loading && ledger !== null && ledger.since !== '' && full === null
   useEffect(() => {
     const scroller = content.current?.closest('[data-scroll]')
     if (!loaded || !scroller) return
@@ -68,6 +75,10 @@ export function LedgerView({ days, project }: LedgerViewProps) {
     return () => scroller.removeEventListener('scroll', spy)
   }, [loaded])
 
+  useEffect(() => {
+    if (full !== null) content.current?.closest('[data-scroll]')?.scrollTo({ top: 0 })
+  }, [full])
+
   if (loading || ledger === null) return <Loading />
   if (ledger.since === '') {
     return (
@@ -84,6 +95,32 @@ export function LedgerView({ days, project }: LedgerViewProps) {
   const sections = project ? SECTIONS.filter((s) => s.id !== 'projects') : SECTIONS
   const pick = (id: string) => {
     document.getElementById(`ledger-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  const back = (table: Table) => {
+    setFull(null)
+    requestAnimationFrame(() => document.getElementById(`ledger-${table}`)?.scrollIntoView({ block: 'start' }))
+  }
+
+  const tables: Record<Table, { title: string; count: number; table(limit?: number): ReactNode }> = {
+    projects: { title: 'Projects', count: ledger.projects.length, table: (limit) => <LedgerTable projects={ledger.projects} limit={limit} /> },
+    spend: { title: 'Spend by model', count: usage.byModel.length, table: (limit) => <LedgerUsage usage={usage} limit={limit} /> },
+    work: { title: 'Work', count: ledger.work.length, table: (limit) => <LedgerWork work={ledger.work} limit={limit} /> },
+  }
+  const showAll = (table: Table) => <LedgerShowAll count={tables[table].count} limit={ROWS} onShow={() => setFull(table)} />
+
+  if (full !== null) {
+    return (
+      <div ref={content} className="mx-auto flex max-w-5xl flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <button className="btn btn-ghost h-7 gap-1.5 px-2" onClick={() => back(full)}>
+            <Icon name="back" /> Back
+          </button>
+          <h2 className="text-title font-semibold">{tables[full].title}</h2>
+          <span className="text-small text-dim">{tables[full].count.toLocaleString()} rows</span>
+        </div>
+        {tables[full].table()}
+      </div>
+    )
   }
 
   return (
@@ -146,7 +183,8 @@ export function LedgerView({ days, project }: LedgerViewProps) {
           </LedgerSection>
           {!project && (
             <LedgerSection id="projects" title="Projects" hint={`${ledger.projects.length.toLocaleString()} with activity`}>
-              <LedgerTable projects={ledger.projects} />
+              {tables.projects.table(ROWS)}
+              {showAll('projects')}
             </LedgerSection>
           )}
           <LedgerSection id="spend" title="Spend" hint="estimated">
@@ -166,10 +204,12 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 },
               ]}
             />
-            {usage.byModel.length > 0 && <LedgerUsage usage={usage} />}
+            {usage.byModel.length > 0 && tables.spend.table(ROWS)}
+            {showAll('spend')}
           </LedgerSection>
           <LedgerSection id="work" title="Work" hint="tokens by issue and task">
-            {ledger.work.length > 0 ? <LedgerWork work={ledger.work} /> : <p className="text-small text-dim">No usage yet.</p>}
+            {ledger.work.length > 0 ? tables.work.table(ROWS) : <p className="text-small text-dim">No usage yet.</p>}
+            {showAll('work')}
           </LedgerSection>
         </div>
       </div>

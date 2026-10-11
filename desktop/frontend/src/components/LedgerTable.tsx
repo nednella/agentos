@@ -1,11 +1,11 @@
 import { dollars, tokenCount } from '../spend'
 import type { LedgerRow } from '../types'
 
-type LedgerTableProps = { projects: LedgerRow[] }
+type LedgerTableProps = { projects: LedgerRow[]; limit?: number }
 
 const HEADS = ['Prompts', 'Tasks', 'PRs merged', 'Issues closed', 'Tokens', 'Cost']
 
-export function LedgerTable({ projects }: LedgerTableProps) {
+export function LedgerTable({ projects, limit }: LedgerTableProps) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-body">
@@ -18,7 +18,7 @@ export function LedgerTable({ projects }: LedgerTableProps) {
           </tr>
         </thead>
         <tbody>
-          {projects.map((p) => (
+          {projects.slice(0, limit).map((p) => (
             <tr key={p.project} className="border-t border-line">
               <td className="py-1.5">{p.project}</td>
               <td className="mono py-1.5 pl-3 text-right whitespace-nowrap">{p.prompts.toLocaleString()}</td>
