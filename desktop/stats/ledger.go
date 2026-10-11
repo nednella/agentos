@@ -1,6 +1,7 @@
 package stats
 
 import (
+	"cmp"
 	"slices"
 	"strings"
 	"time"
@@ -18,22 +19,26 @@ type Ledger struct {
 	Totals   LedgerRow   `json:"totals"`   // every project summed
 	Projects []LedgerRow `json:"projects"` // most prompts first, then by name
 	Heat     []DayCount  `json:"heat"`     // prompts per day, the 364 days ending today, oldest first
+	Usage    Usage       `json:"usage"`
+	Work     []WorkRow   `json:"work"` // latest first
 }
 
 // LedgerRow is one project's figures, or all of them in the totals.
 type LedgerRow struct {
-	Project       string `json:"project"`
-	Prompts       int    `json:"prompts"`
-	Sessions      int    `json:"sessions"`
-	IssueSessions int    `json:"issueSessions"`
-	WorkMs        int64  `json:"workMs"`
-	PRsOpened     int    `json:"prsOpened"`
-	PRsMerged     int    `json:"prsMerged"`
-	PRsClosed     int    `json:"prsClosed"` // closed without a merge
-	IssuesFiled   int    `json:"issuesFiled"`
-	IssuesClosed  int    `json:"issuesClosed"`
-	AvgSessionMs  int64  `json:"avgSessionMs"` // 0 when no session ended
-	AvgLeadMs     int64  `json:"avgLeadMs"`    // from a PR first seen open to merged; 0 when none merged
+	Project       string  `json:"project"`
+	Prompts       int     `json:"prompts"`
+	Sessions      int     `json:"sessions"`
+	IssueSessions int     `json:"issueSessions"`
+	WorkMs        int64   `json:"workMs"`
+	PRsOpened     int     `json:"prsOpened"`
+	PRsMerged     int     `json:"prsMerged"`
+	PRsClosed     int     `json:"prsClosed"` // closed without a merge
+	IssuesFiled   int     `json:"issuesFiled"`
+	IssuesClosed  int     `json:"issuesClosed"`
+	AvgSessionMs  int64   `json:"avgSessionMs"` // 0 when no session ended
+	AvgLeadMs     int64   `json:"avgLeadMs"`    // from a PR first seen open to merged; 0 when none merged
+	Tokens        int64   `json:"tokens"`
+	Cost          float64 `json:"cost"` // US dollars at list prices
 }
 
 // total is days added up, and the issues closed over them.
@@ -46,6 +51,7 @@ func (t total) row(project string) LedgerRow {
 	r := LedgerRow{
 		Project: project, Prompts: t.Prompts, Sessions: t.Sessions, IssueSessions: t.IssueSessions, WorkMs: t.WorkMs,
 		PRsOpened: t.PRsOpened, PRsMerged: t.PRsMerged, PRsClosed: t.PRsClosed, IssuesFiled: t.IssuesFiled, IssuesClosed: t.issuesClosed,
+		Tokens: t.spending.all.Total(), Cost: t.spending.all.Dollars(),
 	}
 	if t.Ended > 0 {
 		r.AvgSessionMs = t.SessionMs / int64(t.Ended)
@@ -79,7 +85,7 @@ func (b *Books) Ledger(days int, now time.Time) (Ledger, error) {
 		from = time.Date(y, m, d-(days-1), 0, 0, 0, 0, now.Location()).Format(time.DateOnly)
 	}
 	projects := b.projects.List()
-	led := Ledger{Days: days, Projects: make([]LedgerRow, len(projects)), Heat: make([]DayCount, heatDays)}
+	led := Ledger{Days: days, Projects: make([]LedgerRow, len(projects)), Heat: make([]DayCount, heatDays), Work: []WorkRow{}}
 	heat := map[string]int{}
 	var totals total
 	for i, p := range projects {
@@ -101,6 +107,7 @@ func (b *Books) Ledger(days int, now time.Time) (Ledger, error) {
 		totals.add(sum.Day)
 		totals.issuesClosed += sum.issuesClosed
 		led.Projects[i] = sum.row(p.Name)
+		led.Work = append(led.Work, sum.spending.work(p.Name)...)
 	}
 	for i := range led.Heat {
 		day := time.Date(y, m, d-(heatDays-1-i), 0, 0, 0, 0, now.Location()).Format(time.DateOnly)
@@ -113,6 +120,10 @@ func (b *Books) Ledger(days int, now time.Time) (Ledger, error) {
 		}
 		return strings.Compare(a.Project, b.Project)
 	})
+	slices.SortFunc(led.Work, func(a, b WorkRow) int {
+		return cmp.Or(cmp.Compare(b.LastAt, a.LastAt), cmp.Compare(a.Project, b.Project), cmp.Compare(a.Issue, b.Issue), cmp.Compare(a.Session, b.Session))
+	})
 	led.Totals = totals.row("")
+	led.Usage = totals.spending.usage()
 	return led, nil
 }

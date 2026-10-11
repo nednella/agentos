@@ -9,6 +9,7 @@ import (
 
 	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/usage"
 )
 
 type fakeProjects []project.Project
@@ -142,5 +143,47 @@ func TestLedgerPullRequestsAndIssues(t *testing.T) {
 	}
 	if tot := led.Totals; tot.PRsMerged != 4 || tot.IssuesClosed != 2 || tot.AvgLeadMs != 2500 || tot.AvgSessionMs != 200 {
 		t.Errorf("totals = %+v: issue 5 of each project counts once per project", tot)
+	}
+}
+
+func TestLedgerUsage(t *testing.T) {
+	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
+	at := func(ago int) int64 { return now.AddDate(0, 0, -ago).UnixMilli() }
+	log := loaded(t, t.TempDir())
+	use := func(key, session string, ago, issue int, model, effort, title string, input, cost int64) {
+		log.Record(key, activity.Event{At: at(ago), Kind: activity.Usage, Session: session, Issue: issue, Model: model, Effort: effort, Title: title,
+			Tokens: usage.Tokens{Input: input, Output: 10, Cost: cost}})
+	}
+	use("alpha", "alpha/aaaaaaaa", 3, 7, "claude-opus-5-5", "high", "#7 first", 100, 2_000_000)
+	use("alpha", "alpha/bbbbbbbb", 1, 7, "claude-opus-5-5", "high", "#7 resumed", 200, 1_000_000)
+	use("alpha", "alpha/bbbbbbbb", 1, 7, "claude-haiku-5-5", "high", "#7 resumed", 50, 10_000)
+	use("alpha", "alpha/cccccccc", 0, 0, "claude-sonnet-5-5", "", "Plain task", 30, 500_000)
+	use("beta", "beta/dddddddd", 0, 7, "claude-opus-5-5", "medium", "#7 beta's own", 1, 1)
+	use("alpha", "alpha/eeeeeeee", 40, 9, "claude-opus-5-5", "high", "#9 old", 1000, 9_000_000)
+
+	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := led.Projects[0]; a.Project != "Alpha" || a.Tokens != 380+40 || a.Cost != 3.51 {
+		t.Errorf("alpha = %+v", a)
+	}
+	tot := led.Usage.Totals
+	if tot.Sessions != 4 || tot.Input != 381 || tot.Output != 50 || tot.Tokens != 431 || tot.Cost != 3.510001 || led.Usage.PricesAsOf == "" {
+		t.Errorf("usage totals = %+v", led.Usage)
+	}
+	var models []string
+	for _, r := range led.Usage.ByModel {
+		models = append(models, fmt.Sprintf("%s/%s:%d:%v", r.Model, r.Effort, r.Sessions, r.Cost))
+	}
+	if want := []string{"claude-opus-5-5/high:2:3", "claude-sonnet-5-5/:1:0.5", "claude-haiku-5-5/high:1:0.01", "claude-opus-5-5/medium:1:1e-06"}; !slices.Equal(models, want) {
+		t.Errorf("by model = %v, want %v", models, want)
+	}
+	var work []string
+	for _, w := range led.Work {
+		work = append(work, fmt.Sprintf("%s#%d%s:%s:%d:%d", w.Project, w.Issue, w.Session, w.Title, w.Sessions, w.Tokens))
+	}
+	if want := []string{"Alpha#0alpha/cccccccc:Plain task:1:40", "Beta#7:#7 beta's own:1:11", "Alpha#7:#7 resumed:2:380"}; !slices.Equal(work, want) {
+		t.Errorf("work = %v, want %v", work, want)
 	}
 }
