@@ -91,7 +91,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
 
   const { totals, usage } = ledger
   const spent = usage.totals
-  const tasks = { sessions: spent.sessions - usage.chats.sessions, tokens: spent.tokens - usage.chats.tokens, cost: spent.cost - usage.chats.cost }
+  const tasks = usage.tasks
   const perTask = tasks.sessions ? tasks.tokens / tasks.sessions : 0
   const sections = project ? SECTIONS.filter((s) => s.id !== 'projects') : SECTIONS
   const pick = (id: string) => {
@@ -205,7 +205,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 },
               ]}
             />
-            {spent.sessions > 0 && tables.spend.table(ROWS.spend)}
+            {usage.byModel.length > 0 && tables.spend.table(ROWS.spend)}
             {showAll('spend')}
           </LedgerSection>
           <LedgerSection id="work" title="Work" hint="tokens by issue and task">
