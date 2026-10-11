@@ -28,7 +28,7 @@ const SECTIONS = [
   { id: 'work', title: 'Work' },
 ]
 
-const ROWS = 10
+const ROWS: Record<Table, number> = { projects: 10, spend: 10, work: 5 }
 
 const average = (ms: number) => (ms ? duration(ms) : '—')
 const hours = (ms: number) => {
@@ -106,7 +106,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
     spend: { title: 'Spend by model', count: usage.byModel.length, table: (limit) => <LedgerUsage usage={usage} limit={limit} /> },
     work: { title: 'Work', count: ledger.work.length, table: (limit) => <LedgerWork work={ledger.work} limit={limit} /> },
   }
-  const showAll = (table: Table) => <LedgerShowAll count={tables[table].count} limit={ROWS} onShow={() => setFull(table)} />
+  const showAll = (table: Table) => <LedgerShowAll count={tables[table].count} limit={ROWS[table]} onShow={() => setFull(table)} />
 
   if (full !== null) {
     return (
@@ -183,7 +183,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
           </LedgerSection>
           {!project && (
             <LedgerSection id="projects" title="Projects" hint={`${ledger.projects.length.toLocaleString()} with activity`}>
-              {tables.projects.table(ROWS)}
+              {tables.projects.table(ROWS.projects)}
               {showAll('projects')}
             </LedgerSection>
           )}
@@ -204,11 +204,11 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 },
               ]}
             />
-            {usage.byModel.length > 0 && tables.spend.table(ROWS)}
+            {usage.byModel.length > 0 && tables.spend.table(ROWS.spend)}
             {showAll('spend')}
           </LedgerSection>
           <LedgerSection id="work" title="Work" hint="tokens by issue and task">
-            {ledger.work.length > 0 ? tables.work.table(ROWS) : <p className="text-small text-dim">No usage yet.</p>}
+            {ledger.work.length > 0 ? tables.work.table(ROWS.work) : <p className="text-small text-dim">No usage yet.</p>}
             {showAll('work')}
           </LedgerSection>
         </div>
