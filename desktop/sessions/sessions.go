@@ -578,7 +578,7 @@ func (s *Sessions) sync() {
 		}
 		if s.loaded {
 			ended := !in.Chat && s.tally.Closed(id, at)
-			opens := !in.Chat && (state == session.Waiting || replied)
+			opens := !in.Chat && state == session.Waiting
 			if opens {
 				issue, _ := strconv.Atoi(in.Issue)
 				s.tally.Opened(id, cmp.Or(in.Title, defaultTitle), issue, in.Model, rec, at)

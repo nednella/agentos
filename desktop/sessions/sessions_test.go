@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -203,16 +202,11 @@ func TestIdleReminders(t *testing.T) {
 
 	h.Hook(t, s.ID, "PostToolUse", `{"tool_name":"Edit"}`)
 	eventually(t, "working again", func() bool { return state() == "working" })
-	h.Hook(t, s.ID, "Stop", `{}`)
-	eventually(t, "a wait for the reply", func() bool { return waits() == 2 })
-	st, _ := h.Stats(7)
-	var kinds []string
-	for _, c := range st.ByCause {
-		kinds = append(kinds, c.Kind+"/"+c.Label)
-	}
-	slices.Sort(kinds)
-	if !slices.Equal(kinds, []string{"idle/Reply landed", "permission/Permission"}) {
-		t.Errorf("causes = %q", kinds)
+	replied = h.Rec.CountAttention("replied")
+	h.Hook(t, s.ID, "Stop", `{"last_assistant_message":"Which branch should I use?"}`)
+	eventually(t, "the reply", func() bool { return h.Rec.CountAttention("replied") > replied })
+	if st, _ := h.Stats(7); st.Total != 1 || st.ByCause[0].Kind != "permission" {
+		t.Errorf("a finished turn counted as an interruption: %+v", st.ByCause)
 	}
 }
 
