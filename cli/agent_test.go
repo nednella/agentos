@@ -104,6 +104,30 @@ func TestNewSendsThePrompt(t *testing.T) {
 	}
 }
 
+func TestIssueSendsThePromptForOneIssue(t *testing.T) {
+	var got control.Request
+	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
+		got = req
+		return control.Response{OK: true, Out: "ok"}
+	})
+	root := newRootCmd()
+	root.SetIn(strings.NewReader("the patch is in /tmp/x\n"))
+	root.SetOut(&bytes.Buffer{})
+	root.SetArgs([]string{"issue", "327", "--prompt", "-"})
+	if err := root.Execute(); err != nil || got.Cmd != "issue" || strings.Join(got.Args, " ") != "327" || got.Opts["prompt"] != "the patch is in /tmp/x" {
+		t.Errorf("request = %+v, %v", got, err)
+	}
+
+	got = control.Request{}
+	root = newRootCmd()
+	root.SetOut(&bytes.Buffer{})
+	root.SetErr(&bytes.Buffer{})
+	root.SetArgs([]string{"issue", "327", "328", "--prompt", "x"})
+	if err := root.Execute(); err == nil || got.Cmd != "" {
+		t.Errorf("a prompt for two issues = %+v, %v", got, err)
+	}
+}
+
 func TestStatsCommandSendsItsFlags(t *testing.T) {
 	var got control.Request
 	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
