@@ -21,6 +21,7 @@ export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | 'settings' | 'patch-notes' | 'changelog' | { issue: number } | null
 export type SidebarTab = 'queue' | 'notes'
 export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
+export type Composing = 'session' | 'chat' | null
 export type PendingImage = { base64: string; mime: string }
 
 export type Agentos = {
@@ -49,7 +50,7 @@ export type Agentos = {
   overlay: Overlay
   sidebarTab: SidebarTab
   noteDraft: string
-  composing: boolean
+  composing: Composing
   focusRequest: { target: FocusTarget; n: number }
   shellIds: string[]
   shellId: string
@@ -66,6 +67,7 @@ export type Agentos = {
   detach(): void
   stepSession(delta: number): void
   newSession(title?: string): Promise<Session>
+  newChat(title?: string): Promise<Session>
   killSession(id: string): Promise<void>
   dismissSession(id: string): Promise<void>
   renameSession(id: string, title: string): Promise<void>
@@ -113,7 +115,7 @@ export type Agentos = {
   setPromptSend(mode: PromptSend): Promise<void>
   setBrowserEnabled(on: boolean): Promise<void>
   setDigestSchedule(schedule: DigestSchedule): Promise<void>
-  setComposing(open: boolean): void
+  setComposing(kind: Composing): void
   setIssueFilter(query: string): void
   focus(target: FocusTarget): void
   report(run: () => unknown): void
@@ -179,7 +181,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [overlay, setOverlay] = useState<Overlay>((devFlags.overlay as Overlay) ?? null)
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>(devFlags.tab === 'notes' ? 'notes' : 'queue')
   const [noteDraft, setNoteDraft] = useState('')
-  const [composing, setComposing] = useState(false)
+  const [composing, setComposing] = useState<Composing>(null)
   const [focusRequest, setFocusRequest] = useState<Agentos['focusRequest']>({ target: 'terminal', n: 0 })
 
   const sessionsRef = useRef(sessions)
@@ -582,6 +584,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async newSession(title = '') {
         return addSession(await api.newSession(title, ''))
+      },
+      async newChat(title = '') {
+        return addSession(await api.newChat(title))
       },
       async killSession(id) {
         await api.killSession(id)

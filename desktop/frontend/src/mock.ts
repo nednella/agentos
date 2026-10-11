@@ -219,6 +219,7 @@ export function createMock(params: URLSearchParams) {
       cleanupReason: s.cleanupReason,
       browser: s.browser,
       evidence: s.evidence,
+      chat: s.chat,
     }
   }
 
@@ -345,6 +346,7 @@ export function createMock(params: URLSearchParams) {
     history: HistoryEntry[] = [],
     createdAt = Date.now(),
     owner = current,
+    chat = false,
   ): MockSession {
     const s: MockSession = {
       id: `${owner.name}/${Math.random().toString(36).slice(2, 10)}`,
@@ -365,6 +367,7 @@ export function createMock(params: URLSearchParams) {
       cleanupReason: '',
       browser: false,
       evidence: 0,
+      chat,
       project: owner.name,
       buffer: term.banner(owner.dir) + term.diffBlock('app-frontend/src/js/pages/[slug]/Index.tsx') + term.paragraphs[0] + '\r\n\r\n',
       opened: false,
@@ -381,10 +384,10 @@ export function createMock(params: URLSearchParams) {
     return s
   }
 
-  function seed(title: string, issue: number, state: State, trail: [State, number][], owner = data[0]) {
+  function seed(title: string, issue: number, state: State, trail: [State, number][], owner = data[0], chat = false) {
     const now = Date.now()
     const history = trail.map(([st, minutesAgo]) => ({ state: st, at: now - minutesAgo * minute }))
-    const s = create(title, issue, state, history, history[0] ? history[0].at - minute : now, owner)
+    const s = create(title, issue, state, history, history[0] ? history[0].at - minute : now, owner, chat)
     s.state = state
   }
 
@@ -407,6 +410,8 @@ export function createMock(params: URLSearchParams) {
     Object.assign(byIssue(430), { pr: pr(447, 'closed', 'failing'), cleanup: 'ask' })
     seed('#12 session memory', 12, 'waiting', [['working', 30], ['waiting', 7]], data[1])
     seed('notes sync spike', 0, 'working', [['working', 11]], data[1])
+    seed('Why does checkout call the cart API twice?', 0, 'waiting', [['working', 6], ['waiting', 2]], data[0], true)
+    seed('Where do we set the cache headers?', 0, 'idle', [['working', 30], ['idle', 24]], data[0], true)
   }
 
   if (flags.warn) {
@@ -770,6 +775,12 @@ export function createMock(params: URLSearchParams) {
     Snapshot: async () => snapshot(),
     Awake: async () => data.some((p) => projectView(p).working > 0),
     NewSession: async (title: string, prefill: string) => startSessionFor(title || `session ${nextN}`, 0, prefill),
+    NewChat: async (title: string) => {
+      const s = create(title || `chat ${nextN}`, 0, 'idle', [], Date.now(), current, true)
+      s.buffer = term.banner(current.dir) + term.promptLine('')
+      publish()
+      return view(s)
+    },
     DismissSession: async (id: string) => {
       const s = find(id)
       if (s.state !== 'ended') throw 'Only an ended session can be dismissed'

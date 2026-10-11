@@ -49,7 +49,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
             <ModelTag model={session.model} effort={session.effort} />
           </span>
         )}
-        {!dense && (
+        {!dense && !session.chat && (
           <span className="w-full pl-[1.625rem]">
             <Timeline session={session} size="mini" />
           </span>

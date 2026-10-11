@@ -8,7 +8,11 @@ import (
 
 // Launch is what a session is started with besides its name. An empty field leaves the choice to the agent.
 // Resume is a conversation to continue, which an agent that cannot resume ignores.
-type Launch struct{ Model, Effort, Resume string }
+// Chat starts the agent read-only, able to run only the commands that hand work off; an agent that cannot ignores it.
+type Launch struct {
+	Model, Effort, Resume string
+	Chat                  bool
+}
 
 // Agent builds the command a session runs.
 type Agent interface {

@@ -6,38 +6,49 @@ import { Keycap } from './Keycap'
 type NewSessionRowProps = { cursor: boolean; compact: boolean }
 
 export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
-  const { composing, setComposing, newSession, report } = useAgentos()
+  const { composing, setComposing, newSession, newChat, report } = useAgentos()
 
   if (composing) {
+    const chat = composing === 'chat'
     return (
       <div className="flex-none border-t border-line p-3">
         <InlineInput
-          placeholder="Title (optional)"
+          key={composing}
+          placeholder={chat ? 'Chat title (optional)' : 'Session title (optional)'}
           blur="cancel"
           action="Start"
           icon={<Icon name="plus" />}
-          onSubmit={(title) => {
-            setComposing(false)
-            report(() => newSession(title.trim()))
+          onSubmit={(text) => {
+            setComposing(null)
+            const title = text.trim()
+            report(() => (chat ? newChat(title) : newSession(title)))
           }}
-          onCancel={() => setComposing(false)}
+          onCancel={() => setComposing(null)}
         />
       </div>
     )
   }
   return (
-    <button
-      className="row h-11 flex-none items-center gap-2 border-t border-line px-4 text-soft"
-      data-cursor={cursor}
-      onClick={() => setComposing(true)}
-    >
-      <Icon name="plus" />
-      <span className="text-body">New session</span>
-      {!compact && (
-        <span className="ml-auto">
-          <Keycap>⌘N</Keycap>
-        </span>
-      )}
-    </button>
+    <div className="flex h-11 flex-none border-t border-line">
+      <button className="row flex-1 items-center gap-2 px-4 text-soft" title="Ask a question about the project; the chat cannot change files" onClick={() => setComposing('chat')}>
+        <Icon name="plus" />
+        <span className="text-body">Chat</span>
+        {!compact && (
+          <span className="ml-auto">
+            <Keycap>⌘M</Keycap>
+          </span>
+        )}
+      </button>
+      <span className="w-px flex-none bg-line" />
+      <button className="row flex-1 items-center gap-2 px-4 text-soft" data-cursor={cursor} onClick={() => setComposing('session')}>
+        <Icon name="plus" />
+        <span className="text-body">Session</span>
+        {!compact && (
+          <span className="ml-auto">
+            <Keycap>⌘N</Keycap>
+          </span>
+        )}
+      </button>
+    </div>
   )
 }
