@@ -41,7 +41,8 @@
   --radius-sm: 4px;
   --radius-md: 6px;
 
-  --topbar-h: 2.5rem;
+  /* px, not rem: the window buttons stay at 20pt down at every text size */
+  --topbar-h: 40px;
   --edge-strip-w: 2.75rem;
   --traffic-light-zone: 112px;
   --corner-pad: 1.375rem;

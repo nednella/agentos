@@ -37,7 +37,7 @@ export function TopBar() {
   const othersNeedYou = projects.some((p) => p.name !== project?.name && p.needsYou > 0)
   const find = (id: string) => actions.find((a) => a.id === id)!
   const keys = (id: string) => formatShortcut(find(id).shortcut!)
-  const iconButton = 'btn btn-ghost h-8 w-8 justify-center px-0'
+  const iconButton = 'btn btn-ghost h-[32px] w-[32px] justify-center px-0'
   const badge = width < DOTS_MIN
   const unseen = digestUnseenCount + newsUnseen
 
@@ -66,7 +66,7 @@ export function TopBar() {
       </div>
       <div className="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1" style={noDrag}>
         <button
-          className="btn btn-ghost h-8 min-w-0 gap-2 px-2 text-body font-semibold text-ink"
+          className="btn btn-ghost h-[32px] min-w-0 gap-2 px-2 text-body font-semibold text-ink"
           aria-haspopup="dialog"
           title={`Switch project (${keys('switch-project')})`}
           onClick={() => setOverlay('projects')}
@@ -79,7 +79,7 @@ export function TopBar() {
       </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
         {update && (
-          <button className="btn btn-accent" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
+          <button className="btn btn-accent max-h-[32px]" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
             {updating ? 'Updating…' : width >= NEXT_FULL_MIN ? `v${update} available · Update` : 'Update'}
           </button>
         )}
