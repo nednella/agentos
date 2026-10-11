@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -25,7 +26,7 @@ func appCmd(use, short, group string, args cobra.PositionalArgs) *cobra.Command 
 
 func newAppCmds() []*cobra.Command {
 	return []*cobra.Command{
-		appCmd("issue <number...>", "Start a session for each issue", groupWork, cobra.MinimumNArgs(1)),
+		newIssueCmd(),
 		newNewCmd(),
 		appCmd("open <n|title>", "Show a session in the terminal", groupWork, cobra.MinimumNArgs(1)),
 		appCmd("next", "Show the session that needs you most", groupWork, cobra.NoArgs),
@@ -69,21 +70,50 @@ func newProjectCmd() *cobra.Command {
 	return project
 }
 
+func newIssueCmd() *cobra.Command {
+	var prompt string
+	cmd := &cobra.Command{
+		Use: "issue <number...>", Short: "Start a session for each issue (--prompt: context for one issue, - reads it from stdin)", GroupID: groupWork,
+		Args: cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if prompt != "" && len(args) > 1 {
+				return errors.New("--prompt takes one issue")
+			}
+			text, err := readPrompt(cmd, prompt)
+			if err != nil {
+				return err
+			}
+			return askApp(cmd, control.Request{Cmd: "issue", Args: args, Opts: map[string]string{"prompt": text}})
+		},
+	}
+	cmd.Flags().StringVar(&prompt, "prompt", "", "context for the new session, from the session that starts it")
+	return cmd
+}
+
 func newNewCmd() *cobra.Command {
 	var prompt string
 	cmd := &cobra.Command{
 		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin)", GroupID: groupWork,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if prompt == "-" {
-				data, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), 1<<20))
-				if err != nil {
-					return fmt.Errorf("reading the prompt: %w", err)
-				}
-				prompt = string(data)
+			text, err := readPrompt(cmd, prompt)
+			if err != nil {
+				return err
 			}
-			return askApp(cmd, control.Request{Cmd: "new", Args: args, Opts: map[string]string{"prompt": strings.TrimSpace(prompt)}})
+			return askApp(cmd, control.Request{Cmd: "new", Args: args, Opts: map[string]string{"prompt": text}})
 		},
 	}
 	cmd.Flags().StringVar(&prompt, "prompt", "", "the first message of the new session")
 	return cmd
+}
+
+// readPrompt is the value of a --prompt flag, read from stdin when it is "-".
+func readPrompt(cmd *cobra.Command, prompt string) (string, error) {
+	if prompt == "-" {
+		data, err := io.ReadAll(io.LimitReader(cmd.InOrStdin(), 1<<20))
+		if err != nil {
+			return "", fmt.Errorf("reading the prompt: %w", err)
+		}
+		prompt = string(data)
+	}
+	return strings.TrimSpace(prompt), nil
 }
