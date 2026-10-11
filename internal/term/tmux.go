@@ -66,7 +66,7 @@ type Info struct {
 	Issue   string // the GitHub issue number the session was started for, or ""
 	Model   string // the model the agent was started with, or ""
 	Effort  string // the effort the agent was started with, or ""
-	Chat    bool   // a chat: a read-only agent for questions, not work
+	Chat    bool   // a chat: a read-only session for questions, not work
 	Created time.Time
 }
 
