@@ -1382,6 +1382,9 @@ func (s *Sessions) Track(id, branch string) error {
 	if !found {
 		return fmt.Errorf("session %q is not running", id)
 	}
+	if branch == s.life.mainBranch(s.ctx, proj.Dir) {
+		return fmt.Errorf("%s is the project's default branch; track the branch your work is on", branch)
+	}
 	s.life.track(s.ctx, id, proj, branch, false, true)
 	return nil
 }
