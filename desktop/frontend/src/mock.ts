@@ -626,7 +626,7 @@ export function createMock(params: URLSearchParams) {
       }
     }
     const byModel = [
-      usageRow('claude-opus-5-5', 'high', 0.62, Math.round(totals.sessions * 0.6)),
+      usageRow('claude-opus-5-5', 'high', 0.54, Math.round(totals.sessions * 0.6)),
       usageRow('claude-opus-5-5', '', 0.21, Math.round(totals.sessions * 0.3)),
       usageRow('claude-sonnet-5-5', 'medium', 0.12, Math.round(totals.sessions * 0.1)),
       usageRow('claude-haiku-5-5', '', 0.05, Math.round(totals.sessions * 0.4)),
@@ -641,7 +641,7 @@ export function createMock(params: URLSearchParams) {
       { project: 'storefront', issue: 0, session: 'storefront/k3j2h4g5', title: 'Look into the flaky login test', sessions: 1, tokens: 6_700_000, cost: 3.31, lastAt: hoursAgo(26) },
       { project: 'agentos', issue: 309, session: '', title: '#309 Empty states for session groups', sessions: 3, tokens: 31_900_000, cost: 15.6, lastAt: hoursAgo(50) },
     ]
-    const usage = { totals: usageRow('', '', 1, totals.sessions), byModel, pricesAsOf: '2026-10-06' }
+    const usage = { totals: usageRow('', '', 1, totals.sessions + totals.chats), chats: usageRow('', '', 0.08, totals.chats), byModel, pricesAsOf: '2026-10-06' }
     return { days, since: dayKey(120), totals, projects, heat, usage, work: work.filter((w) => !project || w.project === project) }
   }
 

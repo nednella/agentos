@@ -91,7 +91,8 @@ export function LedgerView({ days, project }: LedgerViewProps) {
 
   const { totals, usage } = ledger
   const spent = usage.totals
-  const perTask = spent.sessions ? spent.tokens / spent.sessions : 0
+  const tasks = { sessions: spent.sessions - usage.chats.sessions, tokens: spent.tokens - usage.chats.tokens, cost: spent.cost - usage.chats.cost }
+  const perTask = tasks.sessions ? tasks.tokens / tasks.sessions : 0
   const sections = project ? SECTIONS.filter((s) => s.id !== 'projects') : SECTIONS
   const pick = (id: string) => {
     document.getElementById(`ledger-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -134,7 +135,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 {
                   label: 'Chats',
                   value: totals.chats.toLocaleString(),
-                  hint: 'in no other figure',
+                  hint: 'counted only in spend',
                 },
                 {
                   label: 'Tasks',
@@ -199,12 +200,12 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 {
                   label: 'Tokens per task',
                   value: perTask ? tokenCount(Math.round(perTask)) : '—',
-                  hint: perTask ? `~${dollars(spent.cost / spent.sessions)} estimated` : 'no usage yet',
+                  hint: perTask ? `~${dollars(tasks.cost / tasks.sessions)} estimated` : 'no usage yet',
                   title: priceNote(usage.pricesAsOf),
                 },
               ]}
             />
-            {usage.byModel.length > 0 && tables.spend.table(ROWS.spend)}
+            {spent.sessions > 0 && tables.spend.table(ROWS.spend)}
             {showAll('spend')}
           </LedgerSection>
           <LedgerSection id="work" title="Work" hint="tokens by issue and task">
