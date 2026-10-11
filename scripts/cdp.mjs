@@ -11,6 +11,8 @@ const port = 9333
 // A new profile asks the macOS keychain for its key, and a Brave under agentos's tmux shows "Keychain Not Found".
 const brave = spawn('/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
   ['--headless=new', '--use-mock-keychain', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', '--disable-brave-update', '--disable-features=MacAppCodeSignClone', `--user-data-dir=${join(tmpdir(), 'agentos-cdp-profile')}`, 'about:blank'], { stdio: 'ignore' })
+process.on('exit', () => brave.kill())
+for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => process.exit(1))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let target
 for (let i = 0; i < 50 && !target; i++) {
@@ -39,4 +41,4 @@ for (const step of JSON.parse(stepsJson)) {
   if (step.shot) { const r = await send('Page.captureScreenshot', { format: 'png' }); const file = resolve(tmpdir(), step.shot); writeFileSync(file, Buffer.from(r.data, 'base64')); console.log('shot:', file) }
 }
 console.log(logs.slice(0, 20).join('\n'))
-ws.close(); brave.kill(); process.exit(0)
+ws.close(); process.exit(0)
