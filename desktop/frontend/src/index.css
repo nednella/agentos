@@ -727,9 +727,83 @@
     animation: spin 0.8s linear infinite;
   }
 
-  .spinner-lg {
-    width: 1.5rem;
-    height: 1.5rem;
+  /* The app icon's prompt, in its units (desktop/build/icon.go), scaled to a 28px chevron. */
+  .prompt-loader {
+    --u: calc(28px / 328);
+    display: flex;
+    align-items: flex-end;
+    width: calc(812 * var(--u));
+  }
+
+  .prompt-loader svg {
+    flex: none;
+    width: calc(224 * var(--u));
+    height: calc(328 * var(--u));
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 64;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .prompt-loader-line {
+    display: flex;
+    flex: none;
+    width: 0;
+    overflow: hidden;
+    animation: prompt-type 2.4s steps(1, end) infinite;
+  }
+
+  .prompt-loader-line > i,
+  .prompt-loader-cursor {
+    flex: none;
+    margin-left: calc(38 * var(--u));
+    height: calc(72 * var(--u));
+    border-radius: calc(20 * var(--u));
+  }
+
+  .prompt-loader-line > i {
+    width: calc(72 * var(--u));
+    background: var(--text-dim);
+  }
+
+  .prompt-loader-cursor {
+    width: calc(220 * var(--u));
+    background: var(--accent);
+    animation: prompt-blink 2.4s steps(1, end) infinite;
+  }
+
+  @keyframes prompt-type {
+    0% {
+      width: 0;
+    }
+    10% {
+      width: calc(110 * var(--u));
+    }
+    20% {
+      width: calc(220 * var(--u));
+    }
+    30% {
+      width: calc(330 * var(--u));
+    }
+    75% {
+      width: 0;
+    }
+  }
+
+  @keyframes prompt-blink {
+    0%,
+    40%,
+    56%,
+    72%,
+    92% {
+      opacity: 1;
+    }
+    48%,
+    64%,
+    84% {
+      opacity: 0;
+    }
   }
 
   @keyframes spin {

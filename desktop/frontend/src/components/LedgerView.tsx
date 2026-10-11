@@ -26,7 +26,7 @@ export function LedgerView({ days }: LedgerViewProps) {
     }
   }, [days, report])
 
-  if (ledger === null) return <Loading label="Loading stats" />
+  if (ledger === null) return <Loading />
   if (ledger.since === '') {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">

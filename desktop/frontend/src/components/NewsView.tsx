@@ -56,7 +56,7 @@ export function NewsView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!news && <Loading label="Loading news" />}
+        {!news && <Loading />}
         {news && issues.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">No news yet</p>
