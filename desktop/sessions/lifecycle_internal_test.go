@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -54,7 +55,7 @@ func TestParsePR(t *testing.T) {
 
 func TestParseWorktrees(t *testing.T) {
 	w := parseWorktrees("worktree /p\nHEAD abc\nbranch refs/heads/main\n\nworktree /p/trees/issue-7\nHEAD def\nbranch refs/heads/issue-7\n\nworktree /p/detached\nHEAD 123\ndetached\n")
-	if w.main != "/p" || w.byBranch["issue-7"] != "/p/trees/issue-7" || w.byBranch["main"] != "/p" || len(w.byBranch) != 2 {
+	if w.main != "/p" || w.byBranch["issue-7"] != "/p/trees/issue-7" || w.byBranch["main"] != "/p" || len(w.byBranch) != 2 || !slices.Equal(w.detached, []string{"/p/detached"}) {
 		t.Errorf("worktrees = %+v", w)
 	}
 }

@@ -881,3 +881,25 @@ func TestClosedPROfABranchTheSessionMovedOnFromAsksThenCleansUpThatBranch(t *tes
 		t.Errorf("side exists %v, issue worktree exists %v", exists(side), exists(wt))
 	}
 }
+
+func TestRebasingWorktreeBlocksTheCleanup(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	cmd := exec.Command("git", "-c", "user.name=t", "-c", "user.email=t@example.com", "rebase", "--exec", "false", "HEAD~1")
+	cmd.Dir = wt
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_SYSTEM=/dev/null")
+	if out, err := cmd.CombinedOutput(); err == nil {
+		t.Fatalf("the rebase did not stop: %s", out)
+	}
+
+	openThenMerge(h)
+	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if got, _ := h.Session(s.ID); got.CleanupReason != "the worktree of issue-7 is in the middle of a rebase" || got.Worktree != wt {
+		t.Errorf("reason %q, worktree %q", got.CleanupReason, got.Worktree)
+	}
+	if !exists(wt) || branches(t, h.Dir) == "" {
+		t.Error("the clean-up removed a worktree in the middle of a rebase")
+	}
+}
