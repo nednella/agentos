@@ -68,7 +68,7 @@ export function Stats() {
       className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       onKeyDown={(e) => e.key === 'Escape' && closeCentre()}
     >
-      <header className="panel-head flex flex-none flex-wrap items-center gap-3 border-b border-line px-4 py-2.5">
+      <header className="panel-head flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
         <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
         <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
@@ -79,17 +79,17 @@ export function Stats() {
             </option>
           ))}
         </select>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
           <SegmentedControl
             label="Range"
             options={work ? WORK_RANGES : RANGES}
             value={String(work ? workDays : days)}
             onChange={pickRange}
           />
+          <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
+            <Icon name="close" />
+          </button>
         </div>
-        <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
-          <Icon name="close" />
-        </button>
       </header>
       <div data-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
         {work ? <LedgerView days={workDays} project={project} /> : <StatsInterruptions days={days} project={project} />}
