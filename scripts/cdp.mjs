@@ -8,8 +8,9 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 const [url, w, h, stepsJson] = process.argv.slice(2)
 const port = 9333
+// A new profile asks the macOS keychain for its key, and a Brave under agentos's tmux shows "Keychain Not Found".
 const brave = spawn('/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
-  ['--headless=new', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', '--disable-brave-update', '--disable-features=MacAppCodeSignClone', `--user-data-dir=${join(tmpdir(), 'agentos-cdp-profile')}`, 'about:blank'], { stdio: 'ignore' })
+  ['--headless=new', '--use-mock-keychain', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', '--disable-brave-update', '--disable-features=MacAppCodeSignClone', `--user-data-dir=${join(tmpdir(), 'agentos-cdp-profile')}`, 'about:blank'], { stdio: 'ignore' })
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let target
 for (let i = 0; i < 50 && !target; i++) {
