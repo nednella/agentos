@@ -929,9 +929,9 @@ func (h *Harness) SetDataDir(dir string, withData bool) error {
 	return h.settings.SetDataDir(dir, withData)
 }
 
-func (h *Harness) Stats(days int) (stats.Stats, error) { return h.stats.Stats(days) }
+func (h *Harness) Stats(days int, key string) (stats.Stats, error) { return h.stats.Stats(days, key) }
 
-func (h *Harness) Ledger(days int) (stats.Ledger, error) { return h.stats.Ledger(days) }
+func (h *Harness) Ledger(days int, key string) (stats.Ledger, error) { return h.stats.Ledger(days, key) }
 
 // Events are the main project's recorded events of the kind given, oldest first.
 func (h *Harness) Events(t *testing.T, kind string) []activity.Event {

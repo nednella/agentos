@@ -27,7 +27,7 @@ func TestStatsSummary(t *testing.T) {
 		wait.SessionTitle = fmt.Sprint("s", i)
 		writeWait(t, dir, "p", wait)
 	}
-	st, err := w.Stats("p", 7, now)
+	st, err := w.Stats([]string{"p"}, 7, now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,10 +50,13 @@ func TestStatsSummary(t *testing.T) {
 	for i := range 60 {
 		writeWait(t, dir, "q", Wait{Kind: "idle", Label: "Reply landed", StartedAt: at(0) + int64(i), WaitedMs: 1})
 	}
-	if st, _ = w.Stats("q", 1, now); st.Total != 60 || len(st.Recent) != 50 || st.Recent[0].StartedAt != at(0)+59 {
+	if st, _ = w.Stats([]string{"q"}, 1, now); st.Total != 60 || len(st.Recent) != 50 || st.Recent[0].StartedAt != at(0)+59 {
 		t.Errorf("recent cap: total %d, kept %d", st.Total, len(st.Recent))
 	}
-	if st, _ = w.Stats("none", 3, now); st.Total != 0 || len(st.ByDay) != 3 || st.ByCause == nil || st.Recent == nil {
+	if st, _ = w.Stats([]string{"p", "q"}, 1, now); st.Total != 62 {
+		t.Errorf("two projects: total %d", st.Total)
+	}
+	if st, _ = w.Stats([]string{"none"}, 3, now); st.Total != 0 || len(st.ByDay) != 3 || st.ByCause == nil || st.Recent == nil {
 		t.Errorf("empty stats = %+v", st)
 	}
 }
@@ -75,7 +78,7 @@ func TestStatsLabelsAnEventWithoutCauseByItsKind(t *testing.T) {
 	dir := t.TempDir()
 	now := time.Date(2026, 10, 2, 15, 0, 0, 0, time.Local)
 	writeWait(t, dir, "p", Wait{Kind: "idle", StartedAt: now.UnixMilli(), WaitedMs: 5})
-	st, err := New(NewLog(dir, mine)).Stats("p", 1, now)
+	st, err := New(NewLog(dir, mine)).Stats([]string{"p"}, 1, now)
 	if err != nil {
 		t.Fatal(err)
 	}

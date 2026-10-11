@@ -114,22 +114,24 @@ func (w *Waits) End(id string, at time.Time) bool {
 	return true
 }
 
-// Stats sums up a project's waits over the last days days, today included.
-func (w *Waits) Stats(key string, days int, now time.Time) (Stats, error) {
+// Stats sums up the waits of the projects whose keys are given over the last days days, today included.
+func (w *Waits) Stats(keys []string, days int, now time.Time) (Stats, error) {
 	days = max(days, 1)
 	st := Stats{Days: days, ByCause: []CauseCount{}, ByDay: []DayCount{}, Recent: []Wait{}}
 	y, m, d := now.Date()
 	from := time.Date(y, m, d-(days-1), 0, 0, 0, 0, now.Location())
 	var waits []Wait
-	w.log.Since(key, localDay(from), func(e activity.Event) {
-		if e.Kind != activity.Wait {
-			return
-		}
-		waits = append(waits, Wait{SessionTitle: e.Title, Issue: e.Issue, Model: e.Model, Kind: e.Label, Label: cmp.Or(e.Cause, e.Label), StartedAt: e.At - e.Ms, WaitedMs: e.Ms})
-	})
+	for _, key := range keys {
+		w.log.Since(key, localDay(from), func(e activity.Event) {
+			if e.Kind != activity.Wait {
+				return
+			}
+			waits = append(waits, Wait{SessionTitle: e.Title, Issue: e.Issue, Model: e.Model, Kind: e.Label, Label: cmp.Or(e.Cause, e.Label), StartedAt: e.At - e.Ms, WaitedMs: e.Ms})
+		})
+	}
 	w.mu.Lock()
 	for id, wait := range w.open {
-		if session.ProjectKey(id) == key {
+		if slices.Contains(keys, session.ProjectKey(id)) {
 			wait.WaitedMs = 0
 			waits = append(waits, wait)
 		}

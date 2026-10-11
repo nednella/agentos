@@ -118,7 +118,7 @@ func TestChatStaysOutOfTheStats(t *testing.T) {
 		h.Hook(t, id, "Stop", `{}`)
 	}
 	eventually(t, "the session's prompt", func() bool { return len(h.Events(t, activity.Prompt)) == 1 })
-	eventually(t, "the session's wait", func() bool { st, _ := h.Stats(7); return st.Total > 0 })
+	eventually(t, "the session's wait", func() bool { st, _ := h.Stats(7, ""); return st.Total > 0 })
 
 	for _, kind := range []string{activity.Prompt, activity.SessionStart, activity.Worked, activity.Wait} {
 		for _, e := range h.Events(t, kind) {
@@ -127,13 +127,13 @@ func TestChatStaysOutOfTheStats(t *testing.T) {
 			}
 		}
 	}
-	st, _ := h.Stats(7)
+	st, _ := h.Stats(7, "")
 	for _, w := range st.Recent {
 		if w.SessionTitle == chat.Title {
 			t.Errorf("wait of the chat: %+v", w)
 		}
 	}
-	led, err := h.Ledger(30)
+	led, err := h.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -46,7 +46,7 @@ func TestLedger(t *testing.T) {
 	books := NewBooks(log, projects)
 	build := func(days int) Ledger {
 		t.Helper()
-		led, err := books.Ledger(days, now)
+		led, err := books.Ledger(days, "", now)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -85,6 +85,23 @@ func TestLedger(t *testing.T) {
 		}
 	})
 
+	t.Run("one project", func(t *testing.T) {
+		led, err := books.Ledger(30, "beta", now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(led.Projects) != 1 || led.Projects[0].Project != "Beta" || led.Totals.Prompts != 3 || led.Since != day(400).Format(time.DateOnly) {
+			t.Errorf("projects %+v, totals %+v, since %s", led.Projects, led.Totals, led.Since)
+		}
+		sum := 0
+		for _, d := range led.Heat {
+			sum += d.Count
+		}
+		if sum != 3 {
+			t.Errorf("heat sum = %d, want beta's 3", sum)
+		}
+	})
+
 	t.Run("heat", func(t *testing.T) {
 		led := build(30)
 		if len(led.Heat) != 364 || led.Heat[363].Day != "2026-10-09" || led.Heat[0].Day != day(363).Format(time.DateOnly) {
@@ -105,7 +122,7 @@ func TestLedger(t *testing.T) {
 func TestLedgerWithoutRecord(t *testing.T) {
 	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
 	books := NewBooks(loaded(t, t.TempDir()), fakeProjects{{Name: "Solo", Dir: "/s"}})
-	led, err := books.Ledger(30, now)
+	led, err := books.Ledger(30, "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,7 +149,7 @@ func TestLedgerPullRequestsAndIssues(t *testing.T) {
 		log.Record("alpha", e)
 	}
 	log.Record("beta", activity.Event{At: at(0), Kind: activity.PRMerged, Issue: 5, Ms: 4000})
-	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, now)
+	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +178,7 @@ func TestLedgerUsage(t *testing.T) {
 	use("beta", "beta/dddddddd", 0, 7, "claude-opus-5-5", "medium", "#7 beta's own", 1, 1)
 	use("alpha", "alpha/eeeeeeee", 40, 9, "claude-opus-5-5", "high", "#9 old", 1000, 9_000_000)
 
-	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, now)
+	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}, {Name: "Beta", Dir: "/b"}}).Ledger(30, "", now)
 	if err != nil {
 		t.Fatal(err)
 	}
