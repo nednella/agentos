@@ -14,8 +14,7 @@ export function LedgerHeatmap({ heat }: LedgerHeatmapProps) {
   const top = Math.max(...heat.map((d) => d.count), 1)
   const lead = heat.length ? new Date(`${heat[0].day}T00:00`).getDay() : 0
   return (
-    <section>
-      <h3 className="label pb-2">Prompts per day, last 52 weeks</h3>
+    <figure>
       <div
         className="grid grid-flow-col grid-rows-7 auto-cols-fr gap-[2px]"
         role="img"
@@ -28,6 +27,7 @@ export function LedgerHeatmap({ heat }: LedgerHeatmapProps) {
           <i key={d.day} title={`${d.day}: ${d.count} prompts`} className="block aspect-square rounded-[2px]" style={{ background: cellColor(d.count, top) }} />
         ))}
       </div>
-    </section>
+      <figcaption className="pt-1.5 text-small text-dim">Prompts per day, last 52 weeks</figcaption>
+    </figure>
   )
 }
