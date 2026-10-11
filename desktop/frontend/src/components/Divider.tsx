@@ -45,7 +45,7 @@ export function Divider({ panel }: DividerProps) {
       className="divider"
       role="separator"
       aria-orientation="vertical"
-      aria-label={`Resize ${panel === 'sidebar' ? 'queue and notes' : 'sessions'} panel`}
+      aria-label={`Resize ${panel === 'sidebar' ? 'queue and notes' : 'agents'} panel`}
       tabIndex={0}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}

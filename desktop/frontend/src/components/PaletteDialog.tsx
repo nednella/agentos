@@ -69,12 +69,12 @@ export function PaletteDialog() {
         <input
           autoFocus
           role="combobox"
-          aria-label={prompting ? prompting.prompt?.label || prompting.label : 'Search sessions, actions, projects and issues'}
+          aria-label={prompting ? prompting.prompt?.label || prompting.label : 'Search agents, actions, projects and issues'}
           aria-expanded={!prompting}
           aria-controls="palette-list"
           aria-activedescendant={!prompting && results[cursor] ? `palette-option-${cursor}` : undefined}
           value={query}
-          placeholder={prompting ? 'Type, then Enter' : 'Sessions, actions, projects, issues (@author label: type:)'}
+          placeholder={prompting ? 'Type, then Enter' : 'Agents, actions, projects, issues (@author label: type:)'}
           className="min-w-0 flex-1 bg-transparent text-title outline-none"
           onChange={(e) => {
             setQuery(e.target.value)
