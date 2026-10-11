@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
+import { dollars, tokenCount } from '../spend'
 import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
@@ -84,6 +85,11 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
         <StateBadge state={session.state} chat={session.chat} />
         {session.chat && <ChatTag />}
         <ModelTag model={session.model} effort={session.effort} />
+        {session.tokens > 0 && (
+          <span className="mono flex-none text-small whitespace-nowrap text-dim" title="Tokens so far and their cost, estimated at API list prices">
+            {tokenCount(session.tokens)} tokens · ~{dollars(session.cost)}
+          </span>
+        )}
       </div>
       {!session.chat && <Timeline session={session} size="full" />}
       {kill.armed && (
