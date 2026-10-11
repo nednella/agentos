@@ -210,6 +210,9 @@ func TestSessionReportsItsBranch(t *testing.T) {
 	if resp := h.Ask(t, ctl.Request{Cmd: "track", Opts: map[string]string{"branch": "my-fix"}}); resp.OK {
 		t.Error("track outside a session was accepted")
 	}
+	if resp := h.Ask(t, ctl.Request{Cmd: "track", Session: s.ID, Opts: map[string]string{"branch": "main"}}); resp.OK {
+		t.Error("track of the default branch was accepted")
+	}
 	resp := h.Ask(t, ctl.Request{Cmd: "track", Session: s.ID, Opts: map[string]string{"branch": "my-fix"}})
 	if !resp.OK {
 		t.Fatalf("track: %s", resp.Error)
