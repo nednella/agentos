@@ -1,10 +1,10 @@
-import { STATE_LABEL } from '../stateMeta'
+import { stateLabel } from '../stateMeta'
 import type { State } from '../types'
 import { StateDot } from './StateDot'
 
-type StateBadgeProps = { state: State }
+type StateBadgeProps = { state: State; chat: boolean }
 
-export function StateBadge({ state }: StateBadgeProps) {
+export function StateBadge({ state, chat }: StateBadgeProps) {
   return (
     <span
       data-state={state}
@@ -12,7 +12,7 @@ export function StateBadge({ state }: StateBadgeProps) {
       style={{ color: 'var(--c)', borderColor: 'color-mix(in srgb, var(--c) 45%, transparent)' }}
     >
       <StateDot state={state} />
-      {STATE_LABEL[state]}
+      {stateLabel(state, chat)}
     </span>
   )
 }

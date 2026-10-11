@@ -1,6 +1,6 @@
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
-import { STATE_LABEL } from '../stateMeta'
+import { stateLabel } from '../stateMeta'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { CleanupControls } from './CleanupControls'
@@ -44,7 +44,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         {!compact && !dense && (
           <span className="flex w-full items-center gap-2 pl-[1.625rem]">
             <span className="min-w-0 flex-1 truncate text-small font-medium" data-state={session.state} style={{ color: 'var(--c)' }}>
-              {STATE_LABEL[session.state]}
+              {stateLabel(session.state, session.chat)}
             </span>
             <ModelTag model={session.model} effort={session.effort} />
           </span>

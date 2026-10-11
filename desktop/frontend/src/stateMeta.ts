@@ -6,3 +6,7 @@ export const STATE_LABEL: Record<State, string> = {
   idle: 'Idle',
   ended: 'Ended',
 }
+
+export function stateLabel(state: State, chat: boolean): string {
+  return chat && state === 'working' ? 'Thinking' : STATE_LABEL[state]
+}
