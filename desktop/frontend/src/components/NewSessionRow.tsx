@@ -35,7 +35,7 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
         <span className="text-body">Chat</span>
         {!compact && (
           <span className="ml-auto">
-            <Keycap>⌘M</Keycap>
+            <Keycap>⌘N</Keycap>
           </span>
         )}
       </button>
@@ -45,7 +45,7 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
         <span className="text-body">Task</span>
         {!compact && (
           <span className="ml-auto">
-            <Keycap>⌘N</Keycap>
+            <Keycap>⌘M</Keycap>
           </span>
         )}
       </button>
