@@ -14,7 +14,7 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
       <div className="flex-none border-t border-line p-3">
         <InlineInput
           key={composing}
-          placeholder={chat ? 'Chat title (optional)' : 'Session title (optional)'}
+          placeholder={chat ? 'Chat title (optional)' : 'Task title (optional)'}
           blur="cancel"
           action="Start"
           icon={<Icon name="plus" />}
@@ -42,7 +42,7 @@ export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
       <span className="w-px flex-none bg-line" />
       <button className="row flex-1 items-center gap-2 px-4 text-soft" data-cursor={cursor} onClick={() => setComposing('session')}>
         <Icon name="plus" />
-        <span className="text-body">Session</span>
+        <span className="text-body">Task</span>
         {!compact && (
           <span className="ml-auto">
             <Keycap>⌘N</Keycap>

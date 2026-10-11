@@ -113,7 +113,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
         </span>
         <span className="ml-auto flex items-center">
           <span className="reveal">
-            <button className={iconButton} title="Start a session from this note" aria-label="Start session" onClick={() => a.report(() => a.noteToSession(note.id))}>
+            <button className={iconButton} title="Start a task from this note" aria-label="Start task" onClick={() => a.report(() => a.noteToSession(note.id))}>
               <Icon name="play" size={12} />
             </button>
             {canFile && (

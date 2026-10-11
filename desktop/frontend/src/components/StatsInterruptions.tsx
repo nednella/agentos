@@ -23,7 +23,7 @@ export function StatsInterruptions({ days }: StatsInterruptionsProps) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">
         <p className="text-body font-medium">No interruptions recorded yet</p>
-        <p className="text-small text-dim">Each time a session waits for you, it shows up here with what it asked for.</p>
+        <p className="text-small text-dim">Each time a task waits for you, it shows up here with what it asked for.</p>
       </div>
     )
   }
