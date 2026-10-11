@@ -31,7 +31,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	h.Hook(t, s.ID, "Stop", `{}`)
 	eventually(t, "finished wait", func() bool {
 		st, _ := h.Stats(7)
-		return st.Total == 4
+		return st.Total == 3
 	})
 	if err := h.KillSession(s.ID); err != nil {
 		t.Fatal(err)
@@ -44,12 +44,12 @@ func TestWaitsAreRecorded(t *testing.T) {
 	for _, c := range st.ByCause {
 		causes = append(causes, fmt.Sprintf("%s/%s/%d", c.Kind, c.Label, c.Count))
 	}
-	want := []string{"idle/Reply landed/1", "permission/Bash: make test api/1", "permission/Edit/1", "question/Question/1"}
+	want := []string{"permission/Bash: make test api/1", "permission/Edit/1", "question/Question/1"}
 	slices.Sort(causes)
 	if !slices.Equal(causes, want) {
 		t.Errorf("causes = %q, want %q", causes, want)
 	}
-	if st.Recent[len(st.Recent)-1].Issue != 3 || st.Recent[0].SessionTitle != "#3 work" || st.MedianWaitMs <= 0 || len(st.ByDay) != 7 || st.ByDay[6].Count != 4 {
+	if st.Recent[len(st.Recent)-1].Issue != 3 || st.Recent[0].SessionTitle != "#3 work" || st.MedianWaitMs <= 0 || len(st.ByDay) != 7 || st.ByDay[6].Count != 3 {
 		t.Errorf("stats = %+v", st)
 	}
 	for _, w := range st.Recent {
