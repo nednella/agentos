@@ -52,7 +52,7 @@ func TestNewChatStartsClaudeInPlanMode(t *testing.T) {
 			if slices.Contains(args, "--mcp-config") {
 				t.Errorf("a chat has a browser: %q", args)
 			}
-			if joined := strings.Join(args, "\n"); !strings.Contains(joined, prompts.Chat()) || strings.Contains(joined, prompts.Session()) {
+			if joined := strings.Join(args, "\n"); !strings.Contains(joined, prompts.Chat()) || strings.Contains(joined, prompts.Task()) {
 				t.Errorf("system prompt of the chat = %q", joined)
 			}
 		})
@@ -66,7 +66,7 @@ func TestNewChatStartsClaudeInPlanMode(t *testing.T) {
 		t.Error("a session is flagged as a chat")
 	}
 	args := claudeArgs(t, dir, work.ID)
-	if slices.Contains(args, "--permission-mode") || !strings.Contains(strings.Join(args, "\n"), prompts.Session()) {
+	if slices.Contains(args, "--permission-mode") || !strings.Contains(strings.Join(args, "\n"), prompts.Task()) {
 		t.Errorf("args of a session = %q", args)
 	}
 }
