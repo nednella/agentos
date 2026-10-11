@@ -1378,7 +1378,7 @@ func (s *Sessions) Track(id, branch string) error {
 	if !found {
 		return fmt.Errorf("session %q is not running", id)
 	}
-	s.life.track(s.ctx, id, proj, branch, false)
+	s.life.track(s.ctx, id, proj, branch, false, true)
 	return nil
 }
 

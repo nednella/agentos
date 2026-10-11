@@ -804,6 +804,60 @@ func TestCleanupBlockedByAnOlderBranchWithAnOpenPR(t *testing.T) {
 	}
 }
 
+// mergeLeavesSide merges the PR of issue-7 while side has an open PR, and checks that s is cleaned
+// up and that side, which other works on, is left alone.
+func mergeLeavesSide(t *testing.T, h *apptest.Harness, s, other sessions.Session, side, wt string) {
+	t.Helper()
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	h.RefreshPRs()
+	h.GH.SetPRFor("issue-7", numberedPR(21, "MERGED"))
+	h.RefreshPRs()
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	if exists(wt) {
+		t.Error("the issue worktree is still there")
+	}
+	if !exists(side) || gitIn(t, h.Dir, "branch", "--list", "side") == "" {
+		t.Error("the branch the other session works on was removed")
+	}
+	if got, _ := h.Session(other.ID); got.PR == nil || got.PR.Number != 20 {
+		t.Errorf("other session = %+v, want the PR of side", got)
+	}
+	if log := h.Cleanups(); len(log) != 1 || log[0].Status != "done" || slices.Contains(log[0].Removed, "clean-up command for side") {
+		t.Errorf("log = %+v", log)
+	}
+}
+
+func TestBranchHandedToAnotherSessionIsLeftToIt(t *testing.T) {
+	h := newHarness(t)
+	s, side, wt := twoBranchSession(t, h)
+	other := issueSession(h, t, 8)
+	if err := h.Sessions().Track(other.ID, "side"); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the other session on side", func() bool { got, _ := h.Session(other.ID); return got.Branch == "side" })
+	mergeLeavesSide(t, h, s, other, side, wt)
+}
+
+func TestLookingInAnotherSessionsWorktreeDoesNotTakeItsBranch(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	side := branchWorktree(t, h, "side")
+	wt := issueWorktree(t, h)
+	other := issueSession(h, t, 8)
+	worksIn(h, t, other, side)
+	eventually(t, "the other session on side", func() bool { got, _ := h.Session(other.ID); return got.Branch == "side" })
+	s := issueSession(h, t, 7)
+	worksIn(h, t, s, side)
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Branch == "side" {
+		t.Fatal("the session took the branch of the other session")
+	}
+	worksIn(h, t, s, wt)
+	eventually(t, "the issue branch", func() bool { got, _ := h.Session(s.ID); return got.Branch == "issue-7" })
+	mergeLeavesSide(t, h, s, other, side, wt)
+}
+
 func TestClosedPROfABranchTheSessionMovedOnFromAsksThenCleansUpThatBranch(t *testing.T) {
 	h := newHarness(t)
 	s, side, wt := twoBranchSession(t, h)
