@@ -3,11 +3,11 @@ import type { Stats } from '../types'
 
 type StatsFigureProps = { stats: Stats }
 
-type FigureProps = { label: string; value: string; hint: string }
+type FigureProps = { label: string; value: string; hint: string; title?: string }
 
-export function Figure({ label, value, hint }: FigureProps) {
+export function Figure({ label, value, hint, title }: FigureProps) {
   return (
-    <div className="flex min-w-0 flex-1 basis-36 flex-col gap-0.5 rounded-md border border-line bg-surface px-4 py-3">
+    <div title={title} className="flex min-w-0 flex-1 basis-36 flex-col gap-0.5 rounded-md border border-line bg-surface px-4 py-3">
       <span className="label">{label}</span>
       <span className="mono text-[1.75rem] leading-tight font-semibold">{value}</span>
       <span className="text-small text-dim">{hint}</span>

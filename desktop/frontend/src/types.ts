@@ -32,6 +32,8 @@ export type Session = {
   browser: boolean
   evidence: number
   chat: boolean
+  tokens: number
+  cost: number
 }
 
 export type Project = {
@@ -160,6 +162,32 @@ export type LedgerRow = {
   issuesClosed: number
   avgSessionMs: number
   avgLeadMs: number
+  tokens: number
+  cost: number
+}
+
+export type UsageRow = {
+  model: string
+  effort: string
+  sessions: number
+  tokens: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+  thinking: number
+  cost: number
+}
+
+export type WorkRow = {
+  project: string
+  issue: number
+  session: string
+  title: string
+  sessions: number
+  tokens: number
+  cost: number
+  lastAt: number
 }
 
 export type Ledger = {
@@ -168,6 +196,8 @@ export type Ledger = {
   totals: LedgerRow
   projects: LedgerRow[]
   heat: { day: string; count: number }[]
+  usage: { totals: UsageRow; byModel: UsageRow[]; pricesAsOf: string }
+  work: WorkRow[]
 }
 
 export type Cleanup = {
@@ -222,11 +252,20 @@ export type Digest = {
   items: DigestItem[]
 }
 
-export type Change = { scope: string; text: string; issue: number; url: string }
+export type Change = {
+  scope: string
+  text: string
+  issue: number
+  url: string
+}
 
 export type ReleaseSection = { title: string; changes: Change[] }
 
-export type Release = { version: string; date: string; sections: ReleaseSection[] }
+export type Release = {
+  version: string
+  date: string
+  sections: ReleaseSection[]
+}
 
 export type NewsItem = {
   id: string
@@ -274,6 +313,9 @@ export type EventMap = {
   'browser:state': BrowserState
   'term:data': { id: string; data: string }
   'term:exit': { id: string }
-  attention: { id: string; state: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence' }
+  attention: {
+    id: string
+    state: 'waiting' | 'replied' | 'opened' | 'pr' | 'evidence'
+  }
   update: { version: string }
 }

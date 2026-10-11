@@ -5,6 +5,8 @@ import type { Ledger } from '../types'
 import { LedgerFigures } from './LedgerFigures'
 import { LedgerHeatmap } from './LedgerHeatmap'
 import { LedgerTable } from './LedgerTable'
+import { LedgerUsage } from './LedgerUsage'
+import { LedgerWork } from './LedgerWork'
 
 type LedgerViewProps = { days: number }
 
@@ -28,15 +30,17 @@ export function LedgerView({ days }: LedgerViewProps) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">
         <p className="text-body font-medium">Nothing recorded yet</p>
-        <p className="text-small text-dim">Prompts, tasks and agent time are counted from now on.</p>
+        <p className="text-small text-dim">Prompts, tasks, agent time and tokens are counted from now on.</p>
       </div>
     )
   }
   return (
     <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <LedgerFigures totals={ledger.totals} since={ledger.since} />
+      <LedgerFigures totals={ledger.totals} since={ledger.since} usage={ledger.usage} />
       <LedgerHeatmap heat={ledger.heat} />
       <LedgerTable projects={ledger.projects} />
+      {ledger.usage.byModel.length > 0 && <LedgerUsage usage={ledger.usage} />}
+      <LedgerWork work={ledger.work} />
     </div>
   )
 }
