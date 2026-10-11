@@ -903,3 +903,28 @@ func TestRebasingWorktreeBlocksTheCleanup(t *testing.T) {
 		t.Error("the clean-up removed a worktree in the middle of a rebase")
 	}
 }
+
+func onBranch(h *apptest.Harness, id, branch string) func() bool {
+	return func() bool { got, ok := h.Session(id); return ok && got.Branch == branch }
+}
+
+func TestForcedCleanupOfABranchTheSessionLostIsRefused(t *testing.T) {
+	h := newHarness(t)
+	s, side, _ := twoBranchSession(t, h)
+	h.GH.SetPRFor("issue-7", "[]")
+	h.GH.SetPRFor("side", numberedPR(20, "OPEN"))
+	h.RefreshPRs()
+	if got, _ := h.Session(s.ID); got.PR == nil || got.PR.Number != 20 {
+		t.Fatalf("session = %+v, want the PR of side", got)
+	}
+	other := issueSession(h, t, 8)
+	worksIn(h, t, other, side)
+	eventually(t, "the other session on side", onBranch(h, other.ID, "side"))
+
+	if err := h.Cleanup(s.ID, true); err == nil || !strings.Contains(err.Error(), "side is no longer a branch of this session") {
+		t.Errorf("forced clean-up = %v", err)
+	}
+	if !exists(side) || len(h.Cleanups()) != 0 {
+		t.Errorf("side exists %v, log %+v", exists(side), h.Cleanups())
+	}
+}
