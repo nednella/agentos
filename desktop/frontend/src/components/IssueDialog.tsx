@@ -62,7 +62,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
                 <button
                   key={action}
                   className={i === 0 ? 'btn btn-accent' : 'btn'}
-                  title={`${action}: start a session for this issue`}
+                  title={`${action}: start a task for this issue`}
                   onClick={() => {
                     close()
                     report(() => startIssue(number, action))

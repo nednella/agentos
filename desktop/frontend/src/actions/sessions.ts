@@ -21,7 +21,7 @@ const describe = (s: Session) => `${s.n} ${s.title}`
 export const sessionActions = ({ a, current }: ActionContext): Action[] => [
   {
     id: 'new-session',
-    label: 'New session',
+    label: 'New task',
     group: 'Sessions',
     shortcut: { key: 'n' },
     run() {
@@ -107,12 +107,12 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
   },
   {
     id: 'cleanup',
-    label: current ? `Clean up session ${describe(current)}` : 'Clean up session',
+    label: current ? `Clean up task ${describe(current)}` : 'Clean up task',
     group: 'Sessions',
     confirm: true,
     async run(args) {
       const target = args.length ? findSession(a.sessions, args.join(' ')) : current
-      if (!target) throw 'No session to clean up'
+      if (!target) throw 'No task to clean up'
       await a.cleanupSession(target.id, false)
       return `Cleaned up ${describe(target)}`
     },

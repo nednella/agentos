@@ -20,7 +20,7 @@ export function StatsFigure({ stats }: StatsFigureProps) {
   return (
     <div className="flex flex-wrap gap-3">
       <Figure label="Interruptions" value={String(stats.total)} hint={`${perDay} a day`} />
-      <Figure label="Time waiting on you" value={duration(stats.totalWaitMs)} hint="all sessions together" />
+      <Figure label="Time waiting on you" value={duration(stats.totalWaitMs)} hint="all tasks together" />
       <Figure label="Median wait" value={duration(stats.medianWaitMs)} hint="before you answered" />
     </div>
   )

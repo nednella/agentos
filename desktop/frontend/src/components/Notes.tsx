@@ -98,7 +98,7 @@ export function Notes({ nav }: NotesProps) {
       )}
       <div ref={list} className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-3 pb-3">
         {a.notes.length === 0 && (
-          <Notice title="Nothing jotted yet" hint="Ramble here: half ideas, things to ask, bugs you noticed. Start a session or file an issue from any note later." centered />
+          <Notice title="Nothing jotted yet" hint="Ramble here: half ideas, things to ask, bugs you noticed. Start a task or file an issue from any note later." centered />
         )}
         {a.notes.length > 0 && visible.length === 0 && <Notice title="No notes match" hint="Clear the search to see them all." centered />}
         {active.map(card)}

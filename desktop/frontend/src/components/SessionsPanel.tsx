@@ -6,7 +6,7 @@ import { useLayout } from '../LayoutContext'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { useToggleAnimation } from '../useToggleAnimation'
-import { AgentGroupHeader } from './AgentGroupHeader'
+import { SessionGroupHeader } from './SessionGroupHeader'
 import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
@@ -66,7 +66,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
       }}
     >
       <div className="panel-head flex h-10 flex-none items-center gap-2 border-b border-line pr-[0.3125rem] pl-4">
-        <span className="label">Agents</span>
+        <span className="label">Sessions</span>
         <span className="mono text-small text-dim">{sessions.length}</span>
         <span className="ml-auto" />
         <CleanupsMenu />
@@ -82,7 +82,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         )}
       </div>
       <div ref={list} className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
-        <AgentGroupHeader label="Chats" count={chats.length} />
+        <SessionGroupHeader label="Chats" count={chats.length} />
         {chats.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
@@ -91,11 +91,11 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
             Ask about the project without starting work
           </button>
         )}
-        <AgentGroupHeader label="Sessions" count={work.length} />
+        <SessionGroupHeader label="Tasks" count={work.length} />
         {work.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {work.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No sessions yet</p>}
+        {work.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No tasks yet</p>}
       </div>
       <NewSessionRow cursor={nav.cursorKey === NEW_SESSION_KEY} compact={compact} />
     </aside>

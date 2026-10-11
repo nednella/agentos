@@ -11,7 +11,7 @@ export function EmptyState() {
       <div className="flex max-w-sm flex-col items-center gap-4 text-center">
         <Masthead />
         <button className="btn btn-accent h-9 px-4 text-body" onClick={() => report(() => newSession())}>
-          Start a session
+          Start a task
         </button>
         <span className="flex items-center gap-1.5 text-small text-dim">
           or press <Keycap>⌘N</Keycap>

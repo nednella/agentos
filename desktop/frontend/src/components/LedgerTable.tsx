@@ -2,7 +2,7 @@ import type { LedgerRow } from '../types'
 
 type LedgerTableProps = { projects: LedgerRow[] }
 
-const HEADS = ['Prompts', 'Sessions', 'PRs merged', 'Issues closed']
+const HEADS = ['Prompts', 'Tasks', 'PRs merged', 'Issues closed']
 
 export function LedgerTable({ projects }: LedgerTableProps) {
   return (

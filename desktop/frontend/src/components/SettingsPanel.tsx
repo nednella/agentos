@@ -84,10 +84,10 @@ export function SettingsPanel() {
           <SettingRow label="Clean up after a close" hint="Auto cleans up when you close the pull request. Manual asks first.">
             <SegmentedControl label="Clean up after a close" options={MODES} value={settings.cleanup.close} onChange={(value) => report(() => setCleanup('close', value))} />
           </SettingRow>
-          <SettingRow label="Send the first prompt" hint="Auto sends what a new session starts with at once. Manual types it and waits for Enter.">
+          <SettingRow label="Send the first prompt" hint="Auto sends what a new task starts with at once. Manual types it and waits for Enter.">
             <SegmentedControl label="Send the first prompt" options={MODES} value={settings.promptSend} onChange={(value) => report(() => setPromptSend(value))} />
           </SettingRow>
-          <SettingRow label="Browser enabled" hint="Tells new sessions about the browser and evidence commands.">
+          <SettingRow label="Browser enabled" hint="Tells new tasks about the browser and evidence commands.">
             <SegmentedControl label="Browser enabled" options={SWITCH} value={settings.browserEnabled ? 'on' : 'off'} onChange={(value) => report(() => setBrowserEnabled(value === 'on'))} />
           </SettingRow>
           <SettingRow label="Digest schedule" hint="Weekly runs the digest by itself. Off leaves it to you.">

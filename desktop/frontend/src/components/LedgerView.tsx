@@ -28,7 +28,7 @@ export function LedgerView({ days }: LedgerViewProps) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">
         <p className="text-body font-medium">Nothing recorded yet</p>
-        <p className="text-small text-dim">Prompts, sessions and agent time are counted from now on.</p>
+        <p className="text-small text-dim">Prompts, tasks and agent time are counted from now on.</p>
       </div>
     )
   }
