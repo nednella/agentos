@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/nednella/agentos/compare/v0.27.0...v0.27.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* **desktop:** stop counting finished turns as interruptions ([4adf56d](https://github.com/nednella/agentos/commit/4adf56dc2b31ec3977c1ae9418b522974da59033))
+
 ## [0.27.0](https://github.com/nednella/agentos/compare/v0.26.0...v0.27.0) (2026-10-11)
 
 
