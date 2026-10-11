@@ -58,9 +58,11 @@ func (w *work) merge(o work) {
 
 type modelEffort struct{ model, effort string }
 
-// spending is the usage of a day or of a range of days, in all and split up.
+// spending is the usage of a day or of a range of days, in all and split up. Chats count in all
+// and in chats only.
 type spending struct {
 	all     spend
+	chats   spend
 	byModel map[modelEffort]*spend
 	byWork  map[string]*work // by "#<issue>" or session id
 }
@@ -70,6 +72,10 @@ func (s *spending) count(e activity.Event) {
 		s.byModel, s.byWork = map[modelEffort]*spend{}, map[string]*work{}
 	}
 	s.all.count(e.Session, e.Tokens)
+	if e.Kind == activity.ChatUsage {
+		s.chats.count(e.Session, e.Tokens)
+		return
+	}
 	key := modelEffort{e.Model, e.Effort}
 	if s.byModel[key] == nil {
 		s.byModel[key] = &spend{}
@@ -106,6 +112,7 @@ func (s *spending) merge(o spending) {
 		s.byModel, s.byWork = map[modelEffort]*spend{}, map[string]*work{}
 	}
 	s.all.merge(o.all)
+	s.chats.merge(o.chats)
 	for key, sp := range o.byModel {
 		if s.byModel[key] == nil {
 			s.byModel[key] = &spend{}
@@ -145,13 +152,14 @@ type WorkRow struct {
 
 // Usage is what the agents used over the ledger's days.
 type Usage struct {
-	Totals     UsageRow   `json:"totals"`
-	ByModel    []UsageRow `json:"byModel"` // costliest first
+	Totals     UsageRow   `json:"totals"`  // tasks and chats
+	Chats      UsageRow   `json:"chats"`   // in no other row
+	ByModel    []UsageRow `json:"byModel"` // of tasks, costliest first
 	PricesAsOf string     `json:"pricesAsOf"`
 }
 
 func (s spending) usage() Usage {
-	u := Usage{Totals: s.all.row("", ""), ByModel: []UsageRow{}, PricesAsOf: usage.PricesAsOf}
+	u := Usage{Totals: s.all.row("", ""), Chats: s.chats.row("", ""), ByModel: []UsageRow{}, PricesAsOf: usage.PricesAsOf}
 	for key, sp := range s.byModel {
 		u.ByModel = append(u.ByModel, sp.row(key.model, key.effort))
 	}
