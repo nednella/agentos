@@ -3,6 +3,7 @@
 @import '@fontsource/ibm-plex-sans/latin-500.css';
 @import '@fontsource/ibm-plex-sans/latin-600.css';
 @import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
 @import '@fontsource/jetbrains-mono/latin-600.css';
 @import '@xterm/xterm/css/xterm.css';
 @import './tokens.css';
@@ -596,6 +597,87 @@
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  /* Sizes are the app icon's units (desktop/build/icon.go), scaled to a 72px chevron. */
+  .splash {
+    --u: calc(72px / 328);
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-splash);
+    display: grid;
+    place-items: center;
+    background: var(--bg-app);
+  }
+
+  .splash.leaving {
+    opacity: 0;
+    transition: opacity 0.6s ease-in;
+  }
+
+  .splash.leaving .splash-prompt {
+    transform: scale(1.04);
+    transition: transform 0.6s ease-in;
+  }
+
+  .splash-prompt {
+    display: flex;
+    align-items: baseline;
+    width: calc(224 * var(--u) + 38 * var(--u) + 7.4ch + 220 * var(--u));
+    font: 500 60px/1 var(--font-mono);
+  }
+
+  .splash-prompt svg {
+    flex: none;
+    width: calc(224 * var(--u));
+    height: calc(328 * var(--u));
+    overflow: visible;
+  }
+
+  .splash-prompt polyline {
+    fill: none;
+    stroke: var(--text);
+    stroke-width: 64;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-dasharray: 415;
+    stroke-dashoffset: 415;
+  }
+
+  .splash.drawn polyline {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .splash-name {
+    margin-left: calc(38 * var(--u));
+    white-space: pre;
+  }
+
+  .splash-cursor {
+    flex: none;
+    display: inline-block;
+    width: calc(220 * var(--u));
+    height: calc(50 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: var(--accent);
+    opacity: 0;
+    box-shadow: 0 0 calc(40 * var(--u)) color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+
+  .splash-cursor.on {
+    opacity: 1;
+  }
+
+  .app-enter {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+
+  .app-enter.shown {
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
   }
 
   @media (prefers-reduced-motion: reduce) {
