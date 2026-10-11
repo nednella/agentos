@@ -22,7 +22,8 @@ type Commands struct {
 
 func NewCommands(i *Issues, prs PRs) *Commands { return &Commands{issues: i, prs: prs} }
 
-// Issue starts a session for each issue number given, or finds the one already running.
+// Issue starts a session for each issue number given, or finds the one already running. A prompt is the asking
+// session's handover; it reaches only a session that starts.
 func (c *Commands) Issue(ctx context.Context, req ctl.Request) (string, error) {
 	if len(req.Args) == 0 {
 		return "", errors.New("usage: agentos issue <number...>")
@@ -35,10 +36,12 @@ func (c *Commands) Issue(ctx context.Context, req ctl.Request) (string, error) {
 			continue
 		}
 		had := c.hasSession(ctx, n)
-		s, err := c.issues.Start(ctx, n, "")
+		s, err := c.issues.Start(ctx, n, "", req.Opts["prompt"])
 		switch {
 		case err != nil:
 			failed = append(failed, fmt.Sprintf("#%d (%v)", n, err))
+		case had && req.Opts["prompt"] != "":
+			running = append(running, fmt.Sprintf("#%d (%d, the prompt was not given to it)", n, s.N))
 		case had:
 			running = append(running, fmt.Sprintf("#%d (%d)", n, s.N))
 		default:

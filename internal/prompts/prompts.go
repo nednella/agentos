@@ -32,6 +32,8 @@ var (
 	task string
 	//go:embed chat.md
 	chat string
+	//go:embed handover.md
+	handover string
 )
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
@@ -50,6 +52,9 @@ func Task() string { return body(task) }
 
 // Chat follows Session in the system prompt of a chat: why it runs in plan mode and how it hands work off.
 func Chat() string { return body(chat) }
+
+// Handover ends the system prompt of a task that another session asked for, with the context that session gave.
+func Handover(context string) string { return strings.Replace(body(handover), "{context}", context, 1) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }

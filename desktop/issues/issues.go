@@ -26,7 +26,7 @@ type Sessions interface {
 	Current() project.Project
 	IssueSessions() map[int]string
 	List() []sessions.Session
-	CreateIssue(title, text string, issue int, action project.Action, labels []string) (sessions.Session, error)
+	CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (sessions.Session, error)
 }
 
 // Issue is a GitHub issue placed in a section of the queue.
@@ -281,7 +281,7 @@ func (i *Issues) Reload(ctx context.Context, proj project.Project) {
 // Start opens a session for the issue with the action of its section that has the name given, or the
 // section's default action when action is "". An issue that already has a live session gets that session
 // back instead of a second agent.
-func (i *Issues) Start(ctx context.Context, number int, action string) (sessions.Session, error) {
+func (i *Issues) Start(ctx context.Context, number int, action, handover string) (sessions.Session, error) {
 	list, err := i.List(ctx, i.sessions.Current(), false)
 	if err != nil {
 		return sessions.Session{}, err
@@ -303,7 +303,7 @@ func (i *Issues) Start(ctx context.Context, number int, action string) (sessions
 		if !ok {
 			return sessions.Session{}, fmt.Errorf("issue #%d has no action %q", number, action)
 		}
-		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels)
+		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
 	}
 	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
 }

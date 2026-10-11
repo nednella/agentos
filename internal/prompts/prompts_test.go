@@ -51,6 +51,12 @@ func TestBodyWithoutComment(t *testing.T) {
 	}
 }
 
+func TestHandoverEndsWithTheContext(t *testing.T) {
+	if got := Handover("line one\n{context}"); !strings.HasSuffix(got, ":\n\nline one\n{context}") || strings.Contains(got, "<!--") {
+		t.Errorf("Handover = %q", got)
+	}
+}
+
 func TestDigestNamesTheDependencies(t *testing.T) {
 	got := Digest([]string{"react", "gopkg.in/yaml.v3"})
 	for _, want := range []string{"react\ngopkg.in/yaml.v3\n", "agentos digest add --title", "Do nothing else."} {
