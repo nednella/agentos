@@ -10,7 +10,7 @@ type SortKey = 'lastAt' | 'sessions' | 'tokens' | 'cost'
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'sessions', label: 'Tasks' },
   { key: 'tokens', label: 'Tokens' },
-  { key: 'cost', label: 'Cost' },
+  { key: 'cost', label: 'Est. cost' },
   { key: 'lastAt', label: 'Last' },
 ]
 
