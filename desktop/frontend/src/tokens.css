@@ -56,6 +56,7 @@
   --z-popup: 30;
   --z-overlay: 40;
   --z-toast: 50;
+  --z-splash: 60;
 }
 
 :root[data-theme='light'] {
