@@ -727,9 +727,9 @@
     animation: spin 0.8s linear infinite;
   }
 
-  /* The app icon's prompt, in its units (desktop/build/icon.go), scaled to a 28px chevron. */
+  /* The app icon's prompt, in its units (desktop/build/icon.go), scaled to a 22px chevron. */
   .prompt-loader {
-    --u: calc(28px / 328);
+    --u: calc(22px / 328);
     display: flex;
     align-items: flex-end;
     width: calc(812 * var(--u));
