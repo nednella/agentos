@@ -144,6 +144,7 @@ func TestLedgerPullRequestsAndIssues(t *testing.T) {
 		{At: at(1), Kind: activity.IssueFiled},
 		{At: at(1), Kind: activity.SessionEnd, Ms: 100},
 		{At: at(1), Kind: activity.SessionEnd, Ms: 300},
+		{At: at(1), Kind: activity.ChatStart},
 		{At: at(50), Kind: activity.PRMerged, Issue: 6, Ms: 5000},
 	} {
 		log.Record("alpha", e)
@@ -154,7 +155,7 @@ func TestLedgerPullRequestsAndIssues(t *testing.T) {
 		t.Fatal(err)
 	}
 	alpha := led.Projects[0]
-	want := LedgerRow{Project: "Alpha", PRsOpened: 1, PRsMerged: 3, PRsClosed: 1, IssuesFiled: 1, IssuesClosed: 1, AvgSessionMs: 200, AvgLeadMs: 2000}
+	want := LedgerRow{Project: "Alpha", Chats: 1, PRsOpened: 1, PRsMerged: 3, PRsClosed: 1, IssuesFiled: 1, IssuesClosed: 1, SessionMs: 400, AvgSessionMs: 200, AvgLeadMs: 2000}
 	if alpha != want {
 		t.Errorf("alpha = %+v, want %+v", alpha, want)
 	}

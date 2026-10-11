@@ -27,6 +27,7 @@ type Ledger struct {
 type LedgerRow struct {
 	Project       string  `json:"project"`
 	Prompts       int     `json:"prompts"`
+	Chats         int     `json:"chats"`
 	Sessions      int     `json:"sessions"`
 	IssueSessions int     `json:"issueSessions"`
 	WorkMs        int64   `json:"workMs"`
@@ -35,6 +36,7 @@ type LedgerRow struct {
 	PRsClosed     int     `json:"prsClosed"` // closed without a merge
 	IssuesFiled   int     `json:"issuesFiled"`
 	IssuesClosed  int     `json:"issuesClosed"`
+	SessionMs     int64   `json:"sessionMs"`    // how long the ended sessions ran, start to end, all together
 	AvgSessionMs  int64   `json:"avgSessionMs"` // 0 when no session ended
 	AvgLeadMs     int64   `json:"avgLeadMs"`    // from a PR first seen open to merged; 0 when none merged
 	Tokens        int64   `json:"tokens"`
@@ -49,7 +51,7 @@ type total struct {
 
 func (t total) row(project string) LedgerRow {
 	r := LedgerRow{
-		Project: project, Prompts: t.Prompts, Sessions: t.Sessions, IssueSessions: t.IssueSessions, WorkMs: t.WorkMs,
+		Project: project, Prompts: t.Prompts, Chats: t.Chats, Sessions: t.Sessions, IssueSessions: t.IssueSessions, WorkMs: t.WorkMs, SessionMs: t.SessionMs,
 		PRsOpened: t.PRsOpened, PRsMerged: t.PRsMerged, PRsClosed: t.PRsClosed, IssuesFiled: t.IssuesFiled, IssuesClosed: t.issuesClosed,
 		Tokens: t.spending.all.Total(), Cost: t.spending.all.Dollars(),
 	}

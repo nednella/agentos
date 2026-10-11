@@ -137,7 +137,10 @@ func TestChatStaysOutOfTheStats(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if led.Totals.Prompts != 1 || led.Totals.Sessions != 1 {
+	if starts := h.Events(t, activity.ChatStart); len(starts) != 1 || starts[0].Session != chat.ID {
+		t.Errorf("chat_start events = %+v", starts)
+	}
+	if led.Totals.Prompts != 1 || led.Totals.Sessions != 1 || led.Totals.Chats != 1 {
 		t.Errorf("totals = %+v", led.Totals)
 	}
 

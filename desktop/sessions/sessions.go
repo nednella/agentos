@@ -556,7 +556,10 @@ func (s *Sessions) sync() {
 		}
 		prev, known := s.seen[id]
 		if !known {
-			if s.synced {
+			switch {
+			case s.synced && in.Chat:
+				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.ChatStart})
+			case s.synced:
 				issue, _ := strconv.Atoi(in.Issue)
 				e := activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionStart, Issue: issue, Model: in.Model, Effort: in.Effort}
 				if s.resumed[id] {
@@ -649,16 +652,16 @@ func (s *Sessions) worked(id string, end time.Time) {
 	}
 }
 
-// record adds an event of the session to the activity record.
+// record adds an event of the session to the activity record. Of a chat, only its start is recorded.
 func (s *Sessions) record(id string, e activity.Event) {
-	if s.isChat(id) {
+	if e.Kind != activity.ChatStart && s.isChat(id) {
 		return
 	}
 	e.Session = id
 	s.activity.Record(session.ProjectKey(id), e)
 }
 
-// isChat says whether the session, live or ended, is a chat, which stays out of the stats. It needs mu.
+// isChat says whether the session, live or ended, is a chat, which the stats only count. It needs mu.
 func (s *Sessions) isChat(id string) bool {
 	if e, ok := s.ended[id]; ok {
 		return e.info.Chat
