@@ -1123,27 +1123,44 @@ func (l *Lifecycle) Cleanups(key string) []Cleanup {
 	return out[:min(len(out), cleanupsKept)]
 }
 
-// branchesOf are the branches a session worked on, oldest first.
+// branchesOf are the branches a session worked on, oldest first. An older one that another session
+// works on now is that session's: an agent that made a branch and handed it on must not clean it up.
 func (l *Lifecycle) branchesOf(proj project.Project, id string) []string {
 	if l == nil {
 		return nil
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	return slices.Clone(l.prs(proj.Key()).Branches[id])
+	f := l.prs(proj.Key())
+	own := f.Branches[id]
+	return slices.DeleteFunc(slices.Clone(own), func(b string) bool {
+		return b != own[len(own)-1] && f.othersOn(id, b)
+	})
+}
+
+// othersOn says whether a session other than id works on branch now.
+func (f *prsFile) othersOn(id, branch string) bool {
+	for other, branches := range f.Branches {
+		if other != id && len(branches) > 0 && branches[len(branches)-1] == branch {
+			return true
+		}
+	}
+	return false
 }
 
 // learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
 // not the main one.
 func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string, turnEnded bool) {
 	if branch, ok := l.workBranch(ctx, proj, cwd); ok {
-		l.track(ctx, id, proj, branch, turnEnded)
+		l.track(ctx, id, proj, branch, turnEnded, false)
 	}
 }
 
 // track notes branch as the newest one the session works on and looks up its pull request.
 // A branch it already knows is looked up again only when the turn ended: the agent may just have opened the PR.
-func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string, turnEnded bool) {
+// Unless the agent reported the branch, one that another session works on now stays that session's:
+// the agent only looked in its worktree.
+func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string, turnEnded, reported bool) {
 	key := proj.Key()
 	l.mu.Lock()
 	if l.gone[id] {
@@ -1151,6 +1168,10 @@ func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, 
 		return
 	}
 	f := l.prs(key)
+	if !reported && f.othersOn(id, branch) {
+		l.mu.Unlock()
+		return
+	}
 	known := f.Branches[id]
 	if len(known) > 0 && known[len(known)-1] == branch {
 		l.mu.Unlock()
