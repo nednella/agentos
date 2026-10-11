@@ -6,12 +6,12 @@ type LedgerUsageProps = { usage: Ledger['usage']; limit?: number }
 const HEADS = ['Tasks', 'Tokens', 'Per task', 'Cost']
 
 export function LedgerUsage({ usage, limit }: LedgerUsageProps) {
-  const { totals, byModel, pricesAsOf } = usage
+  const { totals, chats, byModel, pricesAsOf } = usage
   return (
     <div>
       <p className="pb-2 text-small text-dim">
         {tokenCount(totals.input)} input, {tokenCount(totals.output)} output ({tokenCount(totals.thinking)} thinking),{' '}
-        {tokenCount(totals.cacheRead)} cache read, {tokenCount(totals.cacheWrite)} cache write. {priceNote(pricesAsOf)}; subagents included.
+        {tokenCount(totals.cacheRead)} cache read, {tokenCount(totals.cacheWrite)} cache write. {priceNote(pricesAsOf)}; subagents and chats included.
       </p>
       <table className="w-full text-body">
         <thead>
@@ -26,12 +26,20 @@ export function LedgerUsage({ usage, limit }: LedgerUsageProps) {
           </tr>
         </thead>
         <tbody>
-          {byModel.slice(0, limit).map((r) => (
-            <tr key={`${r.model} ${r.effort}`} className="border-t border-line">
-              <td className="mono py-1.5 whitespace-nowrap" title={r.model}>
-                {r.model.replace(/^claude-/, '') || 'unknown'}
-              </td>
-              <td className="py-1.5 pl-3 text-soft">{r.effort || 'default'}</td>
+          {[...byModel.slice(0, limit), ...(chats.sessions > 0 ? [chats] : [])].map((r) => (
+            <tr key={r === chats ? 'chats' : `${r.model} ${r.effort}`} className="border-t border-line">
+              {r === chats ? (
+                <td className="py-1.5" colSpan={2}>
+                  Chats
+                </td>
+              ) : (
+                <>
+                  <td className="mono py-1.5 whitespace-nowrap" title={r.model}>
+                    {r.model.replace(/^claude-/, '') || 'unknown'}
+                  </td>
+                  <td className="py-1.5 pl-3 text-soft">{r.effort || 'default'}</td>
+                </>
+              )}
               <td className="mono py-1.5 pl-3 text-right whitespace-nowrap">{r.sessions.toLocaleString()}</td>
               <td className="mono py-1.5 pl-3 text-right whitespace-nowrap">{tokenCount(r.tokens)}</td>
               <td className="mono py-1.5 pl-3 text-right whitespace-nowrap">
