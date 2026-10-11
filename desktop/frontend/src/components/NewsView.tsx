@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAgentos } from "../AgentosContext";
 import { ago, useNow } from "../time";
+import { Loading } from "./Loading";
 import { NewsHeader } from "./NewsHeader";
 import { NewsItemRow } from "./NewsItemRow";
 
@@ -55,7 +56,8 @@ export function NewsView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {issues.length === 0 && (
+        {!news && <Loading label="Loading news" />}
+        {news && issues.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">No news yet</p>
             <p className="text-small text-dim">
