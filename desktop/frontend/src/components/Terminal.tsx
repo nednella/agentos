@@ -16,6 +16,8 @@ const RESIZE_SETTLE_MS = 120
 
 const BASE_FONT_PX = 14
 const SHIFT_ENTER = '\x1b[13;2u'
+const LINE_START = '\x01'
+const LINE_END = '\x05'
 const SYSTEM_KEYS = new Set(['c', 'v', 'x', 'm', 'h', 'w', 'q'])
 
 // A remount of one id must not let the old mount's close land after the new mount's open.
@@ -125,6 +127,13 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       const key = event.key.toLowerCase()
       if (event.metaKey && key === 'c' && term.hasSelection()) {
         void navigator.clipboard.writeText(term.getSelection())
+        return false
+      }
+      if (event.metaKey && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+        if (event.type === 'keydown') {
+          event.preventDefault()
+          void api.termWrite(id, event.key === 'ArrowLeft' ? LINE_START : LINE_END)
+        }
         return false
       }
       if (event.metaKey && !SYSTEM_KEYS.has(key)) return false
