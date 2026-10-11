@@ -25,6 +25,7 @@ import (
 	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
+	"github.com/nednella/agentos/internal/usage"
 	"github.com/nednella/agentos/internal/util"
 )
 
@@ -75,6 +76,9 @@ type Session struct {
 	CleanupReason string `json:"cleanupReason"`
 
 	EndedAt int64 `json:"endedAt"` // unix ms; 0 while the session runs
+
+	Tokens int64   `json:"tokens"` // what the agent used in this run of the app, 0 when not known
+	Cost   float64 `json:"cost"`   // what those tokens cost at list prices, in US dollars
 }
 
 // Project is a project as the front end sees it, with how its sessions stand.
@@ -137,6 +141,8 @@ type Sessions struct {
 	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
 	wakes      map[string]string        // prompts for sessions that were waiting on the user when their PR needed them
 	prefillFor time.Duration
+	readers    map[string]*reader      // each session's transcript reader
+	spent      map[string]usage.Tokens // what each session's agent used
 }
 
 // ProjectList is the configured projects.
@@ -154,6 +160,7 @@ type Tally interface {
 // Activity records what the user, the agents and the app do.
 type Activity interface {
 	Record(projectKey string, e activity.Event)
+	Since(projectKey, day string, each func(activity.Event))
 }
 
 // Evidence is what the sessions need of the evidence store.
@@ -231,6 +238,8 @@ func newSessions(o Options) *Sessions {
 		ready:      map[string]chan struct{}{},
 		resumed:    map[string]bool{},
 		wakes:      map[string]string{},
+		readers:    map[string]*reader{},
+		spent:      map[string]usage.Tokens{},
 		prefillFor: prefillWait,
 		ctx:        context.Background(),
 	}
@@ -449,6 +458,8 @@ func (s *Sessions) drop(id string) {
 	delete(s.history, id)
 	delete(s.known, id)
 	delete(s.nums, id)
+	delete(s.readers, id)
+	delete(s.spent, id)
 	s.dismissed[id] = true
 	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
@@ -497,6 +508,10 @@ func (s *Sessions) take(rec session.Record) {
 	}
 	s.records[rec.Session] = rec
 	s.followBranch(rec)
+	// A turn's usage is all written by its Stop. The first refresh catches up on turns while the app was closed.
+	if rec.Transcript != "" && (rec.Event == "Stop" || rec.Event == "SessionEnd" || !s.loaded) {
+		go s.countUsage(rec.Session, rec.Transcript)
+	}
 	if ch, ok := s.ready[rec.Session]; ok && rec.Event == "SessionStart" {
 		close(ch)
 		delete(s.ready, rec.Session)
@@ -765,6 +780,9 @@ func (s *Sessions) list() []Session {
 		view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
 		if view.Branch == "" && issue > 0 {
 			view.Branch = s.project.BranchFor(issue)
+		}
+		if spent, ok := s.spent[id]; ok {
+			view.Tokens, view.Cost = spent.Total(), spent.Dollars()
 		}
 		if view.History == nil {
 			view.History = []Change{}
