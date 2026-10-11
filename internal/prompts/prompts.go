@@ -28,6 +28,10 @@ var (
 	startIssue string
 	//go:embed session.md
 	session string
+	//go:embed session-work.md
+	sessionWork string
+	//go:embed chat.md
+	chat string
 )
 
 // Digest is what the weekly digest run asks Claude to do, given the names the project depends on.
@@ -40,6 +44,12 @@ func BrowserSession() string { return body(browserSession) }
 
 // Session is appended to every Claude session's system prompt: where it runs and the commands that reach the app.
 func Session() string { return body(session) }
+
+// SessionWork follows Session in the system prompt of a session that works on the project: how it uses branches.
+func SessionWork() string { return body(sessionWork) }
+
+// Chat follows Session in the system prompt of a chat: why it runs in plan mode and how it hands work off.
+func Chat() string { return body(chat) }
 
 // BrowserHelp is what agentos browser help prints.
 func BrowserHelp() string { return body(browserHelp) }
