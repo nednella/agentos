@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.27.0](https://github.com/nednella/agentos/compare/v0.26.0...v0.27.0) (2026-10-11)
+
+
+### Features
+
+* **desktop:** free ⌘M from Minimize ([8ec3ff6](https://github.com/nednella/agentos/commit/8ec3ff694cc2286624d03db171f74e3737d33e97))
+* **desktop:** start read-only chats in a project ([d754f81](https://github.com/nednella/agentos/commit/d754f819d0c9184272f244767b8479a1484d8575))
+* **ui:** call working sessions tasks ([7e637ed](https://github.com/nednella/agentos/commit/7e637edbcfc7b28b32fc0e1e17bfe308651e9cbc))
+* **ui:** offer chat and task cards on empty screen ([fd22686](https://github.com/nednella/agentos/commit/fd226864fc9103601f702362e6ffc350c3c11f31))
+* **ui:** say agent where text means session or chat ([6c9c701](https://github.com/nednella/agentos/commit/6c9c70115b9e094f36669d5b5bed38c85765db66))
+* **ui:** say no chats yet in empty chats group ([1e919ea](https://github.com/nednella/agentos/commit/1e919eaea983ec154e36ed058b247524586881ca))
+* **ui:** show chat shortcut on empty screen and in sheet ([6469ee1](https://github.com/nednella/agentos/commit/6469ee1acf84c36cc851e6f061f1a66369a1e425))
+* **ui:** show chats above sessions in agents panel ([2aece6f](https://github.com/nednella/agentos/commit/2aece6f2a7e3f28eac5bf4be34d3edfa1f6211a6))
+* **ui:** show icon and hint in empty session groups ([b11e87d](https://github.com/nednella/agentos/commit/b11e87d5296cf9f5a6448085bb5d293c711d9c3b))
+
 ## [0.26.0](https://github.com/nednella/agentos/compare/v0.25.0...v0.26.0) (2026-10-10)
 
 
