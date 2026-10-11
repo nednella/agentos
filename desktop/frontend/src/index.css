@@ -751,7 +751,7 @@
     flex: none;
     width: 0;
     overflow: hidden;
-    animation: prompt-type 2.4s steps(1, end) infinite;
+    animation: prompt-type 4s steps(1, end) infinite;
   }
 
   .prompt-loader-line > i,
@@ -770,20 +770,20 @@
   .prompt-loader-cursor {
     width: calc(220 * var(--u));
     background: var(--accent);
-    animation: prompt-blink 2.4s steps(1, end) infinite;
+    animation: prompt-blink 4s steps(1, end) infinite;
   }
 
   @keyframes prompt-type {
     0% {
       width: 0;
     }
-    10% {
+    7.5% {
       width: calc(110 * var(--u));
     }
-    20% {
+    15% {
       width: calc(220 * var(--u));
     }
-    30% {
+    22.5% {
       width: calc(330 * var(--u));
     }
     75% {
@@ -792,16 +792,16 @@
   }
 
   @keyframes prompt-blink {
-    0%,
-    40%,
-    56%,
-    72%,
-    92% {
+    0% {
       opacity: 1;
     }
-    48%,
-    64%,
-    84% {
+    40% {
+      opacity: 0;
+    }
+    53% {
+      opacity: 1;
+    }
+    87.5% {
       opacity: 0;
     }
   }

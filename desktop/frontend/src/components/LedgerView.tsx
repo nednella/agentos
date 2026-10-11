@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api'
 import { useAgentos } from '../AgentosContext'
+import { useMinimumLoading } from '../useMinimumLoading'
 import type { Ledger } from '../types'
 import { LedgerFigures } from './LedgerFigures'
 import { LedgerHeatmap } from './LedgerHeatmap'
@@ -25,8 +26,9 @@ export function LedgerView({ days }: LedgerViewProps) {
       current = false
     }
   }, [days, report])
+  const loading = useMinimumLoading(ledger === null)
 
-  if (ledger === null) return <Loading />
+  if (loading || ledger === null) return <Loading />
   if (ledger.since === '') {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">

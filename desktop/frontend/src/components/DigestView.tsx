@@ -3,6 +3,7 @@ import { useAgentos } from "../AgentosContext";
 import { ago, until, useNow } from "../time";
 import type { DigestItem } from "../types";
 import { DigestItemRow } from "./DigestItemRow";
+import { useMinimumLoading } from "../useMinimumLoading";
 import { Loading } from "./Loading";
 import { NewsHeader } from "./NewsHeader";
 
@@ -30,6 +31,7 @@ export function DigestView() {
   const { digest, runDigest, markDigestSeen, report, focusRequest, project } =
     useAgentos();
   const now = useNow();
+  const loading = useMinimumLoading(!digest);
   const panel = useRef<HTMLElement>(null);
   const groups = useMemo(
     () => groupByDay(digest?.items ?? []),
@@ -74,8 +76,8 @@ export function DigestView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!digest && <Loading />}
-        {digest && groups.length === 0 && (
+        {loading && <Loading />}
+        {!loading && groups.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">Nothing in the digest yet</p>
             <p className="text-small text-dim">
@@ -84,20 +86,22 @@ export function DigestView() {
             </p>
           </div>
         )}
-        <div className="mx-auto max-w-3xl">
-          {groups.map((group) => (
-            <section key={group.day}>
-              <h3 className="label sticky top-0 border-b border-line bg-surface px-4 py-2">
-                {group.day}
-              </h3>
-              <ul className="divide-y divide-line">
-                {group.items.map((item) => (
-                  <DigestItemRow key={item.id} item={item} />
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+        {!loading && (
+          <div className="mx-auto max-w-3xl">
+            {groups.map((group) => (
+              <section key={group.day}>
+                <h3 className="label sticky top-0 border-b border-line bg-surface px-4 py-2">
+                  {group.day}
+                </h3>
+                <ul className="divide-y divide-line">
+                  {group.items.map((item) => (
+                    <DigestItemRow key={item.id} item={item} />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
