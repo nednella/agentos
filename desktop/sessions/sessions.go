@@ -1548,7 +1548,7 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 	if proj.BrowserOn() && s.browsers.Available() {
 		if port := s.browsers.Port(name.Project); port != 0 {
 			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
-			prompt += "\n\n" + prompts.BrowserSession()
+			prompt += "\n\n" + prompts.Browser()
 		}
 	}
 	return append(argv, "--append-system-prompt", prompt)
