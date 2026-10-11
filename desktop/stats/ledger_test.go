@@ -228,11 +228,15 @@ func TestLedgerChatUsage(t *testing.T) {
 	if tot := led.Usage.Totals; tot.Sessions != 2 || tot.Tokens != 135 || tot.Cost != 2.51 {
 		t.Errorf("usage totals = %+v, want the task and the chat", tot)
 	}
-	if c := led.Usage.Chats; c.Sessions != 1 || c.Tokens != 35 || c.Cost != 0.51 {
-		t.Errorf("chats = %+v", c)
+	if task := led.Usage.Tasks; task.Sessions != 1 || task.Tokens != 100 || task.Cost != 2 {
+		t.Errorf("tasks = %+v", task)
 	}
-	if len(led.Usage.ByModel) != 1 || led.Usage.ByModel[0].Tokens != 100 {
-		t.Errorf("by model = %+v, want the task only", led.Usage.ByModel)
+	var models []string
+	for _, r := range led.Usage.ByModel {
+		models = append(models, fmt.Sprintf("%s:%d:%d", r.Model, r.Sessions, r.Tokens))
+	}
+	if want := []string{"claude-opus-5-5:2:130", "claude-haiku-5-5:1:5"}; !slices.Equal(models, want) {
+		t.Errorf("by model = %v, want the task and the chat", models)
 	}
 	if len(led.Work) != 1 || led.Work[0].Issue != 7 {
 		t.Errorf("work = %+v, want the task only", led.Work)
