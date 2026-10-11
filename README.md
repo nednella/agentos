@@ -34,6 +34,7 @@ The script puts `agentos.app` in `~/Applications` and the `agentos` command in `
 1. Open `agentos`.
 2. Add a project: `⌘P` → _Add project_, or `agentos project add` in its folder.
 3. Start a session: `⌘N`, or `Enter` on an issue in the queue to open it, then start one from it.
+4. Ask about the project without starting work: `⌘M` starts a chat. A chat reads the project and changes nothing; it files an issue or hands off to a session when the talk turns into work. Chats stay out of the stats.
 
 `⌘K` opens the command palette. `⌘/` lists every shortcut. `agentos --help` lists the commands.
 
