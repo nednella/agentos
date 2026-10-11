@@ -40,15 +40,18 @@ jobs:
     runs-on: macos-latest
     strategy:
       fail-fast: false
-      # sessions and browser take most of the time, so each gets a runner of its own.
+      # sessions and browser take most of the time, so each gets a runner of its own;
+      # issues, projects and notes come next, so they share one.
       matrix:
         include:
           - name: sessions
             packages: ./desktop/sessions
           - name: browser
             packages: ./desktop/browser
+          - name: issues, projects, notes
+            packages: ./desktop/issues ./desktop/projects ./desktop/notes
           - name: other
-            packages: $(go list -tags stub ./... | grep -vE '/desktop/(sessions|browser)$')
+            packages: $(go list -tags stub ./... | grep -vE '/desktop/(sessions|browser|issues|projects|notes)$')
             vet: true
     steps:
       - uses: actions/checkout@v4
