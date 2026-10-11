@@ -28,6 +28,8 @@ type IconName =
   | 'camera'
   | 'compare'
   | 'issue'
+  | 'chat'
+  | 'branch'
 
 type IconProps = { name: IconName; size?: number }
 
@@ -78,6 +80,16 @@ function IconShape({ name }: IconShapeProps) {
   if (name === 'forward') return <path d="M6.5 3.5 11 8l-4.5 4.5M11 8H3" />
   if (name === 'camera') return <path d="M2 5h3l1-1.5h4L11 5h3v8H2ZM8 11.2a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z" />
   if (name === 'compare') return <path d="M2.5 3h4.5v10H2.5ZM9 3h4.5v10H9Z" />
+  if (name === 'chat') return <path d="M2.5 3.5h11v7.5H7l-3 2.5V11H2.5Z" />
+  if (name === 'branch')
+    return (
+      <>
+        <circle cx="5" cy="3.5" r="1.5" />
+        <circle cx="5" cy="12.5" r="1.5" />
+        <circle cx="11" cy="5" r="1.5" />
+        <path d="M5 5v6M11 6.5c0 2.5-6 1.5-6 4.5" />
+      </>
+    )
   if (name === 'issue') return <path d="M8 13.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11ZM8 5.5v3.2M8 10.8v.01" />
   if (name === 'help') return <path d="M6 6a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5M8 12v.01" />
   return <path d="M2 4h4l1.5 1.5H14V13H2Z" />
