@@ -1024,7 +1024,8 @@ func TestRebasingWorktreeBlocksTheCleanup(t *testing.T) {
 
 	openThenMerge(h)
 	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
-	if got, _ := h.Session(s.ID); got.CleanupReason != "the worktree of issue-7 is in the middle of a rebase" || got.Worktree != wt {
+	realWt, _ := filepath.EvalSymlinks(wt)
+	if got, _ := h.Session(s.ID); got.CleanupReason != "the worktree of issue-7 is in the middle of a rebase" || got.Worktree != realWt {
 		t.Errorf("reason %q, worktree %q", got.CleanupReason, got.Worktree)
 	}
 	if !exists(wt) || branches(t, h.Dir) == "" {
