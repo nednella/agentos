@@ -26,10 +26,10 @@ var (
 	setupConflict string
 	//go:embed start-issue.md
 	startIssue string
+	//go:embed agent.md
+	agent string
 	//go:embed session.md
 	session string
-	//go:embed session-work.md
-	sessionWork string
 	//go:embed chat.md
 	chat string
 )
@@ -42,13 +42,13 @@ func Digest(dependencies []string) string {
 // BrowserSession is appended to a session's system prompt when it has a browser.
 func BrowserSession() string { return body(browserSession) }
 
-// Session is appended to every Claude session's system prompt: where it runs and the commands that reach the app.
+// Agent starts the system prompt of every Claude session and chat: where it runs and the commands both use.
+func Agent() string { return body(agent) }
+
+// Session follows Agent in the system prompt of a session that works on the project: its commands and branches.
 func Session() string { return body(session) }
 
-// SessionWork follows Session in the system prompt of a session that works on the project: how it uses branches.
-func SessionWork() string { return body(sessionWork) }
-
-// Chat follows Session in the system prompt of a chat: why it runs in plan mode and how it hands work off.
+// Chat follows Agent in the system prompt of a chat: why it runs in plan mode and how it hands work off.
 func Chat() string { return body(chat) }
 
 // BrowserHelp is what agentos browser help prints.
