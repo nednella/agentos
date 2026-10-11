@@ -652,16 +652,16 @@ func (s *Sessions) worked(id string, end time.Time) {
 	}
 }
 
-// record adds an event of the session to the activity record. Of a chat, only its start is recorded.
+// record adds an event of the session to the activity record. Of a chat, only its start and usage are recorded.
 func (s *Sessions) record(id string, e activity.Event) {
-	if e.Kind != activity.ChatStart && s.isChat(id) {
+	if e.Kind != activity.ChatStart && e.Kind != activity.ChatUsage && s.isChat(id) {
 		return
 	}
 	e.Session = id
 	s.activity.Record(session.ProjectKey(id), e)
 }
 
-// isChat says whether the session, live or ended, is a chat, which the stats only count. It needs mu.
+// isChat says whether the session, live or ended, is a chat, which the stats only count and cost. It needs mu.
 func (s *Sessions) isChat(id string) bool {
 	if e, ok := s.ended[id]; ok {
 		return e.info.Chat
