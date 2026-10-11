@@ -3,6 +3,7 @@ import { useAgentos } from '../AgentosContext'
 import { useActions, formatShortcut } from '../actions'
 import { useLayout } from '../LayoutContext'
 import type { State } from '../types'
+import { useFullscreen } from '../useFullscreen'
 import { Icon } from './Icon'
 import { StateDot } from './StateDot'
 
@@ -31,6 +32,7 @@ export function TopBar() {
   const { project, projects, sessions, setOverlay, digestUnseenCount, newsUnseen, report, update, updating, applyUpdate } = useAgentos()
   const { width, statsOpen, newsOpen } = useLayout()
   const actions = useActions()
+  const fullscreen = useFullscreen()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
   const idle = count('idle')
@@ -44,7 +46,7 @@ export function TopBar() {
   return (
     <header
       className="relative flex flex-none items-center border-b border-line"
-      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: 'var(--traffic-light-zone)', paddingRight: 'var(--corner-pad)' }}
+      style={{ ...drag, height: 'var(--topbar-h)', paddingLeft: fullscreen ? 'var(--corner-pad)' : 'var(--traffic-light-zone)', paddingRight: 'var(--corner-pad)' }}
     >
       <div className="flex min-w-0 items-center gap-3" style={noDrag}>
         {badge ? (
