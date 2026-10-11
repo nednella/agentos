@@ -16,6 +16,9 @@ func (v *Service) NewSession(title, prefill string) (Session, error) {
 	return v.s.Create(title, prefill, false, 0)
 }
 
+// NewChat starts a chat in the current project: a read-only session for questions about it.
+func (v *Service) NewChat(title string) (Session, error) { return v.s.CreateChat(title) }
+
 // ShellInfo names a shell session.
 type ShellInfo struct {
 	ID string `json:"id"`

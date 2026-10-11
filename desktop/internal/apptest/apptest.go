@@ -829,6 +829,10 @@ func (h *Harness) RemoveProject(name string) (projects.Snapshot, error) {
 func (h *Harness) SetUpProject() (sessions.Session, error)  { return h.projects.SetUpProject() }
 func (h *Harness) DismissSetup() (projects.Snapshot, error) { return h.projects.DismissSetup() }
 
+func (h *Harness) NewChat(title string) (sessions.Session, error) {
+	return h.sessions.NewChat(title)
+}
+
 func (h *Harness) NewSession(title, prefill string) (sessions.Session, error) {
 	return h.sessions.NewSession(title, prefill)
 }

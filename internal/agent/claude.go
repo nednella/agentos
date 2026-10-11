@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nednella/agentos/internal/util"
 )
+
+// chatTools are the commands a chat may run in plan mode: the ones that hand work to the owner's queue.
+var chatTools = []string{"Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(gh issue create:*)"}
 
 var claudeEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
@@ -52,6 +56,9 @@ func (c Claude) Command(_ string, l Launch) []string {
 	}
 	if l.Resume != "" {
 		argv = append(argv, "--resume", l.Resume)
+	}
+	if l.Chat {
+		argv = append(argv, "--permission-mode", "plan", "--allowedTools", strings.Join(chatTools, ","))
 	}
 	return argv
 }

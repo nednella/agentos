@@ -30,6 +30,7 @@ type Record struct {
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`
 	Issue   int    `json:"issue,omitempty"`
+	Chat    bool   `json:"chat,omitempty"`
 	Model   string `json:"model,omitempty"`
 	Effort  string `json:"effort,omitempty"`
 	Path    string `json:"path,omitempty"`

@@ -6,13 +6,9 @@ The `agentos` command reaches the app; `agentos --help` lists every command. The
 
 - `agentos show <file>`, or `--text "<words>"`: show the owner evidence, such as a screenshot of what you built.
 - `agentos note <text>`: add a note to the project.
-- `agentos track --branch <name>`: name the branch you work on, when it is not the one checked out in your folder.
-- `agentos issue <number>`: start a session for an issue, as the owner's queue does. Only when the owner agrees.
 - `agentos new "<short title>" --prompt -`: start a session of its own for a topic, with the context on stdin. Only when the owner agrees. The new session sees nothing of this one: give it the question, what you found, the files that matter and what is still open.
 
-Never commit on the default branch. Before you change files, run `git fetch` and make a branch from the default branch on origin, in its own worktree, where the project's AGENTS.md or CLAUDE.md says. Name it with `agentos track --branch`. One topic per branch, and never a branch another session works on.
-
-One topic per session, too. When the owner asks for work outside this session's topic, offer to hand it to a new session: `agentos issue` when it has an issue, else `agentos new`. If the owner wants it done here, make it a branch of its own; the app cleans up each branch when its pull request merges, and this session when the pull request of its newest branch merges.
+One topic per session. When the owner asks for work outside this session's topic, offer to hand it to a new session.
 
 A message that starts with `APPLICATION_PROMPT:` comes from agentos, not the owner: it starts your task or tells you about your pull request.
 
