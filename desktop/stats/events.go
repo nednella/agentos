@@ -270,6 +270,8 @@ type Day struct {
 	LeadMs       int64 // of the merged PRs, the time from first seen open to merged
 	IssuesFiled  int
 	ClosedIssues []int // the issues whose session's PR merged
+
+	spending spending // the tokens the agents used
 }
 
 func (d *Day) add(o Day) {
@@ -284,6 +286,7 @@ func (d *Day) add(o Day) {
 	d.PRsClosed += o.PRsClosed
 	d.LeadMs += o.LeadMs
 	d.IssuesFiled += o.IssuesFiled
+	d.spending.merge(o.spending)
 }
 
 // apply adds the event to its day. Kinds the rollup does not count are skipped.
@@ -319,6 +322,8 @@ func apply(days map[string]*Day, e activity.Event) {
 		d.PRsClosed++
 	case activity.IssueFiled:
 		d.IssuesFiled++
+	case activity.Usage:
+		d.spending.count(e)
 	}
 }
 
