@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.29.0](https://github.com/nednella/agentos/compare/v0.28.0...v0.29.0) (2026-10-11)
+
+
+### Features
+
+* **desktop:** count chat starts and session time in ledger ([77bede1](https://github.com/nednella/agentos/commit/77bede1bfde7f415360e4d4d4bbfe0c2adfc952e))
+* **desktop:** scope stats and ledger to a project ([d322445](https://github.com/nednella/agentos/commit/d32244508e3d85cd6fd551deefd825b11118127d))
+* **ui:** add project picker to stats ([a67babb](https://github.com/nednella/agentos/commit/a67babb9721379b01e4a07f27d24dcd3186821b9))
+* **ui:** cap stats tables with a show-all page ([17894af](https://github.com/nednella/agentos/commit/17894af50db3ff03ef1a2ab7c8468bd7840fd42b))
+* **ui:** cap work table at 5 rows ([74f5132](https://github.com/nednella/agentos/commit/74f51327bf5c3b7271a35610afc86f4c61d8eebd))
+* **ui:** drop last-active column from work table ([9f21a33](https://github.com/nednella/agentos/commit/9f21a33473378cba19c3f92b46f2901f5545ad27))
+* **ui:** name stats cost columns as estimates ([6f20872](https://github.com/nednella/agentos/commit/6f2087256089246736c46dd7b246bae7d0ed68ea))
+* **ui:** show chats and session time in stats ([d63d15c](https://github.com/nednella/agentos/commit/d63d15c42ab8300a49adff02724062183ce709ae))
+* **ui:** split stats into sections with a rail ([019411c](https://github.com/nednella/agentos/commit/019411c1eb599179ed17395d7a276d873b0d360d)), closes [#327](https://github.com/nednella/agentos/issues/327)
+
+
+### Bug Fixes
+
+* **ui:** call stats cost columns Cost ([111b4f7](https://github.com/nednella/agentos/commit/111b4f7616c6a1523ec198942ac578f4d478b8ed))
+* **ui:** give stats sections more room ([3ab65d8](https://github.com/nednella/agentos/commit/3ab65d81a8272b73d2e8ba69be75ca35ae423957))
+* **ui:** lay stats top bar out in two rows when narrow ([49e7789](https://github.com/nednella/agentos/commit/49e7789630a3812dac7437d2d41471645c423e6b))
+* **ui:** match stats text inset on both sides ([ff57e20](https://github.com/nednella/agentos/commit/ff57e204f10e214723c63c3f27195d3de070a141))
+* **ui:** name current figures in empty stats ([4099b5d](https://github.com/nednella/agentos/commit/4099b5dd0b58da6aad96a371656861320c6509a4))
+* **ui:** use 16px side padding on narrow stats panel ([8b2bf60](https://github.com/nednella/agentos/commit/8b2bf60d499f956383a8eff6a573e65ee4541d9b))
+
 ## [0.28.0](https://github.com/nednella/agentos/compare/v0.27.2...v0.28.0) (2026-10-11)
 
 
