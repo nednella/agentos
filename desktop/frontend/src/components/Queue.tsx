@@ -5,6 +5,7 @@ import { filterIssues, isFiltering } from '../issueFilter'
 import { readStored, writeStored } from '../storage'
 import type { Issue } from '../types'
 import { useListNav } from '../useListNav'
+import { useMinimumLoading } from '../useMinimumLoading'
 import { useIssueDrag } from '../useIssueDrag'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
@@ -149,8 +150,9 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   }, [nav, listNav.handle])
 
   useScrollCursorIntoView(list, listNav.cursorKey)
+  const loading = useMinimumLoading(issuesLoading && issues.length === 0)
 
-  if (issuesLoading && issues.length === 0) return <Loading />
+  if (loading) return <Loading />
   if (issues.length === 0) return <Notice title="No open issues" hint="This repo has nothing in the queue." centered />
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." centered />
 

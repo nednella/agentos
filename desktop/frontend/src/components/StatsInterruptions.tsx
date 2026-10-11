@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, on } from '../api'
 import { useAgentos } from '../AgentosContext'
+import { useMinimumLoading } from '../useMinimumLoading'
 import type { Stats as StatsData } from '../types'
 import { Loading } from './Loading'
 import { StatsBars } from './StatsBars'
@@ -18,8 +19,9 @@ export function StatsInterruptions({ days }: StatsInterruptionsProps) {
     load()
     return on('stats', load)
   }, [days, report])
+  const loading = useMinimumLoading(stats === null)
 
-  if (stats === null) return <Loading />
+  if (loading || stats === null) return <Loading />
   if (stats.total === 0) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">

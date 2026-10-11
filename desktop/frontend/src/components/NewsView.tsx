@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAgentos } from "../AgentosContext";
 import { ago, useNow } from "../time";
+import { useMinimumLoading } from "../useMinimumLoading";
 import { Loading } from "./Loading";
 import { NewsHeader } from "./NewsHeader";
 import { NewsItemRow } from "./NewsItemRow";
@@ -18,6 +19,7 @@ export function NewsView() {
   const { news, refreshNews, markNewsSeen, report, focusRequest } =
     useAgentos();
   const now = useNow();
+  const loading = useMinimumLoading(!news);
   const panel = useRef<HTMLElement>(null);
   const issues = news?.issues ?? [];
   const newest = Math.max(0, ...issues.map((i) => i.fetchedAt));
@@ -56,8 +58,8 @@ export function NewsView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!news && <Loading />}
-        {news && issues.length === 0 && (
+        {loading && <Loading />}
+        {!loading && issues.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">No news yet</p>
             <p className="text-small text-dim">
@@ -66,23 +68,25 @@ export function NewsView() {
             </p>
           </div>
         )}
-        <div className="mx-auto max-w-3xl pb-8">
-          {issues.map((issue) => (
-            <section key={issue.date}>
-              <h3 className="sticky top-0 flex flex-col gap-0.5 border-b border-line bg-surface px-6 pt-6 pb-3">
-                <span className="label">{dayLabel(issue.date)}</span>
-                <span className="truncate text-small text-dim">
-                  {issue.title}
-                </span>
-              </h3>
-              <ul className="flex flex-col gap-1 py-3">
-                {issue.items.map((item) => (
-                  <NewsItemRow key={item.id} item={item} />
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+        {!loading && (
+          <div className="mx-auto max-w-3xl pb-8">
+            {issues.map((issue) => (
+              <section key={issue.date}>
+                <h3 className="sticky top-0 flex flex-col gap-0.5 border-b border-line bg-surface px-6 pt-6 pb-3">
+                  <span className="label">{dayLabel(issue.date)}</span>
+                  <span className="truncate text-small text-dim">
+                    {issue.title}
+                  </span>
+                </h3>
+                <ul className="flex flex-col gap-1 py-3">
+                  {issue.items.map((item) => (
+                    <NewsItemRow key={item.id} item={item} />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );

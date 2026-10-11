@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useAgentos } from '../AgentosContext'
+import { useMinimumLoading } from '../useMinimumLoading'
 import { ago, useNow } from '../time'
 import type { IssueDetail } from '../types'
 import { Icon } from './Icon'
@@ -26,6 +27,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
   const body = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<IssueDetail | null>(null)
   const [error, setError] = useState('')
+  const loading = useMinimumLoading(!detail && !error)
   const issue = issues.find((i) => i.number === number)
   const session = sessions.find((s) => s.id === issue?.sessionId)
 
@@ -97,27 +99,30 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
         )}
       </header>
       <div ref={body} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-4 outline-none">
-        <div className="flex flex-col gap-6">
-          {error && <p className="text-small text-danger">{error}</p>}
-          {!detail && !error && <Loading />}
-          {detail && (detail.bodyHTML ? <IssueBody html={detail.bodyHTML} /> : <p className="text-small text-dim">No description.</p>)}
-          {detail && detail.comments.length > 0 && (
-            <section className="flex flex-col gap-4 border-t border-line pt-4">
-              <h3 className="label">{detail.comments.length === 1 ? '1 comment' : `${detail.comments.length} comments`}</h3>
-              {detail.comments.map((comment) => (
-                <article key={comment.createdAt} className="flex flex-col gap-1.5">
-                  <div className="flex items-baseline gap-2 text-small">
-                    <span className="font-medium">{comment.author}</span>
-                    <span className="text-dim" title={dateOf(comment.createdAt)}>
-                      {ago(comment.createdAt, now)}
-                    </span>
-                  </div>
-                  <IssueBody html={comment.bodyHTML} />
-                </article>
-              ))}
-            </section>
-          )}
-        </div>
+        {loading ? (
+          <Loading />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {error && <p className="text-small text-danger">{error}</p>}
+            {detail && (detail.bodyHTML ? <IssueBody html={detail.bodyHTML} /> : <p className="text-small text-dim">No description.</p>)}
+            {detail && detail.comments.length > 0 && (
+              <section className="flex flex-col gap-4 border-t border-line pt-4">
+                <h3 className="label">{detail.comments.length === 1 ? '1 comment' : `${detail.comments.length} comments`}</h3>
+                {detail.comments.map((comment) => (
+                  <article key={comment.createdAt} className="flex flex-col gap-1.5">
+                    <div className="flex items-baseline gap-2 text-small">
+                      <span className="font-medium">{comment.author}</span>
+                      <span className="text-dim" title={dateOf(comment.createdAt)}>
+                        {ago(comment.createdAt, now)}
+                      </span>
+                    </div>
+                    <IssueBody html={comment.bodyHTML} />
+                  </article>
+                ))}
+              </section>
+            )}
+          </div>
+        )}
       </div>
     </Overlay>
   )
