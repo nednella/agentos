@@ -77,7 +77,7 @@ export function Stats() {
           <Icon name="close" />
         </button>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div data-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
         {work ? <LedgerView days={workDays} /> : <StatsInterruptions days={days} />}
       </div>
     </section>

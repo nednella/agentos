@@ -8,8 +8,7 @@ const HEADS = ['Tasks', 'Tokens', 'Per task', 'Cost']
 export function LedgerUsage({ usage }: LedgerUsageProps) {
   const { totals, byModel, pricesAsOf } = usage
   return (
-    <section>
-      <h3 className="label pb-1">Tokens by model and effort</h3>
+    <div>
       <p className="pb-2 text-small text-dim">
         {tokenCount(totals.input)} input, {tokenCount(totals.output)} output ({tokenCount(totals.thinking)} thinking),{' '}
         {tokenCount(totals.cacheRead)} cache read, {tokenCount(totals.cacheWrite)} cache write. {priceNote(pricesAsOf)}; subagents included.
@@ -43,6 +42,6 @@ export function LedgerUsage({ usage }: LedgerUsageProps) {
           ))}
         </tbody>
       </table>
-    </section>
+    </div>
   )
 }
