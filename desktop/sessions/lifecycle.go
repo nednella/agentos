@@ -665,10 +665,13 @@ func (l *Lifecycle) Ack(id string) error {
 	return nil
 }
 
-// worktrees are a project's git worktrees by branch; main is the project folder's own.
+// worktrees are a project's git worktrees by branch; main is the project folder's own. A worktree
+// in the middle of a rebase is detached, so its branch comes from the rebase.
 type worktrees struct {
 	main     string
 	byBranch map[string]string
+	detached []string
+	rebasing map[string]bool
 }
 
 func (l *Lifecycle) git(ctx context.Context, dir string, args ...string) ([]byte, error) {
@@ -682,11 +685,34 @@ func (l *Lifecycle) worktrees(ctx context.Context, dir string) (worktrees, error
 	if err != nil {
 		return worktrees{}, err
 	}
-	return parseWorktrees(string(out)), nil
+	w := parseWorktrees(string(out))
+	for _, path := range w.detached {
+		if branch := l.rebasingBranch(ctx, path); branch != "" {
+			w.byBranch[branch] = path
+			w.rebasing[branch] = true
+		}
+	}
+	return w, nil
+}
+
+// rebasingBranch is the branch a rebase in the worktree is on, or "" when no rebase runs there or
+// git cannot read the worktree, as when its folder is gone.
+func (l *Lifecycle) rebasingBranch(ctx context.Context, worktree string) string {
+	out, err := l.git(ctx, worktree, "rev-parse", "--path-format=absolute", "--git-dir")
+	if err != nil {
+		return ""
+	}
+	gitDir := strings.TrimSpace(string(out))
+	for _, state := range []string{"rebase-merge", "rebase-apply"} {
+		if head, err := os.ReadFile(filepath.Join(gitDir, state, "head-name")); err == nil {
+			return strings.TrimPrefix(strings.TrimSpace(string(head)), "refs/heads/")
+		}
+	}
+	return ""
 }
 
 func parseWorktrees(out string) worktrees {
-	w := worktrees{byBranch: map[string]string{}}
+	w := worktrees{byBranch: map[string]string{}, rebasing: map[string]bool{}}
 	path := ""
 	sc := bufio.NewScanner(strings.NewReader(out))
 	for sc.Scan() {
@@ -699,6 +725,8 @@ func parseWorktrees(out string) worktrees {
 			}
 		case strings.HasPrefix(line, "branch refs/heads/"):
 			w.byBranch[strings.TrimPrefix(line, "branch refs/heads/")] = path
+		case line == "detached":
+			w.detached = append(w.detached, path)
 		}
 	}
 	return w
@@ -926,6 +954,9 @@ func (l *Lifecycle) plan(ctx context.Context, t target, pr *PR, prBranch string,
 		p.branches = append(p.branches, b)
 		if force {
 			continue
+		}
+		if trees.rebasing[branch] {
+			return p, fmt.Sprintf("the worktree of %s is in the middle of a rebase", branch)
 		}
 		branchPR := pr
 		if branch != prBranch {
