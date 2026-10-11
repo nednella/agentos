@@ -47,12 +47,12 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
             <span className="min-w-0 flex-1 truncate text-small font-medium" data-state={session.state} style={{ color: 'var(--c)' }}>
               {stateLabel(session.state, session.chat)}
             </span>
+            <ModelTag model={session.model} effort={session.effort} />
             {session.tokens > 0 && (
-              <span className="mono flex-none text-small whitespace-nowrap text-dim" title="Tokens so far and their cost, estimated at API list prices">
-                {tokenCount(session.tokens)} · ~{dollars(session.cost)}
+              <span className="mono flex-none text-small whitespace-nowrap text-dim" title={`${tokenCount(session.tokens)} tokens so far, estimated at API list prices`}>
+                ~{dollars(session.cost)}
               </span>
             )}
-            <ModelTag model={session.model} effort={session.effort} />
           </span>
         )}
         {!dense && !session.chat && (
