@@ -79,6 +79,7 @@ type Unsubscribe = () => void
 
 type Runtime = {
   BrowserOpenURL?(url: string): void
+  WindowIsFullscreen?(): Promise<boolean>
   EventsOn(name: string, handler: (payload: never) => void): Unsubscribe | void
 }
 
