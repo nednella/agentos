@@ -31,6 +31,7 @@ export type Session = {
   cleanupReason: string
   browser: boolean
   evidence: number
+  chat: boolean
 }
 
 export type Project = {

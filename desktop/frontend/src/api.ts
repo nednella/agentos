@@ -4,6 +4,7 @@ import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, D
 type Backend = {
   Snapshot(): Promise<Snapshot>
   NewSession(title: string, prefill: string): Promise<Session>
+  NewChat(title: string): Promise<Session>
   KillSession(id: string): Promise<void>
   DismissSession(id: string): Promise<void>
   RenameSession(id: string, title: string): Promise<void>
@@ -91,7 +92,7 @@ declare global {
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'CreateRepo', 'RemoveProject', 'SetUpProject', 'DismissSetup'],
-  sessions: ['NewSession', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose'],
+  sessions: ['NewSession', 'NewChat', 'KillSession', 'DismissSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'MoveIssue', 'UndoMove', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
@@ -129,6 +130,7 @@ export const devFlags: DevFlags = mock?.flags ?? {}
 export const api = {
   snapshot: () => backend.Snapshot(),
   newSession: (title: string, prefill = '') => backend.NewSession(title, prefill),
+  newChat: (title: string) => backend.NewChat(title),
   killSession: (id: string) => backend.KillSession(id),
   dismissSession: (id: string) => backend.DismissSession(id),
   renameSession: (id: string, title: string) => backend.RenameSession(id, title),

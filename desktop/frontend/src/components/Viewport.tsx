@@ -36,7 +36,7 @@ export function Viewport() {
     >
       <ViewportHeader key={selected.id} session={selected} />
       <ViewportActions session={selected} />
-      <ViewTabs session={selected} view={view} />
+      {!selected.chat && <ViewTabs session={selected} view={view} />}
       <div className="relative min-h-0 flex-1 border-t border-line bg-term">
         <div className={view === 'terminal' ? 'absolute inset-0' : 'hidden'}>
           {openedIds
