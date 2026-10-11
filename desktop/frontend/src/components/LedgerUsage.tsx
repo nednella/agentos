@@ -1,11 +1,11 @@
 import { dollars, priceNote, tokenCount } from '../spend'
 import type { Ledger } from '../types'
 
-type LedgerUsageProps = { usage: Ledger['usage'] }
+type LedgerUsageProps = { usage: Ledger['usage']; limit?: number }
 
 const HEADS = ['Tasks', 'Tokens', 'Per task', 'Cost']
 
-export function LedgerUsage({ usage }: LedgerUsageProps) {
+export function LedgerUsage({ usage, limit }: LedgerUsageProps) {
   const { totals, byModel, pricesAsOf } = usage
   return (
     <div>
@@ -26,7 +26,7 @@ export function LedgerUsage({ usage }: LedgerUsageProps) {
           </tr>
         </thead>
         <tbody>
-          {byModel.map((r) => (
+          {byModel.slice(0, limit).map((r) => (
             <tr key={`${r.model} ${r.effort}`} className="border-t border-line">
               <td className="mono py-1.5 whitespace-nowrap" title={r.model}>
                 {r.model.replace(/^claude-/, '') || 'unknown'}
