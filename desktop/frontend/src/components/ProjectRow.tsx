@@ -27,7 +27,7 @@ function ProjectRowView({ project: p, index, current, active, removing, onHover,
               ? `Forget ${p.name}? This ends its ${p.sessions} running ${p.sessions === 1 ? 'session' : 'sessions'} and loses unsaved work.`
               : `Forget ${p.name}?`
           }
-          confirmLabel={p.sessions > 0 ? 'End agents and remove' : 'Remove'}
+          confirmLabel={p.sessions > 0 ? 'End sessions and remove' : 'Remove'}
           onCancel={onCancelRemove}
           onConfirm={() => onRemove(p.name)}
         />
@@ -46,7 +46,7 @@ function ProjectRowView({ project: p, index, current, active, removing, onHover,
               <span style={{ color: p.working > 0 ? 'var(--working)' : 'var(--text-dim)' }} title="working">
                 {p.working} work
               </span>
-              <span className="text-dim" title="agents">
+              <span className="text-dim" title="sessions">
                 {p.sessions} total
               </span>
             </span>

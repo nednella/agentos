@@ -7,7 +7,7 @@ import type { State } from './types'
 
 export type PaletteItem = {
   key: string
-  group: 'Agents' | 'Actions' | 'Projects' | 'Notes' | 'Issues'
+  group: 'Sessions' | 'Actions' | 'Projects' | 'Notes' | 'Issues'
   label: string
   hint: string
   state?: State
@@ -29,7 +29,7 @@ export function usePaletteItems(query: string): PaletteItem[] {
     .filter((s) => s.state !== 'ended')
     .map((s) => ({
     key: `s-${s.id}`,
-    group: 'Agents',
+    group: 'Sessions',
     label: `${s.n}  ${s.title}`,
     hint: s.detail,
     state: s.state,
@@ -55,7 +55,7 @@ export function usePaletteItems(query: string): PaletteItem[] {
       key: `p-${p.name}`,
       group: 'Projects',
       label: `Switch to ${p.name}`,
-      hint: p.needsYou > 0 ? `${p.needsYou} need you` : `${p.sessions} agents`,
+      hint: p.needsYou > 0 ? `${p.needsYou} need you` : `${p.sessions} sessions`,
       run: () => a.switchProject(p.name),
     }))
 

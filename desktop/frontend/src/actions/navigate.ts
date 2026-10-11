@@ -43,7 +43,7 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
   },
   {
     id: 'toggle-sessions',
-    label: 'Toggle agents panel',
+    label: 'Toggle sessions panel',
     group: 'Navigate',
     shortcut: { key: 'd', shift: true },
     run: layout.toggleSessions,
@@ -67,7 +67,7 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
   },
   {
     id: 'panel-terminal',
-    label: 'Middle panel: the active agent',
+    label: 'Middle panel: the active session',
     group: 'Navigate',
     run() {
       layout.closeCentre()
@@ -76,21 +76,21 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
   },
   {
     id: 'panel-sessions',
-    label: 'Right panel: agents',
+    label: 'Right panel: sessions',
     group: 'Navigate',
     shortcut: { key: 'd' },
     run: () => layout.focusPanel('sessions'),
   },
   {
     id: 'previous-session',
-    label: 'Previous agent',
+    label: 'Previous session',
     group: 'Navigate',
     shortcut: { key: '[' },
     run: () => a.stepSession(-1),
   },
   {
     id: 'next-session',
-    label: 'Next agent',
+    label: 'Next session',
     group: 'Navigate',
     shortcut: { key: ']' },
     run: () => a.stepSession(1),

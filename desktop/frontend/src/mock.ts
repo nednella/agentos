@@ -106,7 +106,7 @@ const details: Record<State, string[]> = {
   ],
   waiting: ['Claude needs your permission', 'Claude has a question for you'],
   idle: ['Done: 4 files changed', 'Done: tests pass'],
-  ended: ['Agent ended'],
+  ended: ['Session ended'],
 }
 
 const order: Record<State, number> = { waiting: 0, idle: 1, working: 2, ended: 3 }
@@ -326,7 +326,7 @@ export function createMock(params: URLSearchParams) {
 
   function find(id: string): MockSession {
     const found = sessions.find((s) => s.id === id)
-    if (!found) throw 'No such agent'
+    if (!found) throw 'No such session'
     return found
   }
 
@@ -379,7 +379,7 @@ export function createMock(params: URLSearchParams) {
     if (initial === 'waiting') s.buffer += term.permissionPrompt('npx tsc --noEmit')
     if (initial === 'idle' && history.length > 0) s.buffer += term.finishedNote(134)
     if (initial === 'idle' && history.length === 0) s.buffer = term.banner(owner.dir) + term.promptLine('')
-    if (initial === 'ended') s.buffer += '\r\n\x1b[2m[agent ended]\x1b[0m\r\n'
+    if (initial === 'ended') s.buffer += '\r\n\x1b[2m[session ended]\x1b[0m\r\n'
     sessions.push(s)
     return s
   }
@@ -783,14 +783,14 @@ export function createMock(params: URLSearchParams) {
     },
     DismissSession: async (id: string) => {
       const s = find(id)
-      if (s.state !== 'ended') throw 'Only an ended agent can be dismissed'
+      if (s.state !== 'ended') throw 'Only an ended session can be dismissed'
       sessions.splice(sessions.indexOf(s), 1)
       publish()
       emit('issues', { project: current.name, items: currentIssues() })
     },
     KillSession: async (id: string) => {
       const s = find(id)
-      if (s.state === 'ended') throw `agent ${id} has ended: dismiss it`
+      if (s.state === 'ended') throw `session ${id} has ended: dismiss it`
       emit('term:exit', { id })
       setState(s, 'ended')
       emit('issues', { project: current.name, items: currentIssues() })
