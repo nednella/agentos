@@ -1,11 +1,13 @@
 package sessions_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/internal/activity"
@@ -142,6 +144,14 @@ func TestChatStaysOutOfTheStats(t *testing.T) {
 	}
 	if led.Totals.Prompts != 1 || led.Totals.Sessions != 1 || led.Totals.Chats != 1 {
 		t.Errorf("totals = %+v", led.Totals)
+	}
+
+	transcript := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendLines(t, transcript, assistantLine("msg_1", time.Now().Add(time.Second), 1000, 100))
+	h.Hook(t, chat.ID, "Stop", fmt.Sprintf(`{"transcript_path":%q}`, transcript))
+	eventually(t, "the chat's usage", func() bool { return len(h.Events(t, activity.ChatUsage)) == 1 })
+	if got := h.Events(t, activity.Usage); len(got) != 0 {
+		t.Errorf("usage events = %+v, want the chat's under chat_usage only", got)
 	}
 
 	if err := h.KillSession(chat.ID); err != nil {

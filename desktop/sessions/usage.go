@@ -32,8 +32,12 @@ func (s *Sessions) countUsage(id, transcript string) {
 		s.readers[id] = r
 	}
 	s.mu.Unlock()
-	if !ok || in.Chat {
+	if !ok {
 		return
+	}
+	kind := activity.Usage
+	if in.Chat {
+		kind = activity.ChatUsage
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -41,7 +45,7 @@ func (s *Sessions) countUsage(id, transcript string) {
 	if r.cursor == nil {
 		after := in.Created
 		s.activity.Since(session.ProjectKey(id), in.Created.In(time.Local).Format(time.DateOnly), func(e activity.Event) {
-			if e.Kind != activity.Usage || e.Session != id {
+			if e.Kind != kind || e.Session != id {
 				return
 			}
 			before.Add(e.Tokens)
@@ -64,7 +68,7 @@ func (s *Sessions) countUsage(id, transcript string) {
 	total := s.spent[id]
 	total.Add(before)
 	for _, p := range parts {
-		e := activity.Event{At: r.cursor.After().UnixMilli(), Kind: activity.Usage, Issue: issue, Model: p.Model, Effort: in.Effort, Title: cmp.Or(in.Title, defaultTitle), Tokens: p.Tokens}
+		e := activity.Event{At: r.cursor.After().UnixMilli(), Kind: kind, Issue: issue, Model: p.Model, Effort: in.Effort, Title: cmp.Or(in.Title, defaultTitle), Tokens: p.Tokens}
 		if p.Subagent {
 			e.Label = activity.Subagent
 		}

@@ -8,7 +8,7 @@ const (
 	Prompt       = "prompt"
 	SessionStart = "session_start" // label "resumed" when it continues a conversation
 	SessionEnd   = "session_end"   // ms is how long the session ran
-	ChatStart    = "chat_start"    // a chat records only that it started
+	ChatStart    = "chat_start"    // a chat records only that it started, and its usage
 	Worked       = "worked"        // ms is how long a session worked
 	Wait         = "wait"          // ms is how long a session waited on the user; label is its kind (permission, question or idle)
 	PROpened     = "pr_opened"
@@ -20,7 +20,8 @@ const (
 	IssueFiled   = "issue_filed"
 	Cleanup      = "cleanup" // label done or blocked
 	Evidence     = "evidence"
-	Usage        = "usage" // the tokens one model used since the last count; label "subagent" for a session's subagents
+	Usage        = "usage"      // the tokens one model used since the last count; label "subagent" for a session's subagents
+	ChatUsage    = "chat_usage" // usage of a chat, kept apart so it counts only in the cost
 )
 
 // Subagent is the label of usage by a session's subagents.
