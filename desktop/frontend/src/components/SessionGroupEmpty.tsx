@@ -4,11 +4,11 @@ type SessionGroupEmptyProps = { icon: 'chat' | 'branch'; title: string; hint: st
 
 export function SessionGroupEmpty({ icon, title, hint }: SessionGroupEmptyProps) {
   return (
-    <div className="flex items-start gap-3 px-4 py-3 text-dim">
+    <div className="flex items-start gap-3 px-4 py-4 text-dim">
       <span className="mt-0.5 flex-none">
         <Icon name={icon} size={16} />
       </span>
-      <div className="flex min-w-0 flex-col gap-0.5">
+      <div className="flex min-w-0 flex-col gap-1">
         <span className="text-small text-soft">{title}</span>
         <span className="text-small">{hint}</span>
       </div>
