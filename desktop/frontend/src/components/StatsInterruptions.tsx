@@ -19,7 +19,7 @@ export function StatsInterruptions({ days }: StatsInterruptionsProps) {
     return on('stats', load)
   }, [days, report])
 
-  if (stats === null) return <Loading label="Loading interruptions" />
+  if (stats === null) return <Loading />
   if (stats.total === 0) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">

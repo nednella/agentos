@@ -74,7 +74,7 @@ export function DigestView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {!digest && <Loading label="Loading digest" />}
+        {!digest && <Loading />}
         {digest && groups.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">Nothing in the digest yet</p>

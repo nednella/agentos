@@ -150,7 +150,7 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
 
   useScrollCursorIntoView(list, listNav.cursorKey)
 
-  if (issuesLoading && issues.length === 0) return <Loading label="Loading issues" />
+  if (issuesLoading && issues.length === 0) return <Loading />
   if (issues.length === 0) return <Notice title="No open issues" hint="This repo has nothing in the queue." centered />
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." centered />
 
