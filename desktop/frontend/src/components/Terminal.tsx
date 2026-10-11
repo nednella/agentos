@@ -172,7 +172,7 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
       if (payload.id === id) term.write(decodeBase64(payload.data))
     })
     const offExit = on('term:exit', (payload) => {
-      if (payload.id === id) term.write('\r\n\x1b[2m[session ended]\x1b[0m\r\n')
+      if (payload.id === id) term.write('\r\n\x1b[2m[agent ended]\x1b[0m\r\n')
     })
 
     xterm.current = term

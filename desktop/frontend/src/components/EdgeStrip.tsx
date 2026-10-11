@@ -17,8 +17,8 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
     >
       <button
         className="btn btn-ghost h-8 w-8 flex-none justify-center px-0"
-        title={left ? 'Show queue and notes (⌘⇧A)' : 'Show sessions (⌘⇧D)'}
-        aria-label={left ? 'Show queue and notes' : 'Show sessions'}
+        title={left ? 'Show queue and notes (⌘⇧A)' : 'Show agents (⌘⇧D)'}
+        aria-label={left ? 'Show queue and notes' : 'Show agents'}
         onClick={() => (left ? setSidebarOpen(true) : setSessionsOpen(true))}
       >
         <Icon name={left ? 'panel-left' : 'panel-right'} size={15} />
@@ -39,7 +39,7 @@ export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
             className="flex w-full flex-col items-center gap-1.5 py-1.5"
             data-state={s.state}
             title={`${s.n} ${s.title}`}
-            aria-label={`Open session ${s.n}, ${s.title}`}
+            aria-label={`Open agent ${s.n}, ${s.title}`}
             style={{ boxShadow: s.id === selectedId ? 'inset 2px 0 var(--accent)' : undefined }}
             disabled={s.state === 'ended'}
             onClick={() => select(s.id)}

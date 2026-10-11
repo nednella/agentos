@@ -12,7 +12,7 @@ export type Shortcut = {
   unlessTyping?: boolean
   label?: string
 }
-export type ActionGroup = 'Sessions' | 'Navigate' | 'Projects' | 'Notes' | 'Queue' | 'App'
+export type ActionGroup = 'Agents' | 'Navigate' | 'Projects' | 'Notes' | 'Queue' | 'App'
 
 export type Action = {
   id: string

@@ -53,7 +53,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           <span
             className="contents"
             role="alertdialog"
-            aria-label="Kill this session"
+            aria-label="Kill this agent"
             onKeyDown={(e) => {
               if (e.key !== 'Escape') return
               e.stopPropagation()
@@ -75,7 +75,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
             </button>
           </span>
         ) : (
-          <button className="btn btn-ghost text-danger" onClick={() => kill.arm()} title="Kill this session">
+          <button className="btn btn-ghost text-danger" onClick={() => kill.arm()} title="Kill this agent">
             Kill
           </button>
         )}
@@ -88,7 +88,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
       {!session.chat && <Timeline session={session} size="full" />}
       {kill.armed && (
         <p className="px-4 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
-          Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
+          Kill this agent? It stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
           <code className="mono">claude --resume</code>.
         </p>
       )}

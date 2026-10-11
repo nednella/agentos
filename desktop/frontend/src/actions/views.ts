@@ -40,10 +40,10 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   {
     id: 'show-terminal',
     label: 'Show terminal',
-    group: 'Sessions',
+    group: 'Agents',
     uiCommand: 'term',
     run() {
-      if (!current) throw 'No session selected'
+      if (!current) throw 'No agent selected'
       layout.closeCentre()
       a.setSessionView(current.id, 'terminal')
     },
@@ -51,10 +51,10 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   {
     id: 'show-browser',
     label: 'Show browser',
-    group: 'Sessions',
+    group: 'Agents',
     uiCommand: 'browser',
     async run(args) {
-      if (!current) throw 'No session selected'
+      if (!current) throw 'No agent selected'
       layout.closeCentre()
       if (args.length === 0) {
         a.setSessionView(current.id, 'browser')
@@ -67,10 +67,10 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   {
     id: 'show-evidence',
     label: 'Show evidence',
-    group: 'Sessions',
+    group: 'Agents',
     uiCommand: 'evidence',
     run() {
-      if (!current) throw 'No session selected'
+      if (!current) throw 'No agent selected'
       layout.closeCentre()
       a.setSessionView(current.id, 'evidence')
     },
