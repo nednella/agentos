@@ -326,7 +326,7 @@ func apply(days map[string]*Day, e activity.Event) {
 		d.PRsClosed++
 	case activity.IssueFiled:
 		d.IssuesFiled++
-	case activity.Usage:
+	case activity.Usage, activity.ChatUsage:
 		d.spending.count(e)
 	}
 }

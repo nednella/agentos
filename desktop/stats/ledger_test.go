@@ -205,3 +205,36 @@ func TestLedgerUsage(t *testing.T) {
 		t.Errorf("work = %v, want %v", work, want)
 	}
 }
+
+func TestLedgerChatUsage(t *testing.T) {
+	now := time.Date(2026, 10, 9, 15, 0, 0, 0, time.Local)
+	log := loaded(t, t.TempDir())
+	for _, e := range []activity.Event{
+		{Kind: activity.Usage, Session: "alpha/aaaaaaaa", Issue: 7, Model: "claude-opus-5-5", Title: "#7 work", Tokens: usage.Tokens{Input: 100, Cost: 2_000_000}},
+		{Kind: activity.ChatStart, Session: "alpha/cccccccc"},
+		{Kind: activity.ChatUsage, Session: "alpha/cccccccc", Model: "claude-opus-5-5", Title: "ask", Tokens: usage.Tokens{Input: 30, Cost: 500_000}},
+		{Kind: activity.ChatUsage, Session: "alpha/cccccccc", Model: "claude-haiku-5-5", Label: activity.Subagent, Title: "ask", Tokens: usage.Tokens{Input: 5, Cost: 10_000}},
+	} {
+		e.At = now.UnixMilli()
+		log.Record("alpha", e)
+	}
+	led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}}).Ledger(30, "", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := led.Projects[0]; a.Tokens != 135 || a.Cost != 2.51 || a.Chats != 1 || a.Sessions != 0 {
+		t.Errorf("alpha = %+v, want the chat's cost in the project's", a)
+	}
+	if tot := led.Usage.Totals; tot.Sessions != 2 || tot.Tokens != 135 || tot.Cost != 2.51 {
+		t.Errorf("usage totals = %+v, want the task and the chat", tot)
+	}
+	if c := led.Usage.Chats; c.Sessions != 1 || c.Tokens != 35 || c.Cost != 0.51 {
+		t.Errorf("chats = %+v", c)
+	}
+	if len(led.Usage.ByModel) != 1 || led.Usage.ByModel[0].Tokens != 100 {
+		t.Errorf("by model = %+v, want the task only", led.Usage.ByModel)
+	}
+	if len(led.Work) != 1 || led.Work[0].Issue != 7 {
+		t.Errorf("work = %+v, want the task only", led.Work)
+	}
+}
