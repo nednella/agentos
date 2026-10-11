@@ -88,7 +88,7 @@ func TestNew(t *testing.T) {
 
 func TestBrowserPromptNamesTheCommands(t *testing.T) {
 	for _, want := range []string{"agentos browser help", "agentos browser open", "agentos browser screenshot", "agentos browser close"} {
-		if !strings.Contains(prompts.BrowserSession(), want) {
+		if !strings.Contains(prompts.Browser(), want) {
 			t.Errorf("the prompt lacks %q", want)
 		}
 	}

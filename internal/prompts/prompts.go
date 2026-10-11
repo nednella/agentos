@@ -10,8 +10,8 @@ import (
 var (
 	//go:embed digest.md
 	digest string
-	//go:embed browser-session.md
-	browserSession string
+	//go:embed browser.md
+	browser string
 	//go:embed browser-help.md
 	browserHelp string
 	//go:embed setup-brief.md
@@ -39,8 +39,8 @@ func Digest(dependencies []string) string {
 	return strings.Replace(body(digest), "{dependencies}", strings.Join(dependencies, "\n"), 1)
 }
 
-// BrowserSession is appended to a session's system prompt when it has a browser.
-func BrowserSession() string { return body(browserSession) }
+// Browser is appended to a session's system prompt when it has a browser.
+func Browser() string { return body(browser) }
 
 // Agent starts the system prompt of every Claude session and chat: where it runs and the commands both use.
 func Agent() string { return body(agent) }

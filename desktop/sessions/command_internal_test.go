@@ -57,7 +57,7 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			if claude && !strings.HasPrefix(argv[prompt+1], prompts.Agent()+"\n\n"+prompts.Session()) {
 				t.Errorf("system prompt = %q", argv[prompt+1])
 			}
-			if claude && strings.Contains(argv[prompt+1], prompts.BrowserSession()) != tt.want {
+			if claude && strings.Contains(argv[prompt+1], prompts.Browser()) != tt.want {
 				t.Errorf("system prompt = %q", argv[prompt+1])
 			}
 			if tt.want && argv[config+1] != wantMCPConfig {
