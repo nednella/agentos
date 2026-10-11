@@ -26,7 +26,7 @@ func TestLedgerLeavesOutProjectsNotOnThisMachine(t *testing.T) {
 		}
 	}
 
-	led, err := h.Restart(t).Ledger(30)
+	led, err := h.Restart(t).Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -19,10 +19,10 @@ func TestActivityIsCounted(t *testing.T) {
 	h.Hook(t, s.ID, "Stop", `{}`)
 
 	eventually(t, "two prompts and the work between them", func() bool {
-		led, err := h.Ledger(30)
+		led, err := h.Ledger(30, "")
 		return err == nil && led.Totals.Prompts == 2 && led.Totals.WorkMs >= 100
 	})
-	led, err := h.Ledger(30)
+	led, err := h.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestActivityIsCounted(t *testing.T) {
 
 	second := h.Restart(t)
 	time.Sleep(200 * time.Millisecond)
-	again, err := second.Ledger(30)
+	again, err := second.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestActivityIsCounted(t *testing.T) {
 		t.Fatal(err)
 	}
 	eventually(t, "the session's length", func() bool {
-		led, err := second.Ledger(30)
+		led, err := second.Ledger(30, "")
 		return err == nil && led.Totals.AvgSessionMs >= 100
 	})
 }

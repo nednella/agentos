@@ -181,7 +181,7 @@ func TestIdleReminders(t *testing.T) {
 		t.Fatal(err)
 	}
 	state := func() string { got, _ := h.Session(s.ID); return string(got.State) }
-	waits := func() int { st, _ := h.Stats(7); return st.Total }
+	waits := func() int { st, _ := h.Stats(7, ""); return st.Total }
 
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
 	eventually(t, "working", func() bool { return state() == "working" })
@@ -205,7 +205,7 @@ func TestIdleReminders(t *testing.T) {
 	replied = h.Rec.CountAttention("replied")
 	h.Hook(t, s.ID, "Stop", `{"last_assistant_message":"Which branch should I use?"}`)
 	eventually(t, "the reply", func() bool { return h.Rec.CountAttention("replied") > replied })
-	if st, _ := h.Stats(7); st.Total != 1 || st.ByCause[0].Kind != "permission" {
+	if st, _ := h.Stats(7, ""); st.Total != 1 || st.ByCause[0].Kind != "permission" {
 		t.Errorf("a finished turn counted as an interruption: %+v", st.ByCause)
 	}
 }

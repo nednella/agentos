@@ -12,7 +12,7 @@ import (
 // heatDays is how many days the heat map covers: 52 weeks.
 const heatDays = 364
 
-// Ledger is what the agents did across every project, from the event log.
+// Ledger is what the agents did in one project or across every project, from the event log.
 type Ledger struct {
 	Days     int         `json:"days"`     // 0 for lifetime
 	Since    string      `json:"since"`    // the first day with any record, "" when there is none
@@ -75,20 +75,22 @@ func NewBooks(l *Log, p Registry) *Books {
 	return &Books{log: l, projects: p}
 }
 
-// Ledger sums the last days days, today included; 0 is all of the record. An issue closed on two days
-// counts once.
-func (b *Books) Ledger(days int, now time.Time) (Ledger, error) {
+// Ledger sums the last days days, today included; 0 is all of the record. It covers the project whose key
+// is given, or every project for "". An issue closed on two days counts once.
+func (b *Books) Ledger(days int, key string, now time.Time) (Ledger, error) {
 	days = max(days, 0)
 	y, m, d := now.Date()
 	from := ""
 	if days > 0 {
 		from = time.Date(y, m, d-(days-1), 0, 0, 0, 0, now.Location()).Format(time.DateOnly)
 	}
-	projects := b.projects.List()
-	led := Ledger{Days: days, Projects: make([]LedgerRow, len(projects)), Heat: make([]DayCount, heatDays), Work: []WorkRow{}}
+	led := Ledger{Days: days, Projects: []LedgerRow{}, Heat: make([]DayCount, heatDays), Work: []WorkRow{}}
 	heat := map[string]int{}
 	var totals total
-	for i, p := range projects {
+	for _, p := range b.projects.List() {
+		if key != "" && p.Key() != key {
+			continue
+		}
 		var sum total
 		closed := map[int]bool{}
 		for day, v := range b.log.Days(p.Key()) {
@@ -106,7 +108,7 @@ func (b *Books) Ledger(days int, now time.Time) (Ledger, error) {
 		sum.issuesClosed = len(closed)
 		totals.add(sum.Day)
 		totals.issuesClosed += sum.issuesClosed
-		led.Projects[i] = sum.row(p.Name)
+		led.Projects = append(led.Projects, sum.row(p.Name))
 		led.Work = append(led.Work, sum.spending.work(p.Name)...)
 	}
 	for i := range led.Heat {

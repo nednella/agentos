@@ -43,7 +43,7 @@ func (c *Commands) Stats(_ context.Context, req ctl.Request) (string, error) {
 		}
 	}
 	key := c.asker.AskerProject(req)
-	st, err := c.waits.Stats(key, days, time.Now())
+	st, err := c.waits.Stats([]string{key}, days, time.Now())
 	if err != nil {
 		return "", err
 	}

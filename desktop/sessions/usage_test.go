@@ -65,7 +65,7 @@ func TestUsageIsCountedOncePerMessage(t *testing.T) {
 	second.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"again"}`)
 	second.Hook(t, s.ID, "Stop", stop)
 	time.Sleep(200 * time.Millisecond)
-	led, err := second.Ledger(30)
+	led, err := second.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}

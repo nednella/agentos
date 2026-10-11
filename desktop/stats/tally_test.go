@@ -18,7 +18,7 @@ func TestWaitsAreRecorded(t *testing.T) {
 	h.Hook(t, s.ID, "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"make test api foo/bar.test.ts"}}`)
 	h.Hook(t, s.ID, "Notification", `{"message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}`)
 	eventually(t, "open wait", func() bool {
-		st, _ := h.Stats(7)
+		st, _ := h.Stats(7, "")
 		return st.Total == 1 && st.Recent[0].WaitedMs == 0
 	})
 	time.Sleep(20 * time.Millisecond)
@@ -30,13 +30,13 @@ func TestWaitsAreRecorded(t *testing.T) {
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"b"}`)
 	h.Hook(t, s.ID, "Stop", `{}`)
 	eventually(t, "finished wait", func() bool {
-		st, _ := h.Stats(7)
+		st, _ := h.Stats(7, "")
 		return st.Total == 3
 	})
 	if err := h.KillSession(s.ID); err != nil {
 		t.Fatal(err)
 	}
-	st, err := h.Stats(7)
+	st, err := h.Stats(7, "")
 	if err != nil {
 		t.Fatal(err)
 	}

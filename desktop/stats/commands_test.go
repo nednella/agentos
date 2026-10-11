@@ -17,7 +17,7 @@ func TestStatsCommand(t *testing.T) {
 	}
 	h.Hook(t, s.ID, "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"yarn test api"}}`)
 	h.Hook(t, s.ID, "Notification", `{"message":"needs permission","notification_type":"permission_prompt"}`)
-	eventually(t, "a wait", func() bool { st, _ := h.Stats(7); return st.Total == 1 })
+	eventually(t, "a wait", func() bool { st, _ := h.Stats(7, ""); return st.Total == 1 })
 
 	text := h.Ask(t, ctl.Request{Cmd: "stats", Session: s.ID, Opts: map[string]string{"days": "30"}})
 	if !text.OK || !strings.Contains(text.Out, "over the last 30 days: 1") || !strings.Contains(text.Out, "Bash: yarn test api") {

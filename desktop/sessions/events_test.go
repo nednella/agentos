@@ -31,7 +31,7 @@ func TestPROpenedThenMergedAcrossARestartCountsOnce(t *testing.T) {
 	if len(merged) != 1 || merged[0].Issue != 7 || merged[0].PR != 12 || merged[0].Ms <= 0 {
 		t.Fatalf("pr_merged = %+v", merged)
 	}
-	led, err := fresh.Ledger(30)
+	led, err := fresh.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
 	}
