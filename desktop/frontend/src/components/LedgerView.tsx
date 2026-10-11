@@ -25,6 +25,10 @@ const SECTIONS = [
 ]
 
 const average = (ms: number) => (ms ? duration(ms) : '—')
+const hours = (ms: number) => {
+  const h = Math.round(ms / 3_600_000)
+  return h ? `${h.toLocaleString()}h` : duration(ms)
+}
 
 export function LedgerView({ days, project }: LedgerViewProps) {
   const { report } = useAgentos()
@@ -77,7 +81,6 @@ export function LedgerView({ days, project }: LedgerViewProps) {
   const { totals, usage } = ledger
   const spent = usage.totals
   const perTask = spent.sessions ? spent.tokens / spent.sessions : 0
-  const hours = Math.round(totals.workMs / 3_600_000)
   const sections = project ? SECTIONS.filter((s) => s.id !== 'projects') : SECTIONS
   const pick = (id: string) => {
     document.getElementById(`ledger-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -92,9 +95,9 @@ export function LedgerView({ days, project }: LedgerViewProps) {
             <LedgerFigures
               figures={[
                 {
-                  label: 'Prompts',
-                  value: totals.prompts.toLocaleString(),
-                  hint: 'sent to agents',
+                  label: 'Chats',
+                  value: totals.chats.toLocaleString(),
+                  hint: 'in no other figure',
                 },
                 {
                   label: 'Tasks',
@@ -102,9 +105,14 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                   hint: `${totals.issueSessions.toLocaleString()} from an issue`,
                 },
                 {
-                  label: 'Agent time',
-                  value: hours ? `${hours.toLocaleString()}h` : duration(totals.workMs),
-                  hint: 'time agents spent working',
+                  label: 'Prompts',
+                  value: totals.prompts.toLocaleString(),
+                  hint: 'sent to agents',
+                },
+                {
+                  label: 'Session time',
+                  value: hours(totals.sessionMs),
+                  hint: 'open, start to end',
                 },
               ]}
             />
@@ -126,12 +134,12 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 {
                   label: 'Task length',
                   value: average(totals.avgSessionMs),
-                  hint: 'on average',
+                  hint: 'average',
                 },
                 {
                   label: 'Lead time',
                   value: average(totals.avgLeadMs),
-                  hint: 'PR open to merge, on average',
+                  hint: 'PR open to merge',
                 },
               ]}
             />

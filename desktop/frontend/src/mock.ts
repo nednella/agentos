@@ -568,6 +568,7 @@ export function createMock(params: URLSearchParams) {
     const row = (project: string, prompts: number): LedgerRow => ({
       project,
       prompts: Math.round(prompts * scale),
+      chats: Math.round(prompts * scale * 0.03),
       sessions: Math.round(prompts * scale * 0.08),
       issueSessions: Math.round(prompts * scale * 0.045),
       workMs: Math.round(prompts * scale * 0.13 * 3_600_000),
@@ -576,6 +577,7 @@ export function createMock(params: URLSearchParams) {
       prsClosed: Math.round(prompts * scale * 0.005),
       issuesFiled: Math.round(prompts * scale * 0.02),
       issuesClosed: Math.round(prompts * scale * 0.035),
+      sessionMs: Math.round(prompts * scale * 0.08) * 52 * 60_000,
       avgSessionMs: prompts > 100 ? 52 * 60_000 : 0,
       avgLeadMs: prompts > 100 ? 5 * 3_600_000 : 0,
       tokens: Math.round(prompts * scale * 61_000),
@@ -593,6 +595,7 @@ export function createMock(params: URLSearchParams) {
     const totals: LedgerRow = {
       project: '',
       prompts: projects.reduce((a, r) => a + r.prompts, 0),
+      chats: projects.reduce((a, r) => a + r.chats, 0),
       sessions: projects.reduce((a, r) => a + r.sessions, 0),
       issueSessions: projects.reduce((a, r) => a + r.issueSessions, 0),
       workMs: projects.reduce((a, r) => a + r.workMs, 0),
@@ -601,6 +604,7 @@ export function createMock(params: URLSearchParams) {
       prsClosed: projects.reduce((a, r) => a + r.prsClosed, 0),
       issuesFiled: projects.reduce((a, r) => a + r.issuesFiled, 0),
       issuesClosed: projects.reduce((a, r) => a + r.issuesClosed, 0),
+      sessionMs: projects.reduce((a, r) => a + r.sessionMs, 0),
       avgSessionMs: 52 * 60_000,
       avgLeadMs: 5 * 3_600_000,
       tokens: projects.reduce((a, r) => a + r.tokens, 0),

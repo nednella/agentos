@@ -152,6 +152,7 @@ export type Stats = {
 export type LedgerRow = {
   project: string
   prompts: number
+  chats: number
   sessions: number
   issueSessions: number
   workMs: number
@@ -160,6 +161,7 @@ export type LedgerRow = {
   prsClosed: number
   issuesFiled: number
   issuesClosed: number
+  sessionMs: number
   avgSessionMs: number
   avgLeadMs: number
   tokens: number
