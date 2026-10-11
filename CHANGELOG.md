@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.2](https://github.com/nednella/agentos/compare/v0.27.1...v0.27.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **ui:** swap new chat and new task shortcuts ([d72bdd4](https://github.com/nednella/agentos/commit/d72bdd46e58cde60ad15ee4d399ef3ae4eb1e582)), closes [#316](https://github.com/nednella/agentos/issues/316)
+
 ## [0.27.1](https://github.com/nednella/agentos/compare/v0.27.0...v0.27.1) (2026-10-11)
 
 
