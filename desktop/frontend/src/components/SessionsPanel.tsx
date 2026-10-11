@@ -86,11 +86,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         {chats.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {chats.length === 0 && (
-          <button className="row w-full px-4 py-2.5 text-left text-small text-dim" onClick={() => setComposing('chat')}>
-            Ask about the project without starting work
-          </button>
-        )}
+        {chats.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No chats yet</p>}
         <SessionGroupHeader label="Tasks" count={work.length} />
         {work.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
