@@ -782,7 +782,8 @@ func CLIPath(t *testing.T) string {
 func ClaudeOnPath(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
-	script := "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"" + dir + "/$(echo \"$AGENTOS_SESSION\" | tr / _).args\"\nexec sleep 60\n"
+	// The rename makes the args file appear whole, so a test never reads it half written.
+	script := "#!/bin/sh\nf=\"" + dir + "/$(echo \"$AGENTOS_SESSION\" | tr / _).args\"\nprintf '%s\\n' \"$@\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"\nexec sleep 60\n"
 	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
