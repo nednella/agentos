@@ -125,7 +125,7 @@ func TestLaunchArgsPerMode(t *testing.T) {
 	}
 	b.headless = false
 	args := b.launchArgs("/p", 24680)
-	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-brave-update", "--disable-features=MacAppCodeSignClone", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
+	for _, want := range []string{"--remote-debugging-port=24680", "--user-data-dir=/p", "--disable-brave-update", "--disable-features=MacAppCodeSignClone", "--use-mock-keychain", "--disable-backgrounding-occluded-windows", "--disable-renderer-backgrounding", "--no-startup-window"} {
 		if !slices.Contains(args, want) {
 			t.Errorf("args lack %s: %v", want, args)
 		}

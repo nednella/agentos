@@ -239,8 +239,10 @@ func (b *Browsers) launchArgs(profile string, port int) []string {
 	// macOS blocks a child of agentos that writes into an app bundle and reports it as "agentos was prevented from
 	// modifying apps". Brave's updater installs into Brave's bundle, and the code sign clone that Chromium makes at
 	// each start hard-links the bundle's executable. Other browsers ignore the Brave flag.
+	// A new profile asks the login keychain for its key, which a browser under the tmux server cannot reach, so macOS
+	// shows "Keychain Not Found". The profile is the agents' own, so a fixed key is safe.
 	args := []string{"--remote-debugging-port=" + strconv.Itoa(port), "--user-data-dir=" + profile, "--no-first-run", "--no-default-browser-check",
-		"--disable-brave-update", "--disable-features=MacAppCodeSignClone"}
+		"--disable-brave-update", "--disable-features=MacAppCodeSignClone", "--use-mock-keychain"}
 	if b.headless {
 		return append(args, "--headless=new", "--hide-scrollbars", "about:blank")
 	}
