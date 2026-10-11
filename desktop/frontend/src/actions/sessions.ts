@@ -25,7 +25,16 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
     group: 'Sessions',
     shortcut: { key: 'n' },
     run() {
-      a.setComposing(true)
+      a.setComposing('session')
+    },
+  },
+  {
+    id: 'new-chat',
+    label: 'New chat',
+    group: 'Sessions',
+    shortcut: { key: 'm' },
+    run() {
+      a.setComposing('chat')
     },
   },
   {

@@ -6,6 +6,7 @@ import { useLayout } from '../LayoutContext'
 import { useListNav } from '../useListNav'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { useToggleAnimation } from '../useToggleAnimation'
+import { AgentGroupHeader } from './AgentGroupHeader'
 import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
@@ -21,12 +22,15 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
   const { sessions, selectedId, select, focus, setComposing } = useAgentos()
   const { mode, setSessionsOpen, returnToTerminal } = useLayout()
   const list = useRef<HTMLDivElement>(null)
+  const chats = sessions.filter((s) => s.chat)
+  const work = sessions.filter((s) => !s.chat)
+  const ordered = [...chats, ...work]
 
-  const nav = useListNav([...sessions.map((s) => s.id), NEW_SESSION_KEY], {
+  const nav = useListNav([...ordered.map((s) => s.id), NEW_SESSION_KEY], {
     onEnter(index) {
-      const session = sessions[index]
+      const session = ordered[index]
       if (!session) {
-        setComposing(true)
+        setComposing('session')
         return
       }
       select(session.id)
@@ -62,7 +66,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
       }}
     >
       <div className="panel-head flex h-10 flex-none items-center gap-2 border-b border-line pr-[0.3125rem] pl-4">
-        <span className="label">Sessions</span>
+        <span className="label">Agents</span>
         <span className="mono text-small text-dim">{sessions.length}</span>
         <span className="ml-auto" />
         <CleanupsMenu />
@@ -78,10 +82,20 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         )}
       </div>
       <div ref={list} className="min-h-0 flex-1 divide-y divide-line overflow-y-auto">
-        {sessions.map((s) => (
+        <AgentGroupHeader label="Chats" count={chats.length} />
+        {chats.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
         ))}
-        {sessions.length === 0 && <p className="flex h-full items-center justify-center px-4 text-center text-body font-medium">No sessions yet</p>}
+        {chats.length === 0 && (
+          <button className="row w-full px-4 py-2.5 text-left text-small text-dim" onClick={() => setComposing('chat')}>
+            Ask about the project without starting work
+          </button>
+        )}
+        <AgentGroupHeader label="Sessions" count={work.length} />
+        {work.map((s) => (
+          <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
+        ))}
+        {work.length === 0 && <p className="px-4 py-2.5 text-small text-dim">No sessions yet</p>}
       </div>
       <NewSessionRow cursor={nav.cursorKey === NEW_SESSION_KEY} compact={compact} />
     </aside>

@@ -33,7 +33,7 @@ export function MobileTabs() {
       <Tab panel="queue" label="Queue" badge={String(issues.length)} />
       <Tab panel="notes" label="Notes" badge={String(notes.filter((n) => !n.archived).length)} />
       <Tab panel="session" label="Session" badge={selected ? `#${selected.n}` : '–'} />
-      <Tab panel="sessions" label="Sessions" badge={String(sessions.length)} urgent={needsYou} />
+      <Tab panel="sessions" label="Agents" badge={String(sessions.length)} urgent={needsYou} />
       <Tab panel="shell" label="Shell" badge="❯" />
     </nav>
   )

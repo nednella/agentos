@@ -4,6 +4,7 @@ import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { InlineInput } from './InlineInput'
+import { ChatTag } from './ChatTag'
 import { ModelTag } from './ModelTag'
 import { StateBadge } from './StateBadge'
 import { Timeline } from './Timeline'
@@ -81,9 +82,10 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
       </div>
       <div className="short:hidden flex items-center gap-3 px-4 pt-2.5 pb-0.5">
         <StateBadge state={session.state} />
+        {session.chat && <ChatTag />}
         <ModelTag model={session.model} effort={session.effort} />
       </div>
-      <Timeline session={session} size="full" />
+      {!session.chat && <Timeline session={session} size="full" />}
       {kill.armed && (
         <p className="px-4 pb-2 text-center text-small" style={{ color: 'var(--danger)' }}>
           Kill this session? The agent stops now. Its conversation stays on disk and can be resumed from a terminal with{' '}
