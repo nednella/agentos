@@ -21,7 +21,7 @@ export function EmptyState() {
               <Icon name="chat" />
               Chat
               <span className="ml-auto">
-                <Keycap>⌘M</Keycap>
+                <Keycap>⌘N</Keycap>
               </span>
             </span>
             <span className="text-small text-soft">Reads the project and answers questions.</span>
@@ -31,7 +31,7 @@ export function EmptyState() {
               <Icon name="branch" />
               Task
               <span className="ml-auto">
-                <Keycap>⌘N</Keycap>
+                <Keycap>⌘M</Keycap>
               </span>
             </span>
             <span className="text-small text-soft">Works on the project in its own branch and opens a pull request.</span>

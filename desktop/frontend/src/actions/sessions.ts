@@ -23,7 +23,7 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
     id: 'new-session',
     label: 'New task',
     group: 'Sessions',
-    shortcut: { key: 'n' },
+    shortcut: { key: 'm' },
     run() {
       a.setComposing('session')
     },
@@ -32,7 +32,7 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
     id: 'new-chat',
     label: 'New chat',
     group: 'Sessions',
-    shortcut: { key: 'm' },
+    shortcut: { key: 'n' },
     run() {
       a.setComposing('chat')
     },
