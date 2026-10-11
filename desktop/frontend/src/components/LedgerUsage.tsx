@@ -3,7 +3,7 @@ import type { Ledger } from '../types'
 
 type LedgerUsageProps = { usage: Ledger['usage']; limit?: number }
 
-const HEADS = ['Tasks', 'Tokens', 'Per task', 'Est. cost']
+const HEADS = ['Tasks', 'Tokens', 'Per task', 'Cost']
 
 export function LedgerUsage({ usage, limit }: LedgerUsageProps) {
   const { totals, byModel, pricesAsOf } = usage

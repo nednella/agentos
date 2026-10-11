@@ -9,7 +9,7 @@ type SortKey = 'sessions' | 'tokens' | 'cost'
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'sessions', label: 'Tasks' },
   { key: 'tokens', label: 'Tokens' },
-  { key: 'cost', label: 'Est. cost' },
+  { key: 'cost', label: 'Cost' },
 ]
 
 export function LedgerWork({ work, limit }: LedgerWorkProps) {
