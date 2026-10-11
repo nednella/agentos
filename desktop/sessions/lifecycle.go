@@ -820,6 +820,10 @@ func (l *Lifecycle) Cleanup(ctx context.Context, id string, force bool) error {
 		l.mu.Unlock()
 		return errors.New("clean-up is already running")
 	}
+	if tr.pr != nil && !slices.Contains(t.branches, tr.branch) {
+		l.mu.Unlock()
+		return fmt.Errorf("%s is no longer a branch of this session", tr.branch)
+	}
 	tr.cleanup, tr.reason = "pending", ""
 	var pr *PR
 	if tr.pr != nil {
