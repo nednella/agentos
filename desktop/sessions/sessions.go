@@ -993,6 +993,9 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		return Session{}, err
 	}
 	view := s.register(name, title, proj, issue, model, conversation != "", chat)
+	if branch := proj.BranchFor(issue); issue > 0 && branch != "" {
+		s.life.claim(proj, name.String(), branch)
+	}
 	if ready != nil {
 		go s.typeWhenReady(name, ready, text, send)
 	}
@@ -1311,14 +1314,17 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	}
 	issue, _ := strconv.Atoi(in.Issue)
 	id := in.Name.String()
-	branches := s.life.branchesOf(proj, id)
-	if fallback := proj.BranchFor(issue); len(branches) == 0 && issue > 0 && fallback != "" {
-		branches = []string{fallback}
+	branches, owned := s.life.branchesOf(proj, id)
+	if fallback := proj.BranchFor(issue); issue > 0 && fallback != "" {
+		owned = append(owned, fallback)
+		if len(branches) == 0 {
+			branches = []string{fallback}
+		}
 	}
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id)}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id)}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.

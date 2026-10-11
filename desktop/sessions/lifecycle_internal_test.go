@@ -80,8 +80,8 @@ func TestPollResultForAForgottenSessionIsDropped(t *testing.T) {
 			}
 			o := l.update(target{id: id, proj: proj}, "issue-7", "", &PR{Number: 7, State: "open"})
 			_, tracked := l.tracks[id]
-			if tracked != tt.want || l.prs("p").Live[id] != tt.want || (!tt.want && o != (outcome{})) {
-				t.Errorf("tracked %v, live %v, outcome %+v, want tracked %v", tracked, l.prs("p").Live[id], o, tt.want)
+			if tracked != tt.want || slices.Contains(l.prs("p").SawOpen[id], "issue-7") != tt.want || (!tt.want && o != (outcome{})) {
+				t.Errorf("tracked %v, saw open %v, outcome %+v, want tracked %v", tracked, l.prs("p").SawOpen[id], o, tt.want)
 			}
 		})
 	}
