@@ -8,6 +8,7 @@ const (
 	Prompt       = "prompt"
 	SessionStart = "session_start" // label "resumed" when it continues a conversation
 	SessionEnd   = "session_end"   // ms is how long the session ran
+	ChatStart    = "chat_start"    // a chat records only that it started
 	Worked       = "worked"        // ms is how long a session worked
 	Wait         = "wait"          // ms is how long a session waited on the user; label is its kind (permission, question or idle)
 	PROpened     = "pr_opened"
