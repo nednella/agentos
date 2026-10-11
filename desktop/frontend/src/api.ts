@@ -38,8 +38,8 @@ type Backend = {
   TermResize(id: string, cols: number, rows: number): Promise<void>
   TermClose(id: string): Promise<void>
   OpenURL(url: string): Promise<void>
-  Stats(days: number): Promise<Stats>
-  Ledger(days: number): Promise<Ledger>
+  Stats(days: number, project: string): Promise<Stats>
+  Ledger(days: number, project: string): Promise<Ledger>
   RefreshPRs(): Promise<void>
   AckPR(id: string): Promise<void>
   TypeInto(id: string, text: string): Promise<void>
@@ -166,8 +166,8 @@ export const api = {
   termResize: (id: string, cols: number, rows: number) => backend.TermResize(id, cols, rows).catch(() => {}),
   termClose: (id: string) => backend.TermClose(id),
   openURL: (url: string) => backend.OpenURL(url),
-  stats: (days: number) => backend.Stats(days).then(readIdleKinds),
-  ledger: (days: number) => backend.Ledger(days),
+  stats: (days: number, project: string) => backend.Stats(days, project).then(readIdleKinds),
+  ledger: (days: number, project: string) => backend.Ledger(days, project),
   refreshPRs: () => backend.RefreshPRs(),
   ackPR: (id: string) => backend.AckPR(id),
   typeInto: (id: string, text: string) => backend.TypeInto(id, text),

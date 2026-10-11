@@ -8,17 +8,17 @@ import { StatsBars } from './StatsBars'
 import { StatsFigure } from './StatsFigure'
 import { StatsRecent } from './StatsRecent'
 
-type StatsInterruptionsProps = { days: number }
+type StatsInterruptionsProps = { days: number; project: string }
 
-export function StatsInterruptions({ days }: StatsInterruptionsProps) {
+export function StatsInterruptions({ days, project }: StatsInterruptionsProps) {
   const { report } = useAgentos()
   const [stats, setStats] = useState<StatsData | null>(null)
 
   useEffect(() => {
-    const load = () => report(async () => setStats(await api.stats(days)))
+    const load = () => report(async () => setStats(await api.stats(days, project)))
     load()
     return on('stats', load)
-  }, [days, report])
+  }, [days, project, report])
   const loading = useMinimumLoading(stats === null)
 
   if (loading || stats === null) return <Loading />

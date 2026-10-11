@@ -22,15 +22,18 @@ const WORK_RANGES = [
 const TAB_KEY = 'agentos.statsTab'
 const RANGE_KEY = 'agentos.statsDays'
 const WORK_RANGE_KEY = 'agentos.statsWorkDays'
+const PROJECT_KEY = 'agentos.statsProject'
 
 export function Stats() {
-  const { focusRequest, project } = useAgentos()
+  const { focusRequest, projects } = useAgentos()
   const { closeCentre } = useLayout()
   const [tab, setTab] = useState<Tab>(() => readStored(TAB_KEY, 'work'))
   const [days, setDays] = useState(() => readStored(RANGE_KEY, 7))
   const [workDays, setWorkDays] = useState(() => readStored(WORK_RANGE_KEY, 30))
+  const [picked, setPicked] = useState(() => readStored(PROJECT_KEY, ''))
   const panel = useRef<HTMLElement>(null)
   const work = tab === 'work'
+  const project = projects.some((p) => p.key === picked) ? picked : ''
 
   useEffect(() => {
     if (focusRequest.target === 'terminal') panel.current?.focus()
@@ -41,6 +44,10 @@ export function Stats() {
   const pickTab = (next: Tab) => {
     setTab(next)
     writeStored(TAB_KEY, next)
+  }
+  const pickProject = (next: string) => {
+    setPicked(next)
+    writeStored(PROJECT_KEY, next)
   }
   const pickRange = (next: string) => {
     if (work) {
@@ -64,7 +71,14 @@ export function Stats() {
       <header className="panel-head flex flex-none flex-wrap items-center gap-3 border-b border-line px-4 py-2.5">
         <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
-        <span className="text-small text-dim">{work ? 'all projects' : project?.name}</span>
+        <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
+          <option value="">All projects</option>
+          {projects.map((p) => (
+            <option key={p.key} value={p.key}>
+              {p.name}
+            </option>
+          ))}
+        </select>
         <div className="ml-auto">
           <SegmentedControl
             label="Range"
@@ -78,7 +92,7 @@ export function Stats() {
         </button>
       </header>
       <div data-scroll className="min-h-0 flex-1 overflow-y-auto p-4">
-        {work ? <LedgerView days={workDays} /> : <StatsInterruptions days={days} />}
+        {work ? <LedgerView days={workDays} project={project} /> : <StatsInterruptions days={days} project={project} />}
       </div>
     </section>
   )
