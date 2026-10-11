@@ -59,6 +59,7 @@ func TestApply(t *testing.T) {
 		{"cwd from the event", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Cwd: "/a"}, Event{Name: "PreToolUse", Cwd: "/b"}, Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t1, Cwd: "/b"}},
 		{"conversation from the event", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Conversation: "a"}, Event{Name: "UserPromptSubmit", Conversation: "b"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Conversation: "b"}},
 		{"conversation kept when the event has none", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Conversation: "a"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Conversation: "a"}},
+		{"transcript kept when the event has none", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Transcript: "/t/a.jsonl"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Transcript: "/t/a.jsonl"}},
 		{"cwd kept when the event has none", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Cwd: "/a"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Cwd: "/a"}},
 		{"reminder with no record", Record{}, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "x"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1}},
 	}
@@ -88,6 +89,7 @@ func TestParseEvent(t *testing.T) {
 			Event{Name: "UserPromptSubmit", Detail: "fix the bug"}},
 		{"working directory", "Stop", `{"cwd":"/tmp/p"}`, Event{Name: "Stop", Cwd: "/tmp/p"}},
 		{"conversation", "Stop", `{"session_id":"abc"}`, Event{Name: "Stop", Conversation: "abc"}},
+		{"transcript", "Stop", `{"transcript_path":"/t/abc.jsonl"}`, Event{Name: "Stop", Transcript: "/t/abc.jsonl"}},
 		{"not json", "Stop", `garbage`, Event{Name: "Stop"}},
 		{"empty", "SessionStart", ``, Event{Name: "SessionStart"}},
 	}

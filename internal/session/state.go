@@ -26,6 +26,7 @@ type Record struct {
 	Notify       string    `json:"notify,omitempty"`       // notification_type of a Notification
 	Cwd          string    `json:"cwd,omitempty"`          // where the agent was working at the latest event
 	Conversation string    `json:"conversation,omitempty"` // the agent's id for its conversation, to resume it
+	Transcript   string    `json:"transcript,omitempty"`   // the file the agent writes its conversation to
 
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`

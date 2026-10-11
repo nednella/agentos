@@ -18,6 +18,7 @@ type Event struct {
 	Command          string // that tool's shell command, when it has one
 	Cwd              string // where the agent was working
 	Conversation     string // the agent's id for its conversation
+	Transcript       string // the file the agent writes its conversation to
 }
 
 type payload struct {
@@ -29,6 +30,7 @@ type payload struct {
 	LastAssistantMessage string         `json:"last_assistant_message"`
 	Cwd                  string         `json:"cwd"`
 	SessionID            string         `json:"session_id"`
+	TranscriptPath       string         `json:"transcript_path"`
 }
 
 // ParseEvent reads the hook JSON from r. A body that is not JSON still gives a
@@ -36,7 +38,7 @@ type payload struct {
 func ParseEvent(name string, r io.Reader) Event {
 	var p payload
 	_ = json.NewDecoder(io.LimitReader(r, 1<<20)).Decode(&p)
-	ev := Event{Name: name, NotificationType: p.NotificationType, Message: p.Message, Cwd: p.Cwd, Conversation: p.SessionID}
+	ev := Event{Name: name, NotificationType: p.NotificationType, Message: p.Message, Cwd: p.Cwd, Conversation: p.SessionID, Transcript: p.TranscriptPath}
 	switch name {
 	case "Notification":
 		ev.Detail = p.Message
@@ -117,7 +119,7 @@ func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	} else if isIdleReminder(ev) && prev.State != Working {
 		return prev
 	}
-	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType, Cwd: cmp.Or(ev.Cwd, prev.Cwd), Conversation: cmp.Or(ev.Conversation, prev.Conversation)}
+	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType, Cwd: cmp.Or(ev.Cwd, prev.Cwd), Conversation: cmp.Or(ev.Conversation, prev.Conversation), Transcript: cmp.Or(ev.Transcript, prev.Transcript)}
 	switch ev.Name {
 	case "PreToolUse", "PostToolUse":
 		rec.Tool, rec.Command = ev.Tool, ev.Command
