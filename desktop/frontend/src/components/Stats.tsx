@@ -65,30 +65,32 @@ export function Stats() {
       data-panel="terminal"
       tabIndex={-1}
       aria-label={work ? 'Stats' : 'Interruption stats'}
-      className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+      className="panel @container flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       onKeyDown={(e) => e.key === 'Escape' && closeCentre()}
     >
-      <header className="panel-head flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-line px-4 py-2.5">
+      <header className="panel-head grid flex-none grid-cols-[minmax(0,1fr)_auto] items-center justify-items-start gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 @xl:flex">
         <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
-        <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
-          <option value="">All projects</option>
-          {projects.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <div className="ml-auto flex items-center gap-3">
-          <SegmentedControl
-            label="Range"
-            options={work ? WORK_RANGES : RANGES}
-            value={String(work ? workDays : days)}
-            onChange={pickRange}
-          />
-          <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
-            <Icon name="close" />
-          </button>
+        <button className="btn btn-ghost h-7 w-7 justify-center justify-self-end px-0 @xl:order-last" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
+          <Icon name="close" />
+        </button>
+        <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @xl:contents">
+          <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
+            <option value="">All projects</option>
+            {projects.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="@xl:ml-auto">
+            <SegmentedControl
+              label="Range"
+              options={work ? WORK_RANGES : RANGES}
+              value={String(work ? workDays : days)}
+              onChange={pickRange}
+            />
+          </div>
         </div>
       </header>
       <div data-scroll className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
