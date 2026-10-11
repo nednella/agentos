@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, on } from '../api'
 import { useAgentos } from '../AgentosContext'
 import type { Stats as StatsData } from '../types'
+import { Loading } from './Loading'
 import { StatsBars } from './StatsBars'
 import { StatsFigure } from './StatsFigure'
 import { StatsRecent } from './StatsRecent'
@@ -18,7 +19,7 @@ export function StatsInterruptions({ days }: StatsInterruptionsProps) {
     return on('stats', load)
   }, [days, report])
 
-  if (stats === null) return <p className="text-small text-dim">Loading…</p>
+  if (stats === null) return <Loading label="Loading interruptions" />
   if (stats.total === 0) {
     return (
       <div className="flex flex-col gap-1 py-16 text-center">

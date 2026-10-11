@@ -9,6 +9,7 @@ import { useIssueDrag } from '../useIssueDrag'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
 import { IssueRow } from './IssueRow'
+import { Loading } from './Loading'
 import { Notice } from './Notice'
 import { QueueSection } from './QueueSection'
 import { QueueSectionHeader } from './QueueSectionHeader'
@@ -149,7 +150,7 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
 
   useScrollCursorIntoView(list, listNav.cursorKey)
 
-  if (issuesLoading && issues.length === 0) return <Notice title="Loading issues" hint="Asking GitHub." centered />
+  if (issuesLoading && issues.length === 0) return <Loading label="Loading issues" />
   if (issues.length === 0) return <Notice title="No open issues" hint="This repo has nothing in the queue." centered />
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." centered />
 

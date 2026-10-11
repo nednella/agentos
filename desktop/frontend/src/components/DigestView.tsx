@@ -3,6 +3,7 @@ import { useAgentos } from "../AgentosContext";
 import { ago, until, useNow } from "../time";
 import type { DigestItem } from "../types";
 import { DigestItemRow } from "./DigestItemRow";
+import { Loading } from "./Loading";
 import { NewsHeader } from "./NewsHeader";
 
 const dayLabel = (at: number) =>
@@ -73,7 +74,8 @@ export function DigestView() {
         </p>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {groups.length === 0 && (
+        {!digest && <Loading label="Loading digest" />}
+        {digest && groups.length === 0 && (
           <div className="flex flex-col gap-1 px-6 py-16 text-center">
             <p className="text-body font-medium">Nothing in the digest yet</p>
             <p className="text-small text-dim">

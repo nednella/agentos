@@ -5,6 +5,7 @@ import { ago, useNow } from '../time'
 import type { IssueDetail } from '../types'
 import { Icon } from './Icon'
 import { IssueBody } from './IssueBody'
+import { Loading } from './Loading'
 import { Overlay } from './Overlay'
 import { StateDot } from './StateDot'
 import { TypeMark } from './TypeMark'
@@ -98,7 +99,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
       <div ref={body} tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-4 outline-none">
         <div className="flex flex-col gap-6">
           {error && <p className="text-small text-danger">{error}</p>}
-          {!detail && !error && <p className="text-small text-dim">Loading…</p>}
+          {!detail && !error && <Loading label="Loading issue" />}
           {detail && (detail.bodyHTML ? <IssueBody html={detail.bodyHTML} /> : <p className="text-small text-dim">No description.</p>)}
           {detail && detail.comments.length > 0 && (
             <section className="flex flex-col gap-4 border-t border-line pt-4">
