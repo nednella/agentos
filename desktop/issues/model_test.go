@@ -11,15 +11,22 @@ import (
 	"github.com/nednella/agentos/desktop/sessions"
 )
 
+// argsOf is the arguments a session's claude was started with, one per line.
+func argsOf(t *testing.T, dir, id string) string {
+	t.Helper()
+	var data []byte
+	eventually(t, "claude started", func() bool {
+		var err error
+		data, err = os.ReadFile(filepath.Join(dir, strings.ReplaceAll(id, "/", "_")+".args"))
+		return err == nil && len(data) > 0
+	})
+	return strings.TrimSpace(string(data))
+}
+
 // flagsOf is the --model and --effort values a session's claude was started with.
 func flagsOf(t *testing.T, dir, id string) (model, effort string) {
 	t.Helper()
-	var args []string
-	eventually(t, "claude started", func() bool {
-		data, err := os.ReadFile(filepath.Join(dir, strings.ReplaceAll(id, "/", "_")+".args"))
-		args = strings.Split(strings.TrimSpace(string(data)), "\n")
-		return err == nil && len(data) > 0
-	})
+	args := strings.Split(argsOf(t, dir, id), "\n")
 	for _, flag := range []string{"--model", "--effort"} {
 		v := ""
 		if i := slices.Index(args, flag); i >= 0 {

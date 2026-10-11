@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nednella/agentos/desktop/internal/apptest"
 	ctl "github.com/nednella/agentos/internal/control"
+	"github.com/nednella/agentos/internal/prompts"
 )
 
 func TestIssueCommand(t *testing.T) {
@@ -28,6 +30,27 @@ func TestIssueCommand(t *testing.T) {
 				t.Errorf("issue %v = %+v, want %q", tt.args, resp, tt.want)
 			}
 		})
+	}
+}
+
+func TestIssueCommandHandsThePromptOver(t *testing.T) {
+	dir := apptest.ClaudeOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+	resp := h.Ask(t, ctl.Request{Cmd: "issue", Args: []string{"7"}, Opts: map[string]string{"prompt": "the patch is in /tmp/x"}})
+	if !resp.OK {
+		t.Fatalf("issue 7 = %+v", resp)
+	}
+	list := h.Sessions().List()
+	if len(list) != 1 || list[0].Issue != 7 {
+		t.Fatalf("sessions = %+v, want one for #7", list)
+	}
+	if args := argsOf(t, dir, list[0].ID); !strings.Contains(args, prompts.Handover("the patch is in /tmp/x")) {
+		t.Errorf("the system prompt lacks the handover:\n%s", args)
+	}
+
+	resp = h.Ask(t, ctl.Request{Cmd: "issue", Args: []string{"7"}, Opts: map[string]string{"prompt": "more"}})
+	if !resp.OK || !strings.Contains(resp.Out, "already running: #7 (1, the prompt was not given to it)") {
+		t.Errorf("issue 7 again = %+v", resp)
 	}
 }
 
