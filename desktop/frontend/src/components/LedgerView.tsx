@@ -14,7 +14,7 @@ import { LedgerUsage } from './LedgerUsage'
 import { LedgerWork } from './LedgerWork'
 import { Loading } from './Loading'
 
-type LedgerViewProps = { days: number }
+type LedgerViewProps = { days: number; project: string }
 
 const SECTIONS = [
   { id: 'activity', title: 'Activity' },
@@ -26,7 +26,7 @@ const SECTIONS = [
 
 const average = (ms: number) => (ms ? duration(ms) : '—')
 
-export function LedgerView({ days }: LedgerViewProps) {
+export function LedgerView({ days, project }: LedgerViewProps) {
   const { report } = useAgentos()
   const [ledger, setLedger] = useState<Ledger | null>(null)
   const [active, setActive] = useState(SECTIONS[0].id)
@@ -35,13 +35,13 @@ export function LedgerView({ days }: LedgerViewProps) {
   useEffect(() => {
     let current = true
     report(async () => {
-      const next = await api.ledger(days)
+      const next = await api.ledger(days, project)
       if (current) setLedger(next)
     })
     return () => {
       current = false
     }
-  }, [days, report])
+  }, [days, project, report])
   const loading = useMinimumLoading(ledger === null)
 
   const loaded = !loading && ledger !== null && ledger.since !== ''
@@ -78,6 +78,7 @@ export function LedgerView({ days }: LedgerViewProps) {
   const spent = usage.totals
   const perTask = spent.sessions ? spent.tokens / spent.sessions : 0
   const hours = Math.round(totals.workMs / 3_600_000)
+  const sections = project ? SECTIONS.filter((s) => s.id !== 'projects') : SECTIONS
   const pick = (id: string) => {
     document.getElementById(`ledger-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
@@ -85,7 +86,7 @@ export function LedgerView({ days }: LedgerViewProps) {
   return (
     <div className="@container">
       <div className="mx-auto flex max-w-5xl flex-col gap-6 @xl:grid @xl:grid-cols-[7.5rem_minmax(0,1fr)] @xl:gap-6">
-        <LedgerRail sections={SECTIONS} active={active} onPick={pick} />
+        <LedgerRail sections={sections} active={active} onPick={pick} />
         <div ref={content} className="flex min-w-0 flex-col gap-8">
           <LedgerSection id="activity" title="Activity" hint={`since ${ledger.since}`}>
             <LedgerFigures
@@ -135,9 +136,11 @@ export function LedgerView({ days }: LedgerViewProps) {
               ]}
             />
           </LedgerSection>
-          <LedgerSection id="projects" title="Projects" hint={`${ledger.projects.length.toLocaleString()} with activity`}>
-            <LedgerTable projects={ledger.projects} />
-          </LedgerSection>
+          {!project && (
+            <LedgerSection id="projects" title="Projects" hint={`${ledger.projects.length.toLocaleString()} with activity`}>
+              <LedgerTable projects={ledger.projects} />
+            </LedgerSection>
+          )}
           <LedgerSection id="spend" title="Spend" hint="estimated">
             <LedgerFigures
               figures={[

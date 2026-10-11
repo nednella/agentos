@@ -532,9 +532,13 @@ export function createMock(params: URLSearchParams) {
     return snapshot()
   }
 
-  function statsFor(days: number): Stats {
+  function statsFor(days: number, project: string): Stats {
     const since = Date.now() - days * 86_400_000
-    const waits = current.waits.filter((w) => w.startedAt >= since)
+    const waits = data
+      .filter((p) => !project || p.name === project)
+      .flatMap((p) => p.waits)
+      .filter((w) => w.startedAt >= since)
+      .sort((a, b) => b.startedAt - a.startedAt)
     const done = waits.filter((w) => w.waitedMs > 0).map((w) => w.waitedMs).sort((a, b) => a - b)
     const groups = new Map<string, { kind: WaitKind; label: string; count: number; totalWaitMs: number }>()
     for (const w of waits) {
@@ -558,14 +562,8 @@ export function createMock(params: URLSearchParams) {
     }
   }
 
-  function ledgerFor(days: number): Ledger {
+  function ledgerFor(days: number, project: string): Ledger {
     const dayKey = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString().slice(0, 10)
-    const heat = Array.from({ length: 364 }, (_, i) => {
-      const weekday = (i + 3) % 7
-      const wave = Math.sin(i / 9) + 1.2
-      const count = weekday > 4 || i % 11 === 0 ? 0 : Math.round(wave * ((i * 37) % 23))
-      return { day: dayKey(363 - i), count }
-    })
     const scale = days === 0 ? 1 : days === 365 ? 0.8 : 0.12
     const row = (project: string, prompts: number): LedgerRow => ({
       project,
@@ -583,12 +581,15 @@ export function createMock(params: URLSearchParams) {
       tokens: Math.round(prompts * scale * 61_000),
       cost: prompts * scale * 0.083,
     })
-    const projects = [
-      row('agentos', 3104),
-      row('upscope-web', 1209),
-      row('dotfiles', 499),
-      row('scratch', 38),
-    ]
+    const all = [row('storefront', 3104), row('agentos', 1209), row('scratch', 38)]
+    const projects = all.filter((r) => !project || r.project === project)
+    const share = projects.reduce((a, r) => a + r.prompts, 0) / all.reduce((a, r) => a + r.prompts, 0)
+    const heat = Array.from({ length: 364 }, (_, i) => {
+      const weekday = (i + 3) % 7
+      const wave = Math.sin(i / 9) + 1.2
+      const count = weekday > 4 || i % 11 === 0 ? 0 : Math.round(wave * ((i * 37) % 23))
+      return { day: dayKey(363 - i), count: Math.round(count * share) }
+    })
     const totals: LedgerRow = {
       project: '',
       prompts: projects.reduce((a, r) => a + r.prompts, 0),
@@ -630,11 +631,11 @@ export function createMock(params: URLSearchParams) {
     const work: WorkRow[] = [
       { project: 'agentos', issue: 320, session: '', title: '#320 Token usage and estimated cost per issue', sessions: 2, tokens: 18_400_000, cost: 9.12, lastAt: hoursAgo(0.2) },
       { project: 'agentos', issue: 316, session: '', title: '#316 Switch task and chat shortcuts', sessions: 1, tokens: 2_100_000, cost: 1.04, lastAt: hoursAgo(3) },
-      { project: 'upscope-web', issue: 0, session: 'upscope-web/k3j2h4g5', title: 'Look into the flaky login test', sessions: 1, tokens: 6_700_000, cost: 3.31, lastAt: hoursAgo(26) },
+      { project: 'storefront', issue: 0, session: 'storefront/k3j2h4g5', title: 'Look into the flaky login test', sessions: 1, tokens: 6_700_000, cost: 3.31, lastAt: hoursAgo(26) },
       { project: 'agentos', issue: 309, session: '', title: '#309 Empty states for session groups', sessions: 3, tokens: 31_900_000, cost: 15.6, lastAt: hoursAgo(50) },
     ]
     const usage = { totals: usageRow('', '', 1, totals.sessions), byModel, pricesAsOf: '2026-10-06' }
-    return { days, since: dayKey(120), totals, projects, heat, usage, work }
+    return { days, since: dayKey(120), totals, projects, heat, usage, work: work.filter((w) => !project || w.project === project) }
   }
 
   function finishCleanup(s: MockSession) {
@@ -1059,8 +1060,8 @@ export function createMock(params: URLSearchParams) {
       const s = sessions.find((x) => x.id === id)
       if (s) s.opened = false
     },
-    Stats: async (days: number) => delay(statsFor(days), 150),
-    Ledger: async (days: number) => delay(ledgerFor(days), 300),
+    Stats: async (days: number, project: string) => delay(statsFor(days, project), 150),
+    Ledger: async (days: number, project: string) => delay(ledgerFor(days, project), 300),
     RefreshPRs: async () => delay(undefined, 500),
     AckPR: async (id: string) => {
       find(id).prAttention = ''
