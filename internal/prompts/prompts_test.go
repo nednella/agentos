@@ -15,9 +15,9 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		hash string
 	}{
 		{"browser", Browser(), "89a9746065d583edb60e70a281c1560f0aa15b66df48737e59269af8def02fbb"},
-		{"agent", Agent(), "b25b7baade761a6f17aeb8e3941cc9af3ea85cfba9a183fb09ea7ef7bb862958"},
-		{"session", Session(), "6ef6a41d5d6345c49a48f17ebd0de50df3f8b2699c712d74614c5c9e2b696692"},
-		{"chat", Chat(), "00ff17f2ff2aad4a322500d83c9f2705748a1bb42f9fdce335559f5cca67f9b8"},
+		{"session", Session(), "5570841f6e4585e98637a7f4a7bb1946c2156a08099d7780e8ca28536723aa1b"},
+		{"task", Task(), "ab0acbf6e542e51bd8dd7033a13c388902ca7bbfedbe450133ffafc70b9c4676"},
+		{"chat", Chat(), "1da85497a6658730bedd3d276d260e2423912320f4f11259f605363210aa396b"},
 		{"browser help", BrowserHelp(), "d84f5a28ba26ad87c9290bb7cdd0e6d0f0bc593666b9f90cbcdea54f9cd7aefa"},
 		{"setup brief", SetupBrief(), "0160381a6edfe8aaa422fcb83ed4fb766d67cb45ab4ca9dbd64cb50016238dc3"},
 		{"setup start", SetupStart(), "cf5d8bdf29eda3fed3e8a7dd0fc7c5eb2129b3f810f26cf0df0da908a13e4606"},

@@ -54,7 +54,7 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 			if (prompt >= 0) != claude {
 				t.Fatalf("argv = %q", argv)
 			}
-			if claude && !strings.HasPrefix(argv[prompt+1], prompts.Agent()+"\n\n"+prompts.Session()) {
+			if claude && !strings.HasPrefix(argv[prompt+1], prompts.Session()+"\n\n"+prompts.Task()) {
 				t.Errorf("system prompt = %q", argv[prompt+1])
 			}
 			if claude && strings.Contains(argv[prompt+1], prompts.Browser()) != tt.want {
@@ -194,7 +194,7 @@ func TestCommandMakesAChatReadOnlyWithoutABrowser(t *testing.T) {
 	if slices.Contains(argv, "--mcp-config") || slices.Contains(argv, "--disallowedTools") {
 		t.Errorf("a chat has a browser: %q", argv)
 	}
-	want := prompts.Agent() + "\n\n" + prompts.Chat()
+	want := prompts.Session() + "\n\n" + prompts.Chat()
 	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != want {
 		t.Errorf("system prompt = %q", argv)
 	}
