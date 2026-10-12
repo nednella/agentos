@@ -56,6 +56,20 @@ func TestSessionCommands(t *testing.T) {
 	list := h.Sessions().List()
 	third := list[slices.IndexFunc(list, func(s sessions.Session) bool { return s.N == 3 })]
 	eventually(t, "the prompt in the new session", func() bool { return strings.Contains(h.Pane(t, third.ID), "context for the new session") })
+	if strings.Contains(h.Pane(t, third.ID), "APPLICATION_PROMPT") {
+		t.Errorf("the owner's prompt is framed as the app's: %q", h.Pane(t, third.ID))
+	}
+
+	req := ctl.Request{Cmd: "new", Session: third.ID, Args: []string{"handed"}, Opts: map[string]string{"prompt": "what the side session found"}}
+	if resp := h.Ask(t, req); !resp.OK || resp.Out != "started session 4: handed" {
+		t.Fatalf("new from a session = %+v", resp)
+	}
+	list = h.Sessions().List()
+	fourth := list[slices.IndexFunc(list, func(s sessions.Session) bool { return s.N == 4 })]
+	eventually(t, "the handover in the new session", func() bool {
+		pane := h.Pane(t, fourth.ID)
+		return strings.Contains(pane, "APPLICATION_PROMPT: Another session asked for this task") && strings.Contains(pane, "what the side session found")
+	})
 
 	if resp := h.Ask(t, ctl.Request{Cmd: "kill", Args: []string{"2"}}); !resp.OK || resp.Out != "killed session 2: fix logout" {
 		t.Errorf("kill = %+v", resp)
