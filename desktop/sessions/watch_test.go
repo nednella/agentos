@@ -292,6 +292,39 @@ func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
 	}
 }
 
+func TestResumedSessionIsCleanedUpOnMerge(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: removeWorktreeAndBranch, ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 1))
+	h.RefreshPRs()
+	var fresh string
+	eventually(t, "a new session for the issue", func() bool {
+		for _, v := range h.Sessions().List() {
+			if v.Issue == 7 && v.State != "ended" {
+				fresh = v.ID
+				return true
+			}
+		}
+		return false
+	})
+	eventually(t, "the ended row to go", func() bool { _, ok := h.Session(s.ID); return !ok })
+
+	// The new session knows the PR was open, as the ended one did, so the merge cleans up without asking.
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 1))
+	h.RefreshPRs()
+	eventually(t, "the new session to be cleaned up", func() bool { _, ok := h.Session(fresh); return !ok })
+	if exists(wt) {
+		t.Error("the worktree is still there")
+	}
+}
+
 func TestReviewOnAnEndedSessionLeavesTheIssuesLiveSession(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
 	h.GH.SetPRFor("issue-12", "[]")

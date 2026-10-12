@@ -20,6 +20,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/agent"
+	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
@@ -468,6 +469,7 @@ func (s *Sessions) drop(id string) {
 	go s.browsers.Close(s.ctx, id)
 	if name, err := session.ParseName(id); err == nil {
 		go os.RemoveAll(s.tmpDir(name))
+		_ = os.Remove(s.handoverPath(name))
 	}
 }
 
@@ -475,6 +477,22 @@ func (s *Sessions) drop(id string) {
 // without asking, so the screenshots and scratch files it makes there need no approval, and it goes with the session.
 func (s *Sessions) tmpDir(name session.Name) string {
 	return filepath.Join(s.localDir, name.Project, "tmp", name.Token)
+}
+
+// handoverPath is where the handover a session started with is kept: a session that resumes its conversation
+// needs it again, since --resume does not bring back the system prompt.
+func (s *Sessions) handoverPath(name session.Name) string {
+	return filepath.Join(s.localDir, name.Project, "handovers", name.Token+".md")
+}
+
+// handoverOf is the handover the session started with, "" when none.
+func (s *Sessions) handoverOf(id string) string {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return ""
+	}
+	data, _ := os.ReadFile(s.handoverPath(name))
+	return string(data)
 }
 
 // Dismiss removes an ended session's row.
@@ -990,13 +1008,13 @@ func (s *Sessions) CreateIssue(title, text string, issue int, action project.Act
 }
 
 // createForIssue starts a session for the issue, unless the project has a live one for it: then it names that one.
-func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation, handover string) (view Session, live string, err error) {
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string) (view Session, live string, err error) {
 	s.issueMu.Lock()
 	defer s.issueMu.Unlock()
 	if live := s.liveIssueSession(proj.Key(), issue); live != "" {
 		return Session{}, live, nil
 	}
-	view, err = s.createIn(proj, title, text, send, issue, model, conversation, "", handover, false)
+	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, false)
 	return view, "", err
 }
 
@@ -1010,10 +1028,15 @@ func fromApp(text string) string {
 }
 
 // createIn is Create in the project given, which need not be the current one, with the model given.
-// A conversation continues that of an earlier session; a brief or a handover is added to the agent's system prompt.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation, brief, handover string, chat bool) (Session, error) {
+// A session from an earlier one continues its conversation and takes over its branches; a brief or a handover is
+// added to the agent's system prompt.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, from, brief, handover string, chat bool) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
+
+	s.mu.Lock()
+	conversation := s.conversationOf(from)
+	s.mu.Unlock()
 
 	model = s.fill(proj.Dir, model)
 	name, ctx, ready := s.reserve(proj, text)
@@ -1027,6 +1050,9 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		return Session{}, err
 	}
 	view := s.register(name, title, proj, issue, model, conversation != "", chat)
+	if from != "" {
+		s.life.inherit(proj, from, name.String())
+	}
 	if branch := proj.BranchFor(issue); issue > 0 && branch != "" {
 		s.life.claim(proj, name.String(), branch)
 	}
@@ -1079,6 +1105,11 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 		return fmt.Errorf("making the session's temp folder: %w", err)
 	}
 	env = append(env, "TMPDIR="+tmp, "CLAUDE_CODE_TMPDIR="+tmp)
+	if handover != "" {
+		if err := atomicfile.Write(s.handoverPath(name), []byte(handover), 0o600); err != nil {
+			return fmt.Errorf("saving the handover: %w", err)
+		}
+	}
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
@@ -1185,14 +1216,14 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 // wake sends the prompt to the session, once it is not waiting on the user: typed into a
 // permission prompt, the text could answer it. A session that has ended gets a new one for
 // its issue when the issue has no live session: the prompt is typed in and sent unless the
-// project sends by hand, and the old row goes. The new one continues the old's conversation
-// when the agent can.
+// project sends by hand, the new one takes over the old's branches and handover, and the old
+// row goes. The new one continues the old's conversation when the agent can.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	if t.ended && t.issue == 0 {
 		return
 	}
 	if t.ended {
-		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.conversation, "")
+		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 		}
@@ -1363,7 +1394,7 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, conversation: s.conversationOf(id)}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.
