@@ -296,6 +296,7 @@ type FakeGH struct {
 	prByHead      map[string]string // what gh pr list --head <branch> prints instead, by branch
 	PRErr         error             // what gh pr list fails with, if set
 	IssuesErr     error             // what gh issue list fails with, if set
+	issues        string            // what gh issue list prints instead of the usual six issues, if set
 	pulls         string            // the body gh api prints for the repo's pull request list
 	etag          string            // its ETag: a request carrying it gets a 304
 	hooks         []*io.PipeWriter
@@ -371,6 +372,9 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 		if f.IssuesErr != nil {
 			return nil, f.IssuesErr
 		}
+		if f.issues != "" {
+			return []byte(f.issues), nil
+		}
 		return []byte(`[
 			{"number":7,"title":"Fix the thing that breaks when the window is narrow","url":"https://x/7","author":{"login":"ned"},"assignees":[{"login":"ned"},{"login":"amy"}],"createdAt":"2026-09-01T10:00:00Z","updatedAt":"2026-09-02T10:00:00Z","labels":[{"name":"ready"},{"name":"type:bug"}]},
 			{"number":8,"title":"Plan it","url":"https://x/8","labels":[{"name":"needs-plan"},{"name":"type:feature"}]},
@@ -407,6 +411,13 @@ func (f *FakeGH) Calls(prefix string) int {
 		}
 	}
 	return n
+}
+
+// SetIssues sets what gh issue list prints.
+func (f *FakeGH) SetIssues(list string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.issues = list
 }
 
 // SetPulls sets what the repo's pull request list answers: its ETag and the body.

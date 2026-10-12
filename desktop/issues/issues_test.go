@@ -95,6 +95,24 @@ func TestIssues(t *testing.T) {
 	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, plan.ID), "/investigate 8") })
 }
 
+func TestStartReadsTheListAgainForANewIssue(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.Issues(false); err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetIssues(`[{"number":13,"title":"Just made","url":"https://x/13","labels":[]}]`)
+	s, err := h.StartIssue(13)
+	if err != nil || s.Issue != 13 {
+		t.Fatalf("start of an issue made after the list was read = %+v, %v", s, err)
+	}
+	if h.GH.IssueCalls() != 2 {
+		t.Errorf("gh issue list ran %d times, want 2", h.GH.IssueCalls())
+	}
+	eventually(t, "the issues event with the new issue", func() bool {
+		return slices.ContainsFunc(h.Rec.LastIssues(), func(is issues.Issue) bool { return is.Number == 13 })
+	})
+}
+
 func TestStartsAtOnceMakeOneSession(t *testing.T) {
 	h := newHarness(t)
 	ids := make([]string, 4)

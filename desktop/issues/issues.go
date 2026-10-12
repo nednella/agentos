@@ -280,24 +280,31 @@ func (i *Issues) Reload(ctx context.Context, proj project.Project) {
 
 // Start opens a session for the issue with the action of its section that has the name given, or the
 // section's default action when action is "". An issue that already has a live session gets that session
-// back instead of a second agent, and created is false.
+// back instead of a second agent, and created is false. An issue not in the cached list may be new: the
+// list is read again once.
 func (i *Issues) Start(ctx context.Context, number int, action, handover string) (view sessions.Session, created bool, err error) {
 	proj := i.sessions.Current()
-	list, err := i.List(ctx, proj, false)
-	if err != nil {
-		return sessions.Session{}, false, err
+	for _, refresh := range []bool{false, true} {
+		list, err := i.List(ctx, proj, refresh)
+		if err != nil {
+			return sessions.Session{}, false, err
+		}
+		at := slices.IndexFunc(list, func(is Issue) bool { return is.Number == number })
+		if at < 0 {
+			continue
+		}
+		if refresh {
+			i.Emit()
+		}
+		is := list[at]
+		_, section := proj.Section(is.Labels)
+		act, ok := pickAction(section, action)
+		if !ok {
+			return sessions.Session{}, false, fmt.Errorf("issue #%d has no action %q", number, action)
+		}
+		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
 	}
-	at := slices.IndexFunc(list, func(is Issue) bool { return is.Number == number })
-	if at < 0 {
-		return sessions.Session{}, false, fmt.Errorf("issue #%d is not open in this project", number)
-	}
-	is := list[at]
-	_, section := proj.Section(is.Labels)
-	act, ok := pickAction(section, action)
-	if !ok {
-		return sessions.Session{}, false, fmt.Errorf("issue #%d has no action %q", number, action)
-	}
-	return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
+	return sessions.Session{}, false, fmt.Errorf("issue #%d is not open in this project", number)
 }
 
 // Move relabels the issue on GitHub so that it falls in the section, then reads the queue again.
