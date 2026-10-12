@@ -75,7 +75,7 @@ queue_sections:
 - An issue goes in the first section it matches: it has any of the section's `labels`, or the section's `labels` is empty and the issue has none, or the section's `labels` holds `"*"`, which matches every issue.
 - So a `"*"` section placed last takes every issue the sections above it did not. A section after it would never be reached, so a config with one does not load.
 - An issue no section matches goes under one folded row below the last section, `<n> more issues match no section`, with the `Start` action. A last `"*"` section is only needed to give those issues a name or other actions.
-- In a command, `{n}` is the issue number and `{title}` its title. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
+- In a command, `{n}` is the issue number, `{title}` its title and `{branch}` its `session_branch_fallback`. The `Start` action names the branch when the project sets one. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
 - Dragging an issue to another section relabels it on GitHub: it loses the labels of the section it left and gains the first label of the section it enters. No session starts. A section with no labels takes an issue only when no label is left.
 - A move can be undone from the app; the app remembers the last move of each issue until it quits.
@@ -118,11 +118,11 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | Group | Command | Does |
 |---|---|---|
 | Work | `issue <n...> [--prompt <text>\|-]` | starts a session per issue; an issue with a live session is reported as already running. `--prompt` takes one issue: its text (`-` reads stdin), at most 6 KB, is added to the new session's system prompt as a handover from the session that asked, and a running session does not get it |
-| Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` types its text (`-` reads stdin), at most 6 KB, into the new session once the agent is ready, sent unless `session_prompt_send` is `manual` |
+| Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` types its text (`-` reads stdin), at most 6 KB, into the new session once the agent is ready, sent unless `session_prompt_send` is `manual`; from a session, the text is framed as that session's handover |
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `news`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
-| From inside a session | `browser open <url>`, `browser tab <url>`, `browser screenshot`, `browser close`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` (not the default branch) | `agentos browser help` explains the browser |
+| From inside a session | `issue <n> --prompt -`, `new <title> --prompt -`, `browser open <url>`, `browser tab <url>`, `browser screenshot`, `browser close`, `show <file> [--caption …] \| --text …`, `note <text>`, `track --branch <name>` (not the default branch) | `issue` and `new` hand work to a new task, as under Work; `agentos browser help` explains the browser |
 
 `stats [--days N] [--json]` prints the interruption tally. `agentos kill` without a number stops this project's agents directly through tmux, with the app closed too; `--all` does it for every project and stops the shells. `agentos version` prints the version. `agentos update` installs the latest release over the installed app, then asks a running app to relaunch. Every command typed at a terminal says on stderr when a newer release is out, asking GitHub at most once a day.
 
