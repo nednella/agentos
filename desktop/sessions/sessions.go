@@ -139,7 +139,7 @@ type Sessions struct {
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
 	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
-	wakes      map[string]string        // prompts for sessions that were waiting on the user when their PR needed them
+	wakes      map[string][]string      // prompts for sessions that were waiting on the user when their PR needed them, oldest first
 	prefillFor time.Duration
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
@@ -237,7 +237,7 @@ func newSessions(o Options) *Sessions {
 		history:    map[string][]Change{},
 		ready:      map[string]chan struct{}{},
 		resumed:    map[string]bool{},
-		wakes:      map[string]string{},
+		wakes:      map[string][]string{},
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
 		prefillFor: prefillWait,
@@ -1170,7 +1170,7 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	}
 	s.mu.Lock()
 	if rec := s.records[t.id]; rec.State == session.Waiting {
-		s.wakes[t.id] = prompt
+		s.wakes[t.id] = append(s.wakes[t.id], prompt)
 		s.mu.Unlock()
 		return
 	}
@@ -1178,17 +1178,22 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	s.send(ctx, name, prompt, true)
 }
 
-// deliverWakes sends the prompts held back while their sessions waited on the user. A session that ended
-// meanwhile was ended by the user, or cleaned up: its prompt goes with it. It needs mu.
+// deliverWakes sends the prompts held back while their sessions waited on the user, in order. A session
+// that ended meanwhile was ended by the user, or cleaned up: its prompts go with it. It needs mu.
 func (s *Sessions) deliverWakes() {
-	for id, prompt := range s.wakes {
+	for id, prompts := range s.wakes {
 		_, live := s.seen[id]
 		switch {
 		case !live:
 			delete(s.wakes, id)
 		case s.records[id].State != session.Waiting:
 			delete(s.wakes, id)
-			go s.send(s.ctx, s.known[id].Name, prompt, true)
+			ctx, name := s.ctx, s.known[id].Name
+			go func() {
+				for _, prompt := range prompts {
+					s.send(ctx, name, prompt, true)
+				}
+			}()
 		}
 	}
 }
