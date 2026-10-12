@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
@@ -65,6 +66,28 @@ func WriteState(dir string, rec session.Record) error {
 		return fmt.Errorf("encoding state: %w", err)
 	}
 	return atomicfile.Write(stateFile(dir, rec.Session), data, 0o600)
+}
+
+// SaveEvent folds ev into the saved state of the session under the file's lock, as of at.
+// It reports whether the state changed.
+func SaveEvent(dir, name string, ev session.Event, at time.Time) (session.Record, bool) {
+	unlock, err := LockState(dir, name)
+	if err != nil {
+		return session.Record{}, false
+	}
+	defer unlock()
+	prev, _ := ReadState(dir, name)
+	if prev.Session == "" && ev.Name != "SessionStart" {
+		return session.Record{}, false // a hook that fires after the session was dismissed must not bring its file back
+	}
+	if prev.At.After(at) {
+		return session.Record{}, false
+	}
+	rec := session.Apply(name, prev, ev, at)
+	if rec == prev || WriteState(dir, rec) != nil {
+		return session.Record{}, false
+	}
+	return rec, true
 }
 
 // ReadState returns the saved record, or the zero record when there is none.

@@ -42,32 +42,11 @@ func reportHookAt(event string, stdin io.Reader, at time.Time) {
 	}
 	dir := bus.DirOf(socket)
 	ev := session.ParseEvent(event, stdin)
-	rec, ok := saveHook(dir, name, ev, at)
+	rec, ok := bus.SaveEvent(dir, name, ev, at)
 	if !ok {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), hookBudget)
 	defer cancel()
 	_ = bus.Send(ctx, socket, rec)
-}
-
-// saveHook folds the event into the saved state under the file's lock. It reports whether the state changed.
-func saveHook(dir, name string, ev session.Event, at time.Time) (session.Record, bool) {
-	unlock, err := bus.LockState(dir, name)
-	if err != nil {
-		return session.Record{}, false
-	}
-	defer unlock()
-	prev, _ := bus.ReadState(dir, name)
-	if prev.Session == "" && ev.Name != "SessionStart" {
-		return session.Record{}, false // a hook that fires after the session was dismissed must not bring its file back
-	}
-	if prev.At.After(at) {
-		return session.Record{}, false
-	}
-	rec := session.Apply(name, prev, ev, at)
-	if rec == prev || bus.WriteState(dir, rec) != nil {
-		return session.Record{}, false
-	}
-	return rec, true
 }
