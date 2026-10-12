@@ -10,7 +10,7 @@ import (
 )
 
 // chatTools are the commands a chat may run in plan mode: the ones that hand work to the owner's queue.
-var chatTools = []string{"Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(gh issue create:*)"}
+var chatTools = []string{"Bash(agentos issue:*)", "Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(gh issue create:*)"}
 
 var claudeEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
