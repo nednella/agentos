@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.30.1](https://github.com/nednella/agentos/compare/v0.30.0...v0.30.1) (2026-10-12)
+
+
+### Bug Fixes
+
+* **cli:** limit --prompt to 6 KB ([cb110f0](https://github.com/nednella/agentos/commit/cb110f058cfe856b416500199021afbf77a3a0b1))
+* **desktop:** block clean-up of worktree in the middle of a rebase ([bb54ac7](https://github.com/nednella/agentos/commit/bb54ac714ad4979694ba063bea0ff5ed48ed9476))
+* **desktop:** clean up only branches a session owns ([c0bce2a](https://github.com/nednella/agentos/commit/c0bce2a685c40d38bb761f897192002698849988)), closes [#337](https://github.com/nednella/agentos/issues/337)
+* **desktop:** count usage at each hook and record it when the turn ends ([6fbe3f1](https://github.com/nednella/agentos/commit/6fbe3f1e5fa3d538cef1b419ed982fac083d13b4))
+* **desktop:** count usage while a session works ([8c36ad1](https://github.com/nednella/agentos/commit/8c36ad11216e41e49d26b0069eb2ad07c1ea0411))
+* **desktop:** drop held PR command when its session ends ([c3846f3](https://github.com/nednella/agentos/commit/c3846f3ea0cfe58248fca56744c18dda896ffc07))
+* **desktop:** follow session_prompt_send when resuming session ([e0e9e4b](https://github.com/nednella/agentos/commit/e0e9e4b097d9d3c453b57f68252b6d8a7af1921f))
+* **desktop:** frame agentos new prompt from session as handover ([16cef8c](https://github.com/nednella/agentos/commit/16cef8c19f2304e1b78fac7f68f07fa395300418))
+* **desktop:** keep a session's timeline and worked time across a restart ([5f84ad6](https://github.com/nednella/agentos/commit/5f84ad60c8e188062ee1676438cd98bd2637d7a1))
+* **desktop:** keep both stats tabs loaded when switching ([ea1d8ee](https://github.com/nednella/agentos/commit/ea1d8eed388478c7140cc88e89f4a8a37697dac4))
+* **desktop:** keep ended session's branches and handover on resume ([04663b0](https://github.com/nednella/agentos/commit/04663b0e10e70dcdc5b7cda5c228554b8f9b46ce))
+* **desktop:** name issue's branch in start line ([e30226e](https://github.com/nednella/agentos/commit/e30226e64d4efc8cbb329179a2abfbd62a3a0fef))
+* **desktop:** queue PR commands held while session waits ([fc5fde9](https://github.com/nednella/agentos/commit/fc5fde9e598bc4d39d23945b7ec57ef4b56dddcf))
+* **desktop:** read issue list again for issue not in it ([27ddeb8](https://github.com/nednella/agentos/commit/27ddeb8e3af3aea4d9a73801f700a171f87a5181))
+* **desktop:** refuse clean-up of branch the session no longer has ([4af95b4](https://github.com/nednella/agentos/commit/4af95b4da6618e6d0b486b7f905170d049571b06))
+* **desktop:** refuse default branch in agentos track ([422b39a](https://github.com/nednella/agentos/commit/422b39a394f2ea124f19b95c960caad623f45c0c))
+* **desktop:** send PR commands only to session that hears the PR ([5b4f554](https://github.com/nednella/agentos/commit/5b4f554cc32c2a7dda1a8b0a593dc0c9f70a2e15))
+* **desktop:** skip resume when issue has live session ([2ffd5b6](https://github.com/nednella/agentos/commit/2ffd5b69d5f030933b25a68caca2e69ce22aa2e7))
+* **desktop:** start one session per issue at a time ([0a6fe6a](https://github.com/nednella/agentos/commit/0a6fe6a52623929e4f4433fb209cd45d7dec7527))
+* **internal:** ask owner before setup session acts on PR command ([93c4f77](https://github.com/nednella/agentos/commit/93c4f77b1ac95f73e8bbf342f299a4538cb158ca))
+* **internal:** give tasks one way to hand work on ([7760d92](https://github.com/nednella/agentos/commit/7760d928f6f5cf4151a41b0244dfaa5c9803bc3e))
+* **internal:** let chat file issue and start its task ([2aa51dc](https://github.com/nednella/agentos/commit/2aa51dcf7c3e8ee13f681298cc0529194760aecb))
+
 ## [0.30.0](https://github.com/nednella/agentos/compare/v0.29.0...v0.30.0) (2026-10-11)
 
 
