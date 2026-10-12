@@ -977,7 +977,7 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 // is false.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view Session, created bool, err error) {
 	proj := s.Current()
-	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), handover)
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover)
 	if live == "" {
 		return view, err == nil, err
 	}
@@ -990,13 +990,13 @@ func (s *Sessions) CreateIssue(title, text string, issue int, action project.Act
 }
 
 // createForIssue starts a session for the issue, unless the project has a live one for it: then it names that one.
-func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, handover string) (view Session, live string, err error) {
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, conversation, handover string) (view Session, live string, err error) {
 	s.issueMu.Lock()
 	defer s.issueMu.Unlock()
 	if live := s.liveIssueSession(proj.Key(), issue); live != "" {
 		return Session{}, live, nil
 	}
-	view, err = s.createIn(proj, title, text, send, issue, model, "", "", handover, false)
+	view, err = s.createIn(proj, title, text, send, issue, model, conversation, "", handover, false)
 	return view, "", err
 }
 
@@ -1184,15 +1184,19 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 
 // wake sends the prompt to the session, once it is not waiting on the user: typed into a
 // permission prompt, the text could answer it. A session that has ended gets a new one for
-// its issue, with the prompt typed in and sent unless the project sends by hand, and its row goes.
-// The new one continues the old's conversation when the agent can.
+// its issue when the issue has no live session: the prompt is typed in and sent unless the
+// project sends by hand, and the old row goes. The new one continues the old's conversation
+// when the agent can.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	if t.ended && t.issue == 0 {
 		return
 	}
 	if t.ended {
-		if _, err := s.createIn(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.conversation, "", "", false); err != nil {
+		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.conversation, "")
+		if err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
+		}
+		if err != nil || live != "" {
 			return
 		}
 		_ = s.Dismiss(t.id)
