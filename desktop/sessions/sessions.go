@@ -753,7 +753,7 @@ func (s *Sessions) announceIssues() {
 	var sig strings.Builder
 	sig.WriteString(s.project.Key())
 	for _, v := range s.list() {
-		if v.Issue > 0 && v.State != session.Ended {
+		if v.Issue > 0 && v.State != session.Ended && !v.Chat {
 			fmt.Fprintf(&sig, " %d=%s", v.Issue, v.ID)
 		}
 	}
@@ -979,30 +979,30 @@ func (s *Sessions) liveIssueSessions(key string) []string {
 	defer s.mu.Unlock()
 	var out []string
 	for _, in := range s.info {
-		if issue, _ := strconv.Atoi(in.Issue); issue > 0 && in.Name.Project == key {
+		if issue, _ := strconv.Atoi(in.Issue); issue > 0 && in.Name.Project == key && !in.Chat {
 			out = append(out, fmt.Sprintf("session %d for #%d", s.nums[in.Name.String()], issue))
 		}
 	}
 	return out
 }
 
-// liveIssueSession is the id of the running session of the project that works on the issue, "" when none. It takes mu.
-func (s *Sessions) liveIssueSession(key string, issue int) string {
+// liveIssueSession is the id of the running task, or chat, of the project for the issue, "" when none. It takes mu.
+func (s *Sessions) liveIssueSession(key string, issue int, chat bool) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, in := range s.info {
-		if in.Name.Project == key && in.Issue == strconv.Itoa(issue) {
+		if in.Name.Project == key && in.Issue == strconv.Itoa(issue) && in.Chat == chat {
 			return in.Name.String()
 		}
 	}
 	return ""
 }
 
-// IssueSessions maps issue numbers to the live session started for each, in the current project.
+// IssueSessions maps issue numbers to the live task started for each, in the current project.
 func (s *Sessions) IssueSessions() map[int]string {
 	out := map[int]string{}
 	for _, v := range s.List() {
-		if v.Issue > 0 && v.State != session.Ended {
+		if v.Issue > 0 && v.State != session.Ended && !v.Chat {
 			out[v.Issue] = v.ID
 		}
 	}
@@ -1027,13 +1027,13 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief, "", false)
 }
 
-// CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
-// that is sent. The action and the issue's labels pick the model. A handover from the session that asked for this
-// one is added to the agent's system prompt. An issue that has a live session gets that session back, and created
-// is false.
+// CreateIssue starts the agent for an issue, in a task or a chat as the action says, and types text into it once it
+// is ready; the project says whether that is sent. The action and the issue's labels pick the model. A handover from
+// the session that asked for this one is added to the agent's system prompt. An issue that has a live session of
+// that kind gets that session back, and created is false.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view Session, created bool, err error) {
 	proj := s.Current()
-	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover)
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat())
 	if live == "" {
 		return view, err == nil, err
 	}
@@ -1045,14 +1045,15 @@ func (s *Sessions) CreateIssue(title, text string, issue int, action project.Act
 	return Session{}, false, fmt.Errorf("session %s of #%d is gone", live, issue)
 }
 
-// createForIssue starts a session for the issue, unless the project has a live one for it: then it names that one.
-func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string) (view Session, live string, err error) {
+// createForIssue starts a task or a chat for the issue, unless the project has a live one of that kind for it: then
+// it names that one.
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string, chat bool) (view Session, live string, err error) {
 	s.issueMu.Lock()
 	defer s.issueMu.Unlock()
-	if live := s.liveIssueSession(proj.Key(), issue); live != "" {
+	if live := s.liveIssueSession(proj.Key(), issue, chat); live != "" {
 		return Session{}, live, nil
 	}
-	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, false)
+	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, chat)
 	return view, "", err
 }
 
@@ -1091,7 +1092,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
-	if branch := proj.BranchFor(issue); issue > 0 && branch != "" {
+	if branch := proj.BranchFor(issue); issue > 0 && branch != "" && !chat {
 		s.life.claim(proj, name.String(), branch)
 	}
 	if ready != nil {
@@ -1261,7 +1262,7 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 		return
 	}
 	if t.ended {
-		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id))
+		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id), false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 		}

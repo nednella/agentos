@@ -174,6 +174,33 @@ func TestStartTypesTheChosenActionsCommand(t *testing.T) {
 	}
 }
 
+func TestChatActionRunsBesideTheTask(t *testing.T) {
+	h := newHarness(t)
+	plan, err := h.StartIssueWith(7, "Plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Chat || plan.Issue != 7 || plan.Title != "[Plan] #7 Fix the thing that breaks when the window is narrow" {
+		t.Errorf("plan = %+v", plan)
+	}
+	if got, _ := h.Issues(false); got[0].SessionID != "" {
+		t.Errorf("issue 7 links to the chat %q", got[0].SessionID)
+	}
+	work, err := h.StartIssue(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if work.ID == plan.ID || work.Chat {
+		t.Errorf("work = %+v, want a task beside the chat %s", work, plan.ID)
+	}
+	if again, err := h.StartIssueWith(7, "Plan"); err != nil || again.ID != plan.ID {
+		t.Errorf("second plan = %+v, %v", again, err)
+	}
+	if got, _ := h.Issues(false); got[0].SessionID != work.ID {
+		t.Errorf("issue 7 links to %q, want the task %s", got[0].SessionID, work.ID)
+	}
+}
+
 func TestIssueOfNoSectionTypesTheStartLine(t *testing.T) {
 	h := newHarness(t)
 	s, err := h.StartIssue(10)

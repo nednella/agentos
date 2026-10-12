@@ -525,7 +525,7 @@ const queueSections = `    queue_sections:
         labels: [ready]
         actions:
           - {name: Work, command: "/ship {n}"}
-          - {name: Plan, command: "/plan {n}", model: opus, effort: high}
+          - {name: Plan, command: "/plan {n}", model: opus, effort: high, kind: chat}
       - name: Plan
         labels: [needs-plan]
         actions:
