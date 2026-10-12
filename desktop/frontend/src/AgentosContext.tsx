@@ -44,6 +44,7 @@ export type Agentos = {
   news: News | null
   newsSeen: number
   newsUnseen: number
+  newsUnread: string[]
   awake: boolean
   settings: Settings
   toasts: Toast[]
@@ -96,7 +97,8 @@ export type Agentos = {
   digestToNote(itemId: string): Promise<void>
   dismissDigestItem(itemId: string): Promise<void>
   markDigestSeen(): void
-  markNewsSeen(): void
+  markNewsSeen(unread: string[]): void
+  markNewsRead(id: string): void
   refreshNews(): Promise<void>
   ackPR(id: string): Promise<void>
   openPR(session: Session): Promise<void>
@@ -144,6 +146,7 @@ const WARNING_SOURCES: Record<Warning['source'], string> = { tmux: 'tmux', githu
 
 const digestKey = (project: string) => `agentos.digestSeen.${project}`
 const NEWS_SEEN_KEY = 'agentos.newsSeen'
+const NEWS_UNREAD_KEY = 'agentos.newsUnread'
 
 const filterKey = (project: string) => `agentos.filter.${project}`
 
@@ -168,6 +171,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [digestSeen, setDigestSeen] = useState(0)
   const [news, setNews] = useState<News | null>(null)
   const [newsSeen, setNewsSeen] = useState(() => readStored(NEWS_SEEN_KEY, 0))
+  const [newsUnread, setNewsUnread] = useState(() => readStored<string[]>(NEWS_UNREAD_KEY, []))
   const [awake, setAwake] = useState(false)
   const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '', dataDirFixed: true })
   const [shellIds, setShellIds] = useState<string[]>([])
@@ -488,11 +492,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     if (projectRef.current) writeStored(digestKey(projectRef.current.name), now)
   }, [])
 
-  const markNewsSeen = useCallback(() => {
+  const markNewsSeen = useCallback((unread: string[]) => {
     const now = Date.now()
     setNewsSeen(now)
     writeStored(NEWS_SEEN_KEY, now)
+    setNewsUnread(unread)
   }, [])
+
+  const markNewsRead = useCallback((id: string) => setNewsUnread((ids) => ids.filter((i) => i !== id)), [])
+
+  useEffect(() => writeStored(NEWS_UNREAD_KEY, newsUnread), [newsUnread])
 
   const issues = useMemo(
     () => rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => s.issue === issue.number)?.id ?? '' })),
@@ -532,6 +541,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       news,
       newsSeen,
       newsUnseen,
+      newsUnread,
       awake,
       settings,
       toasts,
@@ -686,6 +696,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         await api.refreshNews()
       },
       markNewsSeen,
+      markNewsRead,
       markDigestSeen,
       async addNote(text, images = []) {
         const trimmed = text.trim()
@@ -787,7 +798,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, markDigestSeen, markNewsSeen, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

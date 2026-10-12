@@ -16,8 +16,15 @@ const dayLabel = (date: string) => {
 };
 
 export function NewsView() {
-  const { news, refreshNews, markNewsSeen, report, focusRequest } =
-    useAgentos();
+  const {
+    news,
+    newsSeen,
+    newsUnread,
+    refreshNews,
+    markNewsSeen,
+    report,
+    focusRequest,
+  } = useAgentos();
   const now = useNow();
   const loading = useMinimumLoading(!news);
   const panel = useRef<HTMLElement>(null);
@@ -28,7 +35,14 @@ export function NewsView() {
   useEffect(() => {
     if (focusRequest.target === "terminal") panel.current?.focus();
   }, [focusRequest]);
-  useEffect(() => markNewsSeen(), [newest, markNewsSeen]);
+  useEffect(() => {
+    if (!news) return;
+    const ids = (list: typeof issues) =>
+      list.flatMap((issue) => issue.items.map((item) => item.id));
+    const kept = new Set(ids(issues));
+    const fresh = ids(issues.filter((issue) => issue.fetchedAt > newsSeen));
+    markNewsSeen([...newsUnread.filter((id) => kept.has(id)), ...fresh]);
+  }, [newest, markNewsSeen]);
 
   return (
     <section
@@ -80,7 +94,11 @@ export function NewsView() {
                 </h3>
                 <ul className="flex flex-col gap-1 py-3">
                   {issue.items.map((item) => (
-                    <NewsItemRow key={item.id} item={item} />
+                    <NewsItemRow
+                      key={item.id}
+                      item={item}
+                      unread={newsUnread.includes(item.id)}
+                    />
                   ))}
                 </ul>
               </section>
