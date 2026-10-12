@@ -114,6 +114,7 @@ type Sessions struct {
 	tally      Tally
 	activity   Activity
 	closeTerm  func(id string)
+	lastEscape func(id string) time.Time
 	evidence   Evidence
 	browsers   Browsers
 	awake      Awake
@@ -196,6 +197,7 @@ type Options struct {
 	Tally         Tally
 	Activity      Activity
 	CloseTerminal func(id string)
+	LastEscape    func(id string) time.Time
 	Evidence      Evidence
 	Browsers      Browsers
 	Awake         Awake
@@ -227,7 +229,7 @@ func (s *Sessions) Touch() { s.changed() }
 func newSessions(o Options) *Sessions {
 	return &Sessions{
 		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
-		project: o.Current, configured: o.Projects, tally: o.Tally, activity: o.Activity, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
+		project: o.Current, configured: o.Projects, tally: o.Tally, activity: o.Activity, closeTerm: o.CloseTerminal, lastEscape: o.LastEscape, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
 		nums: map[string]int{}, lastNum: map[string]int{},
@@ -294,6 +296,9 @@ func (s *Sessions) Refresh() {
 	}
 	s.warn.Clear("tmux")
 	records := bus.ReadAll(s.stateDir)
+	for name, rec := range records {
+		records[name] = stopInterrupted(s.stateDir, rec, s.lastEscape(name))
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.info = infos
@@ -316,6 +321,27 @@ func (s *Sessions) Refresh() {
 	s.loaded = true
 	s.sync()
 	s.synced = true
+}
+
+// stopInterrupted saves as idle a session whose turn the user stopped with Esc, which fires no hook, so the
+// session would stay working or waiting. Claude Code writes the interrupt to the transcript, except before
+// its first reply of a turn: then only the Esc typed into the session's terminal tells.
+func stopInterrupted(dir string, rec session.Record, escaped time.Time) session.Record {
+	if rec.State != session.Working && rec.State != session.Waiting || rec.Transcript == "" {
+		return rec
+	}
+	turn := session.ReadTurn(rec.Transcript, rec.At)
+	at := turn.Interrupted
+	if at.IsZero() && rec.Event == "UserPromptSubmit" && !turn.Replied && escaped.After(rec.At) {
+		at = escaped
+	}
+	if at.IsZero() {
+		return rec
+	}
+	if saved, ok := bus.SaveEvent(dir, rec.Session, session.Event{Name: session.Interrupt, Detail: "Interrupted"}, at); ok {
+		return saved
+	}
+	return rec
 }
 
 // revive takes back a session that tmux lists although it was marked ended. The saved

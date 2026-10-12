@@ -34,11 +34,12 @@ type Terms struct {
 
 	mu      sync.Mutex
 	streams map[string]*stream
+	escapes map[string]time.Time // when the user last pressed Esc in each session, kept when its view closes
 }
 
 // New streams the sessions of tmux; emit sends the output and clip gets what an agent copies.
 func New(tmux *term.Tmux, emit func(string, any), clip func(string)) *Terms {
-	return &Terms{tmux: tmux, emit: emit, clip: clip, streams: map[string]*stream{}}
+	return &Terms{tmux: tmux, emit: emit, clip: clip, streams: map[string]*stream{}, escapes: map[string]time.Time{}}
 }
 
 // Open attaches a PTY of the given size to the session. Opening an open session keeps its
@@ -93,7 +94,19 @@ func (t *Terms) Write(id, data string) error {
 	if _, err := io.WriteString(st.pty, data); err != nil {
 		return fmt.Errorf("writing to %s: %w", id, err)
 	}
+	if data == "\x1b" {
+		t.mu.Lock()
+		t.escapes[id] = time.Now()
+		t.mu.Unlock()
+	}
 	return nil
+}
+
+// LastEscape is when the user last pressed Esc in the session's terminal, or zero.
+func (t *Terms) LastEscape(id string) time.Time {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.escapes[id]
 }
 
 func (t *Terms) Resize(id string, cols, rows int) error {
