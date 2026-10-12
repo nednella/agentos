@@ -1178,19 +1178,15 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	s.send(ctx, name, prompt, true)
 }
 
-// deliverWakes sends the prompts held back while their sessions waited on the user. It needs mu.
+// deliverWakes sends the prompts held back while their sessions waited on the user. A session that ended
+// meanwhile was ended by the user, or cleaned up: its prompt goes with it. It needs mu.
 func (s *Sessions) deliverWakes() {
 	for id, prompt := range s.wakes {
 		_, live := s.seen[id]
 		switch {
-		case s.dismissed[id]:
+		case !live:
 			delete(s.wakes, id)
-		case s.ended[id] != nil:
-			delete(s.wakes, id)
-			if t, err := s.targetOrErr(s.ended[id].info, true); err == nil {
-				go s.wake(s.ctx, t, prompt)
-			}
-		case live && s.records[id].State != session.Waiting:
+		case s.records[id].State != session.Waiting:
 			delete(s.wakes, id)
 			go s.send(s.ctx, s.known[id].Name, prompt, true)
 		}

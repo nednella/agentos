@@ -8,6 +8,7 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/internal/warn"
+	"github.com/nednella/agentos/desktop/sessions"
 )
 
 // pulls is what the repo's pull request list says of one branch.
@@ -177,6 +178,43 @@ func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
 	}
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"yes"}`)
 	eventually(t, "the held prompt once the session works again", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+}
+
+// waitingWithHeldReview is a session of issue 12 waiting on the user, with a review prompt held for it.
+func waitingWithHeldReview(t *testing.T, h *apptest.Harness) sessions.Session {
+	t.Helper()
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.Hook(t, s.ID, "Notification", `{"message":"needs permission","notification_type":"permission_prompt"}`)
+	eventually(t, "waiting", func() bool { return stateOf(h, s.ID) == "waiting" })
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 1, 0))
+	h.RefreshPRs()
+	return s
+}
+
+func TestEndingASessionDropsItsHeldPrompts(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		end  func(h *apptest.Harness, id string) error
+	}{
+		{"killed", func(h *apptest.Harness, id string) error { return h.KillSession(id) }},
+		{"cleaned up", func(h *apptest.Harness, id string) error { return h.Cleanup(id, true) }},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
+			s := waitingWithHeldReview(t, h)
+			if err := tt.end(h, s.ID); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(500 * time.Millisecond)
+			for _, v := range h.Sessions().List() {
+				if v.ID != s.ID {
+					t.Errorf("a held prompt started session %+v", v)
+				}
+			}
+		})
+	}
 }
 
 func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
