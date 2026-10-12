@@ -114,12 +114,17 @@ func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	if prev.State == "" {
 		prev = Record{Session: name, State: Idle, Event: ev.Name, At: now}
 		if isIdleReminder(ev) {
+			prev.Changes = []Change{{State: Idle, At: now.UnixMilli()}}
 			return prev
 		}
 	} else if isIdleReminder(ev) && prev.State != Working {
 		return prev
 	}
-	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType, Cwd: cmp.Or(ev.Cwd, prev.Cwd), Conversation: cmp.Or(ev.Conversation, prev.Conversation), Transcript: cmp.Or(ev.Transcript, prev.Transcript)}
+	rec := Record{Session: name, State: Next(prev.State, ev), Event: ev.Name, At: now, Detail: ev.Detail, Notify: ev.NotificationType, Cwd: cmp.Or(ev.Cwd, prev.Cwd), Conversation: cmp.Or(ev.Conversation, prev.Conversation), Transcript: cmp.Or(ev.Transcript, prev.Transcript), Changes: prev.Changes}
+	// A record with no changes, the first or one saved before records kept them, starts its timeline here.
+	if rec.State != prev.State || len(prev.Changes) == 0 {
+		rec.Changes = AddChange(prev.Changes, Change{State: rec.State, At: now.UnixMilli()})
+	}
 	switch ev.Name {
 	case "PreToolUse", "PostToolUse":
 		rec.Tool, rec.Command = ev.Tool, ev.Command

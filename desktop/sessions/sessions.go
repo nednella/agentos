@@ -34,7 +34,6 @@ const (
 	tmuxTimeout   = 5 * time.Second
 	defaultTitle  = "agent"
 	chatTitle     = "chat"
-	historyCap    = 200
 	endedKept     = 7 * 24 * time.Hour
 	endedSettle   = 15 * time.Second // a state file this fresh may belong to a session tmux has not listed yet
 	startCols     = 120
@@ -45,28 +44,22 @@ const (
 
 var errNotSession = errors.New("the shell is not a session")
 
-// Change is one entry of a session's state timeline.
-type Change struct {
-	State session.State `json:"state"`
-	At    int64         `json:"at"`
-}
-
 // Session is one agent as the front end sees it.
 type Session struct {
-	ID          string        `json:"id"`
-	N           int           `json:"n"`
-	Title       string        `json:"title"`
-	State       session.State `json:"state"`
-	Detail      string        `json:"detail"`
-	LastEventAt int64         `json:"lastEventAt"`
-	CreatedAt   int64         `json:"createdAt"`
-	Issue       int           `json:"issue"`
-	Chat        bool          `json:"chat"`
-	Model       string        `json:"model"`  // the model the agent was started with, "" when unknown
-	Effort      string        `json:"effort"` // the effort the agent was started with, "" when unknown
-	History     []Change      `json:"history"`
-	Evidence    int           `json:"evidence"`
-	Browser     bool          `json:"browser"`
+	ID          string           `json:"id"`
+	N           int              `json:"n"`
+	Title       string           `json:"title"`
+	State       session.State    `json:"state"`
+	Detail      string           `json:"detail"`
+	LastEventAt int64            `json:"lastEventAt"`
+	CreatedAt   int64            `json:"createdAt"`
+	Issue       int              `json:"issue"`
+	Chat        bool             `json:"chat"`
+	Model       string           `json:"model"`  // the model the agent was started with, "" when unknown
+	Effort      string           `json:"effort"` // the effort the agent was started with, "" when unknown
+	History     []session.Change `json:"history"`
+	Evidence    int              `json:"evidence"`
+	Browser     bool             `json:"browser"`
 
 	Branch        string `json:"branch"`
 	Worktree      string `json:"worktree"`
@@ -128,7 +121,7 @@ type Sessions struct {
 	records    map[string]session.Record
 	cwds       map[string]string // the working directory each session's last hook reported
 	seen       map[string]session.State
-	history    map[string][]Change
+	history    map[string][]session.Change
 	loaded     bool // the first refresh is in, so later changes may raise attention
 	synced     bool // the first refresh is synced, so a session seen from now on is a new one
 	lastSent   string
@@ -234,7 +227,7 @@ func newSessions(o Options) *Sessions {
 		records:    map[string]session.Record{},
 		cwds:       map[string]string{},
 		seen:       map[string]session.State{},
-		history:    map[string][]Change{},
+		history:    map[string][]session.Change{},
 		ready:      map[string]chan struct{}{},
 		resumed:    map[string]bool{},
 		wakes:      map[string][]string{},
@@ -385,8 +378,11 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 	if rec.EndedAt == 0 || rec.State != session.Ended {
 		_ = bus.WriteState(s.stateDir, e.record())
 	}
+	if len(s.history[name]) == 0 {
+		s.history[name] = slices.Clone(rec.Changes)
+	}
 	if h := s.history[name]; len(h) == 0 || h[len(h)-1].State != session.Ended {
-		s.history[name] = append(h, Change{State: session.Ended, At: at.UnixMilli()})
+		s.history[name] = append(h, session.Change{State: session.Ended, At: at.UnixMilli()})
 	}
 }
 
@@ -416,7 +412,7 @@ func (s *Sessions) endSession(id string, at time.Time) {
 		fmt.Fprintf(os.Stderr, "agentos: saving an ended session: %v\n", err)
 	}
 	if h := s.history[id]; len(h) == 0 || h[len(h)-1].State != session.Ended {
-		s.history[id] = append(h, Change{State: session.Ended, At: at.UnixMilli()})
+		s.history[id] = append(h, session.Change{State: session.Ended, At: at.UnixMilli()})
 	}
 }
 
@@ -568,6 +564,7 @@ func (s *Sessions) sync() {
 				s.record(id, e)
 			}
 			delete(s.resumed, id)
+			s.adoptHistory(id, in.Created)
 		}
 		opened := s.loaded && state == session.Idle && s.life.opened(id)
 		if opened {
@@ -580,9 +577,8 @@ func (s *Sessions) sync() {
 		if known && prev == session.Working {
 			s.worked(id, at)
 		}
-		s.history[id] = append(s.history[id], Change{State: state, At: at.UnixMilli()})
-		if h := s.history[id]; len(h) > historyCap {
-			s.history[id] = slices.Clone(h[len(h)-historyCap:])
+		if h := s.history[id]; len(h) == 0 || h[len(h)-1].State != state {
+			s.history[id] = session.AddChange(h, session.Change{State: state, At: at.UnixMilli()})
 		}
 		rec := s.records[id]
 		replied := known && prev == session.Working && state == session.Idle && rec.Event == "Stop"
@@ -640,6 +636,39 @@ func (s *Sessions) sync() {
 	s.emit("sessions", scoped.Of(key, list))
 	for _, a := range attention {
 		s.emit("attention", map[string]string{"id": a[0], "state": a[1]})
+	}
+}
+
+// adoptHistory takes the timeline the hooks kept for a session first seen, and records the working
+// stretches in it that ended while the app was closed. It needs mu.
+func (s *Sessions) adoptHistory(id string, created time.Time) {
+	changes := s.records[id].Changes
+	if len(changes) == 0 || len(s.history[id]) > 0 {
+		return
+	}
+	s.history[id] = slices.Clone(changes)
+	if len(changes) > 1 {
+		go s.catchUpWorked(id, created, changes)
+	}
+}
+
+// catchUpWorked records the working stretches of changes that end after the latest one the event
+// log holds for the session: the app records a stretch at the change that ends it, so the ones
+// before that were counted by a run of the app that saw them.
+func (s *Sessions) catchUpWorked(id string, created time.Time, changes []session.Change) {
+	last := changes[len(changes)-1].At
+	var counted int64
+	s.activity.Since(session.ProjectKey(id), created.In(time.Local).Format(time.DateOnly), func(e activity.Event) {
+		if e.Kind == activity.Worked && e.Session == id && e.At <= last { // a later one is this run's
+			counted = max(counted, e.At)
+		}
+	})
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i, c := range changes[:len(changes)-1] {
+		if end := changes[i+1].At; c.State == session.Working && end > counted {
+			s.record(id, activity.Event{At: end, Kind: activity.Worked, Ms: end - c.At})
+		}
 	}
 }
 
@@ -788,7 +817,7 @@ func (s *Sessions) list() []Session {
 			view.Tokens, view.Cost = spent.Total(), spent.Dollars()
 		}
 		if view.History == nil {
-			view.History = []Change{}
+			view.History = []session.Change{}
 		}
 		out = append(out, view)
 	}

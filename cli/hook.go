@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"reflect"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,7 +67,7 @@ func saveHook(dir, name string, ev session.Event, at time.Time) (session.Record,
 		return session.Record{}, false
 	}
 	rec := session.Apply(name, prev, ev, at)
-	if rec == prev || bus.WriteState(dir, rec) != nil {
+	if reflect.DeepEqual(rec, prev) || bus.WriteState(dir, rec) != nil {
 		return session.Record{}, false
 	}
 	return rec, true
