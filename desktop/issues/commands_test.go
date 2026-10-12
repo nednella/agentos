@@ -54,6 +54,18 @@ func TestIssueCommandHandsThePromptOver(t *testing.T) {
 	}
 }
 
+func TestLongestPromptStartsTheSession(t *testing.T) {
+	dir := apptest.ClaudeOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+	handover := strings.Repeat(`it's "quoted" $HOME \ `, 6<<10)[:6<<10] // the most agentos issue --prompt takes
+	if resp := h.Ask(t, ctl.Request{Cmd: "issue", Args: []string{"7"}, Opts: map[string]string{"prompt": handover}}); !resp.OK {
+		t.Fatalf("issue 7 with the longest prompt = %+v", resp)
+	}
+	if args := argsOf(t, dir, h.Sessions().List()[0].ID); !strings.Contains(args, strings.TrimSpace(handover)) {
+		t.Error("the system prompt lacks the handover")
+	}
+}
+
 func TestRefreshCommand(t *testing.T) {
 	h := newHarness(t)
 	if _, err := h.Issues(false); err != nil {

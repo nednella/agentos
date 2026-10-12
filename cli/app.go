@@ -106,6 +106,9 @@ func newNewCmd() *cobra.Command {
 	return cmd
 }
 
+// maxPrompt keeps a prompt, with the agent's command line or as typed text, under the 16 KB tmux takes in one command.
+const maxPrompt = 6 << 10
+
 // readPrompt is the value of a --prompt flag, read from stdin when it is "-".
 func readPrompt(cmd *cobra.Command, prompt string) (string, error) {
 	if prompt == "-" {
@@ -115,5 +118,9 @@ func readPrompt(cmd *cobra.Command, prompt string) (string, error) {
 		}
 		prompt = string(data)
 	}
-	return strings.TrimSpace(prompt), nil
+	prompt = strings.TrimSpace(prompt)
+	if len(prompt) > maxPrompt {
+		return "", fmt.Errorf("the prompt is %d bytes, more than the %d a session takes: put the long parts in a file and give its path", len(prompt), maxPrompt)
+	}
+	return prompt, nil
 }

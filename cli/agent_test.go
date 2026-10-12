@@ -128,6 +128,25 @@ func TestIssueSendsThePromptForOneIssue(t *testing.T) {
 	}
 }
 
+func TestTooLongPromptIsRefused(t *testing.T) {
+	var got control.Request
+	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
+		got = req
+		return control.Response{OK: true, Out: "ok"}
+	})
+	for _, args := range [][]string{{"new", "--prompt", "-"}, {"issue", "327", "--prompt", "-"}} {
+		got = control.Request{}
+		root := newRootCmd()
+		root.SetIn(strings.NewReader(strings.Repeat("a", maxPrompt+1)))
+		root.SetOut(&bytes.Buffer{})
+		root.SetErr(&bytes.Buffer{})
+		root.SetArgs(args)
+		if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "more than the 6144 a session takes") || got.Cmd != "" {
+			t.Errorf("%v with a long prompt = %+v, %v", args, got, err)
+		}
+	}
+}
+
 func TestStatsCommandSendsItsFlags(t *testing.T) {
 	var got control.Request
 	fakeApp(t, func(_ context.Context, req control.Request) control.Response {
