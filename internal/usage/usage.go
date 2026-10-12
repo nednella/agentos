@@ -107,6 +107,13 @@ func (c *Cursor) Read(path string) ([]Part, error) {
 	return out, nil
 }
 
+// Unread says whether the transcript at path holds more than the cursor read of it. It does not
+// look at the transcripts of subagents.
+func (c *Cursor) Unread(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Size() != c.offsets[path]
+}
+
 // line is the part of a transcript line that tells what an API response used.
 type line struct {
 	Type      string    `json:"type"`

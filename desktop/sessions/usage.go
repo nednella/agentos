@@ -3,6 +3,7 @@ package sessions
 import (
 	"cmp"
 	"fmt"
+	"maps"
 	"os"
 	"strconv"
 	"sync"
@@ -79,6 +80,33 @@ func (s *Sessions) countUsage(id, transcript string) {
 		s.spent[id] = total
 		s.sync()
 	}
+}
+
+// countUnread counts the usage of each live session whose transcript holds lines not read yet: the
+// cost moves during a long turn, and takes in the last reply of a turn, which Claude Code writes
+// just after the turn's Stop.
+func (s *Sessions) countUnread() {
+	s.mu.Lock()
+	transcripts := map[string]string{}
+	for _, in := range s.info {
+		id := in.Name.String()
+		if t := s.records[id].Transcript; t != "" {
+			transcripts[id] = t
+		}
+	}
+	readers := maps.Clone(s.readers)
+	s.mu.Unlock()
+	for id, t := range transcripts {
+		if r := readers[id]; r == nil || r.unread(t) {
+			s.countUsage(id, t)
+		}
+	}
+}
+
+func (r *reader) unread(transcript string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cursor == nil || r.cursor.Unread(transcript)
 }
 
 // infoOf is what is known of the session, live or ended. It needs mu.

@@ -658,6 +658,7 @@ func (h *Harness) build(t *testing.T) *app.App {
 		t.Fatal(err)
 	}
 	a := app.New(cfg, app.Host{Emit: h.Rec.Emit, Clipboard: h.Rec.Clip, PickDir: h.Rec.Picker, Quit: h.Rec.Quit, Awake: h.Rec.Awake}, h.GH.Run, h.GH.Stream, h.Claude.RunEnv)
+	a.Sessions().SetUsageEvery(100 * time.Millisecond)
 	for _, svc := range a.Services() {
 		switch s := svc.(type) {
 		case *projects.Service:
