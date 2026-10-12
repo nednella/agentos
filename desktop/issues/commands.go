@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -35,14 +34,13 @@ func (c *Commands) Issue(ctx context.Context, req ctl.Request) (string, error) {
 			failed = append(failed, fmt.Sprintf("%s (not a number)", arg))
 			continue
 		}
-		had := c.hasSession(ctx, n)
-		s, err := c.issues.Start(ctx, n, "", req.Opts["prompt"])
+		s, created, err := c.issues.Start(ctx, n, "", req.Opts["prompt"])
 		switch {
 		case err != nil:
 			failed = append(failed, fmt.Sprintf("#%d (%v)", n, err))
-		case had && req.Opts["prompt"] != "":
+		case !created && req.Opts["prompt"] != "":
 			running = append(running, fmt.Sprintf("#%d (%d, the prompt was not given to it)", n, s.N))
-		case had:
+		case !created:
 			running = append(running, fmt.Sprintf("#%d (%d)", n, s.N))
 		default:
 			started = append(started, fmt.Sprintf("#%d (%d)", n, s.N))
@@ -67,14 +65,6 @@ func (c *Commands) Issue(ctx context.Context, req ctl.Request) (string, error) {
 		return "", errors.New(out)
 	}
 	return out, nil
-}
-
-func (c *Commands) hasSession(ctx context.Context, number int) bool {
-	list, err := c.issues.List(ctx, c.issues.sessions.Current(), false)
-	if err != nil {
-		return false
-	}
-	return slices.ContainsFunc(c.issues.WithSessions(list), func(is Issue) bool { return is.Number == number && is.SessionID != "" })
 }
 
 // Refresh reads the issues and the pull requests afresh.

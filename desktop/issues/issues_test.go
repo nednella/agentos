@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -92,6 +93,30 @@ func TestIssues(t *testing.T) {
 	}
 	eventually(t, "issues event after the session ends", func() bool { return issuesEvent(7) == "" })
 	eventually(t, "/investigate typed", func() bool { return strings.Contains(h.Pane(t, plan.ID), "/investigate 8") })
+}
+
+func TestStartsAtOnceMakeOneSession(t *testing.T) {
+	h := newHarness(t)
+	ids := make([]string, 4)
+	var wg sync.WaitGroup
+	for k := range ids {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s, err := h.StartIssue(7)
+			if err != nil {
+				t.Error(err)
+			}
+			ids[k] = s.ID
+		}()
+	}
+	wg.Wait()
+	if got := slices.Compact(slices.Clone(ids)); len(got) != 1 || got[0] == "" {
+		t.Errorf("starts got sessions %v, want one", ids)
+	}
+	if n := len(h.Sessions().List()); n != 1 {
+		t.Errorf("%d sessions, want 1", n)
+	}
 }
 
 func TestIssuesWithoutRepo(t *testing.T) {
