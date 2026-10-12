@@ -63,8 +63,8 @@ func TestLoad(t *testing.T) {
 		},
 		{
 			name: "queue sections",
-			path: write("projects:\n  - name: api\n    directory: /srv/api\n    session_prompt_send: manual\n    queue_sections:\n      - {name: Ready, labels: [ready], actions: [{name: Work, command: \"/work {n}\", model: opus, effort: high}]}\n"),
-			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", SessionPromptSend: "manual", QueueSections: []Section{{Name: "Ready", Labels: []string{"ready"}, Actions: []Action{{Name: "Work", Command: "/work {n}", Model: "opus", Effort: "high"}}}}}}},
+			path: write("projects:\n  - name: api\n    directory: /srv/api\n    session_prompt_send: manual\n    queue_sections:\n      - {name: Ready, labels: [ready], actions: [{name: Work, command: \"/work {n}\", model: opus, effort: high}, {name: Plan, kind: chat}]}\n"),
+			want: Config{Projects: []Project{{Name: "api", Dir: "/srv/api", SessionPromptSend: "manual", QueueSections: []Section{{Name: "Ready", Labels: []string{"ready"}, Actions: []Action{{Name: "Work", Command: "/work {n}", Model: "opus", Effort: "high"}, {Name: "Plan", Kind: "chat"}}}}}}},
 		},
 		{name: "section without a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{labels: [x]}]}\n"), wantErr: true},
 		{name: "two sections of a name", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A}, {name: A}]}\n"), wantErr: true},
@@ -76,6 +76,7 @@ func TestLoad(t *testing.T) {
 		{name: "draggable_from on a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A}, {name: Rest, labels: [\"*\"], draggable_from: [A]}]}\n"), wantErr: true},
 		{name: "empty draggable_from on a * section", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: Rest, labels: [\"*\"], draggable_from: []}]}\n"), wantErr: true},
 		{name: "bad action effort", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, effort: huge}]}]}\n"), wantErr: true},
+		{name: "unknown action kind", path: write("projects:\n  - {name: api, directory: /srv/api, queue_sections: [{name: A, actions: [{name: X, kind: shell}]}]}\n"), wantErr: true},
 		{name: "unknown prompt send", path: write("projects:\n  - {name: api, directory: /srv/api, session_prompt_send: later}\n"), wantErr: true},
 		{name: "theme", path: write("app_theme: dark\n"), want: Config{Theme: "dark"}},
 		{name: "unknown theme", path: write("app_theme: sepia\n"), wantErr: true},
