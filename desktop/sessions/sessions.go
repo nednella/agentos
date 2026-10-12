@@ -106,6 +106,7 @@ type Sessions struct {
 
 	createMu sync.Mutex // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
 	shellMu  sync.Mutex // one shell check-and-create at a time: two callers at once would both find no shell and start two
+	issueMu  sync.Mutex // one issue check-and-create at a time: two starts at once would both find no session and start two
 
 	mu         sync.Mutex
 	ctx        context.Context
@@ -929,6 +930,18 @@ func (s *Sessions) liveIssueSessions(key string) []string {
 	return out
 }
 
+// liveIssueSession is the id of the running session of the project that works on the issue, "" when none. It takes mu.
+func (s *Sessions) liveIssueSession(key string, issue int) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, in := range s.info {
+		if in.Name.Project == key && in.Issue == strconv.Itoa(issue) {
+			return in.Name.String()
+		}
+	}
+	return ""
+}
+
 // IssueSessions maps issue numbers to the live session started for each, in the current project.
 func (s *Sessions) IssueSessions() map[int]string {
 	out := map[int]string{}
@@ -960,10 +973,31 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 
 // CreateIssue starts the agent for an issue, and types text into it once it is ready; the project says whether
 // that is sent. The action and the issue's labels pick the model. A handover from the session that asked for this
-// one is added to the agent's system prompt.
-func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (Session, error) {
+// one is added to the agent's system prompt. An issue that has a live session gets that session back, and created
+// is false.
+func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view Session, created bool, err error) {
 	proj := s.Current()
-	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", "", handover, false)
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), handover)
+	if live == "" {
+		return view, err == nil, err
+	}
+	for _, v := range s.List() {
+		if v.ID == live {
+			return v, false, nil
+		}
+	}
+	return Session{}, false, fmt.Errorf("session %s of #%d is gone", live, issue)
+}
+
+// createForIssue starts a session for the issue, unless the project has a live one for it: then it names that one.
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, handover string) (view Session, live string, err error) {
+	s.issueMu.Lock()
+	defer s.issueMu.Unlock()
+	if live := s.liveIssueSession(proj.Key(), issue); live != "" {
+		return Session{}, live, nil
+	}
+	view, err = s.createIn(proj, title, text, send, issue, model, "", "", handover, false)
+	return view, "", err
 }
 
 // fromApp marks text the app writes to the agent, so the agent does not take it for the owner's. A slash command

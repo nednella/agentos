@@ -26,7 +26,7 @@ type Sessions interface {
 	Current() project.Project
 	IssueSessions() map[int]string
 	List() []sessions.Session
-	CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (sessions.Session, error)
+	CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view sessions.Session, created bool, err error)
 }
 
 // Issue is a GitHub issue placed in a section of the queue.
@@ -280,32 +280,24 @@ func (i *Issues) Reload(ctx context.Context, proj project.Project) {
 
 // Start opens a session for the issue with the action of its section that has the name given, or the
 // section's default action when action is "". An issue that already has a live session gets that session
-// back instead of a second agent.
-func (i *Issues) Start(ctx context.Context, number int, action, handover string) (sessions.Session, error) {
-	list, err := i.List(ctx, i.sessions.Current(), false)
+// back instead of a second agent, and created is false.
+func (i *Issues) Start(ctx context.Context, number int, action, handover string) (view sessions.Session, created bool, err error) {
+	proj := i.sessions.Current()
+	list, err := i.List(ctx, proj, false)
 	if err != nil {
-		return sessions.Session{}, err
+		return sessions.Session{}, false, err
 	}
-	list = i.WithSessions(list)
-	for _, is := range list {
-		if is.Number != number {
-			continue
-		}
-		if is.SessionID != "" {
-			for _, s := range i.sessions.List() {
-				if s.ID == is.SessionID {
-					return s, nil
-				}
-			}
-		}
-		_, section := i.sessions.Current().Section(is.Labels)
-		act, ok := pickAction(section, action)
-		if !ok {
-			return sessions.Session{}, fmt.Errorf("issue #%d has no action %q", number, action)
-		}
-		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
+	at := slices.IndexFunc(list, func(is Issue) bool { return is.Number == number })
+	if at < 0 {
+		return sessions.Session{}, false, fmt.Errorf("issue #%d is not open in this project", number)
 	}
-	return sessions.Session{}, fmt.Errorf("issue #%d is not open in this project", number)
+	is := list[at]
+	_, section := proj.Section(is.Labels)
+	act, ok := pickAction(section, action)
+	if !ok {
+		return sessions.Session{}, false, fmt.Errorf("issue #%d has no action %q", number, action)
+	}
+	return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
 }
 
 // Move relabels the issue on GitHub so that it falls in the section, then reads the queue again.
