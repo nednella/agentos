@@ -64,14 +64,13 @@ type Cleanup struct {
 // branches it reported or was seen on, oldest first; a session of an issue with none works on the
 // project's branch pattern, when it sets one. It owns the branches it reported and its issue's branch.
 type target struct {
-	id, title    string
-	issue        int
-	branches     []string
-	owned        []string
-	proj         project.Project
-	model        project.Model // what the session ran, so a replacement for an ended one runs the same
-	ended        bool
-	conversation string // the agent's id for its conversation, "" when unknown
+	id, title string
+	issue     int
+	branches  []string
+	owned     []string
+	proj      project.Project
+	model     project.Model // what the session ran, so a replacement for an ended one runs the same
+	ended     bool
 }
 
 // newest is the branch the session works on now.
@@ -1308,6 +1307,22 @@ func (f *prsFile) ownedByOther(id, branch string) bool {
 		}
 	}
 	return false
+}
+
+// inherit gives the session the branches another one worked on, reported and saw open, older than its own,
+// so a session that takes over an ended one knows its PR as the ended one did.
+func (l *Lifecycle) inherit(proj project.Project, from, to string) {
+	key := proj.Key()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	f := l.prs(key)
+	for _, m := range []map[string][]string{f.Branches, f.Reported, f.SawOpen} {
+		older := slices.DeleteFunc(slices.Clone(m[from]), func(b string) bool { return slices.Contains(m[to], b) })
+		if len(older) > 0 {
+			m[to] = append(older, m[to]...)
+		}
+	}
+	l.savePRs(key)
 }
 
 // claim makes branch the session's own, and takes it from each session that only saw it. A session

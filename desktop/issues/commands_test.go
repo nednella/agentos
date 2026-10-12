@@ -54,6 +54,36 @@ func TestIssueCommandHandsThePromptOver(t *testing.T) {
 	}
 }
 
+func TestResumedSessionGetsTheHandoverAgain(t *testing.T) {
+	dir := apptest.ClaudeOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude", ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
+	if resp := h.Ask(t, ctl.Request{Cmd: "issue", Args: []string{"7"}, Opts: map[string]string{"prompt": "the patch is in /tmp/x"}}); !resp.OK {
+		t.Fatalf("issue 7 = %+v", resp)
+	}
+	old := h.Sessions().List()[0]
+	argsOf(t, dir, old.ID)
+	h.GH.SetPR(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":"OPEN","isDraft":false,"statusCheckRollup":[],"comments":[],"reviews":[],"updatedAt":"2026-10-01T12:00:00Z"}]`)
+	h.RefreshPRs()
+	if err := h.KillSession(old.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPR(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":"OPEN","isDraft":false,"statusCheckRollup":[],"comments":[],"reviews":[{"id":"x"}],"updatedAt":"2026-10-01T12:00:00Z"}]`)
+	h.RefreshPRs()
+	var fresh string
+	eventually(t, "a new session for the issue", func() bool {
+		for _, v := range h.Sessions().List() {
+			if v.Issue == 7 && v.State != "ended" {
+				fresh = v.ID
+				return true
+			}
+		}
+		return false
+	})
+	if args := argsOf(t, dir, fresh); !strings.Contains(args, prompts.Handover("the patch is in /tmp/x")) {
+		t.Errorf("the resumed session's system prompt lacks the handover:\n%s", args)
+	}
+}
+
 func TestLongestPromptStartsTheSession(t *testing.T) {
 	dir := apptest.ClaudeOnPath(t)
 	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
