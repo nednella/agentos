@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.32.0](https://github.com/nednella/agentos/compare/v0.31.0...v0.32.0) (2026-10-12)
+
+
+### Features
+
+* **desktop:** name action in title of issue session ([aeb87e4](https://github.com/nednella/agentos/commit/aeb87e4794c3f589a6290d8b0d76988c79388748))
+* **desktop:** start chat for action of kind chat ([1b580fb](https://github.com/nednella/agentos/commit/1b580fbc7ea195a944ce7602b5790835ecd395b5))
+* **internal:** let chat comment on issues and change their labels ([1a2f46c](https://github.com/nednella/agentos/commit/1a2f46c4cb7fd2b5424b312e873b31ae324620a0))
+* **internal:** let queue action set kind of session ([960a71b](https://github.com/nednella/agentos/commit/960a71be3f316ca64e7de49374b4b99f090bcad7))
+* **internal:** tell sessions to refresh queue after label change ([0a844c0](https://github.com/nednella/agentos/commit/0a844c0e1ad9354f024d3d65371e6c585be7969d))
+
 ## [0.31.0](https://github.com/nednella/agentos/compare/v0.30.1...v0.31.0) (2026-10-12)
 
 
