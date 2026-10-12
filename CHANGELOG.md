@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.31.0](https://github.com/nednella/agentos/compare/v0.30.1...v0.31.0) (2026-10-12)
+
+
+### Features
+
+* **ui:** mark new TLDR stories until opened ([5650f75](https://github.com/nednella/agentos/commit/5650f75e73b8aa7a6e672a133409fc928355f846))
+
+
+### Bug Fixes
+
+* **desktop:** tell web view its window is key once page loads ([62181b1](https://github.com/nednella/agentos/commit/62181b137a9fe15be3cef4426a6d8e26a0a91a4a))
+
 ## [0.30.1](https://github.com/nednella/agentos/compare/v0.30.0...v0.30.1) (2026-10-12)
 
 
