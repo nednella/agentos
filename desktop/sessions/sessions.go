@@ -1150,14 +1150,14 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 
 // wake sends the prompt to the session, once it is not waiting on the user: typed into a
 // permission prompt, the text could answer it. A session that has ended gets a new one for
-// its issue, with the prompt sent, and its row goes. The new one continues the old's conversation
-// when the agent can.
+// its issue, with the prompt typed in and sent unless the project sends by hand, and its row goes.
+// The new one continues the old's conversation when the agent can.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	if t.ended && t.issue == 0 {
 		return
 	}
 	if t.ended {
-		if _, err := s.createIn(t.proj, t.title, prompt, true, t.issue, t.model, t.conversation, "", "", false); err != nil {
+		if _, err := s.createIn(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.conversation, "", "", false); err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 			return
 		}

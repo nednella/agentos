@@ -236,6 +236,33 @@ func TestEndingASessionDropsItsHeldPrompts(t *testing.T) {
 	}
 }
 
+func TestResumeTypesItsPromptWithoutSendingWhenSendIsManual(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    session_prompt_send: manual\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 1))
+	h.RefreshPRs()
+	var fresh string
+	eventually(t, "a new session for the issue", func() bool {
+		for _, v := range h.Sessions().List() {
+			if v.Issue == 12 && v.State != "ended" {
+				fresh = v.ID
+				return true
+			}
+		}
+		return false
+	})
+	eventually(t, "the prompt typed", func() bool { return strings.Contains(h.Pane(t, fresh), "/address-review 12") })
+	time.Sleep(600 * time.Millisecond)
+	if pane := h.Pane(t, fresh); strings.Contains(pane, "No such file or directory") {
+		t.Errorf("the prompt was sent:\n%s", pane)
+	}
+}
+
 func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
 	s := issueSession(h, t, 12)
