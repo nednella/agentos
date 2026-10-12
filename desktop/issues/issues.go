@@ -232,7 +232,7 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 
 func actionNames(s project.Section) []string {
 	var names []string
-	for _, a := range s.ActionList() {
+	for _, a := range s.ActionList(false) {
 		names = append(names, a.Name)
 	}
 	return names
@@ -298,11 +298,11 @@ func (i *Issues) Start(ctx context.Context, number int, action, handover string)
 		}
 		is := list[at]
 		_, section := proj.Section(is.Labels)
-		act, ok := pickAction(section, action)
+		act, ok := pickAction(section, action, proj.Branch != "")
 		if !ok {
 			return sessions.Session{}, false, fmt.Errorf("issue #%d has no action %q", number, action)
 		}
-		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title), number, act, is.Labels, handover)
+		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title, proj.BranchFor(number)), number, act, is.Labels, handover)
 	}
 	return sessions.Session{}, false, fmt.Errorf("issue #%d is not open in this project", number)
 }
@@ -368,8 +368,8 @@ func (i *Issues) editLabels(ctx context.Context, dir string, number int, add, re
 }
 
 // pickAction is the action of the section with the name given, or its default for "".
-func pickAction(s project.Section, name string) (project.Action, bool) {
-	actions := s.ActionList()
+func pickAction(s project.Section, name string, onBranch bool) (project.Action, bool) {
+	actions := s.ActionList(onBranch)
 	if name == "" {
 		return actions[0], true
 	}

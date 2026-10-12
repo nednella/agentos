@@ -180,6 +180,17 @@ func TestIssueOfNoSectionTypesTheStartLine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	eventually(t, "start line typed", func() bool {
+		return strings.Contains(h.Pane(t, s.ID), "APPLICATION_PROMPT: Work on issue #10 on branch `issue-10`: Maybe")
+	})
+}
+
+func TestStartLineLeavesOutBranchProjectDoesNotName(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{NoBranch: true})
+	s, err := h.StartIssue(10)
+	if err != nil {
+		t.Fatal(err)
+	}
 	eventually(t, "start line typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "APPLICATION_PROMPT: Work on issue #10: Maybe") })
 }
 

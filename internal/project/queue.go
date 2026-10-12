@@ -103,20 +103,22 @@ func (s Section) takes(labels []string) bool {
 	return slices.ContainsFunc(labels, func(l string) bool { return slices.Contains(s.Labels, l) })
 }
 
-// StartAction is the only action of an issue whose section lists none: it types a line that names the issue.
-func StartAction() Action { return Action{Name: "Start", Command: prompts.StartIssue()} }
+// StartAction is the only action of an issue whose section lists none: it types a line that names the issue, and
+// its branch when the project names one.
+func StartAction(onBranch bool) Action { return Action{Name: "Start", Command: prompts.StartIssue(onBranch)} }
 
-// ActionList is what can be done with an issue of the section, the default first.
-func (s Section) ActionList() []Action {
+// ActionList is what can be done with an issue of the section, the default first. onBranch says whether the
+// project names the issue's branch.
+func (s Section) ActionList(onBranch bool) []Action {
 	if len(s.Actions) == 0 {
-		return []Action{StartAction()}
+		return []Action{StartAction(onBranch)}
 	}
 	return s.Actions
 }
 
-// Render is the command to type for the issue.
-func (a Action) Render(number int, title string) string {
-	return strings.NewReplacer("{n}", strconv.Itoa(number), "{title}", title).Replace(a.Command)
+// Render is the command to type for the issue, whose branch is the one the project names for it.
+func (a Action) Render(number int, title, branch string) string {
+	return strings.NewReplacer("{n}", strconv.Itoa(number), "{title}", title, "{branch}", branch).Replace(a.Command)
 }
 
 // NoteCommand is what a session for a note types into the agent; the note itself unless the project sets

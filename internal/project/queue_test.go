@@ -39,12 +39,16 @@ func TestSection(t *testing.T) {
 
 func TestActionList(t *testing.T) {
 	own := Section{Actions: []Action{{Name: "Plan"}, {Name: "Work"}}}
-	if got := own.ActionList(); len(got) != 2 || got[0].Name != "Plan" {
+	if got := own.ActionList(true); len(got) != 2 || got[0].Name != "Plan" {
 		t.Errorf("a section's own actions = %+v", got)
 	}
-	got := Section{}.ActionList()
-	if len(got) != 1 || got[0].Name != "Start" || got[0].Render(7, "Fix it") != "Work on issue #7: Fix it" {
+	got := Section{}.ActionList(false)
+	if len(got) != 1 || got[0].Name != "Start" || got[0].Render(7, "Fix it", "") != "Work on issue #7: Fix it" {
 		t.Errorf("without actions: %+v", got)
+	}
+	got = Section{}.ActionList(true)
+	if want := "Work on issue #7 on branch `issue-7`: Fix it"; len(got) != 1 || got[0].Render(7, "Fix it", "issue-7") != want {
+		t.Errorf("without actions, on a branch: %+v, want %q", got, want)
 	}
 }
 
@@ -52,10 +56,11 @@ func TestRender(t *testing.T) {
 	tests := []struct{ command, want string }{
 		{"/work {n}", "/work 4"},
 		{"/plan {n}: {title}", "/plan 4: Add {n} things"},
+		{"/work {n} {branch}", "/work 4 issue-4"},
 		{"", ""},
 	}
 	for _, tt := range tests {
-		if got := (Action{Command: tt.command}).Render(4, "Add {n} things"); got != tt.want {
+		if got := (Action{Command: tt.command}).Render(4, "Add {n} things", "issue-4"); got != tt.want {
 			t.Errorf("Render(%q) = %q, want %q", tt.command, got, tt.want)
 		}
 	}
