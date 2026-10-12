@@ -27,6 +27,8 @@ func TestNext(t *testing.T) {
 		{"idle reminder leaves ended alone", Ended, Event{Name: "Notification", NotificationType: "idle_prompt"}, Ended},
 		{"stop", Working, Event{Name: "Stop"}, Idle},
 		{"stop while waiting", Waiting, Event{Name: "Stop"}, Idle},
+		{"interrupt", Working, Event{Name: Interrupt}, Idle},
+		{"interrupt while waiting", Waiting, Event{Name: Interrupt}, Idle},
 		{"end", Working, Event{Name: "SessionEnd"}, Ended},
 		{"unknown event", Working, Event{Name: "PreCompact"}, Working},
 	}
@@ -55,6 +57,7 @@ func TestApply(t *testing.T) {
 		{"idle reminder keeps the record", stop, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "waiting"}, stop},
 		{"permission prompt", stop, Event{Name: "Notification", NotificationType: "permission_prompt", Detail: "needs Bash"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Detail: "needs Bash", Notify: "permission_prompt"}},
 		{"prompt keeps the last tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", Tool: "Bash", Command: "yarn test"}, Event{Name: "Notification", NotificationType: "permission_prompt"}, Record{Session: "p/1", State: Waiting, Event: "Notification", At: t1, Notify: "permission_prompt", Tool: "Bash", Command: "yarn test"}},
+		{"interrupt keeps the last tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t0, Tool: "Bash", Command: "yarn test"}, Event{Name: Interrupt, Detail: "Interrupted"}, Record{Session: "p/1", State: Idle, Event: Interrupt, At: t1, Detail: "Interrupted", Tool: "Bash", Command: "yarn test"}},
 		{"new prompt forgets the tool", Record{Session: "p/1", State: Working, Event: "PreToolUse", Tool: "Bash", Command: "yarn test"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1}},
 		{"cwd from the event", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Cwd: "/a"}, Event{Name: "PreToolUse", Cwd: "/b"}, Record{Session: "p/1", State: Working, Event: "PreToolUse", At: t1, Cwd: "/b"}},
 		{"conversation from the event", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Conversation: "a"}, Event{Name: "UserPromptSubmit", Conversation: "b"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Conversation: "b"}},

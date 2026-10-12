@@ -21,6 +21,9 @@ type Event struct {
 	Transcript       string // the file the agent writes its conversation to
 }
 
+// Interrupt is the event the app records when the user stopped a turn with Esc, which fires no hook.
+const Interrupt = "Interrupt"
+
 type payload struct {
 	NotificationType     string         `json:"notification_type"`
 	Message              string         `json:"message"`
@@ -79,7 +82,7 @@ func oneLine(s string, max int) string {
 // Next is the state reducer: the state after ev, given the state before it.
 func Next(cur State, ev Event) State {
 	switch ev.Name {
-	case "SessionStart", "Stop":
+	case "SessionStart", "Stop", Interrupt:
 		return Idle
 	case "UserPromptSubmit", "PreToolUse", "PostToolUse":
 		return Working
@@ -123,7 +126,7 @@ func Apply(name string, prev Record, ev Event, now time.Time) Record {
 	switch ev.Name {
 	case "PreToolUse", "PostToolUse":
 		rec.Tool, rec.Command = ev.Tool, ev.Command
-	case "Notification", "Stop":
+	case "Notification", "Stop", Interrupt:
 		// The prompt that follows a tool call is about that tool.
 		rec.Tool, rec.Command = prev.Tool, prev.Command
 	}
