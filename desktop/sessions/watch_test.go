@@ -2,6 +2,7 @@ package sessions_test
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -9,6 +10,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/project"
 )
 
 // pulls is what the repo's pull request list says of one branch.
@@ -287,6 +289,36 @@ func TestReviewOnAnEndedSessionStartsANewOne(t *testing.T) {
 	eventually(t, "the prompt in the new session", func() bool { return strings.Contains(h.Pane(t, fresh), "/address-review 12") })
 	if got, _ := h.Session(fresh); got.Title != "#12 work" {
 		t.Errorf("the new session is titled %q", got.Title)
+	}
+}
+
+func TestReviewOnAnEndedSessionLeavesTheIssuesLiveSession(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
+	h.GH.SetPRFor("issue-12", "[]")
+	h.GH.SetPRFor("side", prJSON("OPEN", false, "[]", 0, 0))
+	s := issueSession(h, t, 12)
+	if err := h.Sessions().Track(s.ID, "side"); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the PR of side", func() bool { got, _ := h.Session(s.ID); return got.PR != nil })
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	live, _, err := h.Sessions().CreateIssue("#12 work", "", 12, project.Action{}, nil, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPRFor("side", prJSON("OPEN", false, "[]", 0, 1))
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	var ids []string
+	for _, v := range h.Sessions().List() {
+		if v.Issue == 12 {
+			ids = append(ids, v.ID)
+		}
+	}
+	if !slices.Equal(ids, []string{live.ID, s.ID}) && !slices.Equal(ids, []string{s.ID, live.ID}) {
+		t.Errorf("sessions of #12 = %v, want the live %s and the ended %s", ids, live.ID, s.ID)
 	}
 }
 
