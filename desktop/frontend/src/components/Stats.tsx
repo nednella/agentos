@@ -93,8 +93,14 @@ export function Stats() {
           </div>
         </div>
       </header>
-      <div data-scroll className="min-h-0 flex-1 overflow-y-auto p-4 @[39rem]:px-6">
-        {work ? <LedgerView days={workDays} project={project} /> : <StatsInterruptions days={days} project={project} />}
+      {/* Both tabs stay mounted so a switch keeps their data. Hiding with visibility, not display, keeps each tab's scroll position. */}
+      <div className="grid min-h-0 flex-1 grid-rows-1">
+        <div data-scroll className={`col-start-1 row-start-1 overflow-y-auto p-4 @[39rem]:px-6 ${work ? '' : 'invisible'}`}>
+          <LedgerView days={workDays} project={project} />
+        </div>
+        <div data-scroll className={`col-start-1 row-start-1 overflow-y-auto p-4 @[39rem]:px-6 ${work ? 'invisible' : ''}`}>
+          <StatsInterruptions days={days} project={project} />
+        </div>
       </div>
     </section>
   )
