@@ -1,6 +1,7 @@
 package session
 
 import (
+	"slices"
 	"sort"
 	"time"
 )
@@ -27,6 +28,7 @@ type Record struct {
 	Cwd          string    `json:"cwd,omitempty"`          // where the agent was working at the latest event
 	Conversation string    `json:"conversation,omitempty"` // the agent's id for its conversation, to resume it
 	Transcript   string    `json:"transcript,omitempty"`   // the file the agent writes its conversation to
+	Changes      []Change  `json:"changes,omitempty"`      // the latest state changes, oldest first, so the timeline outlives the app
 
 	// What the desktop app records when a session ends, so the row can outlive it.
 	Title   string `json:"title,omitempty"`
@@ -37,6 +39,24 @@ type Record struct {
 	Path    string `json:"path,omitempty"`
 	Created int64  `json:"created,omitempty"` // unix ms
 	EndedAt int64  `json:"endedAt,omitempty"` // unix ms
+}
+
+// Change is one entry of a session's state timeline.
+type Change struct {
+	State State `json:"state"`
+	At    int64 `json:"at"` // unix ms
+}
+
+// ChangesCap is how many changes a timeline keeps.
+const ChangesCap = 200
+
+// AddChange appends c to changes and keeps the latest ChangesCap of them. It never writes into the array of changes.
+func AddChange(changes []Change, c Change) []Change {
+	out := append(slices.Clip(changes), c)
+	if len(out) > ChangesCap {
+		out = slices.Clone(out[len(out)-ChangesCap:])
+	}
+	return out
 }
 
 // Session is one agent as the screen sees it.

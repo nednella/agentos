@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -26,14 +27,14 @@ func tempDir(t *testing.T) string {
 
 func TestStateFiles(t *testing.T) {
 	dir := tempDir(t)
-	rec := session.Record{Session: "p/1", State: session.Waiting, Event: "Notification", At: time.Now().UTC().Truncate(time.Second), Detail: "needs you"}
-	if got, err := ReadState(dir, "p/1"); err != nil || got != (session.Record{}) {
+	rec := session.Record{Session: "p/1", State: session.Waiting, Event: "Notification", At: time.Now().UTC().Truncate(time.Second), Detail: "needs you", Changes: []session.Change{{State: session.Working, At: 1}, {State: session.Waiting, At: 2}}}
+	if got, err := ReadState(dir, "p/1"); err != nil || !reflect.DeepEqual(got, session.Record{}) {
 		t.Fatalf("ReadState of nothing = %+v, %v", got, err)
 	}
 	if err := WriteState(dir, rec); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := ReadState(dir, "p/1"); err != nil || got != rec {
+	if got, err := ReadState(dir, "p/1"); err != nil || !reflect.DeepEqual(got, rec) {
 		t.Errorf("ReadState = %+v, %v", got, err)
 	}
 
@@ -45,7 +46,7 @@ func TestStateFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	all := ReadAll(dir)
-	if len(all) != 2 || all["p/1"] != rec || all["q/2"] != other {
+	if len(all) != 2 || !reflect.DeepEqual(all["p/1"], rec) || !reflect.DeepEqual(all["q/2"], other) {
 		t.Errorf("ReadAll = %+v", all)
 	}
 
@@ -111,7 +112,7 @@ func TestSendReachesTheListener(t *testing.T) {
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if got["p/1"] != want {
+	if !reflect.DeepEqual(got["p/1"], want) {
 		t.Errorf("record = %+v, want %+v", got["p/1"], want)
 	}
 }

@@ -1,6 +1,7 @@
 package session
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -65,10 +66,46 @@ func TestApply(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := Apply("p/1", tt.prev, tt.ev, t1); got != tt.want {
+			got := Apply("p/1", tt.prev, tt.ev, t1)
+			got.Changes = nil // TestApplyChanges covers them
+			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got %+v, want %+v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestApplyChanges(t *testing.T) {
+	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
+	at := func(m int) time.Time { return t0.Add(time.Duration(m) * time.Minute) }
+	ms := func(m int) int64 { return at(m).UnixMilli() }
+
+	rec := Apply("p/1", Record{}, Event{Name: "SessionStart"}, at(0))
+	rec = Apply("p/1", rec, Event{Name: "UserPromptSubmit"}, at(1))
+	rec = Apply("p/1", rec, Event{Name: "PreToolUse"}, at(2))
+	rec = Apply("p/1", rec, Event{Name: "Notification", NotificationType: "permission_prompt"}, at(3))
+	rec = Apply("p/1", rec, Event{Name: "Stop"}, at(4))
+	rec = Apply("p/1", rec, Event{Name: "Notification", NotificationType: "idle_prompt"}, at(5))
+	want := []Change{{Idle, ms(0)}, {Working, ms(1)}, {Waiting, ms(3)}, {Idle, ms(4)}}
+	if !reflect.DeepEqual(rec.Changes, want) {
+		t.Errorf("changes = %+v, want a change only when the state changes: %+v", rec.Changes, want)
+	}
+
+	old := Record{Session: "p/1", State: Idle, Event: "Stop", At: t0}
+	if got := Apply("p/1", old, Event{Name: "SessionStart"}, at(1)).Changes; !reflect.DeepEqual(got, []Change{{Idle, ms(1)}}) {
+		t.Errorf("a record saved before changes were kept got %+v, want its timeline to start at the next event", got)
+	}
+
+	rec = Record{Session: "p/1", State: Idle, At: t0}
+	for i := range ChangesCap + 10 {
+		ev := Event{Name: "UserPromptSubmit"}
+		if rec.State == Working {
+			ev = Event{Name: "Stop"}
+		}
+		rec = Apply("p/1", rec, ev, at(i+1))
+	}
+	if len(rec.Changes) != ChangesCap || rec.Changes[ChangesCap-1].At != ms(ChangesCap+10) {
+		t.Errorf("kept %d changes ending at %d, want the latest %d", len(rec.Changes), rec.Changes[len(rec.Changes)-1].At, ChangesCap)
 	}
 }
 

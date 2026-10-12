@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -179,5 +180,19 @@ func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
 		if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
 			t.Fatalf("round %d: state = %+v, want the Stop", i, rec)
 		}
+	}
+}
+
+func TestHookKeepsTheStateChanges(t *testing.T) {
+	dir, _ := hookSetup(t)
+	t0 := time.Now()
+	reportHookAt("SessionStart", strings.NewReader(`{}`), t0)
+	reportHookAt("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`), t0.Add(time.Second))
+	reportHookAt("PreToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0.Add(2*time.Second))
+	reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(3*time.Second))
+	rec, _ := bus.ReadState(dir, "demo/a1")
+	want := []session.Change{{State: session.Idle, At: t0.UnixMilli()}, {State: session.Working, At: t0.Add(time.Second).UnixMilli()}, {State: session.Idle, At: t0.Add(3 * time.Second).UnixMilli()}}
+	if !reflect.DeepEqual(rec.Changes, want) {
+		t.Errorf("changes = %+v, want %+v", rec.Changes, want)
 	}
 }
