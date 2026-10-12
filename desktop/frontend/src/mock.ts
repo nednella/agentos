@@ -985,9 +985,10 @@ export function createMock(params: URLSearchParams) {
       const existing = sessions.find((s) => s.project === current.name && s.issue === number)
       if (existing) return view(existing)
       if (action && !issue.actions.includes(action)) throw `issue #${number} has no action "${action}"`
-      const command = { Work: `/work ${number}`, Plan: `/plan ${number}`, Investigate: `/investigate ${number}` }[action || issue.actions[0]] ?? `Work on issue #${number}: ${issue.title}`
+      const name = action || issue.actions[0]
+      const command = { Work: `/work ${number}`, Plan: `/plan ${number}`, Investigate: `/investigate ${number}` }[name] ?? `Work on issue #${number}: ${issue.title}`
       const short = issue.title.split(' ').slice(0, 3).join(' ')
-      const session = startSessionFor(`#${number} ${short}`, number, command)
+      const session = startSessionFor(`[${name}] #${number} ${short}`, number, command)
       emit('issues', { project: current.name, items: currentIssues() })
       return session
     },
