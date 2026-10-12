@@ -15,13 +15,24 @@ import (
 // DefaultPRPoll is how often pull requests are polled when pr_poll_interval is not set.
 const DefaultPRPoll = 10 * time.Second
 
-// Action is a way to start a session for an issue: a command to type, run with its own model and effort.
+// Action is a way to start a session for an issue: a command to type, run with its own model and effort, in a
+// task or a chat.
 type Action struct {
 	Name    string `yaml:"name"`
 	Command string `yaml:"command,omitempty"` // {n} is the issue number, {title} its title
 	Model   string `yaml:"model,omitempty"`
 	Effort  string `yaml:"effort,omitempty"`
+	Kind    string `yaml:"kind,omitempty"` // KindTask unless set
 }
+
+// The values of Action.Kind.
+const (
+	KindTask = "task"
+	KindChat = "chat"
+)
+
+// Chat says whether the action starts a chat rather than a task.
+func (a Action) Chat() bool { return a.Kind == KindChat }
 
 // Section is a group of the queue. It takes the issues that have any of its labels, the issues that have
 // none when it names no labels, or every issue when its labels hold "*".
@@ -174,6 +185,9 @@ func (p Project) validateQueue() error {
 			actions = append(actions, a.Name)
 			if err := (Model{Model: a.Model, Effort: a.Effort}).Validate(); err != nil {
 				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
+			}
+			if a.Kind != "" && a.Kind != KindTask && a.Kind != KindChat {
+				return fmt.Errorf("queue_sections.%s.%s: kind must be %s or %s, not %q", s.Name, a.Name, KindTask, KindChat, a.Kind)
 			}
 		}
 	}
