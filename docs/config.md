@@ -49,7 +49,7 @@ queue_sections:
   - name: Inbox
     labels: []                  # issues with no labels
     actions:
-      - {name: Plan, command: "/plan {n}", model: opus, effort: high}
+      - {name: Plan, command: "/plan {n}", model: opus, effort: high, kind: chat}
       - {name: Work, command: "/work {n}"}
   - name: Needs plan
     labels: [plan]
@@ -76,6 +76,8 @@ queue_sections:
 - So a `"*"` section placed last takes every issue the sections above it did not. A section after it would never be reached, so a config with one does not load.
 - An issue no section matches goes under one folded row below the last section, `<n> more issues match no section`, with the `Start` action. A last `"*"` section is only needed to give those issues a name or other actions.
 - In a command, `{n}` is the issue number, `{title}` its title and `{branch}` its `session_branch_fallback`. The `Start` action names the branch when the project sets one. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
+- `kind` is `task` (the default) or `chat`. A chat action starts a read-only chat for the issue: it gets `AGENTOS_ISSUE`, but no branch, no pull request commands and no clean-up. An issue can have one live task and one live chat; starting an action of a kind that already runs on the issue opens that session. The queue row links to the task.
+- A session started by an action is titled `[<action>] #<n> <title>`.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
 - Dragging an issue to another section relabels it on GitHub: it loses the labels of the section it left and gains the first label of the section it enters. No session starts. A section with no labels takes an issue only when no label is left.
 - A move can be undone from the app; the app remembers the last move of each issue until it quits.
