@@ -32,7 +32,7 @@ import (
 
 const (
 	pollEvery     = 2 * time.Second
-	usageEvery    = 15 * time.Second
+	stopSettle    = time.Second // Claude Code writes a turn's last reply just after the Stop hook
 	tmuxTimeout   = 5 * time.Second
 	defaultTitle  = "agent"
 	chatTitle     = "chat"
@@ -137,7 +137,6 @@ type Sessions struct {
 	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
 	wakes      map[string][]string      // prompts for sessions that were waiting on the user when their PR needed them, oldest first
 	prefillFor time.Duration
-	usageFor   time.Duration           // how often the transcripts of live sessions are read for usage
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
 }
@@ -238,7 +237,6 @@ func newSessions(o Options) *Sessions {
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
 		prefillFor: prefillWait,
-		usageFor:   usageEvery,
 		ctx:        context.Background(),
 	}
 }
@@ -248,7 +246,6 @@ func newSessions(o Options) *Sessions {
 func (s *Sessions) Start(ctx context.Context) error {
 	s.mu.Lock()
 	s.ctx = ctx
-	usageFor := s.usageFor
 	s.mu.Unlock()
 	ln, err := bus.Listen(bus.SocketPath(s.stateDir), s.observe)
 	if err != nil && !errors.Is(err, bus.ErrInUse) {
@@ -261,16 +258,12 @@ func (s *Sessions) Start(ctx context.Context) error {
 		}
 		tick := time.NewTicker(pollEvery)
 		defer tick.Stop()
-		usageTick := time.NewTicker(usageFor)
-		defer usageTick.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
 				s.Refresh()
-			case <-usageTick.C:
-				s.countUnread()
 			}
 		}
 	}()
@@ -531,9 +524,14 @@ func (s *Sessions) take(rec session.Record) {
 	}
 	s.records[rec.Session] = rec
 	s.followBranch(rec)
-	// A turn's usage is all written by its Stop. The first refresh catches up on turns while the app was closed.
-	if rec.Transcript != "" && (rec.Event == "Stop" || rec.Event == "SessionEnd" || !s.loaded) {
-		go s.countUsage(rec.Session, rec.Transcript)
+	// Each hook moves the row's cost. The event log gets a turn's usage once the turn is over, and the
+	// first refresh's usage at once: it catches up on turns while the app was closed.
+	if rec.Transcript != "" {
+		if rec.Event == "Stop" {
+			time.AfterFunc(stopSettle, func() { s.countUsage(rec.Session, rec.Transcript, true) })
+		} else {
+			go s.countUsage(rec.Session, rec.Transcript, rec.Event == "SessionEnd" || !s.loaded)
+		}
 	}
 	if ch, ok := s.ready[rec.Session]; ok && rec.Event == "SessionStart" {
 		close(ch)
@@ -639,6 +637,9 @@ func (s *Sessions) sync() {
 			}
 			if in := s.known[id]; !in.Created.IsZero() {
 				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionEnd, Ms: time.Since(in.Created).Milliseconds()})
+			}
+			if t := s.records[id].Transcript; t != "" {
+				go s.countUsage(id, t, true)
 			}
 			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
@@ -1470,13 +1471,6 @@ func (s *Sessions) Run(ctx context.Context) error {
 	}
 	go s.life.Run(ctx)
 	return nil
-}
-
-// SetUsageEvery sets how often the transcripts of live sessions are read for usage. It must be called before Start.
-func (s *Sessions) SetUsageEvery(d time.Duration) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.usageFor = d
 }
 
 // SetPrefillWait sets how long to wait for an agent to be ready before typing in the prefill.
