@@ -74,7 +74,7 @@ func TestUsageIsCountedOncePerMessage(t *testing.T) {
 	}
 }
 
-func TestUsageIsCountedDuringATurnAndAfterItsStop(t *testing.T) {
+func TestUsageIsCountedAtEachHookAndRecordedAtTheEndOfATurn(t *testing.T) {
 	h := newHarness(t)
 	s, err := h.Sessions().Create("#4 work", "", false, 4)
 	if err != nil {
@@ -83,10 +83,14 @@ func TestUsageIsCountedDuringATurnAndAfterItsStop(t *testing.T) {
 	transcript := filepath.Join(t.TempDir(), "conv.jsonl")
 	h.Hook(t, s.ID, "UserPromptSubmit", fmt.Sprintf(`{"prompt":"go","transcript_path":%q}`, transcript))
 	appendLines(t, transcript, assistantLine("msg_1", time.Now().Add(100*time.Millisecond), 1000, 100))
+	h.Hook(t, s.ID, "PostToolUse", `{"tool_name":"Bash"}`)
 	eventually(t, "the tokens of a turn still running", func() bool {
 		row, _ := h.Session(s.ID)
 		return row.Tokens == 1100
 	})
+	if led, err := h.Ledger(30, ""); err != nil || led.Usage.Totals.Tokens != 0 {
+		t.Fatalf("usage = %+v, %v: the event log got usage before the turn ended", led.Usage.Totals, err)
+	}
 
 	h.Hook(t, s.ID, "Stop", "{}")
 	// Claude Code writes a turn's last reply a few milliseconds after its Stop hook.
@@ -102,4 +106,13 @@ func TestUsageIsCountedDuringATurnAndAfterItsStop(t *testing.T) {
 	if led.Usage.Totals.Tokens != 1111 || len(led.Work) != 1 || led.Work[0].Tokens != 1111 {
 		t.Errorf("usage = %+v, work = %+v: the stats do not add up to the transcript", led.Usage.Totals, led.Work)
 	}
+
+	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"more"}`)
+	appendLines(t, transcript, assistantLine("msg_3", time.Now().Add(2*time.Second), 100, 10))
+	h.Hook(t, s.ID, "PostToolUse", `{"tool_name":"Bash"}`)
+	second := h.Restart(t)
+	eventually(t, "the recorded usage and the usage read again after a restart in a turn", func() bool {
+		row, _ := second.Session(s.ID)
+		return row.Tokens == 1221
+	})
 }

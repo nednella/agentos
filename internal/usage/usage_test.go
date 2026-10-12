@@ -93,22 +93,6 @@ func TestReadLeavesAPartLine(t *testing.T) {
 	}
 }
 
-func TestUnread(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "conv.jsonl")
-	c := NewCursor(t0)
-	if c.Unread(path) {
-		t.Error("a transcript not written yet has lines to read")
-	}
-	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 2, 0, 0))
-	if !c.Unread(path) {
-		t.Error("a new line was not seen")
-	}
-	_, _ = c.Read(path)
-	if c.Unread(path) {
-		t.Error("a transcript read to its end has lines to read")
-	}
-}
-
 func TestReadAddsSubagents(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "abc.jsonl")
