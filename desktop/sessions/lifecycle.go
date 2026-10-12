@@ -315,15 +315,12 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets []target, only []string) (treeErr, prErr error) {
 	trees, treeErr := l.worktrees(ctx, proj.Dir)
 	prs := map[string]*PR{} // by branch: two sessions of one issue share its PR
-	var auto []string
+	var fetched []done
 	var older []done
 	var dropped []done
 	var wakes []wake
 	reload := false
-	for _, t := range targets {
-		if only != nil && !slices.ContainsFunc(t.branches, func(b string) bool { return slices.Contains(only, b) }) {
-			continue
-		}
+	for _, t := range sharing(targets, only) {
 		branch, pr, err := l.latestPR(ctx, proj.Dir, t.branches, prs)
 		if err == nil {
 			var d, gone []done
@@ -335,15 +332,19 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 			prErr = cmp.Or(prErr, err)
 			continue
 		}
-		o := l.update(t, branch, trees.byBranch[branch], pr)
+		fetched = append(fetched, done{t, branch, pr})
+	}
+	var auto []string
+	for _, f := range fetched {
+		o := l.update(f.target, f.branch, trees.byBranch[f.branch], f.pr, hearer(fetched, f.branch) == f.id)
 		if o.auto {
-			auto = append(auto, t.id)
+			auto = append(auto, f.id)
 		}
 		if o.drop {
-			dropped = append(dropped, done{t, branch, pr})
+			dropped = append(dropped, f)
 		}
 		if o.wake != "" {
-			wakes = append(wakes, wake{t, o.wake})
+			wakes = append(wakes, wake{f.target, o.wake})
 		}
 		reload = reload || o.queue
 	}
@@ -364,6 +365,55 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		l.repos.Reload(ctx, proj)
 	}
 	return treeErr, prErr
+}
+
+// sharing are the targets on a branch named in only, with every target that shares a branch with
+// one of them, so that all the sessions on a PR's branch are there to pick its hearer. A nil only is all of them.
+func sharing(targets []target, only []string) []target {
+	if only == nil {
+		return targets
+	}
+	on := func(t target, names []string) bool {
+		return slices.ContainsFunc(t.branches, func(b string) bool { return slices.Contains(names, b) })
+	}
+	var touched []string
+	for _, t := range targets {
+		if on(t, only) {
+			touched = append(touched, t.branches...)
+		}
+	}
+	var out []target
+	for _, t := range targets {
+		if on(t, touched) {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+// hearer is the session that gets the commands and the opened alert of the PR on branch, of those
+// whose PR it is: one that owns the branch, then a live one, then one that works on it now.
+func hearer(fetched []done, branch string) string {
+	best, bestRank := "", -1
+	for _, f := range fetched {
+		if f.branch != branch {
+			continue
+		}
+		rank := 0
+		if f.owns(branch) {
+			rank += 4
+		}
+		if !f.ended {
+			rank += 2
+		}
+		if f.newest() == branch {
+			rank++
+		}
+		if rank > bestRank {
+			best, bestRank = f.id, rank
+		}
+	}
+	return best
 }
 
 // latestPR is the PR on the newest of the branches that has one, with its branch; without one it is
@@ -481,8 +531,9 @@ type outcome struct {
 	drop  bool   // the branch was never the session's work, so it leaves the session
 }
 
-// update stores what a fetch found and says what it calls for.
-func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
+// update stores what a fetch found and says what it calls for. Only the session that hears the PR
+// gets its commands and its opened alert.
+func (l *Lifecycle) update(t target, branch, worktree string, pr *PR, hears bool) outcome {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.gone[t.id] {
@@ -504,19 +555,19 @@ func (l *Lifecycle) update(t target, branch, worktree string, pr *PR) outcome {
 		return o
 	}
 	live := pr.State == "draft" || pr.State == "open"
-	if _, known := l.prs(key).Acks[strconv.Itoa(pr.Number)]; live && !known {
+	if _, known := l.prs(key).Acks[strconv.Itoa(pr.Number)]; live && !known && hears {
 		tr.opened = true
 	}
 	if live {
 		l.markOpen(t, branch)
 	}
 	l.recordState(t, pr)
-	attention := l.attentionFor(key, pr)
+	attention := l.attentionFor(key, pr, hears)
 	if attention != "" && attention != tr.attention {
 		l.emit("attention", map[string]string{"id": t.id, "state": "pr"})
 	}
 	tr.attention = attention
-	if live {
+	if live && hears {
 		var kind string
 		if o.wake, kind = l.nudgeFor(t.proj, pr); o.wake != "" {
 			l.record(t, pr, activity.Event{Kind: kind})
@@ -638,13 +689,16 @@ func (l *Lifecycle) savePRs(key string) {
 }
 
 // attentionFor says what about the PR needs the user: failing checks, or more
-// comments than they last saw. It needs mu.
-func (l *Lifecycle) attentionFor(key string, pr *PR) string {
+// comments than they last saw. A PR's first sight is saved only by the session that hears it, which
+// tells from it that the PR is new. It needs mu.
+func (l *Lifecycle) attentionFor(key string, pr *PR, hears bool) string {
 	acks := l.prs(key).Acks
 	n := strconv.Itoa(pr.Number)
 	a, seen := acks[n]
 	if !seen {
 		a = ack{Comments: pr.Comments}
+	}
+	if !seen && hears {
 		acks[n] = a
 		l.savePRs(key)
 	}
