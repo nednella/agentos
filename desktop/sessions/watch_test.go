@@ -193,6 +193,25 @@ func waitingWithHeldReview(t *testing.T, h *apptest.Harness) sessions.Session {
 	return s
 }
 
+func TestEveryPromptHeldWhileWaitingIsSent(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
+	s := waitingWithHeldReview(t, h)
+	h.GH.SetPR(prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"FAILURE"}]`, 1, 0))
+	h.RefreshPRs()
+	time.Sleep(500 * time.Millisecond)
+	if pane := h.Pane(t, s.ID); strings.Contains(pane, "/address-review") || strings.Contains(pane, "/fix-checks") {
+		t.Fatal("a prompt was typed into a session waiting on the user")
+	}
+	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"yes"}`)
+	eventually(t, "both held prompts", func() bool {
+		pane := h.Pane(t, s.ID)
+		return strings.Contains(pane, "/address-review 12") && strings.Contains(pane, "/fix-checks 12")
+	})
+	if pane := h.Pane(t, s.ID); strings.Index(pane, "/address-review 12") > strings.Index(pane, "/fix-checks 12") {
+		t.Errorf("the held prompts came out of order:\n%s", pane)
+	}
+}
+
 func TestEndingASessionDropsItsHeldPrompts(t *testing.T) {
 	for _, tt := range []struct {
 		name string
