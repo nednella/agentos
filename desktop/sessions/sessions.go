@@ -32,6 +32,7 @@ import (
 
 const (
 	pollEvery     = 2 * time.Second
+	usageEvery    = 15 * time.Second
 	tmuxTimeout   = 5 * time.Second
 	defaultTitle  = "agent"
 	chatTitle     = "chat"
@@ -136,6 +137,7 @@ type Sessions struct {
 	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
 	wakes      map[string][]string      // prompts for sessions that were waiting on the user when their PR needed them, oldest first
 	prefillFor time.Duration
+	usageFor   time.Duration           // how often the transcripts of live sessions are read for usage
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
 }
@@ -236,6 +238,7 @@ func newSessions(o Options) *Sessions {
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
 		prefillFor: prefillWait,
+		usageFor:   usageEvery,
 		ctx:        context.Background(),
 	}
 }
@@ -245,6 +248,7 @@ func newSessions(o Options) *Sessions {
 func (s *Sessions) Start(ctx context.Context) error {
 	s.mu.Lock()
 	s.ctx = ctx
+	usageFor := s.usageFor
 	s.mu.Unlock()
 	ln, err := bus.Listen(bus.SocketPath(s.stateDir), s.observe)
 	if err != nil && !errors.Is(err, bus.ErrInUse) {
@@ -257,12 +261,16 @@ func (s *Sessions) Start(ctx context.Context) error {
 		}
 		tick := time.NewTicker(pollEvery)
 		defer tick.Stop()
+		usageTick := time.NewTicker(usageFor)
+		defer usageTick.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
 				s.Refresh()
+			case <-usageTick.C:
+				s.countUnread()
 			}
 		}
 	}()
@@ -1462,6 +1470,13 @@ func (s *Sessions) Run(ctx context.Context) error {
 	}
 	go s.life.Run(ctx)
 	return nil
+}
+
+// SetUsageEvery sets how often the transcripts of live sessions are read for usage. It must be called before Start.
+func (s *Sessions) SetUsageEvery(d time.Duration) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.usageFor = d
 }
 
 // SetPrefillWait sets how long to wait for an agent to be ready before typing in the prefill.
