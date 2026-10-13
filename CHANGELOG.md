@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.34.0](https://github.com/nednella/agentos/compare/v0.33.0...v0.34.0) (2026-10-13)
+
+
+### Features
+
+* **desktop:** keep session's action apart from its title ([8ccacf9](https://github.com/nednella/agentos/commit/8ccacf9a72c84cf8c3afa419fe1a496dd96c1fd0))
+* **ui:** add Today, 7D, 90D and 180D stat ranges ([e74e3b4](https://github.com/nednella/agentos/commit/e74e3b41057ee41ebc5f24d47d236a2b3115ff75))
+* **ui:** pick stat range from dropdown ([4d1dc20](https://github.com/nednella/agentos/commit/4d1dc2008921779ecf436f9826ed9b9113bab6b9))
+* **ui:** show session's action as badge ([8bdc855](https://github.com/nednella/agentos/commit/8bdc855030a1dcc048defea0e64d709ea965daee))
+
+
+### Bug Fixes
+
+* **desktop:** drive Chrome for Testing, never the owner's browser ([cdb2980](https://github.com/nednella/agentos/commit/cdb29801a0f520e8773b6b5b3c54454350d22167))
+* **scripts:** drive Chrome for Testing in cdp.mjs ([fc7ea00](https://github.com/nednella/agentos/commit/fc7ea005e5d69839d0bf78b8bc216cfc0764311e))
+* **ui:** join issue row actions into one split button ([cd9a2b7](https://github.com/nednella/agentos/commit/cd9a2b7ab5b4057590eefd02c1a49ce406f7f6ed))
+* **ui:** size stat range dropdown to its choice ([f0d1033](https://github.com/nednella/agentos/commit/f0d1033ff51362902a5632a1df0a09cd3d487f14))
+
 ## [0.33.0](https://github.com/nednella/agentos/compare/v0.32.0...v0.33.0) (2026-10-13)
 
 
