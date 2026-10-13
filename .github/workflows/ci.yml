@@ -38,6 +38,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true'
     runs-on: macos-latest
+    # The runner has no Chrome for Testing; its Google Chrome is no one's default browser.
+    env:
+      AGENTOS_BROWSER: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
     strategy:
       fail-fast: false
       # sessions and browser take most of the time, so each gets a runner of its own;

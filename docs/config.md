@@ -133,6 +133,6 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | Variable | Does |
 |---|---|
 | `AGENTOS_CONFIG` | the config file to use |
-| `AGENTOS_BROWSER` | the browser to drive, as a path; by default the first of Brave, Chrome, Chromium and Edge that is installed |
+| `AGENTOS_BROWSER` | the browser to drive, as a path; by default Chrome for Testing in `~/Applications` or `/Applications`, which `install.sh` installs. agentos never falls back to another browser: macOS sends clicked links to any running copy of your default browser's app, and one that agentos runs has no window to show them |
 | `AGENTOS_DIR` | the project folder to start in, instead of the current folder |
 | `AGENTOS_TMUX_SOCKET`, `AGENTOS_STATE_DIR`, `AGENTOS_DEV_DATA_DIR` | the tmux socket, the state folder, and one folder in place of both data folders; for tests |

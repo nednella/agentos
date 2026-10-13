@@ -54,7 +54,7 @@ func (c *Commands) Browser(ctx context.Context, req control.Request) (string, er
 		return "closed your window", nil
 	}
 	if !c.browsers.Available() {
-		return "", errors.New("no Brave, Chrome, Chromium or Edge browser found")
+		return "", errNoBrowser
 	}
 	switch sub {
 	case "open":
