@@ -81,7 +81,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
           </button>
         )}
       </div>
-      <div className="short:hidden flex items-center gap-3 px-4 pt-2.5 pb-0.5">
+      <div className={`short:hidden flex items-center gap-3 px-4 pt-2.5 ${session.chat ? 'pb-2' : 'pb-0.5'}`}>
         <StateBadge state={session.state} chat={session.chat} />
         {session.chat && <ChatTag />}
         <ModelTag
