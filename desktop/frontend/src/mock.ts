@@ -258,7 +258,7 @@ export function createMock(params: URLSearchParams) {
   function currentIssues(): Issue[] {
     return current.issues.map((issue) => ({
       ...issue,
-      sessionId: sessions.find((s) => s.project === current.name && s.issue === issue.number)?.id ?? '',
+      sessionId: sessions.find((s) => s.project === current.name && !s.chat && s.issue === issue.number)?.id ?? '',
     }))
   }
 
@@ -982,7 +982,7 @@ export function createMock(params: URLSearchParams) {
     StartIssue: async (number: number, action: string) => {
       const issue = current.issues.find((i) => i.number === number)
       if (!issue) throw 'No such issue'
-      const existing = sessions.find((s) => s.project === current.name && s.issue === number)
+      const existing = sessions.find((s) => s.project === current.name && !s.chat && s.issue === number)
       if (existing) return view(existing)
       if (action && !issue.actions.includes(action)) throw `issue #${number} has no action "${action}"`
       const name = action || issue.actions[0]

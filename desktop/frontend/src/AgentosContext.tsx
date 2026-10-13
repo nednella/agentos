@@ -504,7 +504,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => writeStored(NEWS_UNREAD_KEY, newsUnread), [newsUnread])
 
   const issues = useMemo(
-    () => rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => s.issue === issue.number)?.id ?? '' })),
+    () => rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => !s.chat && s.issue === issue.number)?.id ?? '' })),
     [rawIssues, sessions],
   )
 
