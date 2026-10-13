@@ -7,7 +7,7 @@ import { ActionMenu } from './ActionMenu'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
 import { PRMark } from './PRMark'
-import { StateDot } from './StateDot'
+import { SessionMark } from './SessionMark'
 import { TypeMark } from './TypeMark'
 
 type IssueRowProps = { issue: Issue; cursor: boolean; drag: IssueDrag }
@@ -16,6 +16,7 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
   const { sessions, overlay, select, startIssue, setOverlay, report } = useAgentos()
   const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
+  const chat = sessions.find((s) => s.chat && s.issue === issue.number)
   const dense = mode === 'compact'
   const labelled = (key: string) => issue.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1) ?? ''
   const open = typeof overlay === 'object' && overlay?.issue === issue.number
@@ -67,10 +68,15 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
           </>
         )}
       </span>
+      {chat && (
+        <button className="flex h-full flex-none items-center pl-1" title={`Open chat ${chat.n}`} onMouseDown={(e) => e.preventDefault()} onClick={() => select(chat.id)}>
+          <SessionMark session={chat} />
+        </button>
+      )}
       {session && (
-        <button className="flex h-full flex-none items-center justify-end gap-2 pl-1" title={`Open session ${session.n}`} onMouseDown={(e) => e.preventDefault()} onClick={() => select(session.id)}>
+        <button className="flex h-full flex-none items-center justify-end gap-2 pl-1" title={`Open task ${session.n}`} onMouseDown={(e) => e.preventDefault()} onClick={() => select(session.id)}>
           {session.pr && !dense && <PRMark pr={session.pr} />}
-          <StateDot state={session.state} />
+          <SessionMark session={session} />
         </button>
       )}
     </div>

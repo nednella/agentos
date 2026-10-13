@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 import { IssueBody } from './IssueBody'
 import { Loading } from './Loading'
 import { Overlay } from './Overlay'
-import { StateDot } from './StateDot'
+import { SessionMark } from './SessionMark'
 import { TypeMark } from './TypeMark'
 
 const dateOf = (at: number) => new Date(at).toLocaleString()
@@ -30,6 +30,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
   const loading = useMinimumLoading(!detail && !error)
   const issue = issues.find((i) => i.number === number)
   const session = sessions.find((s) => s.id === issue?.sessionId)
+  const chat = sessions.find((s) => s.chat && s.issue === number)
 
   useEffect(() => {
     api.issueDetail(number).then(setDetail, (err) => setError(errorMessage(err)))
@@ -49,14 +50,14 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
             {issue && session && (
               <button
                 className="btn"
-                title={`Open session ${session.n}`}
+                title={`Open task ${session.n}`}
                 onClick={() => {
                   close()
                   select(session.id)
                 }}
               >
-                <StateDot state={session.state} />
-                Session {session.n}
+                <SessionMark session={session} />
+                Task {session.n}
               </button>
             )}
             {issue &&
@@ -74,6 +75,19 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
                   {action}
                 </button>
               ))}
+            {issue && chat && (
+              <button
+                className="btn"
+                title={`Open chat ${chat.n}`}
+                onClick={() => {
+                  close()
+                  select(chat.id)
+                }}
+              >
+                <SessionMark session={chat} />
+                Chat {chat.n}
+              </button>
+            )}
             {issue && (
               <button className="btn btn-ghost h-7 w-7 justify-center px-0" title="Open on GitHub" aria-label="Open on GitHub" onClick={() => report(() => api.openURL(issue.url))}>
                 <Icon name="external" />
