@@ -15,8 +15,8 @@ const TABS = [
 ]
 const RANGES = [7, 14, 30].map((days) => ({ value: String(days), label: `${days} days` }))
 const WORK_RANGES = [
-  { value: '30', label: '30 days' },
-  { value: '365', label: 'Year' },
+  { value: '1', label: 'Today' },
+  ...[7, 30, 90, 180, 365].map((days) => ({ value: String(days), label: `${days}D` })),
   { value: '0', label: 'Lifetime' },
 ]
 const TAB_KEY = 'agentos.statsTab'
@@ -68,13 +68,13 @@ export function Stats() {
       className="panel @container flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       onKeyDown={(e) => e.key === 'Escape' && closeCentre()}
     >
-      <header className="panel-head grid flex-none grid-cols-[minmax(0,1fr)_auto] items-center justify-items-start gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 @xl:flex">
+      <header className="panel-head grid flex-none grid-cols-[minmax(0,1fr)_auto] items-center justify-items-start gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 @[44rem]:flex">
         <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
-        <button className="btn btn-ghost h-7 w-7 justify-center justify-self-end px-0 @xl:order-last" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
+        <button className="btn btn-ghost h-7 w-7 justify-center justify-self-end px-0 @[44rem]:order-last" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
           <Icon name="close" />
         </button>
-        <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @xl:contents">
+        <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @[44rem]:contents">
           <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
             <option value="">All projects</option>
             {projects.map((p) => (
@@ -83,12 +83,13 @@ export function Stats() {
               </option>
             ))}
           </select>
-          <div className="@xl:ml-auto">
+          <div className="@[44rem]:ml-auto">
             <SegmentedControl
               label="Range"
               options={work ? WORK_RANGES : RANGES}
               value={String(work ? workDays : days)}
               onChange={pickRange}
+              dense
             />
           </div>
         </div>
