@@ -189,7 +189,7 @@ func TestCommandEndsATasksPromptWithTheHandover(t *testing.T) {
 	}
 }
 
-func TestCommandMakesAChatReadOnlyWithoutABrowser(t *testing.T) {
+func TestCommandMakesAChatReadOnlyWithTheBrowser(t *testing.T) {
 	t.Setenv("npm_config_cache", t.TempDir())
 	name := session.Name{Project: "p", Token: "a1"}
 	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{available: true}}
@@ -201,10 +201,10 @@ func TestCommandMakesAChatReadOnlyWithoutABrowser(t *testing.T) {
 	if i := slices.Index(argv, "--allowedTools"); i < 0 || argv[i+1] != tools {
 		t.Errorf("allowed tools: %q", argv)
 	}
-	if slices.Contains(argv, "--mcp-config") || slices.Contains(argv, "--disallowedTools") {
-		t.Errorf("a chat has a browser: %q", argv)
+	if !slices.Contains(argv, "--mcp-config") || !slices.Contains(argv, "--disallowedTools") {
+		t.Errorf("a chat has no browser: %q", argv)
 	}
-	want := prompts.Session() + "\n\n" + prompts.Chat()
+	want := prompts.Session() + "\n\n" + prompts.Chat() + "\n\n" + prompts.Browser()
 	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != want {
 		t.Errorf("system prompt = %q", argv)
 	}
