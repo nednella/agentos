@@ -13,12 +13,9 @@ const TABS = [
   { value: 'work' as const, label: 'Stats' },
   { value: 'interruptions' as const, label: 'Interruptions' },
 ]
-const RANGES = [7, 14, 30].map((days) => ({ value: String(days), label: `${days} days` }))
-const WORK_RANGES = [
-  { value: '1', label: 'Today' },
-  ...[7, 30, 90, 180, 365].map((days) => ({ value: String(days), label: `${days}D` })),
-  { value: '0', label: 'Lifetime' },
-]
+const lastDays = (days: number) => ({ value: days, label: `Last ${days} days` })
+const RANGES = [7, 14, 30].map(lastDays)
+const WORK_RANGES = [{ value: 1, label: 'Today' }, ...[7, 30, 90, 180, 365].map(lastDays), { value: 0, label: 'Lifetime' }]
 const TAB_KEY = 'agentos.statsTab'
 const RANGE_KEY = 'agentos.statsDays'
 const WORK_RANGE_KEY = 'agentos.statsWorkDays'
@@ -49,13 +46,13 @@ export function Stats() {
     setPicked(next)
     writeStored(PROJECT_KEY, next)
   }
-  const pickRange = (next: string) => {
+  const pickRange = (next: number) => {
     if (work) {
-      setWorkDays(Number(next))
-      writeStored(WORK_RANGE_KEY, Number(next))
+      setWorkDays(next)
+      writeStored(WORK_RANGE_KEY, next)
     } else {
-      setDays(Number(next))
-      writeStored(RANGE_KEY, Number(next))
+      setDays(next)
+      writeStored(RANGE_KEY, next)
     }
   }
 
@@ -68,13 +65,13 @@ export function Stats() {
       className="panel @container flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
       onKeyDown={(e) => e.key === 'Escape' && closeCentre()}
     >
-      <header className="panel-head grid flex-none grid-cols-[minmax(0,1fr)_auto] items-center justify-items-start gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 @[44rem]:flex">
+      <header className="panel-head grid flex-none grid-cols-[minmax(0,1fr)_auto] items-center justify-items-start gap-x-3 gap-y-2 border-b border-line px-4 py-2.5 @xl:flex">
         <h2 className="sr-only">{work ? 'Stats' : 'What interrupts you'}</h2>
         <SegmentedControl label="View" options={TABS} value={tab} onChange={pickTab} />
-        <button className="btn btn-ghost h-7 w-7 justify-center justify-self-end px-0 @[44rem]:order-last" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
+        <button className="btn btn-ghost h-7 w-7 justify-center justify-self-end px-0 @xl:order-last" title="Back to the terminal (Esc)" aria-label="Back to the terminal" onClick={closeCentre}>
           <Icon name="close" />
         </button>
-        <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @[44rem]:contents">
+        <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @xl:contents">
           <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
             <option value="">All projects</option>
             {projects.map((p) => (
@@ -83,15 +80,13 @@ export function Stats() {
               </option>
             ))}
           </select>
-          <div className="@[44rem]:ml-auto">
-            <SegmentedControl
-              label="Range"
-              options={work ? WORK_RANGES : RANGES}
-              value={String(work ? workDays : days)}
-              onChange={pickRange}
-              dense
-            />
-          </div>
+          <select aria-label="Range" className="btn btn-ghost h-7 px-2 @xl:ml-auto" value={work ? workDays : days} onChange={(e) => pickRange(Number(e.target.value))}>
+            {(work ? WORK_RANGES : RANGES).map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
+            ))}
+          </select>
         </div>
       </header>
       {/* Both tabs stay mounted so a switch keeps their data. Hiding with visibility, not display, keeps each tab's scroll position. */}
