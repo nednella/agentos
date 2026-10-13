@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.33.0](https://github.com/nednella/agentos/compare/v0.32.0...v0.33.0) (2026-10-13)
+
+
+### Features
+
+* **desktop:** start chats with browser ([aa3801e](https://github.com/nednella/agentos/commit/aa3801eff468796df8920c2e5cc02ee9b10e855d))
+* **internal:** let chat with browser use page tools in plan mode ([e07726e](https://github.com/nednella/agentos/commit/e07726ed2d7731f4d59cf03eb568436c2336eb33))
+* **internal:** show session whose reply ends in question as waiting ([a63a8d4](https://github.com/nednella/agentos/commit/a63a8d45610f03271d67c1253f45c6c6950713b1))
+* **internal:** tell sessions to ask the owner with AskUserQuestion ([9292b5c](https://github.com/nednella/agentos/commit/9292b5c2d67f95d1d36923423bdd0982e9c81cea))
+* **ui:** show issue's chat beside its task in queue ([2f276ee](https://github.com/nednella/agentos/commit/2f276eea94947380e629b639f1c1f55b172ecab5))
+* **ui:** show terminal, browser and evidence tabs for chats ([7f2844b](https://github.com/nednella/agentos/commit/7f2844bd3c7609a44f5afc40eed0f588197f6d9f))
+
+
+### Bug Fixes
+
+* **ui:** link queue row to issue's task, not its chat ([64c72d3](https://github.com/nednella/agentos/commit/64c72d39f4f2f6487f430394308d15c3d95cc2cc))
+
 ## [0.32.0](https://github.com/nednella/agentos/compare/v0.31.0...v0.32.0) (2026-10-12)
 
 
