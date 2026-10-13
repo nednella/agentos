@@ -28,6 +28,7 @@ func TestNext(t *testing.T) {
 		{"idle reminder leaves ended alone", Ended, Event{Name: "Notification", NotificationType: "idle_prompt"}, Ended},
 		{"stop", Working, Event{Name: "Stop"}, Idle},
 		{"stop while waiting", Waiting, Event{Name: "Stop"}, Idle},
+		{"stop with a question", Working, Event{Name: "Stop", Asks: true}, Waiting},
 		{"end", Working, Event{Name: "SessionEnd"}, Ended},
 		{"unknown event", Working, Event{Name: "PreCompact"}, Working},
 	}
@@ -128,6 +129,10 @@ func TestParseEvent(t *testing.T) {
 		{"conversation", "Stop", `{"session_id":"abc"}`, Event{Name: "Stop", Conversation: "abc"}},
 		{"transcript", "Stop", `{"transcript_path":"/t/abc.jsonl"}`, Event{Name: "Stop", Transcript: "/t/abc.jsonl"}},
 		{"not json", "Stop", `garbage`, Event{Name: "Stop"}},
+		{"reply ends in a question", "Stop", `{"last_assistant_message":"Done.\n\n**Do you want me to push?**\n"}`,
+			Event{Name: "Stop", Detail: "Done. **Do you want me to push?**", Asks: true}},
+		{"question inside the reply", "Stop", `{"last_assistant_message":"Why? The test was flaky. I fixed it."}`,
+			Event{Name: "Stop", Detail: "Why? The test was flaky. I fixed it."}},
 		{"empty", "SessionStart", ``, Event{Name: "SessionStart"}},
 	}
 	for _, tt := range tests {
