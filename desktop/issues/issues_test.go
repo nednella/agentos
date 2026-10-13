@@ -16,6 +16,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
 	"github.com/nednella/agentos/internal/project"
+	"github.com/nednella/agentos/internal/session"
 )
 
 func TestIssues(t *testing.T) {
@@ -55,7 +56,7 @@ func TestIssues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Issue != 7 || s.Title != "[Work] #7 Fix the thing that breaks when the window is narrow" {
+	if s.Issue != 7 || s.Action != "Work" || s.Title != "#7 Fix the thing that breaks when the window is narrow" {
 		t.Errorf("session = %+v", s)
 	}
 	// The agent is bash: a sent command fails, a typed one just sits on the prompt.
@@ -180,7 +181,7 @@ func TestChatActionRunsBesideTheTask(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !plan.Chat || plan.Issue != 7 || plan.Title != "[Plan] #7 Fix the thing that breaks when the window is narrow" {
+	if !plan.Chat || plan.Issue != 7 || plan.Action != "Plan" || plan.Title != "#7 Fix the thing that breaks when the window is narrow" {
 		t.Errorf("plan = %+v", plan)
 	}
 	if got, _ := h.Issues(false); got[0].SessionID != "" {
@@ -198,6 +199,31 @@ func TestChatActionRunsBesideTheTask(t *testing.T) {
 	}
 	if got, _ := h.Issues(false); got[0].SessionID != work.ID {
 		t.Errorf("issue 7 links to %q, want the task %s", got[0].SessionID, work.ID)
+	}
+}
+
+func TestSessionKeepsItsActionAcrossRestarts(t *testing.T) {
+	h := newHarness(t)
+	work, err := h.StartIssue(7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := h.StartIssueWith(7, "Plan")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := h.KillSession(plan.ID); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "plan ended", func() bool {
+		s, ok := h.Session(plan.ID)
+		return ok && s.State == session.Ended
+	})
+	again := h.Restart(t)
+	for id, want := range map[string]string{work.ID: "Work", plan.ID: "Plan"} {
+		if s, ok := again.Session(id); !ok || s.Action != want {
+			t.Errorf("after a restart, session %s = %+v, want action %q", id, s, want)
+		}
 	}
 }
 

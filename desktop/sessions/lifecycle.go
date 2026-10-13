@@ -65,6 +65,7 @@ type Cleanup struct {
 // project's branch pattern, when it sets one. It owns the branches it reported and its issue's branch.
 type target struct {
 	id, title string
+	action    string
 	issue     int
 	branches  []string
 	owned     []string

@@ -57,6 +57,7 @@ type Session struct {
 	CreatedAt   int64            `json:"createdAt"`
 	Issue       int              `json:"issue"`
 	Chat        bool             `json:"chat"`
+	Action      string           `json:"action"` // the queue action the session was started with, "" when none
 	Model       string           `json:"model"`  // the model the agent was started with, "" when unknown
 	Effort      string           `json:"effort"` // the effort the agent was started with, "" when unknown
 	History     []session.Change `json:"history"`
@@ -334,7 +335,7 @@ func (e *endedSession) record() session.Record {
 	rec.State = session.Ended
 	rec.Title, rec.Path, rec.EndedAt = e.info.Title, e.info.Path, e.at.UnixMilli()
 	rec.Issue, _ = strconv.Atoi(e.info.Issue)
-	rec.Chat = e.info.Chat
+	rec.Chat, rec.Action = e.info.Chat, e.info.Action
 	rec.Model, rec.Effort = e.info.Model, e.info.Effort
 	if !e.info.Created.IsZero() {
 		rec.Created = e.info.Created.UnixMilli()
@@ -369,7 +370,7 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 		s.drop(name)
 		return
 	}
-	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort, Chat: rec.Chat}
+	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort, Chat: rec.Chat, Action: rec.Action}
 	if rec.Issue > 0 {
 		info.Issue = strconv.Itoa(rec.Issue)
 	}
@@ -826,7 +827,7 @@ func (s *Sessions) list() []Session {
 		view := Session{
 			ID: id, N: ss.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Model: in.Model, Effort: in.Effort, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
+			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {
@@ -1012,19 +1013,19 @@ func (s *Sessions) IssueSessions() map[int]string {
 // Create starts the agent in the current project. A non-empty text is typed
 // into its prompt once the agent is ready, and sent when send is set.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
-	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false)
+	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false, "")
 }
 
 // CreateChat starts a chat in the current project: an agent that only reads, for questions about the project.
 func (s *Sessions) CreateChat(title string) (Session, error) {
-	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), "", false, 0, project.Model{}, "", "", "", true)
+	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), "", false, 0, project.Model{}, "", "", "", true, "")
 }
 
 // CreateBriefed is Create for a session with a job of its own: brief is added to the agent's system prompt, and the
 // project says whether text is sent.
 func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief, "", false)
+	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief, "", false, "")
 }
 
 // CreateIssue starts the agent for an issue, in a task or a chat as the action says, and types text into it once it
@@ -1033,7 +1034,7 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 // that kind gets that session back, and created is false.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view Session, created bool, err error) {
 	proj := s.Current()
-	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat())
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat(), action.Name)
 	if live == "" {
 		return view, err == nil, err
 	}
@@ -1047,13 +1048,13 @@ func (s *Sessions) CreateIssue(title, text string, issue int, action project.Act
 
 // createForIssue starts a task or a chat for the issue, unless the project has a live one of that kind for it: then
 // it names that one.
-func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string, chat bool) (view Session, live string, err error) {
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string, chat bool, action string) (view Session, live string, err error) {
 	s.issueMu.Lock()
 	defer s.issueMu.Unlock()
 	if live := s.liveIssueSession(proj.Key(), issue, chat); live != "" {
 		return Session{}, live, nil
 	}
-	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, chat)
+	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, chat, action)
 	return view, "", err
 }
 
@@ -1069,7 +1070,7 @@ func fromApp(text string) string {
 // createIn is Create in the project given, which need not be the current one, with the model given.
 // A session from an earlier one continues its conversation and takes over its branches; a brief or a handover is
 // added to the agent's system prompt.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, from, brief, handover string, chat bool) (Session, error) {
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, from, brief, handover string, chat bool, action string) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -1082,13 +1083,13 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief, handover, chat); err != nil {
+	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief, handover, chat, action); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
 		return Session{}, err
 	}
-	view := s.register(name, title, proj, issue, model, conversation != "", chat)
+	view := s.register(name, title, proj, issue, model, conversation != "", chat, action)
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
@@ -1131,7 +1132,7 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover string, chat bool) error {
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover string, chat bool, action string) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
@@ -1152,17 +1153,17 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief, handover, chat), issue, model, chat)
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief, handover, chat), issue, model, chat, action)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, resumed, chat bool) Session {
+func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, resumed, chat bool, action string) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if resumed {
 		s.resumed[name.String()] = true
 	}
-	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Created: time.Now()}
+	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Created: time.Now()}
 	if _, ok := s.agent.(agent.Claude); ok {
 		in.Model, in.Effort = model.Model, model.Effort
 	}
@@ -1182,7 +1183,7 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 	return Session{}
 }
 
-func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model, chat bool) error {
+func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model, chat bool, action string) error {
 	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
 		return err
 	}
@@ -1203,6 +1204,11 @@ func (s *Sessions) start(ctx context.Context, name session.Name, title, dir stri
 	}
 	if chat {
 		if err := tag(s.tmux.SetChat(ctx, name)); err != nil {
+			return err
+		}
+	}
+	if action != "" {
+		if err := tag(s.tmux.SetAction(ctx, name, action)); err != nil {
 			return err
 		}
 	}
@@ -1262,7 +1268,7 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 		return
 	}
 	if t.ended {
-		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id), false)
+		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id), false, t.action)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 		}
@@ -1433,7 +1439,7 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.

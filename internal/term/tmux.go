@@ -22,6 +22,7 @@ const (
 	modelOption  = "@agentos-model"
 	effortOption = "@agentos-effort"
 	chatOption   = "@agentos-chat"
+	actionOption = "@agentos-action"
 )
 
 const conf = `
@@ -67,6 +68,7 @@ type Info struct {
 	Model   string // the model the agent was started with, or ""
 	Effort  string // the effort the agent was started with, or ""
 	Chat    bool   // a chat: a read-only session for questions, not work
+	Action  string // the queue action the session was started with, or ""
 	Created time.Time
 }
 
@@ -104,7 +106,7 @@ func cleanEnv() []string {
 // No running server means no sessions; any other failure is an error, because
 // callers must not read it as "everything ended".
 func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
-	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{"+modelOption+"}\t#{"+effortOption+"}\t#{"+chatOption+"}\t#{session_created}")
+	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{"+modelOption+"}\t#{"+effortOption+"}\t#{"+chatOption+"}\t#{"+actionOption+"}\t#{session_created}")
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && noServer(err.Error()) {
@@ -116,7 +118,7 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
 	var shells []session.Name
 	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 8 {
+		if len(f) != 9 {
 			continue
 		}
 		name, err := session.ParseName(f[0])
@@ -127,8 +129,8 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
 			shells = append(shells, name)
 			continue
 		}
-		info := Info{Name: name, Title: f[1], Path: f[2], Issue: f[3], Model: f[4], Effort: f[5], Chat: f[6] != ""}
-		if secs, err := strconv.ParseInt(f[7], 10, 64); err == nil {
+		info := Info{Name: name, Title: f[1], Path: f[2], Issue: f[3], Model: f[4], Effort: f[5], Chat: f[6] != "", Action: f[7]}
+		if secs, err := strconv.ParseInt(f[8], 10, 64); err == nil {
 			info.Created = time.Unix(secs, 0)
 		}
 		infos = append(infos, info)
@@ -204,6 +206,14 @@ func (t *Tmux) SetIssue(ctx context.Context, name session.Name, issue int) error
 func (t *Tmux) SetChat(ctx context.Context, name session.Name) error {
 	if _, err := t.run(ctx, "set-option", "-t", target(name), chatOption, "1"); err != nil {
 		return fmt.Errorf("tagging chat %s: %w", name, err)
+	}
+	return nil
+}
+
+// SetAction records the queue action a session was started with.
+func (t *Tmux) SetAction(ctx context.Context, name session.Name, action string) error {
+	if _, err := t.run(ctx, "set-option", "-t", target(name), actionOption, action); err != nil {
+		return fmt.Errorf("recording the action of session %s: %w", name, err)
 	}
 	return nil
 }
