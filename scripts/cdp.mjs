@@ -1,15 +1,22 @@
-// Drives headless Brave over the DevTools protocol, for checking the front end without a window.
+// Drives headless Chrome for Testing over the DevTools protocol, for checking the front end without a window.
 // Usage: node scripts/cdp.mjs <url> <width> <height> '[{"wait":500},{"click":[x,y]},{"type":"text"},{"key":{"key":"Enter","code":"Enter"}},{"eval":"js"},{"shot":"name.png"}]'
 // A shot path that is not absolute lands in $TMPDIR, the session's own temp folder.
-// Drives headless Brave over the DevTools protocol: node cdp.mjs <url> <w> <h> <steps-json>
+// Drives headless Chrome for Testing over the DevTools protocol: node cdp.mjs <url> <w> <h> <steps-json>
 import { spawn } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { existsSync, writeFileSync } from 'node:fs'
+import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 const [url, w, h, stepsJson] = process.argv.slice(2)
 const port = 9333
-// A new profile asks the macOS keychain for its key, and a Brave under agentos's tmux shows "Keychain Not Found".
-const brave = spawn('/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+// Never the owner's browser app: macOS sends a clicked link to any running copy of the default browser, windowless or not.
+const app = 'Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing'
+const binary = process.env.AGENTOS_BROWSER || [join(homedir(), 'Applications', app), join('/Applications', app)].find(existsSync)
+if (!binary) {
+  console.error('no Chrome for Testing found: run install.sh again, or set AGENTOS_BROWSER')
+  process.exit(1)
+}
+// A new profile asks the macOS keychain for its key, and a browser under agentos's tmux shows "Keychain Not Found".
+const brave = spawn(binary,
   ['--headless=new', '--use-mock-keychain', `--remote-debugging-port=${port}`, `--window-size=${w},${h}`, '--hide-scrollbars', '--disable-brave-update', '--disable-features=MacAppCodeSignClone', `--user-data-dir=${join(tmpdir(), 'agentos-cdp-profile')}`, 'about:blank'], { stdio: 'ignore' })
 process.on('exit', () => brave.kill())
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(signal, () => process.exit(1))

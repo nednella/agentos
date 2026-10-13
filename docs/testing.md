@@ -31,7 +31,7 @@ go vet ./...
 go test -race ./...
 ```
 
-Each `desktop/<pkg>` service has its tests beside it. They build the whole app through `desktop/internal/apptest`, which starts real tmux servers on private sockets (`aostest-<pid>`), real git repos in temp folders, and real headless Brave or Chrome on temp profiles. GitHub and `claude` are always replaced by fake runners (`apptest.FakeGH`, `FakeClaude`); commands run through `desktop/internal/run`. The browser tests skip when no Chromium browser is installed. `desktop` embeds `frontend/dist`; build it first, or run with `-tags stub`, which embeds a small page instead. The hooks in the tests run the `agentos` command built from `./desktop` with that tag: the app's binary is the command. The `cli` tests answer from a fake app on a temp control socket. The release check never reaches GitHub: the harness answers curl with `Options.Releases` and refuses every other download.
+Each `desktop/<pkg>` service has its tests beside it. They build the whole app through `desktop/internal/apptest`, which starts real tmux servers on private sockets (`aostest-<pid>`), real git repos in temp folders, and real headless Chrome for Testing on temp profiles. GitHub and `claude` are always replaced by fake runners (`apptest.FakeGH`, `FakeClaude`); commands run through `desktop/internal/run`. The browser tests skip when Chrome for Testing is not installed; CI points `AGENTOS_BROWSER` at its Google Chrome. `desktop` embeds `frontend/dist`; build it first, or run with `-tags stub`, which embeds a small page instead. The hooks in the tests run the `agentos` command built from `./desktop` with that tag: the app's binary is the command. The `cli` tests answer from a fake app on a temp control socket. The release check never reaches GitHub: the harness answers curl with `Options.Releases` and refuses every other download.
 
 ## The real front end, in a browser
 
@@ -47,7 +47,7 @@ Agents' commands reach the same app: `AGENTOS_SESSION=<id> AGENTOS_SOCKET=$S/age
 
 ## Driving the page
 
-`scripts/cdp.mjs` opens a page in its own headless Brave (its own temp profile, never the owner's) and runs steps: wait, click at a point, type, key, eval JavaScript, screenshot.
+`scripts/cdp.mjs` opens a page in its own headless Chrome for Testing (its own temp profile, never the owner's) and runs steps: wait, click at a point, type, key, eval JavaScript, screenshot.
 
 ```sh
 node scripts/cdp.mjs http://127.0.0.1:18772/ 1400 900 \
