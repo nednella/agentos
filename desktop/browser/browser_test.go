@@ -24,7 +24,7 @@ func TestStrayBrowserIsReplaced(t *testing.T) {
 	defer os.RemoveAll(dir)
 	first := New(dir, func(string, any) {})
 	if !first.Available() {
-		t.Skip("no Chromium based browser installed")
+		t.Skip("no Chrome for Testing installed")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
@@ -48,7 +48,7 @@ func TestStopStraysEndsTheLastRunsBrowsers(t *testing.T) {
 	defer os.RemoveAll(dir)
 	first := New(dir, func(string, any) {})
 	if !first.Available() {
-		t.Skip("no Chromium based browser installed")
+		t.Skip("no Chrome for Testing installed")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
@@ -108,11 +108,39 @@ func TestNoBrowserFound(t *testing.T) {
 		t.Error("available without a browser")
 	}
 	st, err := b.Open(context.Background(), "p/1", "")
-	if err == nil || !strings.Contains(st.Error, "no Brave") {
+	if err == nil || !strings.Contains(st.Error, "no Chrome for Testing") {
 		t.Errorf("Open = %+v, %v", st, err)
 	}
 	if s := b.State("p/1"); s.Open || s.ID != "p/1" {
 		t.Errorf("state = %+v", s)
+	}
+}
+
+func TestFindBrowserSkipsTheOwnersBrowser(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("AGENTOS_BROWSER", "")
+	install := func(app string) string {
+		p := filepath.Join(home, "Applications", app)
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, nil, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	brave := install("Brave Browser.app/Contents/MacOS/Brave Browser")
+	if got := findBrowser(); got == brave {
+		t.Errorf("findBrowser picked the owner's Brave: %s", got)
+	}
+	cft := install(chromeForTesting)
+	if got := findBrowser(); got != cft {
+		t.Errorf("findBrowser = %q, want %q", got, cft)
+	}
+	t.Setenv("AGENTOS_BROWSER", brave)
+	if got := findBrowser(); got != brave {
+		t.Errorf("findBrowser = %q, want the AGENTOS_BROWSER %q", got, brave)
 	}
 }
 
@@ -162,7 +190,7 @@ func newTestBrowsers(t *testing.T) (*Browsers, context.Context) {
 	t.Helper()
 	b := New(t.TempDir(), func(string, any) {})
 	if !b.Available() {
-		t.Skip("no Chromium based browser installed")
+		t.Skip("no Chrome for Testing installed")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	t.Cleanup(func() { cancel(); b.CloseAll() })

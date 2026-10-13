@@ -38,7 +38,7 @@ func browserHarness(t *testing.T) (*apptest.Harness, sessions.Session) {
 	t.Helper()
 	h := newHarness(t)
 	if !h.App.Browsers().Available() {
-		t.Skip("no Chromium based browser installed")
+		t.Skip("no Chrome for Testing installed")
 	}
 	s, err := h.NewSession("web", "")
 	if err != nil {

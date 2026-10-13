@@ -52,19 +52,25 @@ type BrowserState struct {
 	Console []string `json:"console"`
 }
 
-var browserPaths = []string{
-	"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
-	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-	"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-}
+// chromeForTesting is the browser agentos drives, relative to an Applications folder. Its bundle ID is its own: macOS
+// sends a clicked link to any running copy of the default browser's app, so a copy agentos runs would catch the
+// owner's links.
+const chromeForTesting = "Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"
 
-// findBrowser returns a Chromium based browser to drive: AGENTOS_BROWSER, else Brave, Chrome, Chromium or Edge.
+var errNoBrowser = errors.New("no Chrome for Testing found: run install.sh again, or set AGENTOS_BROWSER")
+
+// findBrowser returns the browser to drive: AGENTOS_BROWSER, else Chrome for Testing in ~/Applications or
+// /Applications.
 func findBrowser() string {
 	if p := os.Getenv("AGENTOS_BROWSER"); p != "" {
 		return p
 	}
-	for _, p := range browserPaths {
+	dirs := []string{"/Applications"}
+	if home, err := os.UserHomeDir(); err == nil {
+		dirs = append([]string{filepath.Join(home, "Applications")}, dirs...)
+	}
+	for _, dir := range dirs {
+		p := filepath.Join(dir, chromeForTesting)
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
@@ -180,7 +186,7 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 		return p, nil
 	}
 	if b.binary == "" {
-		return nil, errors.New("no Brave, Chrome, Chromium or Edge browser found")
+		return nil, errNoBrowser
 	}
 	profile := filepath.Join(b.dataDir, key, "browser")
 	if err := os.MkdirAll(profile, 0o700); err != nil {
