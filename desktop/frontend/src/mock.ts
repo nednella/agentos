@@ -220,6 +220,7 @@ export function createMock(params: URLSearchParams) {
       browser: s.browser,
       evidence: s.evidence,
       chat: s.chat,
+      action: s.action,
       tokens: s.tokens,
       cost: s.cost,
     }
@@ -376,6 +377,7 @@ export function createMock(params: URLSearchParams) {
       browser: false,
       evidence: 0,
       chat,
+      action: issue ? 'Work' : '',
       ...usageFor(chat, createdAt),
       project: owner.name,
       buffer: term.banner(owner.dir) + term.diffBlock('app-frontend/src/js/pages/[slug]/Index.tsx') + term.paragraphs[0] + '\r\n\r\n',
@@ -520,8 +522,9 @@ export function createMock(params: URLSearchParams) {
     emit('notes', { project: current.name, items: currentNotes() })
   }
 
-  function startSessionFor(title: string, issue: number, prefill: string): Session {
+  function startSessionFor(title: string, issue: number, prefill: string, action = ''): Session {
     const s = create(title, issue, 'idle')
+    s.action = action
     s.buffer = term.banner(current.dir) + term.promptLine(prefill)
     publish()
     return view(s)
@@ -988,7 +991,7 @@ export function createMock(params: URLSearchParams) {
       const name = action || issue.actions[0]
       const command = { Work: `/work ${number}`, Plan: `/plan ${number}`, Investigate: `/investigate ${number}` }[name] ?? `Work on issue #${number}: ${issue.title}`
       const short = issue.title.split(' ').slice(0, 3).join(' ')
-      const session = startSessionFor(`[${name}] #${number} ${short}`, number, command)
+      const session = startSessionFor(`#${number} ${short}`, number, command, name)
       emit('issues', { project: current.name, items: currentIssues() })
       return session
     },

@@ -32,6 +32,7 @@ export type Session = {
   browser: boolean
   evidence: number
   chat: boolean
+  action: string
   tokens: number
   cost: number
 }

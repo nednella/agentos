@@ -4,6 +4,7 @@ import { dollars, tokenCount } from '../spend'
 import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
+import { ActionTag } from './ActionTag'
 import { InlineInput } from './InlineInput'
 import { ChatTag } from './ChatTag'
 import { ModelTag } from './ModelTag'
@@ -83,6 +84,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
       </div>
       <div className={`short:hidden flex items-center gap-3 px-4 pt-2.5 ${session.chat ? 'pb-2' : 'pb-0.5'}`}>
         <StateBadge state={session.state} chat={session.chat} />
+        <ActionTag action={session.action} />
         {session.chat && <ChatTag />}
         <ModelTag
           model={session.model}
