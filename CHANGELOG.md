@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.1](https://github.com/nednella/agentos/compare/v0.34.0...v0.34.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **ui:** dim heat map days outside chosen range ([1d1414b](https://github.com/nednella/agentos/commit/1d1414bb0d0460152e41a58e4b5929e71b3ed661))
+
 ## [0.34.0](https://github.com/nednella/agentos/compare/v0.33.0...v0.34.0) (2026-10-13)
 
 
