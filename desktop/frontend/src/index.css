@@ -206,6 +206,22 @@
     color: var(--danger);
   }
 
+  .btn-split {
+    display: inline-flex;
+    flex: none;
+  }
+
+  .btn-split > .btn:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .btn-split > .btn + .btn {
+    margin-left: -1px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
   .field {
     height: 1.875rem;
     min-width: 0;
