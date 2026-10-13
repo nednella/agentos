@@ -80,7 +80,7 @@ export function Stats() {
               </option>
             ))}
           </select>
-          <select aria-label="Range" className="btn btn-ghost h-7 px-2 @xl:ml-auto" value={work ? workDays : days} onChange={(e) => pickRange(Number(e.target.value))}>
+          <select aria-label="Range" className="btn btn-ghost h-7 px-2 [field-sizing:content] @xl:ml-auto" value={work ? workDays : days} onChange={(e) => pickRange(Number(e.target.value))}>
             {(work ? WORK_RANGES : RANGES).map((r) => (
               <option key={r.value} value={r.value}>
                 {r.label}
