@@ -564,7 +564,7 @@ export function createMock(params: URLSearchParams) {
 
   function ledgerFor(days: number, project: string): Ledger {
     const dayKey = (ago: number) => new Date(Date.now() - ago * 86_400_000).toISOString().slice(0, 10)
-    const scale = days === 0 ? 1 : days === 365 ? 0.8 : 0.12
+    const scale = days === 0 ? 1 : 0.05 + 0.75 * (days / 365)
     const row = (project: string, prompts: number): LedgerRow => ({
       project,
       prompts: Math.round(prompts * scale),
