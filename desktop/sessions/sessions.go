@@ -1671,25 +1671,29 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 }
 
 // commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
-// about the browser when the project allows it and one exists; a session with a brief learns only the brief, and
-// a chat has no browser. A task started by another session gets that session's handover last.
+// about the browser when the project allows it and one exists; a session with a brief learns only the brief. A
+// task started by another session gets that session's handover last.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover string, chat bool) []string {
-	argv := s.agent.Command(name.String(), agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat})
+	launch := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat}
 	if _, ok := s.agent.(agent.Claude); !ok {
-		return argv
+		return s.agent.Command(name.String(), launch)
 	}
 	if brief != "" {
-		return append(argv, "--append-system-prompt", brief)
+		return append(s.agent.Command(name.String(), launch), "--append-system-prompt", brief)
 	}
-	if chat {
-		return append(argv, "--append-system-prompt", prompts.Session()+"\n\n"+prompts.Chat())
-	}
-	prompt := prompts.Session() + "\n\n" + prompts.Task()
+	port := 0
 	if proj.BrowserOn() && s.browsers.Available() {
-		if port := s.browsers.Port(name.Project); port != 0 {
-			argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
-			prompt += "\n\n" + prompts.Browser()
-		}
+		port = s.browsers.Port(name.Project)
+	}
+	launch.Browser = port != 0
+	argv := s.agent.Command(name.String(), launch)
+	prompt := prompts.Session() + "\n\n" + prompts.Task()
+	if chat {
+		prompt = prompts.Session() + "\n\n" + prompts.Chat()
+	}
+	if port != 0 {
+		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
+		prompt += "\n\n" + prompts.Browser()
 	}
 	if handover != "" {
 		prompt += "\n\n" + prompts.Handover(handover)

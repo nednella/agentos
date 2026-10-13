@@ -51,9 +51,6 @@ func TestNewChatStartsClaudeInPlanMode(t *testing.T) {
 			if i := slices.Index(args, "--allowedTools"); i < 0 || !strings.Contains(args[i+1], "Bash(agentos new:*)") {
 				t.Errorf("args = %q", args)
 			}
-			if slices.Contains(args, "--mcp-config") {
-				t.Errorf("a chat has a browser: %q", args)
-			}
 			if joined := strings.Join(args, "\n"); !strings.Contains(joined, prompts.Chat()) || strings.Contains(joined, prompts.Task()) {
 				t.Errorf("system prompt of the chat = %q", joined)
 			}
