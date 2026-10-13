@@ -61,6 +61,8 @@ func CauseOf(rec session.Record) (kind, label string) {
 	switch {
 	case rec.State == session.Idle:
 		return "idle", "Reply landed"
+	case rec.Event == "Stop":
+		return "question", "Question in reply"
 	case rec.Notify == "permission_prompt" || (rec.Notify == "" && strings.Contains(strings.ToLower(rec.Detail), "permission")):
 		return "permission", permissionLabel(rec.Tool, rec.Command)
 	}

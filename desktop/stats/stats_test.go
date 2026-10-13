@@ -101,6 +101,7 @@ func TestCauseOf(t *testing.T) {
 		{"untyped permission", session.Record{State: session.Waiting, Detail: "Claude needs your permission to use Edit", Tool: "Edit"}, "permission", "Edit"},
 		{"elicitation", session.Record{State: session.Waiting, Notify: "elicitation_dialog", Tool: "Edit"}, "question", "Question"},
 		{"reply landed", session.Record{State: session.Idle, Event: "Stop", Tool: "Edit"}, "idle", "Reply landed"},
+		{"question in reply", session.Record{State: session.Waiting, Event: "Stop", Detail: "Do you want permission rules?", Tool: "Edit"}, "question", "Question in reply"},
 	}
 	for _, tt := range tests {
 		if kind, label := CauseOf(tt.rec); kind != tt.kind || label != tt.label {

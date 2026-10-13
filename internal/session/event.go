@@ -19,6 +19,7 @@ type Event struct {
 	Cwd              string // where the agent was working
 	Conversation     string // the agent's id for its conversation
 	Transcript       string // the file the agent writes its conversation to
+	Asks             bool   // a Stop whose reply ends in a question to the owner
 }
 
 type payload struct {
@@ -48,6 +49,7 @@ func ParseEvent(name string, r io.Reader) Event {
 		ev.Detail = p.Prompt
 	case "Stop":
 		ev.Detail = p.LastAssistantMessage
+		ev.Asks = strings.HasSuffix(strings.TrimRight(p.LastAssistantMessage, " \t\n*_"), "?")
 	}
 	ev.Detail = oneLine(ev.Detail, 120)
 	if name == "PreToolUse" || name == "PostToolUse" {
@@ -79,7 +81,13 @@ func oneLine(s string, max int) string {
 // Next is the state reducer: the state after ev, given the state before it.
 func Next(cur State, ev Event) State {
 	switch ev.Name {
-	case "SessionStart", "Stop":
+	case "SessionStart":
+		return Idle
+	case "Stop":
+		// A session that asks in text, not with AskUserQuestion, still waits on the owner.
+		if ev.Asks {
+			return Waiting
+		}
 		return Idle
 	case "UserPromptSubmit", "PreToolUse", "PostToolUse":
 		return Working
