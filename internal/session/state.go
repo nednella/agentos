@@ -34,6 +34,7 @@ type Record struct {
 	Title   string `json:"title,omitempty"`
 	Issue   int    `json:"issue,omitempty"`
 	Chat    bool   `json:"chat,omitempty"`
+	Action  string `json:"action,omitempty"`
 	Model   string `json:"model,omitempty"`
 	Effort  string `json:"effort,omitempty"`
 	Path    string `json:"path,omitempty"`

@@ -302,7 +302,7 @@ func (i *Issues) Start(ctx context.Context, number int, action, handover string)
 		if !ok {
 			return sessions.Session{}, false, fmt.Errorf("issue #%d has no action %q", number, action)
 		}
-		return i.sessions.CreateIssue(fmt.Sprintf("[%s] #%d %s", act.Name, number, is.Title), act.Render(number, is.Title, proj.BranchFor(number)), number, act, is.Labels, handover)
+		return i.sessions.CreateIssue(fmt.Sprintf("#%d %s", number, is.Title), act.Render(number, is.Title, proj.BranchFor(number)), number, act, is.Labels, handover)
 	}
 	return sessions.Session{}, false, fmt.Errorf("issue #%d is not open in this project", number)
 }
