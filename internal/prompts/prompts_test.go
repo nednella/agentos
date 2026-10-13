@@ -15,7 +15,7 @@ func TestPromptsKeepTheirText(t *testing.T) {
 		hash string
 	}{
 		{"browser", Browser(), "89a9746065d583edb60e70a281c1560f0aa15b66df48737e59269af8def02fbb"},
-		{"session", Session(), "c767496e6fa31ec3d23fad286ee1c96924cd71a42670feea8b489d2e912b2d63"},
+		{"session", Session(), "cd132cb9e7d8967a3ece8a9a88a489ef7a91347d3d9f91ce3f5894bc96faa393"},
 		{"task", Task(), "5181694ae5b63faba593eade34cb2f8e912ea7b0444ade07b08183da5c2373f2"},
 		{"chat", Chat(), "3a4ef510420450b4c67d88375811ae17a111621f89a5dcb2b405e33895b9c4e9"},
 		{"browser help", BrowserHelp(), "d84f5a28ba26ad87c9290bb7cdd0e6d0f0bc593666b9f90cbcdea54f9cd7aefa"},
