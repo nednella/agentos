@@ -85,6 +85,20 @@ func TestLedger(t *testing.T) {
 		}
 	})
 
+	t.Run("today starts at midnight", func(t *testing.T) {
+		log := loaded(t, t.TempDir())
+		lastNight := time.Date(2026, 10, 8, 23, 0, 0, 0, time.Local)
+		log.Record("alpha", activity.Event{At: lastNight.UnixMilli(), Kind: activity.Prompt})
+		log.Record("alpha", activity.Event{At: now.UnixMilli(), Kind: activity.Prompt})
+		led, err := NewBooks(log, fakeProjects{{Name: "Alpha", Dir: "/a"}}).Ledger(1, "", now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if led.Totals.Prompts != 1 {
+			t.Errorf("today's prompts = %d, want 1", led.Totals.Prompts)
+		}
+	})
+
 	t.Run("one project", func(t *testing.T) {
 		led, err := books.Ledger(30, "beta", now)
 		if err != nil {
