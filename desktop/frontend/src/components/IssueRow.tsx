@@ -3,7 +3,7 @@ import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
 import type { IssueDrag } from '../useIssueDrag'
-import { ActionMenu } from './ActionMenu'
+import { ActionButton } from './ActionButton'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
 import { PRMark } from './PRMark'
@@ -54,18 +54,7 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
           <Icon name="external" size={12} />
         </button>
         {!session && (
-          <>
-            <button
-              className="btn btn-accent h-6 flex-none justify-center px-2"
-              title={`${issue.actions[0]} (hold ⌥ to keep your place)`}
-              onClick={(e) => report(() => startIssue(issue.number, issue.actions[0], e.altKey))}
-            >
-              {issue.actions[0]}
-            </button>
-            {issue.actions.length > 1 && (
-              <ActionMenu issue={issue.number} actions={issue.actions.slice(1)} onPick={(action, e) => report(() => startIssue(issue.number, action, e.altKey))} />
-            )}
-          </>
+          <ActionButton issue={issue.number} actions={issue.actions} onStart={(action, e) => report(() => startIssue(issue.number, action, e.altKey))} />
         )}
       </span>
       {chat && (
