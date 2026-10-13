@@ -21,13 +21,12 @@ Needs macOS on Apple silicon, plus:
 - [tmux](https://github.com/tmux/tmux): `brew install tmux`
 - [GitHub CLI](https://cli.github.com), logged in: `brew install gh && gh auth login`; 2.99 or later to attach pictures when a note becomes an issue
 - [Claude Code](https://docs.claude.com/en/docs/claude-code)
-- optional: Brave, Chrome, Chromium or Edge, for the agent browser
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nednella/agentos/main/install.sh | bash
 ```
 
-The script puts `agentos.app` in `~/Applications` and the `agentos` command in `~/.local/bin`, then lists anything missing. No sudo.
+The script puts `agentos.app` and Chrome for Testing, the agent browser, in `~/Applications` and the `agentos` command in `~/.local/bin`, then lists anything missing. No sudo.
 
 ## Start
 
