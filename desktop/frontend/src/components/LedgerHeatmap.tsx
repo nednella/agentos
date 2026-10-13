@@ -1,6 +1,6 @@
 import type { Ledger } from '../types'
 
-type LedgerHeatmapProps = { heat: Ledger['heat'] }
+type LedgerHeatmapProps = { heat: Ledger['heat']; days: number }
 
 const LEVELS = 4
 
@@ -10,7 +10,8 @@ function cellColor(count: number, top: number) {
   return `color-mix(in srgb, var(--finished) ${level * 25}%, var(--bg-raised))`
 }
 
-export function LedgerHeatmap({ heat }: LedgerHeatmapProps) {
+export function LedgerHeatmap({ heat, days }: LedgerHeatmapProps) {
+  const firstInRange = days ? heat.length - days : 0
   const top = Math.max(...heat.map((d) => d.count), 1)
   const lead = heat.length ? new Date(`${heat[0].day}T00:00`).getDay() : 0
   return (
@@ -23,11 +24,16 @@ export function LedgerHeatmap({ heat }: LedgerHeatmapProps) {
         {Array.from({ length: lead }, (_, i) => (
           <i key={i} />
         ))}
-        {heat.map((d) => (
-          <i key={d.day} title={`${d.day}: ${d.count} prompts`} className="block aspect-square rounded-[2px]" style={{ background: cellColor(d.count, top) }} />
+        {heat.map((d, i) => (
+          <i
+            key={d.day}
+            title={`${d.day}: ${d.count} prompts`}
+            className={`block aspect-square rounded-[2px] ${i < firstInRange ? 'opacity-40' : ''}`}
+            style={{ background: cellColor(d.count, top) }}
+          />
         ))}
       </div>
-      <figcaption className="pt-1.5 text-small text-dim">Prompts per day, last 52 weeks</figcaption>
+      <figcaption className="pt-1.5 text-small text-dim">Prompts per day, last 52 weeks{firstInRange > 0 && ', days outside the range dimmed'}</figcaption>
     </figure>
   )
 }
