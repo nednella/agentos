@@ -154,7 +154,7 @@ export function LedgerView({ days, project }: LedgerViewProps) {
                 },
               ]}
             />
-            <LedgerHeatmap heat={ledger.heat} />
+            <LedgerHeatmap heat={ledger.heat} days={ledger.days} />
           </LedgerSection>
           <LedgerSection id="delivery" title="Delivery" hint="what the work shipped">
             <LedgerFigures
