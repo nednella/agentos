@@ -4,6 +4,7 @@ import { dollars } from '../spend'
 import { stateLabel } from '../stateMeta'
 import { ago, useNow } from '../time'
 import type { Session } from '../types'
+import { ActionTag } from './ActionTag'
 import { CleanupControls } from './CleanupControls'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
@@ -39,6 +40,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         <span className="flex w-full items-center gap-2">
           <StateDot state={session.state} />
           <span className="mono w-4 flex-none text-small text-dim">{session.n}</span>
+          <ActionTag action={session.action} />
           <span className="min-w-0 flex-1 truncate text-body font-medium">{session.title}</span>
           <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
         </span>
