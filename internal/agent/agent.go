@@ -9,9 +9,10 @@ import (
 // Launch is what a session is started with besides its name. An empty field leaves the choice to the agent.
 // Resume is a conversation to continue, which an agent that cannot resume ignores.
 // Chat starts the agent read-only, able to run only the commands that hand work off; an agent that cannot ignores it.
+// Browser says the agent has the page tools of the MCP server "browser", which a chat may then use too.
 type Launch struct {
 	Model, Effort, Resume string
-	Chat                  bool
+	Chat, Browser         bool
 }
 
 // Agent builds the command a session runs.

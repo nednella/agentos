@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -30,6 +31,49 @@ func TestClaudeCommand(t *testing.T) {
 	got := settings.Hooks["Stop"][0].Hooks[0]
 	if got.Type != "command" || !strings.HasSuffix(got.Command, " hook Stop") || !strings.HasPrefix(got.Command, `'/opt/it'\''s here/agentos'`) {
 		t.Errorf("Stop hook = %+v", got)
+	}
+}
+
+func TestClaudeLetsAChatUseTheBrowser(t *testing.T) {
+	tests := []struct {
+		name string
+		l    Launch
+		want bool
+	}{
+		{"chat with a browser", Launch{Chat: true, Browser: true}, true},
+		{"chat without one", Launch{Chat: true}, false},
+		{"task with a browser", Launch{Browser: true}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
+			type group struct {
+				Matcher string
+				Hooks   []struct{ Command string }
+			}
+			var settings struct{ Hooks map[string][]group }
+			if err := json.Unmarshal([]byte(argv[2]), &settings); err != nil {
+				t.Fatal(err)
+			}
+			groups := settings.Hooks["PreToolUse"]
+			i := slices.IndexFunc(groups, func(g group) bool { return g.Matcher == "mcp__browser__.*" })
+			if (i >= 0) != tt.want {
+				t.Fatalf("PreToolUse = %+v", groups)
+			}
+			if i < 0 {
+				return
+			}
+			out, err := exec.Command("sh", "-c", groups[i].Hooks[0].Command).Output()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var answer struct {
+				HookSpecificOutput struct{ HookEventName, PermissionDecision string }
+			}
+			if err := json.Unmarshal(out, &answer); err != nil || answer.HookSpecificOutput.HookEventName != "PreToolUse" || answer.HookSpecificOutput.PermissionDecision != "allow" {
+				t.Errorf("hook output = %s", out)
+			}
+		})
 	}
 }
 

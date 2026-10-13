@@ -36,13 +36,21 @@ type hookCommand struct {
 }
 
 type hookGroup struct {
-	Hooks []hookCommand `json:"hooks"`
+	Matcher string        `json:"matcher,omitempty"`
+	Hooks   []hookCommand `json:"hooks"`
 }
+
+// allowTool is a PreToolUse hook command that lets the tool run. Plan mode asks before any page tool that changes
+// or reads a page, and no allow rule changes that; a hook's answer does.
+const allowTool = `printf '%s' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'`
 
 func (c Claude) Command(_ string, l Launch) []string {
 	hooks := make(map[string][]hookGroup, len(claudeEvents))
 	for _, ev := range claudeEvents {
 		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: util.ShellQuote(c.Exe) + " hook " + ev}}}}
+	}
+	if l.Chat && l.Browser {
+		hooks["PreToolUse"] = append(hooks["PreToolUse"], hookGroup{Matcher: "mcp__browser__.*", Hooks: []hookCommand{{Type: "command", Command: allowTool}}})
 	}
 	type permissions struct {
 		AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
