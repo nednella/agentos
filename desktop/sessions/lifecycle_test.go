@@ -275,6 +275,38 @@ func TestCleanupClosedAsksFirst(t *testing.T) {
 	}
 }
 
+func TestPRClosedBeforeTheSessionStartedIsNotItsPR(t *testing.T) {
+	closedAt := func(pr string, at time.Time) string {
+		return strings.Replace(pr, `"updatedAt"`, fmt.Sprintf(`"closedAt":%q,"updatedAt"`, at.UTC().Format(time.RFC3339)), 1)
+	}
+	tests := []struct {
+		name    string
+		state   string
+		at      time.Time
+		cleanup string
+	}{
+		{"closed before", "CLOSED", time.Now().Add(-time.Hour), ""},
+		{"merged before", "MERGED", time.Now().Add(-time.Hour), ""},
+		{"closed after", "CLOSED", time.Now().Add(time.Hour), "ask"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newHarness(t)
+			repoFixture(t, h)
+			wt := issueWorktree(t, h)
+			s := issueSession(h, t, 7)
+
+			h.GH.SetPR(closedAt(prJSON(tt.state, false, "[]", 0, 0), tt.at))
+			h.RefreshPRs()
+			h.RefreshPRs()
+			got, _ := h.Session(s.ID)
+			if got.Cleanup != tt.cleanup || (got.PR == nil) != (tt.cleanup == "") || !exists(wt) || len(h.Cleanups()) != 0 {
+				t.Errorf("cleanup %q, PR %+v, worktree %v, log %+v", got.Cleanup, got.PR, exists(wt), h.Cleanups())
+			}
+		})
+	}
+}
+
 func TestCleanupMergedWithRemoteBranchGone(t *testing.T) {
 	h := newHarness(t)
 	origin := repoFixture(t, h)

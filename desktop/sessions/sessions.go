@@ -1459,7 +1459,7 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, created: in.Created}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.
