@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.34.2](https://github.com/nednella/agentos/compare/v0.34.1...v0.34.2) (2026-10-14)
+
+
+### Bug Fixes
+
+* **desktop:** do not count approvals as reviews to address ([34b6c37](https://github.com/nednella/agentos/commit/34b6c37db71b7a790a406c3710c11bc501d91ad4))
+* **desktop:** send no review command while the PR is a draft ([36e3e46](https://github.com/nednella/agentos/commit/36e3e46eab8d5d7a51475c82f052d60eb2859fdf)), closes [#392](https://github.com/nednella/agentos/issues/392)
+* **desktop:** track project folder branch only when session switched to it ([fed877d](https://github.com/nednella/agentos/commit/fed877d9f7a13a085e4632151c408b50a81e5ef3)), closes [#393](https://github.com/nednella/agentos/issues/393)
+
 ## [0.34.1](https://github.com/nednella/agentos/compare/v0.34.0...v0.34.1) (2026-10-13)
 
 
