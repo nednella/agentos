@@ -163,7 +163,6 @@ func TestChatStaysOutOfTheStats(t *testing.T) {
 func TestChatHasNoBranchOrPR(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 
 	chat, err := h.NewChat("ask")
@@ -171,6 +170,7 @@ func TestChatHasNoBranchOrPR(t *testing.T) {
 		t.Fatal(err)
 	}
 	work := plainSession(h, t)
+	madeBranch(h, t, work)
 	worksIn(h, t, chat, h.Dir)
 	worksIn(h, t, work, h.Dir)
 	eventually(t, "the session's branch", func() bool { got, _ := h.Session(work.ID); return got.Branch == "my-fix" })

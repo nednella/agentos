@@ -124,6 +124,7 @@ type Sessions struct {
 	dismissed  map[string]bool          // ended sessions the user dismissed: the poll must not bring them back
 	records    map[string]session.Record
 	cwds       map[string]string // the working directory each session's last hook reported
+	heads      map[string]string // the HEAD of the project folder at each session's latest PreToolUse
 	seen       map[string]session.State
 	history    map[string][]session.Change
 	loaded     bool // the first refresh is in, so later changes may raise attention
@@ -230,6 +231,7 @@ func newSessions(o Options) *Sessions {
 		nums: map[string]int{}, lastNum: map[string]int{},
 		records:    map[string]session.Record{},
 		cwds:       map[string]string{},
+		heads:      map[string]string{},
 		seen:       map[string]session.State{},
 		history:    map[string][]session.Change{},
 		ready:      map[string]chan struct{}{},
@@ -540,25 +542,43 @@ func (s *Sessions) take(rec session.Record) {
 	}
 }
 
-// followBranch has the lifecycle look at the branch of a session, when the agent moved or
-// finished a turn. It needs mu.
+// followBranch has the lifecycle look at the branch of a session, when the agent moved,
+// finished a turn or switched the branch of the project folder. It needs mu.
 func (s *Sessions) followBranch(rec session.Record) {
-	if s.isChat(rec.Session) {
+	if s.isChat(rec.Session) || rec.Cwd == "" {
 		return
 	}
-	moved := rec.Cwd != "" && (rec.Cwd != s.cwds[rec.Session] || rec.Event == "Stop")
-	if !moved {
-		return
-	}
+	moved := rec.Cwd != s.cwds[rec.Session] || rec.Event == "Stop"
 	s.cwds[rec.Session] = rec.Cwd
 	for _, in := range s.info {
 		if in.Name.String() != rec.Session {
 			continue
 		}
-		if proj, ok := s.projectOf(in); ok {
-			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop")
+		proj, ok := s.projectOf(in)
+		if !ok {
+			continue
+		}
+		if switched := s.switched(rec, proj.Dir); moved || switched {
+			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop", switched)
 		}
 	}
+}
+
+// switched says whether the session's tool call changed the branch of the project folder. The owner
+// works in that folder too, so a branch they check out there must not become the session's. The HEAD
+// file is read, not git run: a PreToolUse must be read before the tool starts. It needs mu.
+func (s *Sessions) switched(rec session.Record, dir string) bool {
+	if rec.Event != "PreToolUse" && rec.Event != "PostToolUse" {
+		return false
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, ".git", "HEAD"))
+	head := string(data)
+	if rec.Event == "PreToolUse" {
+		s.heads[rec.Session] = head
+		return false
+	}
+	before, ok := s.heads[rec.Session]
+	return ok && head != before
 }
 
 // sync updates history and attention from what is known, and tells the front

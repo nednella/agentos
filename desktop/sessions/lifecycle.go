@@ -1360,11 +1360,20 @@ func (l *Lifecycle) claim(proj project.Project, id, branch string) {
 }
 
 // learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
-// not the main one.
-func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string, turnEnded bool) {
-	if branch, ok := l.workBranch(ctx, proj, cwd); ok {
+// not the main one. In the project folder itself, not a linked worktree, the branch may be the owner's:
+// a new one counts only when the session's own tool call switched to it.
+func (l *Lifecycle) learn(ctx context.Context, id string, proj project.Project, cwd string, turnEnded, switched bool) {
+	branch, mainTree, ok := l.workBranch(ctx, proj, cwd)
+	if ok && (!mainTree || switched || l.hasBranch(proj, id, branch)) {
 		l.track(ctx, id, proj, branch, turnEnded, false)
 	}
+}
+
+// hasBranch says whether the session already works or worked on branch.
+func (l *Lifecycle) hasBranch(proj project.Project, id, branch string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.Contains(l.prs(proj.Key()).Branches[id], branch)
 }
 
 // track notes branch as the newest one the session works on and looks up its pull request.
@@ -1402,21 +1411,24 @@ func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, 
 }
 
 // workBranch is the branch checked out in cwd, unless cwd is detached, on the main branch or in another repo.
-func (l *Lifecycle) workBranch(ctx context.Context, proj project.Project, cwd string) (string, bool) {
+// mainTree says whether cwd is in the repo's main worktree rather than a linked one.
+func (l *Lifecycle) workBranch(ctx context.Context, proj project.Project, cwd string) (branch string, mainTree, ok bool) {
 	out, err := l.git(ctx, cwd, "branch", "--show-current")
-	branch := strings.TrimSpace(string(out))
+	branch = strings.TrimSpace(string(out))
 	if err != nil || branch == "" || branch == l.mainBranch(ctx, proj.Dir) {
-		return "", false
+		return "", false, false
 	}
-	common := func(dir string) string {
-		out, err := l.git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-common-dir")
+	gitDirs := func(dir string) (gitDir, common string) {
+		out, err := l.git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
 		if err != nil {
-			return ""
+			return "", ""
 		}
-		return strings.TrimSpace(string(out))
+		gitDir, common, _ = strings.Cut(strings.TrimSpace(string(out)), "\n")
+		return gitDir, common
 	}
-	here := common(cwd)
-	return branch, here != "" && samePath(here, common(proj.Dir))
+	gitDir, here := gitDirs(cwd)
+	_, project := gitDirs(proj.Dir)
+	return branch, samePath(gitDir, here), here != "" && samePath(here, project)
 }
 
 // mainBranch is the branch origin calls its default, or main when origin does not say.
