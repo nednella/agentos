@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.3](https://github.com/nednella/agentos/compare/v0.34.2...v0.34.3) (2026-10-14)
+
+
+### Bug Fixes
+
+* **desktop:** ignore PR that closed before session started ([757ea15](https://github.com/nednella/agentos/commit/757ea15b49e4b65f74b0a6d08c413609029c3d4b))
+
 ## [0.34.2](https://github.com/nednella/agentos/compare/v0.34.1...v0.34.2) (2026-10-14)
 
 
