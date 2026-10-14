@@ -9,10 +9,10 @@ import (
 	"github.com/nednella/agentos/internal/util"
 )
 
-// chatTools are the commands a chat may run in plan mode: the ones that hand work to the owner's queue or plan
-// an issue in it.
+// chatTools are the commands a chat may run in plan mode: the ones that hand work to the owner's queue, plan
+// an issue in it, or drive the session's own browser window.
 var chatTools = []string{
-	"Bash(agentos issue:*)", "Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(agentos refresh:*)",
+	"Bash(agentos issue:*)", "Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(agentos refresh:*)", "Bash(agentos browser:*)",
 	"Bash(gh issue create:*)", "Bash(gh issue comment:*)", "Bash(gh issue edit:*)",
 }
 

@@ -101,7 +101,7 @@ func TestClaudeLaunch(t *testing.T) {
 		{"effort", Launch{Effort: "high"}, []string{"--effort", "high"}},
 		{"both", Launch{Model: "sonnet", Effort: "medium"}, []string{"--model", "sonnet", "--effort", "medium"}},
 		{"resume", Launch{Resume: "abc"}, []string{"--resume", "abc"}},
-		{"chat", Launch{Chat: true}, []string{"--permission-mode", "plan", "--allowedTools", "Bash(agentos issue:*),Bash(agentos new:*),Bash(agentos note:*),Bash(agentos refresh:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"}},
+		{"chat", Launch{Chat: true}, []string{"--permission-mode", "plan", "--allowedTools", "Bash(agentos issue:*),Bash(agentos new:*),Bash(agentos note:*),Bash(agentos refresh:*),Bash(agentos browser:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"}},
 	}
 	for _, tt := range tests {
 		argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
