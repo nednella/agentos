@@ -108,6 +108,39 @@ func TestReviewWakesTheSession(t *testing.T) {
 	})
 }
 
+func TestDraftCommentsAreSeenButSendNoReviewPrompt(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(prJSON("OPEN", true, `[{"status":"COMPLETED","conclusion":"FAILURE"}]`, 1, 0))
+	h.RefreshPRs()
+	eventually(t, "the checks prompt on the draft", func() bool { return strings.Contains(h.Pane(t, s.ID), "/fix-checks 12") })
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
+		t.Fatal("a comment on a draft woke the session")
+	}
+
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 1, 0))
+	h.RefreshPRs()
+	time.Sleep(500 * time.Millisecond)
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
+		t.Fatal("a comment made while the PR was a draft woke the session once it was ready")
+	}
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 1, 1))
+	h.RefreshPRs()
+	eventually(t, "the review prompt once the PR is ready", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+}
+
+func TestReviewDraftsWakesTheSessionOnADraft(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_review_drafts: true\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+	h.RefreshPRs()
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 1, 0))
+	h.RefreshPRs()
+	eventually(t, "the review prompt on the draft", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+}
+
 func TestPlainReviewPromptIsMarkedFromTheApp(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"Read PR {n}\"\n"})
 	s := issueSession(h, t, 12)
