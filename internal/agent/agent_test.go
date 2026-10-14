@@ -55,10 +55,10 @@ func TestClaudeLetsAChatUseTheBrowser(t *testing.T) {
 			if err := json.Unmarshal([]byte(argv[2]), &settings); err != nil {
 				t.Fatal(err)
 			}
-			groups := settings.Hooks["PreToolUse"]
+			groups := settings.Hooks["PermissionRequest"]
 			i := slices.IndexFunc(groups, func(g group) bool { return g.Matcher == "mcp__browser__.*" })
 			if (i >= 0) != tt.want {
-				t.Fatalf("PreToolUse = %+v", groups)
+				t.Fatalf("PermissionRequest = %+v", groups)
 			}
 			if i < 0 {
 				return
@@ -68,9 +68,12 @@ func TestClaudeLetsAChatUseTheBrowser(t *testing.T) {
 				t.Fatal(err)
 			}
 			var answer struct {
-				HookSpecificOutput struct{ HookEventName, PermissionDecision string }
+				HookSpecificOutput struct {
+					HookEventName string
+					Decision      struct{ Behavior string }
+				}
 			}
-			if err := json.Unmarshal(out, &answer); err != nil || answer.HookSpecificOutput.HookEventName != "PreToolUse" || answer.HookSpecificOutput.PermissionDecision != "allow" {
+			if err := json.Unmarshal(out, &answer); err != nil || answer.HookSpecificOutput.HookEventName != "PermissionRequest" || answer.HookSpecificOutput.Decision.Behavior != "allow" {
 				t.Errorf("hook output = %s", out)
 			}
 		})
