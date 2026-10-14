@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.5](https://github.com/nednella/agentos/compare/v0.34.4...v0.34.5) (2026-10-14)
+
+
+### Bug Fixes
+
+* **ui:** show focus only on panel that holds it ([9e9cb4a](https://github.com/nednella/agentos/commit/9e9cb4ad9bb3e7bbcdd03cf5bb6afd31a76b3c7d))
+
 ## [0.34.4](https://github.com/nednella/agentos/compare/v0.34.3...v0.34.4) (2026-10-14)
 
 
