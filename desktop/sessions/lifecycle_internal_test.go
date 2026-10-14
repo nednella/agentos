@@ -27,6 +27,7 @@ func TestParsePR(t *testing.T) {
 	}{
 		{"draft", prJSON("OPEN", true, "[]", 0, 0), "draft", "none", 0},
 		{"open", prJSON("OPEN", false, "[]", 1, 2), "open", "none", 3},
+		{"approval is not a review to address", strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `[{"id":"x"},{"id":"x"}]`, `[{"state":"APPROVED"},{"state":"CHANGES_REQUESTED"}]`, 1), "open", "none", 2},
 		{"merged", prJSON("MERGED", false, "[]", 0, 0), "merged", "none", 0},
 		{"closed", prJSON("CLOSED", false, "[]", 0, 0), "closed", "none", 0},
 		{"passing", prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"},{"state":"SUCCESS"}]`, 0, 0), "open", "passing", 0},
