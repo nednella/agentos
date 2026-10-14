@@ -20,6 +20,7 @@ import { Toasts } from './components/Toasts'
 import { TopBar } from './components/TopBar'
 import { Viewport } from './components/Viewport'
 import { useLayout } from './LayoutContext'
+import { useFocusedPanel } from './useFocusedPanel'
 import { useNewsToasts } from './useNewsToasts'
 import { useShortcuts } from './useShortcuts'
 import { useUiCommands } from './useUiCommands'
@@ -34,6 +35,7 @@ export function App() {
   useShortcuts()
   useUiCommands()
   useNewsToasts()
+  useFocusedPanel()
   const { mode, sidebarOpen, sessionsOpen, mobilePanel, statsOpen, newsOpen, newsPage } = useLayout()
   const narrow = mode === 'narrow'
   const showCentre = !narrow || mobilePanel === 'session'
