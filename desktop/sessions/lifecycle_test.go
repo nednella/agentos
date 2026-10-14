@@ -420,6 +420,55 @@ func TestCleanupCommandMayWorkInTheMainTree(t *testing.T) {
 	}
 }
 
+func TestOwnersBranchInTheProjectFolderIsNotTheSessions(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	ownBranch(t, h.Dir)
+	h.GH.SetPRFor("my-fix", numberedPR(20, "OPEN"))
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	s := issueSession(h, t, 7)
+
+	worksIn(h, t, s, h.Dir)
+	wt := issueWorktree(t, h)
+	worksIn(h, t, s, wt)
+	inToolCall(h, t, s, h.Dir, func() {})
+	worksIn(h, t, s, h.Dir)
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.PR == nil || got.PR.Number != 21 {
+		t.Fatalf("session = %+v, want the PR of issue-7", got)
+	}
+
+	h.GH.SetPRFor("my-fix", numberedPR(20, "MERGED"))
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, ok := h.Session(s.ID); !ok || got.Cleanup != "" {
+		t.Errorf("session = %+v after the owner's PR merged", got)
+	}
+	if len(h.Cleanups()) != 0 || gitIn(t, h.Dir, "branch", "--list", "my-fix") == "" {
+		t.Errorf("cleanups = %+v, branches %q", h.Cleanups(), gitIn(t, h.Dir, "branch", "--list"))
+	}
+}
+
+func TestOwnersSwitchDuringSessionsWorkIsNotTheSessions(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	h.GH.SetPRFor("my-fix", numberedPR(20, "OPEN"))
+	h.GH.SetPRFor("issue-7", numberedPR(21, "OPEN"))
+	s := issueSession(h, t, 7)
+	wt := issueWorktree(t, h)
+
+	worksIn(h, t, s, wt)
+	inToolCall(h, t, s, wt, func() { ownBranch(t, h.Dir) })
+	inToolCall(h, t, s, h.Dir, func() {})
+	worksIn(h, t, s, h.Dir)
+	h.RefreshPRs()
+	time.Sleep(300 * time.Millisecond)
+	if got, _ := h.Session(s.ID); got.Branch != "issue-7" || got.PR == nil || got.PR.Number != 21 {
+		t.Errorf("session = %+v, want issue-7 and its PR", got)
+	}
+}
+
 func TestCleanupWithoutCommandRemovesOnlyTheSession(t *testing.T) {
 	h := apptest.New(t)
 	repoFixture(t, h)

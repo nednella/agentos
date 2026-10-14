@@ -31,6 +31,22 @@ func worksIn(h *apptest.Harness, t *testing.T, s sessions.Session, dir string) {
 	h.Hook(t, s.ID, "Stop", string(cwd))
 }
 
+// inToolCall runs do between the PreToolUse and PostToolUse of one of the session's tool calls in dir.
+func inToolCall(h *apptest.Harness, t *testing.T, s sessions.Session, dir string, do func()) {
+	t.Helper()
+	cwd, _ := json.Marshal(map[string]string{"cwd": dir})
+	h.Hook(t, s.ID, "PreToolUse", string(cwd))
+	eventually(t, "the tool call", func() bool { got, _ := h.Session(s.ID); return got.State == "working" })
+	do()
+	h.Hook(t, s.ID, "PostToolUse", string(cwd))
+}
+
+// madeBranch has the session check out my-fix in the project folder, as ownBranch does.
+func madeBranch(h *apptest.Harness, t *testing.T, s sessions.Session) {
+	t.Helper()
+	inToolCall(h, t, s, h.Dir, func() { ownBranch(t, h.Dir) })
+}
+
 // ownBranch checks out my-fix in dir with one pushed commit.
 func ownBranch(t *testing.T, dir string) {
 	t.Helper()
@@ -50,8 +66,8 @@ func hasPR(h *apptest.Harness, id string) func() bool {
 func TestPRIsFoundWhenTheTurnEnds(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
+	madeBranch(h, t, s)
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the branch", func() bool { got, _ := h.Session(s.ID); return got.Branch == "my-fix" })
 
@@ -63,8 +79,8 @@ func TestPRIsFoundWhenTheTurnEnds(t *testing.T) {
 func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
+	madeBranch(h, t, s)
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the lookup of the turn", func() bool { return h.GH.Calls("pr list") > 0 })
 	time.Sleep(300 * time.Millisecond)
@@ -82,8 +98,8 @@ func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
 func TestPlainSessionFindsItsPR(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
+	madeBranch(h, t, s)
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 
 	worksIn(h, t, s, h.Dir)
@@ -124,8 +140,8 @@ func TestPlainSessionOnMainHasNoPR(t *testing.T) {
 func TestPlainSessionCleanupCommandRunsInTheProjectFolder(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "git -C {dir} switch main && git branch -D {branch}"})
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
+	madeBranch(h, t, s)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the PR", hasPR(h, s.ID))
@@ -152,8 +168,8 @@ func TestPlainSessionCleanupCommandRunsInTheProjectFolder(t *testing.T) {
 func TestPlainSessionCleanupBlockedByChangesInTheProjectFolder(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
-	ownBranch(t, h.Dir)
 	s := plainSession(h, t)
+	madeBranch(h, t, s)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the PR", hasPR(h, s.ID))
@@ -237,7 +253,7 @@ func TestIssueSessionWithoutBranchPatternFollowsItsFolder(t *testing.T) {
 	}
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 
-	gitIn(t, h.Dir, "checkout", "my-fix")
+	inToolCall(h, t, s, h.Dir, func() { gitIn(t, h.Dir, "checkout", "my-fix") })
 	worksIn(h, t, s, h.Dir)
 	eventually(t, "the PR of the branch the session works on", hasPR(h, s.ID))
 	if got, _ := h.Session(s.ID); got.Branch != "my-fix" {
