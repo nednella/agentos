@@ -718,8 +718,9 @@ func (l *Lifecycle) attentionFor(key string, pr *PR, hears bool) string {
 
 // nudgeFor is the prompt the PR's session should get, and its kind of event: once per new comment
 // or review, once per commit whose checks fail, and once per commit that conflicts with the base.
-// Comments a PR had when first seen are not news. A project that sets no command for an event gets
-// no prompt, but the event still counts as seen.
+// Comments a PR had when first seen are not news, nor are those on a draft unless the project sets
+// pr_review_drafts. A project that sets no command for an event gets no prompt, but the event still
+// counts as seen.
 // It needs mu.
 func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string) {
 	key := proj.Key()
@@ -728,6 +729,10 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string)
 	seen, known := nudged[n]
 	if !known {
 		seen = nudge{Comments: pr.Comments}
+	}
+	draftComments := pr.State == "draft" && !proj.ReviewDrafts && pr.Comments > seen.Comments
+	if draftComments {
+		seen.Comments = pr.Comments
 	}
 	head := cmp.Or(pr.HeadOid, "unknown")
 	switch {
@@ -741,7 +746,7 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string)
 		seen.Conflict = head
 		prompt, kind = proj.ConflictCommand(pr.Number), activity.Conflict
 	}
-	if !known || prompt != "" {
+	if !known || draftComments || prompt != "" {
 		nudged[n] = seen
 		l.savePRs(key)
 	}

@@ -29,6 +29,7 @@ projects:
     pr_watch_method: ""        # webhook or poll; "" tries gh webhook forward (needs the gh extension and admin rights on the repo) and polls when it does not work
     pr_poll_interval: 10s      # how often to poll the pull requests; at least 1s
     pr_review_command: ""      # typed into a session whose PR got a review or comment, {n} the PR number, e.g. "/address-review {n}"; "" sends nothing. An approval is not counted
+    pr_review_drafts: false    # send pr_review_command while the PR is a draft too; when false, comments on a draft count as seen
     pr_checks_command: ""      # typed into a session whose PR has failing checks, {n} the PR number; "" sends nothing
     pr_conflict_command: ""    # typed into a session whose PR conflicts with its base branch, {n} the PR number; "" sends nothing
     setup_dismissed: false     # Not now was chosen on the offer to set the project up; the queue writes it

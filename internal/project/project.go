@@ -32,6 +32,7 @@ type Project struct {
 	PRPoll             string    `yaml:"pr_poll_interval,omitempty"`        // how often to poll pull requests, "10s" by default
 	KeepAwake          *bool     `yaml:"keep_mac_awake,omitempty"`          // overrides the config's keep_mac_awake for this project
 	OnReview           string    `yaml:"pr_review_command,omitempty"`       // typed into a session whose PR got a review or comment; {n} is the PR number
+	ReviewDrafts       bool      `yaml:"pr_review_drafts,omitempty"`        // send pr_review_command while the PR is a draft too
 	OnChecks           string    `yaml:"pr_checks_command,omitempty"`       // typed into a session whose PR has failing checks; {n} is the PR number
 	OnConflict         string    `yaml:"pr_conflict_command,omitempty"`     // typed into a session whose PR conflicts with its base branch; {n} is the PR number
 	SetupDismissed     bool      `yaml:"setup_dismissed,omitempty"`         // the owner turned down the offer to set the project up
