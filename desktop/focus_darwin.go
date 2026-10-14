@@ -6,6 +6,7 @@ package main
 #cgo CFLAGS: -x objective-c
 #cgo LDFLAGS: -framework Cocoa
 #import <Cocoa/Cocoa.h>
+#import <objc/runtime.h>
 
 // After a relaunch the window can be key while the web view never heard it become key, and then
 // the web view shows no hover and keeps a stale cursor until the user leaves the app and comes
@@ -21,7 +22,19 @@ static void refreshKeyWindow(void) {
 		[center postNotificationName:NSWindowDidBecomeKeyNotification object:window];
 	});
 }
+
+// macOS hands the click that brings the window to the front to the view only when the view
+// accepts the first mouse. WKWebView declines it for most of the page, so that click only
+// raised the window and left focus where it was.
+static void acceptFirstMouse(void) {
+	Class webView = NSClassFromString(@"WailsWebView");
+	SEL selector = @selector(acceptsFirstMouse:);
+	IMP accept = imp_implementationWithBlock(^BOOL(id view, NSEvent *event) { return YES; });
+	class_replaceMethod(webView, selector, accept, method_getTypeEncoding(class_getInstanceMethod(webView, selector)));
+}
 */
 import "C"
 
 func refreshKeyWindow() { C.refreshKeyWindow() }
+
+func acceptFirstMouse() { C.acceptFirstMouse() }

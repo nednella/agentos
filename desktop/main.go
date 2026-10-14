@@ -96,6 +96,7 @@ func launch() error {
 			window.Store(&c)
 			stripMenuShortcuts()
 			compactTitleBar()
+			acceptFirstMouse()
 			if err := a.Start(c); err != nil {
 				log.Printf("agentos: %v", err)
 			}
