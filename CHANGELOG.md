@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.34.6](https://github.com/nednella/agentos/compare/v0.34.5...v0.34.6) (2026-10-14)
+
+
+### Bug Fixes
+
+* **internal:** let chat browser tools that change the page run without asking ([15a62f3](https://github.com/nednella/agentos/commit/15a62f3001cc3ac9f04b9eb1e9cc34e0bea66bca))
+* **internal:** let chats run agentos browser without asking ([2c10d77](https://github.com/nednella/agentos/commit/2c10d7714d724a7746dab7b13c197515cdc80433)), closes [#407](https://github.com/nednella/agentos/issues/407)
+
 ## [0.34.5](https://github.com/nednella/agentos/compare/v0.34.4...v0.34.5) (2026-10-14)
 
 
