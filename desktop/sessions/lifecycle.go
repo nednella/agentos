@@ -870,9 +870,11 @@ func parsePR(data []byte) (*PR, error) {
 			Conclusion string `json:"conclusion"`
 			State      string `json:"state"`
 		} `json:"statusCheckRollup"`
-		Comments  []json.RawMessage `json:"comments"`
-		Reviews   []json.RawMessage `json:"reviews"`
-		UpdatedAt time.Time         `json:"updatedAt"`
+		Comments []json.RawMessage `json:"comments"`
+		Reviews  []struct {
+			State string `json:"state"`
+		} `json:"reviews"`
+		UpdatedAt time.Time `json:"updatedAt"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("reading gh pr list: %w", err)
@@ -881,7 +883,12 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments) + len(r.Reviews), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
+	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
+	for _, v := range r.Reviews {
+		if v.State != "APPROVED" { // an approval asks nothing of the session
+			pr.Comments++
+		}
+	}
 	switch {
 	case r.State == "MERGED":
 		pr.State = "merged"
