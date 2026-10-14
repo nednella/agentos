@@ -44,6 +44,7 @@ type PR struct {
 	Comments  int    `json:"comments"`
 	UpdatedAt int64  `json:"updatedAt"`
 
+	ClosedAt    int64  `json:"-"` // when the PR merged or closed; 0 while it is live
 	HeadOid     string `json:"-"` // the commit the PR's branch ended on
 	Conflicting bool   `json:"-"` // the branch does not merge cleanly into its base
 }
@@ -71,6 +72,7 @@ type target struct {
 	owned     []string
 	proj      project.Project
 	model     project.Model // what the session ran, so a replacement for an ended one runs the same
+	created   time.Time
 	ended     bool
 }
 
@@ -78,6 +80,12 @@ type target struct {
 func (t target) newest() string { return t.branches[len(t.branches)-1] }
 
 func (t target) owns(branch string) bool { return slices.Contains(t.owned, branch) }
+
+// predates says whether the PR merged or closed before the session started: it belongs to an
+// earlier session on the same branch name.
+func (t target) predates(pr *PR) bool {
+	return pr.ClosedAt > 0 && !t.created.IsZero() && pr.ClosedAt < t.created.UnixMilli()
+}
 
 // track is what is known about the pull request and clean-up of one session.
 type track struct {
@@ -321,7 +329,7 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	var wakes []wake
 	reload := false
 	for _, t := range sharing(targets, only) {
-		branch, pr, err := l.latestPR(ctx, proj.Dir, t.branches, prs)
+		branch, pr, err := l.latestPR(ctx, t, prs)
 		if err == nil {
 			var d, gone []done
 			d, gone, err = l.olderDone(ctx, t, branch, prs)
@@ -416,19 +424,19 @@ func hearer(fetched []done, branch string) string {
 	return best
 }
 
-// latestPR is the PR on the newest of the branches that has one, with its branch; without one it is
-// nil, with the newest branch. found caches the lookups by branch.
-func (l *Lifecycle) latestPR(ctx context.Context, dir string, branches []string, found map[string]*PR) (string, *PR, error) {
-	for _, branch := range slices.Backward(branches) {
-		pr, err := l.cachedPR(ctx, dir, branch, found)
+// latestPR is the session's PR on the newest of its branches that has one, with its branch; without
+// one it is nil, with the newest branch. found caches the lookups by branch.
+func (l *Lifecycle) latestPR(ctx context.Context, t target, found map[string]*PR) (string, *PR, error) {
+	for _, branch := range slices.Backward(t.branches) {
+		pr, err := l.cachedPR(ctx, t.proj.Dir, branch, found)
 		if err != nil {
 			return "", nil, err
 		}
-		if pr != nil {
+		if pr != nil && !t.predates(pr) {
 			return branch, pr, nil
 		}
 	}
-	return branches[len(branches)-1], nil, nil
+	return t.newest(), nil, nil
 }
 
 func (l *Lifecycle) cachedPR(ctx context.Context, dir, branch string, found map[string]*PR) (*PR, error) {
@@ -461,7 +469,7 @@ func (l *Lifecycle) olderDone(ctx context.Context, t target, prBranch string, fo
 		if err != nil {
 			return nil, nil, err
 		}
-		if pr == nil {
+		if pr == nil || t.predates(pr) {
 			continue
 		}
 		l.mu.Lock()
@@ -855,7 +863,7 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
-		"number,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt", "--limit", "1")
+		"number,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt,closedAt", "--limit", "1")
 	if err != nil {
 		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
@@ -880,6 +888,7 @@ func parsePR(data []byte) (*PR, error) {
 			State string `json:"state"`
 		} `json:"reviews"`
 		UpdatedAt time.Time `json:"updatedAt"`
+		ClosedAt  time.Time `json:"closedAt"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("reading gh pr list: %w", err)
@@ -888,7 +897,7 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
+	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
 	for _, v := range r.Reviews {
 		if v.State != "APPROVED" { // an approval asks nothing of the session
 			pr.Comments++
