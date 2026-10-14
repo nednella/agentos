@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.4](https://github.com/nednella/agentos/compare/v0.34.3...v0.34.4) (2026-10-14)
+
+
+### Bug Fixes
+
+* **desktop:** let first click on inactive window reach page ([99c928d](https://github.com/nednella/agentos/commit/99c928d78ad3ccc433d81abaf5917bf12faa6500))
+
 ## [0.34.3](https://github.com/nednella/agentos/compare/v0.34.2...v0.34.3) (2026-10-14)
 
 
