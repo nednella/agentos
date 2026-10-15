@@ -16,7 +16,7 @@ projects:
     # everything below is optional; the values shown are the defaults
     queue_sections: []         # the groups of the queue, in order; see below
     note_session_command: ""   # typed into a session started from a note; {text} is the note; "" types the note itself
-    session_prompt_send: auto  # auto types what a session starts with and sends it at once; manual leaves it on the prompt for Enter. The settings panel writes it
+    session_prompt_send: auto  # auto sends what a session starts with at once (Claude gets it as its start argument); manual types it on the prompt for Enter. The settings panel writes it
     session_branch_fallback: "" # branch of an issue's work, for an issue session that reports none; {n} is the issue number; "" names none
     session_cleanup_command: "" # shell command that cleans up the git side of a session; {branch}, {worktree}, {dir}, {force} (--force when forced, else empty), e.g. "{ [ -z {worktree} ] || git worktree remove {force} {worktree}; } && git branch -D {branch}"; "" leaves branches and folders alone
     session_cleanup_mode:      # does the app clean up by itself? The settings panel writes it
@@ -121,7 +121,7 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | Group | Command | Does |
 |---|---|---|
 | Work | `issue <n...> [--prompt <text>\|-]` | starts a session per issue; an issue with a live session is reported as already running. `--prompt` takes one issue: its text (`-` reads stdin), at most 6 KB, is added to the new session's system prompt as a handover from the session that asked, and a running session does not get it |
-| Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` types its text (`-` reads stdin), at most 6 KB, into the new session once the agent is ready, sent unless `session_prompt_send` is `manual`; from a session, the text is framed as that session's handover |
+| Work | `new [title] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--prompt` gives its text (`-` reads stdin), at most 6 KB, to the new session, sent unless `session_prompt_send` is `manual`; from a session, the text is framed as that session's handover |
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `news`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |

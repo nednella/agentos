@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
 )
 
@@ -141,6 +143,38 @@ func TestPrefillIsTypedNotSubmitted(t *testing.T) {
 	time.Sleep(300 * time.Millisecond)
 	if pane := h.Pane(t, s.ID); strings.Contains(pane, "not found") {
 		t.Errorf("prefill was submitted:\n%s", pane)
+	}
+}
+
+func TestClaudeGetsASentPromptOnItsCommandLine(t *testing.T) {
+	dir := apptest.ClaudeOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+	for _, tt := range []struct {
+		name            string
+		send, wantTyped bool
+	}{
+		{"sent", true, false},
+		{"not sent", false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := h.Sessions().Create("#7 work", "/work 7", tt.send, 7)
+			if err != nil {
+				t.Fatal(err)
+			}
+			args := claudeArgs(t, dir, s.ID)
+			onCommandLine := len(args) > 2 && slices.Equal(args[len(args)-2:], []string{"--", "/work 7"})
+			if onCommandLine == tt.wantTyped {
+				t.Errorf("args = %q", args)
+			}
+			if tt.wantTyped {
+				eventually(t, "the prompt typed", func() bool { return strings.Contains(h.Pane(t, s.ID), "/work 7") })
+				return
+			}
+			time.Sleep(600 * time.Millisecond)
+			if pane := h.Pane(t, s.ID); strings.Contains(pane, "/work 7") {
+				t.Errorf("the prompt was typed as well:\n%s", pane)
+			}
+		})
 	}
 }
 
