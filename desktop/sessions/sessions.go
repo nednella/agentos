@@ -76,6 +76,8 @@ type Session struct {
 
 	Tokens int64   `json:"tokens"` // what the agent used in this run of the app, 0 when not known
 	Cost   float64 `json:"cost"`   // what those tokens cost at list prices, in US dollars
+
+	Memory int64 `json:"memory"` // bytes held by the processes under the session's pane, rounded up; 0 when not known
 }
 
 // Project is a project as the front end sees it, with how its sessions stand.
@@ -96,6 +98,7 @@ type Project struct {
 type Sessions struct {
 	tmux     *term.Tmux
 	agent    agent.Agent
+	run      run.Runner
 	stateDir string
 	localDir string
 	emit     func(event string, payload any)
@@ -142,6 +145,8 @@ type Sessions struct {
 	prefillFor time.Duration
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
+	held       map[string]int64        // the memory each live session held at the last sample
+	memory     Memory
 }
 
 // ProjectList is the configured projects.
@@ -174,6 +179,7 @@ type Browsers interface {
 	Has(id string) bool
 	Close(ctx context.Context, id string)
 	Port(projectKey string) int
+	PIDs() []int
 }
 
 // Awake holds off idle sleep.
@@ -225,7 +231,7 @@ func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
+		tmux: o.Tmux, agent: o.Agent, run: o.Run, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, activity: o.Activity, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -240,6 +246,7 @@ func newSessions(o Options) *Sessions {
 		wakes:      map[string][]string{},
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
+		held:       map[string]int64{},
 		prefillFor: prefillWait,
 		ctx:        context.Background(),
 	}
@@ -262,15 +269,20 @@ func (s *Sessions) Start(ctx context.Context) error {
 		}
 		tick := time.NewTicker(pollEvery)
 		defer tick.Stop()
+		sample := time.NewTicker(sampleEvery)
+		defer sample.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-tick.C:
 				s.Refresh()
+			case <-sample.C:
+				s.SampleMemory()
 			}
 		}
 	}()
+	go s.SampleMemory()
 	return nil
 }
 
@@ -867,6 +879,7 @@ func (s *Sessions) list() []Session {
 		if spent, ok := s.spent[id]; ok {
 			view.Tokens, view.Cost = spent.Total(), spent.Dollars()
 		}
+		view.Memory = s.held[id]
 		if view.History == nil {
 			view.History = []session.Change{}
 		}
