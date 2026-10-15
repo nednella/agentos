@@ -18,8 +18,8 @@ const (
 	memoryStep = (1 << 30) / 10
 )
 
-// Memory is what agentos and its agents hold, in bytes, rounded up to memoryStep. It is resident memory
-// summed over processes, which counts shared pages more than once: an estimate.
+// Memory is what agentos and its agents use, in bytes, rounded up to memoryStep. It is each process's
+// footprint summed over the processes, so memory two processes share is not counted: an estimate.
 type Memory struct {
 	App      int64 `json:"app"`      // the app and the commands it runs, without its browsers
 	Browsers int64 `json:"browsers"` // the projects' browsers and their helper processes
@@ -35,12 +35,12 @@ func (s *Sessions) Memory() Memory {
 	return s.memory
 }
 
-// SampleMemory reads what every process holds, and tells the front end when a rounded figure moved.
+// SampleMemory reads what every process uses, and tells the front end when a rounded figure moved.
 // The poll does it every sampleEvery.
 func (s *Sessions) SampleMemory() {
 	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
 	defer cancel()
-	out, err := s.run(ctx, "", "ps", "-axo", "pid=,ppid=,rss=")
+	out, err := s.run(ctx, "", "ps", "-axo", "pid=,ppid=")
 	if err != nil {
 		s.warn.Report("memory", util.FirstLine(err.Error()))
 		return
@@ -57,7 +57,7 @@ func (s *Sessions) SampleMemory() {
 			machine, _ = strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
 		}
 	}
-	procs := readProcesses(out)
+	procs := readProcesses(out, footprint)
 	var browsers int64
 	for _, pid := range s.browsers.PIDs() {
 		browsers += procs.held(pid)
@@ -85,27 +85,25 @@ func (s *Sessions) SampleMemory() {
 	s.sync()
 }
 
-// processes is what ps reported: each process's resident memory in bytes, and its children.
+// processes is the process tree ps reported, and how much memory a process uses.
 type processes struct {
-	rss      map[int]int64
 	children map[int][]int
+	size     func(pid int) int64
 }
 
-// readProcesses reads lines of `ps -axo pid=,ppid=,rss=`, rss in kilobytes.
-func readProcesses(out []byte) processes {
-	p := processes{rss: map[int]int64{}, children: map[int][]int{}}
+// readProcesses reads lines of `ps -axo pid=,ppid=`.
+func readProcesses(out []byte, size func(pid int) int64) processes {
+	p := processes{children: map[int][]int{}, size: size}
 	for line := range bytes.Lines(out) {
 		f := strings.Fields(string(line))
-		if len(f) != 3 {
+		if len(f) != 2 {
 			continue
 		}
 		pid, err1 := strconv.Atoi(f[0])
 		ppid, err2 := strconv.Atoi(f[1])
-		kb, err3 := strconv.ParseInt(f[2], 10, 64)
-		if err1 != nil || err2 != nil || err3 != nil {
+		if err1 != nil || err2 != nil {
 			continue
 		}
-		p.rss[pid] = kb << 10
 		if pid != ppid {
 			p.children[ppid] = append(p.children[ppid], pid)
 		}
@@ -113,12 +111,12 @@ func readProcesses(out []byte) processes {
 	return p
 }
 
-// held is what pid and every process under it hold; 0 when pid is gone.
+// held is what pid and every process under it use; 0 when pid is gone.
 func (p processes) held(pid int) int64 {
 	if pid <= 0 {
 		return 0
 	}
-	total := p.rss[pid]
+	total := p.size(pid)
 	for _, child := range p.children[pid] {
 		total += p.held(child)
 	}
