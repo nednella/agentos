@@ -70,6 +70,7 @@ type Info struct {
 	Chat    bool   // a chat: a read-only session for questions, not work
 	Action  string // the queue action the session was started with, or ""
 	Created time.Time
+	PID     int // the process the session's pane runs: the agent, or the shell that started it
 }
 
 // argv runs tmux with -u: without a UTF-8 locale (an app started from Finder has none)
@@ -106,7 +107,7 @@ func cleanEnv() []string {
 // No running server means no sessions; any other failure is an error, because
 // callers must not read it as "everything ended".
 func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
-	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{"+modelOption+"}\t#{"+effortOption+"}\t#{"+chatOption+"}\t#{"+actionOption+"}\t#{session_created}")
+	out, err := t.run(ctx, "list-sessions", "-F", "#{session_name}\t#{"+titleOption+"}\t#{session_path}\t#{"+issueOption+"}\t#{"+modelOption+"}\t#{"+effortOption+"}\t#{"+chatOption+"}\t#{"+actionOption+"}\t#{session_created}\t#{pane_pid}")
 	if err != nil {
 		var exit *exec.ExitError
 		if errors.As(err, &exit) && noServer(err.Error()) {
@@ -118,7 +119,7 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
 	var shells []session.Name
 	for line := range strings.SplitSeq(out, "\n") {
 		f := strings.Split(line, "\t")
-		if len(f) != 9 {
+		if len(f) != 10 {
 			continue
 		}
 		name, err := session.ParseName(f[0])
@@ -133,9 +134,23 @@ func (t *Tmux) ListAll(ctx context.Context) ([]Info, []session.Name, error) {
 		if secs, err := strconv.ParseInt(f[8], 10, 64); err == nil {
 			info.Created = time.Unix(secs, 0)
 		}
+		info.PID, _ = strconv.Atoi(f[9])
 		infos = append(infos, info)
 	}
 	return infos, shells, nil
+}
+
+// ServerPID is the tmux server's process, or 0 when no server runs.
+func (t *Tmux) ServerPID(ctx context.Context) (int, error) {
+	out, err := t.run(ctx, "display-message", "-p", "#{pid}")
+	if err != nil {
+		var exit *exec.ExitError
+		if errors.As(err, &exit) && noServer(err.Error()) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(out))
 }
 
 // noServer recognises tmux's message for a socket nobody listens on.

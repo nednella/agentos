@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -133,6 +134,30 @@ func TestShellSessionsAreListedApart(t *testing.T) {
 	}
 	if !tmux.Has(ctx, shell) || !tmux.Has(ctx, agent) || tmux.Has(ctx, session.Name{Project: "demo", Token: "b2"}) || tmux.Has(ctx, session.Name{Project: "dem", Shell: 1}) {
 		t.Error("Has gave a wrong answer")
+	}
+}
+
+func TestListGivesThePanesProcessUnderTheServer(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	if pid, err := tmux.ServerPID(ctx); err != nil || pid != 0 {
+		t.Fatalf("ServerPID without a server = %d, %v", pid, err)
+	}
+	name := session.Name{Project: "demo", Token: "a1"}
+	if err := tmux.NewSession(ctx, name, "title", t.TempDir(), nil, []string{"sleep", "60"}, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	infos, err := list(tmux, ctx)
+	if err != nil || len(infos) != 1 {
+		t.Fatalf("List = %v, %v", infos, err)
+	}
+	server, err := tmux.ServerPID(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parent, err := exec.Command("ps", "-o", "ppid=", "-p", strconv.Itoa(infos[0].PID)).Output()
+	if err != nil || strings.TrimSpace(string(parent)) != strconv.Itoa(server) {
+		t.Errorf("pane %d has parent %q, want the server %d (%v)", infos[0].PID, parent, server, err)
 	}
 }
 
