@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.35.0](https://github.com/nednella/agentos/compare/v0.34.7...v0.35.0) (2026-10-15)
+
+
+### Features
+
+* **desktop:** list running browser processes ([f527df7](https://github.com/nednella/agentos/commit/f527df77abf5dd5c3453f97d2b1b9fafd425fed1))
+* **desktop:** resume ended session by hand ([27e8b09](https://github.com/nednella/agentos/commit/27e8b09ebd287430765d42f764dc195fa95957ac))
+* **desktop:** sample memory of each session and of agentos ([36eff7e](https://github.com/nednella/agentos/commit/36eff7e34d970dd77d9864da3112dc3baf4593be))
+* **internal:** read session pane process and tmux server process ([cd190f5](https://github.com/nednella/agentos/commit/cd190f5e5454cefaf78dd7957206e4f64962ca35))
+* **internal:** start browser MCP server at first tool call ([4751acb](https://github.com/nednella/agentos/commit/4751acbb59a77410ca836de09b7d36fbec241c2f)), closes [#417](https://github.com/nednella/agentos/issues/417)
+* **ui:** show resume on ended rows and in palette ([0ab3e15](https://github.com/nednella/agentos/commit/0ab3e1569874e7beb3b5b5d89ad08665fc7bc0a0))
+* **ui:** show session memory and agentos total ([c6769a4](https://github.com/nednella/agentos/commit/c6769a4ddc80b01835d74049cd6ca328d46b0a23))
+
+
+### Bug Fixes
+
+* **desktop:** count compressed memory in session figures ([a004f36](https://github.com/nednella/agentos/commit/a004f36028ccfe5b8086f4d3867338141f54a3a9))
+* **desktop:** give Claude its sent prompt as start argument ([b2b6edf](https://github.com/nednella/agentos/commit/b2b6edf7726f1c104ee5fa1ae4fa19bb7b42cf57)), closes [#418](https://github.com/nednella/agentos/issues/418)
+* **desktop:** stop app's watchers and commands when it quits ([93ca710](https://github.com/nednella/agentos/commit/93ca7100f8642702dfc70b59ca48e82722d3ba3a)), closes [#417](https://github.com/nednella/agentos/issues/417)
+* **desktop:** stop browser when its first window cannot open ([599be58](https://github.com/nednella/agentos/commit/599be58e825a25eeab6afa74936154bc45e3deab)), closes [#417](https://github.com/nednella/agentos/issues/417)
+* **internal:** stop every process under killed session's pane ([e9ff49a](https://github.com/nednella/agentos/commit/e9ff49af86cb2370148eaf0768015208788cf36a)), closes [#417](https://github.com/nednella/agentos/issues/417)
+* **internal:** tell reused pid apart by its start time ([f9f3b76](https://github.com/nednella/agentos/commit/f9f3b768e93ad4494e6a12412dc08ddfb2dc8128)), closes [#417](https://github.com/nednella/agentos/issues/417)
+* **ui:** hide queue row's model tag when title has no room ([29f4074](https://github.com/nednella/agentos/commit/29f40747d40b59b175fc7f2402d4c26c91431d74))
+* **ui:** keep type mark from shrinking in narrow rows ([a0333fe](https://github.com/nednella/agentos/commit/a0333fe4dcbef1d5a8f6bbbcb83a429cfb0cb00e))
+
 ## [0.34.7](https://github.com/nednella/agentos/compare/v0.34.6...v0.34.7) (2026-10-15)
 
 
