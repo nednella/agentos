@@ -9,6 +9,7 @@ import (
 	"io"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -53,7 +54,13 @@ func ExecEnv(ctx context.Context, dir string, env []string, name string, args ..
 	cmd.WaitDelay = waitDelay
 	stdout, stderr := &capped{max: outputCap}, &capped{max: outputCap}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
-	if err := cmd.Run(); err != nil {
+	err := cmd.Start()
+	if err == nil {
+		running.add(cmd.Process.Pid)
+		err = cmd.Wait()
+		running.remove(cmd.Process.Pid)
+	}
+	if err != nil {
 		msg, _, _ := strings.Cut(strings.TrimSpace(stderr.String()), "\n")
 		return nil, fmt.Errorf("%s %s: %w: %s", name, strings.Join(args[:min(len(args), 1)], ""), err, msg)
 	}
@@ -79,6 +86,7 @@ func Stream(ctx context.Context, dir, name string, args ...string) (io.ReadClose
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("%s %s: %w", name, strings.Join(args[:min(len(args), 1)], ""), err)
 	}
+	running.add(cmd.Process.Pid)
 	return &stream{Reader: out, cmd: cmd, stderr: stderr, args: args}, nil
 }
 
@@ -92,11 +100,43 @@ type stream struct {
 func (s *stream) Close() error {
 	_ = s.cmd.Cancel()
 	err := s.cmd.Wait()
+	running.remove(s.cmd.Process.Pid)
 	if err == nil {
 		return nil
 	}
 	msg, _, _ := strings.Cut(strings.TrimSpace(s.stderr.String()), "\n")
 	return fmt.Errorf("%s %s: %w: %s", s.cmd.Path, strings.Join(s.args[:min(len(s.args), 1)], ""), err, msg)
+}
+
+// groups are the process groups of commands that are running, each named by its leader's pid.
+type groups struct {
+	mu   sync.Mutex
+	pids map[int]bool
+}
+
+var running = groups{pids: map[int]bool{}}
+
+func (g *groups) add(pid int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.pids[pid] = true
+}
+
+func (g *groups) remove(pid int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	delete(g.pids, pid)
+}
+
+// StopAll kills every command that is still running, with all it started, before the app exits. Each command
+// runs in a process group of its own, and the timeout that would end it lives in the app, so without this it
+// would outlive the app.
+func StopAll() {
+	running.mu.Lock()
+	defer running.mu.Unlock()
+	for pid := range running.pids {
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
+	}
 }
 
 // capped keeps the first max bytes written and drops the rest.

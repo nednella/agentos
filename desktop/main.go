@@ -57,7 +57,7 @@ func launch() error {
 			Awake: awake.Caffeinate,
 		}, run.Exec, run.Stream, run.ExecEnv)
 		quitOnSignal(a)
-		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: a.Stop, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
+		return devhttp.Serve(devhttp.Options{Services: a.Services(), Start: a.Start, Stop: func() { stop(a) }, Hub: hub, Assets: assets, Media: a.Media(), Addr: addr})
 	}
 
 	var window atomic.Pointer[context.Context]
@@ -102,7 +102,7 @@ func launch() error {
 			}
 		},
 		OnDomReady: func(context.Context) { refreshKeyWindow() },
-		OnShutdown: func(context.Context) { a.Stop() },
+		OnShutdown: func(context.Context) { stop(a) },
 		Bind:       a.Services(),
 		// The Edit menu is what makes ⌘C, ⌘V and ⌘X reach the web view on macOS. Select All loses its key in stripMenuShortcuts.
 		Menu: menu.NewMenuFromItems(menu.AppMenu(), menu.EditMenu(), menu.WindowMenu()),
@@ -112,13 +112,19 @@ func launch() error {
 	})
 }
 
-// quitOnSignal stops the app's terminals before the process ends.
+// quitOnSignal stops the app before the process ends.
 func quitOnSignal(a *app.App) {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP)
 	go func() {
 		<-quit
-		a.Stop()
+		stop(a)
 		os.Exit(0)
 	}()
+}
+
+// stop stops the app and every command it still runs, which would outlive it.
+func stop(a *app.App) {
+	a.Stop()
+	run.StopAll()
 }
