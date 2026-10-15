@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.36.0](https://github.com/nednella/agentos/compare/v0.35.0...v0.36.0) (2026-10-15)
+
+
+### Features
+
+* **ui:** label top bar memory total as mem ([36f4b12](https://github.com/nednella/agentos/commit/36f4b12210960e047d4c3408e380871f175baa4a))
+* **ui:** show memory total in top bar ([9d09d8c](https://github.com/nednella/agentos/commit/9d09d8c71e6c1113e1044e9b8d78af5ff04e08f4))
+
+
+### Bug Fixes
+
+* **ui:** separate memory from cost in session row ([d1cb626](https://github.com/nednella/agentos/commit/d1cb626bd5deba7681aa871fbbe896317d41b640)), closes [#426](https://github.com/nednella/agentos/issues/426)
+
 ## [0.35.0](https://github.com/nednella/agentos/compare/v0.34.7...v0.35.0) (2026-10-15)
 
 
