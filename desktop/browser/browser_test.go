@@ -101,6 +101,19 @@ func TestDroppedConnectionForgetsTheBrowser(t *testing.T) {
 	}
 }
 
+func TestPIDsAreTheRunningBrowsers(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	if pids := b.PIDs(); len(pids) != 0 {
+		t.Fatalf("PIDs before a browser = %v", pids)
+	}
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	if pids := b.PIDs(); len(pids) != 1 || pids[0] != b.tab("p/1").proc.cmd.Process.Pid {
+		t.Errorf("PIDs = %v", pids)
+	}
+}
+
 func TestNoBrowserFound(t *testing.T) {
 	b := New(t.TempDir(), func(string, any) {})
 	b.binary = ""
