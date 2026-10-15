@@ -9,7 +9,7 @@ export function MemoryTotal() {
   return (
     <>
       <span className="mono flex-none cursor-default pr-3 pl-1 text-small whitespace-nowrap text-dim" title={`${parts.join('\n')}${machine}\n\n${memoryNote}`}>
-        Memory <span className="text-soft">{gigabytes(memory.total)}</span>
+        mem <span className="text-soft">{gigabytes(memory.total)}</span>
       </span>
       <span className="mr-1 h-[18px] w-px flex-none bg-line-strong" />
     </>
