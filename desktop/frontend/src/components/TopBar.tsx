@@ -5,6 +5,7 @@ import { useLayout } from '../LayoutContext'
 import type { State } from '../types'
 import { useFullscreen } from '../useFullscreen'
 import { Icon } from './Icon'
+import { MemoryTotal } from './MemoryTotal'
 import { StateDot } from './StateDot'
 
 const drag = { '--wails-draggable': 'drag' } as CSSProperties
@@ -80,6 +81,7 @@ export function TopBar() {
         </button>
       </div>
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
+        {!badge && <MemoryTotal />}
         {update && (
           <button className="btn btn-accent max-h-[32px]" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
             {updating ? 'Updating…' : width >= NEXT_FULL_MIN ? `v${update} available · Update` : 'Update'}
