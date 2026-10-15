@@ -1030,8 +1030,8 @@ func (s *Sessions) IssueSessions() map[int]string {
 	return out
 }
 
-// Create starts the agent in the current project. A non-empty text is typed
-// into its prompt once the agent is ready, and sent when send is set.
+// Create starts the agent in the current project. A non-empty text is given to the agent: sent when send is set,
+// else typed into its prompt once the agent is ready.
 func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
 	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false, "")
 }
@@ -1099,11 +1099,17 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	s.mu.Unlock()
 
 	model = s.fill(proj.Dir, model)
+	// Typed in while Claude still runs its start hooks, the text and Enter reach it as one paste, where Enter is a
+	// newline. Claude submits a prompt given on its command line itself once it is ready.
+	start := ""
+	if _, ok := s.agent.(agent.Claude); ok && send {
+		start, text = text, ""
+	}
 	name, ctx, ready := s.reserve(proj, text)
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief, handover, chat, action); err != nil {
+	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief, handover, start, chat, action); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
@@ -1152,7 +1158,7 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover string, chat bool, action string) error {
+func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover, start string, chat bool, action string) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
@@ -1173,7 +1179,7 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if _, ok := s.agent.(agent.Claude); !ok {
 		model = project.Model{} // another agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief, handover, chat), issue, model, chat, action)
+	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief, handover, start, chat), issue, model, chat, action)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
@@ -1280,7 +1286,7 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 
 // wake sends the prompt to the session, once it is not waiting on the user: typed into a
 // permission prompt, the text could answer it. A session that has ended gets a new one for
-// its issue when the issue has no live session: the prompt is typed in and sent unless the
+// its issue when the issue has no live session: it gets the prompt, sent unless the
 // project sends by hand, the new one takes over the old's branches and handover, and the old
 // row goes. The new one continues the old's conversation when the agent can.
 func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
@@ -1698,14 +1704,15 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 
 // commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
 // about the browser when the project allows it and one exists; a session with a brief learns only the brief. A
-// task started by another session gets that session's handover last.
-func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover string, chat bool) []string {
+// task started by another session gets that session's handover last. Claude submits start, when set, as its first
+// prompt.
+func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
 	launch := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat}
 	if _, ok := s.agent.(agent.Claude); !ok {
 		return s.agent.Command(name.String(), launch)
 	}
 	if brief != "" {
-		return append(s.agent.Command(name.String(), launch), "--append-system-prompt", brief)
+		return withStart(append(s.agent.Command(name.String(), launch), "--append-system-prompt", brief), start)
 	}
 	port := 0
 	if proj.BrowserOn() && s.browsers.Available() {
@@ -1724,5 +1731,14 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 	if handover != "" {
 		prompt += "\n\n" + prompts.Handover(handover)
 	}
-	return append(argv, "--append-system-prompt", prompt)
+	return withStart(append(argv, "--append-system-prompt", prompt), start)
+}
+
+// withStart ends Claude's argv with its first prompt. The "--" keeps a prompt that starts with "-" from being read
+// as a flag, and from being taken as one more value of a list flag such as --allowedTools.
+func withStart(argv []string, start string) []string {
+	if start == "" {
+		return argv
+	}
+	return append(argv, "--", start)
 }
