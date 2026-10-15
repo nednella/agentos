@@ -23,7 +23,7 @@ func (f fakeBrowsers) Close(context.Context, string) {}
 func (f fakeBrowsers) Port(string) int               { return 23456 }
 func (f fakeBrowsers) PIDs() []int                   { return nil }
 
-const wantMCPConfig = `{"mcpServers":{"browser":{"command":"npx","args":["-y","--prefer-offline","chrome-devtools-mcp@1.10.1",` +
+const wantMCPConfig = `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--","npx","-y","--prefer-offline","chrome-devtools-mcp@1.10.1",` +
 	`"--browser-url=http://127.0.0.1:23456","--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],` +
 	`"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
 
@@ -127,9 +127,9 @@ func fakeNpxCache(t *testing.T, hashes map[string]string, withBin bool) string {
 func TestMCPServerRunsFromTheNpxCacheWhenThePinnedVersionIsThere(t *testing.T) {
 	cache := fakeNpxCache(t, map[string]string{"aaaa": "1.9.0", "bbbb": chromeDevToolsMCPVersion}, true)
 	bin := filepath.Join(cache, "_npx", "bbbb", "node_modules", ".bin", "chrome-devtools-mcp")
-	want := `{"mcpServers":{"browser":{"command":` + strconv.Quote(bin) + `,"args":["--browser-url=http://127.0.0.1:23456",` +
+	want := `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--",` + strconv.Quote(bin) + `,"--browser-url=http://127.0.0.1:23456",` +
 		`"--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
-	if got := browserMCPConfig(23456, "/work/p", cache); got != want {
+	if got := browserMCPConfig("/x", 23456, "/work/p", cache); got != want {
 		t.Errorf("config = %s\nwant %s", got, want)
 	}
 }
@@ -152,7 +152,7 @@ func TestMCPServerFallsBackToNpx(t *testing.T) {
 			if tt.hashes != nil {
 				cache = fakeNpxCache(t, tt.hashes, tt.bin)
 			}
-			if got := browserMCPConfig(23456, "/work/p", cache); got != wantMCPConfig {
+			if got := browserMCPConfig("/x", 23456, "/work/p", cache); got != wantMCPConfig {
 				t.Errorf("config = %s\nwant %s", got, wantMCPConfig)
 			}
 		})

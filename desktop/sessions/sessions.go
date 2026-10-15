@@ -22,6 +22,7 @@ import (
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
+	"github.com/nednella/agentos/internal/mcp"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
@@ -1703,12 +1704,11 @@ func (s *Sessions) CloseShell(id string) error {
 	return nil
 }
 
-// chromeDevToolsMCP is the package of the MCP server that gives Claude the page tools, pinned so a new release
-// cannot change the tools under a running install.
-const (
-	chromeDevToolsMCPName    = "chrome-devtools-mcp"
-	chromeDevToolsMCPVersion = "1.10.1"
-)
+// chromeDevToolsMCPName is the package of the MCP server that gives Claude the page tools. Its version is pinned
+// so a new release cannot change the tools under a running install, and it is the version agentos stands in for.
+const chromeDevToolsMCPName = "chrome-devtools-mcp"
+
+var chromeDevToolsMCPVersion = mcp.Browser.ServerInfo.Version
 
 // browserToolsDenied are the page tools Claude must not have: new_page and close_page would open and close pages
 // outside the session's own, in a window of another session.
@@ -1750,9 +1750,11 @@ func cachedMCPBin(npmCache string) string {
 }
 
 // browserMCPConfig is the --mcp-config JSON that adds the page tools as the MCP server "browser", attached to the
-// project's browser on port. workspace is the folder the tools may read upload files from. The server runs from
-// npmCache when the pinned version is there; otherwise npx runs it, which also fills the cache for the next session.
-func browserMCPConfig(port int, workspace, npmCache string) string {
+// project's browser on port. workspace is the folder the tools may read upload files from. agentos, at exe, stands
+// in for the server and starts it at the first tool call, so a session that never uses the browser never runs it.
+// The server runs from npmCache when the pinned version is there; otherwise npx runs it, which also fills the
+// cache for the next session.
+func browserMCPConfig(exe string, port int, workspace, npmCache string) string {
 	type server struct {
 		Command string            `json:"command"`
 		Args    []string          `json:"args"`
@@ -1765,7 +1767,7 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 		args = append([]string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion}, args...)
 	}
 	config, _ := json.Marshal(map[string]map[string]server{"mcpServers": {"browser": {
-		Command: command, Args: args,
+		Command: exe, Args: append([]string{"mcp-browser", "--", command}, args...),
 		Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"},
 	}}})
 	return string(config)
@@ -1777,7 +1779,8 @@ func browserMCPConfig(port int, workspace, npmCache string) string {
 // prompt.
 func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
 	launch := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat}
-	if _, ok := s.agent.(agent.Claude); !ok {
+	claude, ok := s.agent.(agent.Claude)
+	if !ok {
 		return s.agent.Command(name.String(), launch)
 	}
 	if brief != "" {
@@ -1794,7 +1797,7 @@ func (s *Sessions) commandFor(name session.Name, proj project.Project, model pro
 		prompt = prompts.Session() + "\n\n" + prompts.Chat()
 	}
 	if port != 0 {
-		argv = append(argv, "--mcp-config", browserMCPConfig(port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
+		argv = append(argv, "--mcp-config", browserMCPConfig(claude.Exe, port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
 		prompt += "\n\n" + prompts.Browser()
 	}
 	if handover != "" {
