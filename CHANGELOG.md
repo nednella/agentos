@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.34.7](https://github.com/nednella/agentos/compare/v0.34.6...v0.34.7) (2026-10-15)
+
+
+### Bug Fixes
+
+* **ui:** keep news date header above scrolled rows ([4821029](https://github.com/nednella/agentos/commit/48210290742e25a6a6ea90c119857c3c60fa744b)), closes [#412](https://github.com/nednella/agentos/issues/412)
+
 ## [0.34.6](https://github.com/nednella/agentos/compare/v0.34.5...v0.34.6) (2026-10-14)
 
 
