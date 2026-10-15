@@ -46,6 +46,9 @@ func (v *Service) KillSession(id string) error { return v.s.Kill(id) }
 // DismissSession removes the row of an ended session.
 func (v *Service) DismissSession(id string) error { return v.s.Dismiss(id) }
 
+// ResumeSession starts a session that continues an ended one's conversation, and removes the ended row.
+func (v *Service) ResumeSession(id string) (Session, error) { return v.s.Resume(id) }
+
 func (v *Service) RenameSession(id, title string) error { return v.s.Rename(id, title) }
 
 // TypeInto types text into the session's prompt, not sent.
