@@ -1,5 +1,5 @@
 import { createMock } from './mock'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Ledger, News, Note, Release, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, DataDirChoice, Digest, DigestSchedule, EventMap, Evidence, Issue, IssueDetail, Ledger, Memory, News, Note, Release, Session, PromptSend, Settings, Snapshot, Stats, ThemeSetting, WaitKind } from './types'
 
 type Backend = {
   Snapshot(): Promise<Snapshot>
@@ -46,6 +46,7 @@ type Backend = {
   TypeInto(id: string, text: string): Promise<void>
   Cleanup(id: string, force: boolean): Promise<void>
   Cleanups(): Promise<Cleanup[]>
+  Memory(): Promise<Memory>
   BrowserOpen(id: string, url: string): Promise<BrowserState>
   BrowserGoto(id: string, url: string): Promise<void>
   BrowserShow(id: string): Promise<void>
@@ -94,7 +95,7 @@ declare global {
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'CreateRepo', 'RemoveProject', 'SetUpProject', 'DismissSetup'],
-  sessions: ['NewSession', 'NewChat', 'KillSession', 'DismissSession', 'ResumeSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose'],
+  sessions: ['NewSession', 'NewChat', 'KillSession', 'DismissSession', 'ResumeSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose', 'Memory'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'MoveIssue', 'UndoMove', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
@@ -176,6 +177,7 @@ export const api = {
   typeInto: (id: string, text: string) => backend.TypeInto(id, text),
   cleanup: (id: string, force: boolean) => backend.Cleanup(id, force),
   cleanups: () => backend.Cleanups(),
+  memory: () => backend.Memory(),
   browserOpen: (id: string, url: string) => backend.BrowserOpen(id, url),
   browserGoto: (id: string, url: string) => backend.BrowserGoto(id, url),
   browserShow: (id: string) => backend.BrowserShow(id),

@@ -11,6 +11,7 @@ import { SessionGroupHeader } from './SessionGroupHeader'
 import { CleanupsMenu } from './CleanupsMenu'
 import { EdgeStrip } from './EdgeStrip'
 import { Icon } from './Icon'
+import { MemoryTotal } from './MemoryTotal'
 import { NewSessionRow } from './NewSessionRow'
 import { SessionRow } from './SessionRow'
 
@@ -70,6 +71,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         <span className="label">Sessions</span>
         <span className="mono text-small text-dim">{sessions.length}</span>
         <span className="ml-auto" />
+        {!compact && <MemoryTotal />}
         <CleanupsMenu />
         {!full && (
           <button

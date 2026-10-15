@@ -36,6 +36,15 @@ export type Session = {
   tokens: number
   cost: number
   resumable: boolean
+  memory: number
+}
+
+export type Memory = {
+  app: number
+  browsers: number
+  sessions: number
+  total: number
+  machine: number
 }
 
 export type Project = {
@@ -309,6 +318,7 @@ export type EventMap = {
   cleanups: ProjectList<Cleanup>
   warnings: Warning
   awake: boolean
+  memory: Memory
   stats: undefined
   'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }

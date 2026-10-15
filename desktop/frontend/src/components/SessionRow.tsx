@@ -1,5 +1,6 @@
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
+import { gigabytes, memoryNote } from '../memory'
 import { dollars } from '../spend'
 import { stateLabel } from '../stateMeta'
 import { ago, useNow } from '../time'
@@ -50,6 +51,11 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
               {stateLabel(session.state, session.chat)}
             </span>
             <ModelTag model={session.model} effort={session.effort} spend={session.tokens > 0 ? `~${dollars(session.cost)}` : ''} />
+            {session.memory > 0 && (
+              <span className="mono flex-none text-small whitespace-nowrap text-dim" title={`The agent and every process under it. ${memoryNote}`}>
+                {gigabytes(session.memory)}
+              </span>
+            )}
           </span>
         )}
         {!dense && !session.chat && (
