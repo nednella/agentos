@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -100,6 +102,81 @@ func TestSessionLifecycle(t *testing.T) {
 	if err := tmux.Kill(ctx, name); err == nil {
 		t.Error("killing a session twice succeeded")
 	}
+}
+
+// paneScript leaves the children a session's agent can leave: one that ignores SIGHUP and SIGTERM, one in a
+// process group of its own, one in a session of its own, and one whose parent has exited. It writes their pids
+// and its own to the file in $1.
+const paneScript = `trap "" HUP TERM
+sleep 300 & echo $! >> "$1"
+set -m; sleep 301 & echo $! >> "$1"; set +m
+perl -e 'use POSIX; setsid(); sleep 302' & echo $! >> "$1"
+(sleep 303 & echo $! >> "$1")
+echo $$ >> "$1"
+wait`
+
+func TestKillStopsEveryProcessUnderThePane(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	pidFile := filepath.Join(t.TempDir(), "pids")
+	name := session.Name{Project: "demo", Token: "k1"}
+	if err := tmux.NewSession(ctx, name, "agent", t.TempDir(), nil, []string{"sh", "-c", paneScript, "sh", pidFile}, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	bystander := exec.Command("sleep", "60")
+	if err := bystander.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = bystander.Process.Kill(); _ = bystander.Wait() }()
+	var pids []int
+	for range 100 {
+		data, _ := os.ReadFile(pidFile)
+		if pids = pidsIn(string(data)); len(pids) == 5 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if len(pids) != 5 {
+		t.Fatalf("the pane wrote pids %v", pids)
+	}
+	t.Cleanup(func() {
+		for _, pid := range pids {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+		}
+	})
+
+	if err := tmux.Kill(ctx, name); err != nil {
+		t.Fatal(err)
+	}
+	for _, pid := range pids {
+		if !gone(pid) {
+			t.Errorf("process %d outlived the session", pid)
+		}
+	}
+	if err := syscall.Kill(bystander.Process.Pid, 0); err != nil {
+		t.Errorf("a process outside the session was stopped: %v", err)
+	}
+}
+
+func pidsIn(s string) []int {
+	var pids []int
+	for _, f := range strings.Fields(s) {
+		if pid, err := strconv.Atoi(f); err == nil {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
+}
+
+// gone waits for pid to stop existing; once its parent is gone too, launchd reaps it.
+func gone(pid int) bool {
+	for range 50 {
+		if syscall.Kill(pid, 0) != nil {
+			return true
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	return false
 }
 
 func TestListSkipsSessionsAgentosDidNotMake(t *testing.T) {
