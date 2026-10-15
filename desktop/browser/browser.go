@@ -120,6 +120,22 @@ func (b *Browsers) Has(id string) bool {
 	return b.tabs[id] != nil
 }
 
+// PIDs are the processes of the browsers that run.
+func (b *Browsers) PIDs() []int {
+	if b == nil {
+		return nil
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var pids []int
+	for _, p := range b.procs {
+		if p.cmd.Process != nil {
+			pids = append(pids, p.cmd.Process.Pid)
+		}
+	}
+	return pids
+}
+
 type browserProc struct {
 	key  string
 	cmd  *exec.Cmd
