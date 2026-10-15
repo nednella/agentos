@@ -195,10 +195,20 @@ func (t *Tmux) NewSession(ctx context.Context, name session.Name, title, dir str
 	return nil
 }
 
+// Kill stops a session and every process under its pane. tmux only hangs the pane up, and a child that ignores
+// SIGHUP or runs in a process group of its own would outlive the session.
 func (t *Tmux) Kill(ctx context.Context, name session.Name) error {
+	var procs map[int]proc
+	if out, err := t.run(ctx, "display-message", "-p", "-t", target(name), "#{pane_pid}"); err == nil {
+		pid, _ := strconv.Atoi(strings.TrimSpace(out))
+		if all, err := processes(ctx); err == nil && pid > 0 {
+			procs = tree(all, pid)
+		}
+	}
 	if _, err := t.run(ctx, "kill-session", "-t", target(name)); err != nil {
 		return fmt.Errorf("stopping session %s: %w", name, err)
 	}
+	stopTree(ctx, procs)
 	return nil
 }
 
