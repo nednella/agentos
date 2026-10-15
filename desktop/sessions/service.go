@@ -65,3 +65,6 @@ func (v *Service) Cleanup(id string, force bool) error { return v.s.life.Cleanup
 
 // Cleanups is the current project's clean-up log, newest first.
 func (v *Service) Cleanups() []Cleanup { return v.s.life.Cleanups(v.s.Current().Key()) }
+
+// Memory is what agentos and its agents held at the last sample.
+func (v *Service) Memory() Memory { return v.s.Memory() }

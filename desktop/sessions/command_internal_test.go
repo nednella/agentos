@@ -21,6 +21,7 @@ func (f fakeBrowsers) Available() bool               { return f.available }
 func (f fakeBrowsers) Has(string) bool               { return false }
 func (f fakeBrowsers) Close(context.Context, string) {}
 func (f fakeBrowsers) Port(string) int               { return 23456 }
+func (f fakeBrowsers) PIDs() []int                   { return nil }
 
 const wantMCPConfig = `{"mcpServers":{"browser":{"command":"npx","args":["-y","--prefer-offline","chrome-devtools-mcp@1.10.1",` +
 	`"--browser-url=http://127.0.0.1:23456","--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],` +
