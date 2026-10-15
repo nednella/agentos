@@ -23,6 +23,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
   const showPR = session.pr !== null && !dense
   const showEvidence = session.evidence > 0 && !dense
   const hasFooter = ended || showPR || showEvidence || session.cleanup !== ''
+  const spend = session.tokens > 0 ? `~${dollars(session.cost)}` : ''
 
   return (
     <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
@@ -50,12 +51,14 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
             <span className="min-w-0 flex-1 truncate text-small font-medium" data-state={session.state} style={{ color: 'var(--c)' }}>
               {stateLabel(session.state, session.chat)}
             </span>
-            <ModelTag model={session.model} effort={session.effort} spend={session.tokens > 0 ? `~${dollars(session.cost)}` : ''} />
-            {session.memory > 0 && (
-              <span className="mono flex-none text-small whitespace-nowrap text-dim" title={`The agent and every process under it. ${memoryNote}`}>
-                {gigabytes(session.memory)}
-              </span>
-            )}
+            <span className="min-w-0 truncate">
+              <ModelTag model={session.model} effort={session.effort} spend={spend} />
+              {session.memory > 0 && (
+                <span className="mono text-small whitespace-nowrap text-dim" title={`The agent and every process under it. ${memoryNote}`}>
+                  {session.model || session.effort || spend ? ` · ${gigabytes(session.memory)}` : gigabytes(session.memory)}
+                </span>
+              )}
+            </span>
           </span>
         )}
         {!dense && !session.chat && (
