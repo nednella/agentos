@@ -3,14 +3,15 @@ package sessions
 import "testing"
 
 func TestHeldSumsAProcessAndEveryProcessUnderIt(t *testing.T) {
-	procs := readProcesses([]byte(`    1     0  10000
-  100     1   1000
-  101   100   2000
-  102   101   4000
-  200     1   8000
+	sizes := map[int]int64{1: 10000, 100: 1000, 101: 2000, 102: 4000, 200: 8000}
+	procs := readProcesses([]byte(`    1     0
+  100     1
+  101   100
+  102   101
+  200     1
   bad line
-`))
-	for pid, want := range map[int]int64{100: 7000 << 10, 101: 6000 << 10, 200: 8000 << 10, 999: 0, 0: 0} {
+`), func(pid int) int64 { return sizes[pid] })
+	for pid, want := range map[int]int64{100: 7000, 101: 6000, 200: 8000, 999: 0, 0: 0} {
 		if got := procs.held(pid); got != want {
 			t.Errorf("held(%d) = %d, want %d", pid, got, want)
 		}
