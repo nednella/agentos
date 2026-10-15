@@ -71,7 +71,8 @@ type Session struct {
 	Cleanup       string `json:"cleanup"`
 	CleanupReason string `json:"cleanupReason"`
 
-	EndedAt int64 `json:"endedAt"` // unix ms; 0 while the session runs
+	EndedAt   int64 `json:"endedAt"`   // unix ms; 0 while the session runs
+	Resumable bool  `json:"resumable"` // the session has ended and its agent can continue its conversation
 
 	Tokens int64   `json:"tokens"` // what the agent used in this run of the app, 0 when not known
 	Cost   float64 `json:"cost"`   // what those tokens cost at list prices, in US dollars
@@ -855,6 +856,7 @@ func (s *Sessions) list() []Session {
 		}
 		if ss.State == session.Ended {
 			view.EndedAt = ss.At.UnixMilli()
+			view.Resumable = s.resumes() && s.conversationOf(id) != ""
 		}
 		f := s.life.fields(id)
 		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
@@ -1058,12 +1060,66 @@ func (s *Sessions) CreateIssue(title, text string, issue int, action project.Act
 	if live == "" {
 		return view, err == nil, err
 	}
+	view, err = s.liveRow(live, issue)
+	return view, false, err
+}
+
+// liveRow is the row of the live session of the issue.
+func (s *Sessions) liveRow(live string, issue int) (Session, error) {
 	for _, v := range s.List() {
 		if v.ID == live {
-			return v, false, nil
+			return v, nil
 		}
 	}
-	return Session{}, false, fmt.Errorf("session %s of #%d is gone", live, issue)
+	return Session{}, fmt.Errorf("session %s of #%d is gone", live, issue)
+}
+
+// Resume starts a session that continues the conversation of an ended one, and types nothing into it. The new one
+// keeps the old one's kind, issue, title, model, queue action and handover, and takes over its branches; the old row
+// goes once the new one runs. An issue that has a live session of that kind gets that session back, and the old row
+// stays.
+func (s *Sessions) Resume(id string) (Session, error) {
+	s.mu.Lock()
+	e, ended := s.ended[id]
+	conversation := s.conversationOf(id)
+	var in term.Info
+	if ended {
+		in = e.info
+	}
+	proj, known := s.projectOf(in)
+	s.mu.Unlock()
+	switch {
+	case !ended:
+		return Session{}, fmt.Errorf("session %s has not ended", id)
+	case !s.resumes() || conversation == "":
+		return Session{}, fmt.Errorf("session %s has no conversation to resume", id)
+	case !known:
+		return Session{}, fmt.Errorf("the project of session %s is gone", id)
+	}
+	issue, _ := strconv.Atoi(in.Issue)
+	title, model, handover := cmp.Or(in.Title, defaultTitle), project.Model{Model: in.Model, Effort: in.Effort}, s.handoverOf(id)
+	var view Session
+	var err error
+	if issue > 0 {
+		var live string
+		view, live, err = s.createForIssue(proj, title, "", false, issue, model, id, handover, in.Chat, in.Action)
+		if live != "" {
+			return s.liveRow(live, issue)
+		}
+	} else {
+		view, err = s.createIn(proj, title, "", false, 0, model, id, "", handover, in.Chat, in.Action)
+	}
+	if err != nil {
+		return Session{}, err
+	}
+	_ = s.Dismiss(id)
+	return view, nil
+}
+
+// resumes says whether the agent can continue a conversation: only Claude takes --resume.
+func (s *Sessions) resumes() bool {
+	_, ok := s.agent.(agent.Claude)
+	return ok
 }
 
 // createForIssue starts a task or a chat for the issue, unless the project has a live one of that kind for it: then
