@@ -105,12 +105,13 @@ func TestSessionLifecycle(t *testing.T) {
 }
 
 // paneScript leaves the children a session's agent can leave: one that ignores SIGHUP and SIGTERM, one in a
-// process group of its own, one in a session of its own, and one whose parent has exited. It writes their pids
-// and its own to the file in $1.
+// process group of its own, one that moves to a session of its own after Kill has looked, and one whose parent has
+// exited. All of them ignore SIGHUP and SIGTERM, as the trap is inherited. It writes their pids and its own to the
+// file in $1.
 const paneScript = `trap "" HUP TERM
 sleep 300 & echo $! >> "$1"
 set -m; sleep 301 & echo $! >> "$1"; set +m
-perl -e 'use POSIX; setsid(); sleep 302' & echo $! >> "$1"
+perl -e 'use POSIX; select(undef, undef, undef, 0.5); setsid(); sleep 302' & echo $! >> "$1"
 (sleep 303 & echo $! >> "$1")
 echo $$ >> "$1"
 wait`

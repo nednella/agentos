@@ -13,26 +13,29 @@ import (
 // treeWait is how long a killed session's processes have to exit after SIGTERM before they get SIGKILL.
 const treeWait = 2 * time.Second
 
-type proc struct{ pid, ppid, pgid int }
+type proc struct {
+	pid, ppid, pgid int
+	started         string
+}
 
 // processes are the live processes on the machine. A zombie is left out: it has exited and only waits for its
 // parent to read its status.
 func processes(ctx context.Context) (map[int]proc, error) {
-	out, err := exec.CommandContext(ctx, "ps", "-axo", "pid=,ppid=,pgid=,stat=").Output()
+	out, err := exec.CommandContext(ctx, "ps", "-axo", "pid=,ppid=,pgid=,stat=,lstart=").Output()
 	if err != nil {
 		return nil, err
 	}
 	procs := map[int]proc{}
 	for line := range strings.SplitSeq(string(out), "\n") {
 		f := strings.Fields(line)
-		if len(f) != 4 || strings.HasPrefix(f[3], "Z") {
+		if len(f) < 5 || strings.HasPrefix(f[3], "Z") {
 			continue
 		}
 		pid, err1 := strconv.Atoi(f[0])
 		ppid, err2 := strconv.Atoi(f[1])
 		pgid, err3 := strconv.Atoi(f[2])
 		if err1 == nil && err2 == nil && err3 == nil {
-			procs[pid] = proc{pid, ppid, pgid}
+			procs[pid] = proc{pid, ppid, pgid, strings.Join(f[4:], " ")}
 		}
 	}
 	return procs, nil
@@ -63,8 +66,7 @@ func tree(procs map[int]proc, root int) map[int]proc {
 }
 
 // stopTree sends SIGTERM to every process of the tree, and SIGKILL to those still there after treeWait. A process
-// counts as still there only while its pid has the same process group, so a pid taken by a new process is left
-// alone.
+// counts as still there only while its pid has the same start time, so a pid taken by a new process is left alone.
 func stopTree(ctx context.Context, procs map[int]proc) {
 	signalAll(procs, syscall.SIGTERM)
 	deadline := time.Now().Add(treeWait)
@@ -75,7 +77,7 @@ func stopTree(ctx context.Context, procs map[int]proc) {
 			return
 		}
 		for pid, p := range procs {
-			if q, ok := now[pid]; !ok || q.pgid != p.pgid {
+			if q, ok := now[pid]; !ok || q.started != p.started {
 				delete(procs, pid)
 			}
 		}
