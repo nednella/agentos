@@ -18,6 +18,14 @@ function findSession(sessions: Session[], query: string): Session {
 
 const describe = (s: Session) => `${s.n} ${s.title}`
 
+const resumable = (sessions: Session[]) => sessions.filter((s) => s.resumable)
+
+function resumePrompt(sessions: Session[]): Action['palette'] {
+  const ended = resumable(sessions)
+  if (ended.length === 0) return false
+  return { prompt: 'Session number or title', initial: ended.length === 1 ? String(ended[0].n) : '' }
+}
+
 export const sessionActions = ({ a, current }: ActionContext): Action[] => [
   {
     id: 'new-session',
@@ -80,6 +88,18 @@ export const sessionActions = ({ a, current }: ActionContext): Action[] => [
       if (!target) throw 'No session to kill'
       await a.killSession(target.id)
       return `Killed ${describe(target)}`
+    },
+  },
+  {
+    id: 'resume-session',
+    label: 'Resume ended session',
+    group: 'Sessions',
+    palette: resumePrompt(a.sessions),
+    uiCommand: 'resume',
+    async run(args) {
+      const target = findSession(resumable(a.sessions), args.join(' '))
+      const resumed = await a.resumeSession(target.id)
+      return `Resumed ${describe(target)} as ${describe(resumed)}`
     },
   },
   {

@@ -71,6 +71,7 @@ export type Agentos = {
   newChat(title?: string): Promise<Session>
   killSession(id: string): Promise<void>
   dismissSession(id: string): Promise<void>
+  resumeSession(id: string): Promise<Session>
   renameSession(id: string, title: string): Promise<void>
   startIssue(number: number, action?: string, background?: boolean): Promise<Session>
   switchProject(name: string): Promise<void>
@@ -608,6 +609,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       async dismissSession(id) {
         await api.dismissSession(id)
         applySessions(sessionsRef.current.filter((s) => s.id !== id))
+      },
+      async resumeSession(id) {
+        return addSession(await api.resumeSession(id))
       },
       async renameSession(id, title) {
         const trimmed = title.trim()

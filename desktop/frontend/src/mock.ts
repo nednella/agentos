@@ -223,6 +223,7 @@ export function createMock(params: URLSearchParams) {
       action: s.action,
       tokens: s.tokens,
       cost: s.cost,
+      resumable: s.resumable,
     }
   }
 
@@ -379,6 +380,7 @@ export function createMock(params: URLSearchParams) {
       chat,
       action: issue ? 'Work' : '',
       ...usageFor(chat, createdAt),
+      resumable: initial === 'ended',
       project: owner.name,
       buffer: term.banner(owner.dir) + term.diffBlock('app-frontend/src/js/pages/[slug]/Index.tsx') + term.paragraphs[0] + '\r\n\r\n',
       opened: false,
@@ -413,6 +415,7 @@ export function createMock(params: URLSearchParams) {
     seed('spike: websocket retry', 0, 'ended', [['working', 140], ['idle', 110], ['ended', 95]])
     seed('#389 webhook retries', 389, 'working', [['working', 58], ['idle', 40], ['working', 9]])
     const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'storefront')!
+    sessions.find((x) => x.title === 'spike: websocket retry')!.resumable = false
     byIssue(454).pr = pr(457, 'draft', 'pending')
     Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
     Object.assign(byIssue(326), { pr: pr(449, 'open', 'passing', 3), prAttention: 'comments' })
@@ -461,6 +464,7 @@ export function createMock(params: URLSearchParams) {
     const at = Date.now()
     closeWait(s, at)
     s.state = state
+    s.resumable = state === 'ended'
     s.detail = pick(details[state])
     s.lastEventAt = at
     s.history = [...s.history, { state, at }].slice(-200)
@@ -840,6 +844,21 @@ export function createMock(params: URLSearchParams) {
       sessions.splice(sessions.indexOf(s), 1)
       publish()
       emit('issues', { project: current.name, items: currentIssues() })
+    },
+    ResumeSession: async (id: string) => {
+      const old = find(id)
+      if (!old.resumable) throw `session ${id} has no conversation to resume`
+      const live = sessions.find((s) => s.project === current.name && s.issue > 0 && s.issue === old.issue && s.chat === old.chat && s.state !== 'ended')
+      if (live) return view(live)
+      const s = create(old.title, old.issue, 'idle', [], Date.now(), current, old.chat)
+      s.action = old.action
+      s.model = old.model
+      s.effort = old.effort
+      s.buffer = old.buffer + term.promptLine('')
+      sessions.splice(sessions.indexOf(old), 1)
+      publish()
+      emit('issues', { project: current.name, items: currentIssues() })
+      return view(s)
     },
     KillSession: async (id: string) => {
       const s = find(id)
