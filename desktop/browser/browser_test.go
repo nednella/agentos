@@ -245,6 +245,29 @@ func TestOpenReportsAFirstPageThatFails(t *testing.T) {
 	}
 }
 
+func TestBrowserStopsWhenItsFirstWindowCannotOpen(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	p, err := b.start(ctx, "p")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	if _, err := b.Open(cancelled, "p/1", ""); err == nil {
+		t.Fatal("Open with a cancelled context made a window")
+	}
+	select {
+	case <-p.gone:
+	case <-time.After(stopLimit + 2*time.Second):
+		t.Error("the browser still runs with no window in it")
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.procs["p"] != nil {
+		t.Error("the stopped browser is still the project's")
+	}
+}
+
 func TestPageTitleDropsTheLabel(t *testing.T) {
 	tests := []struct{ prefix, title, want string }{
 		{"[demo · 2 fix]", "[demo · 2 fix] Example", "Example"},

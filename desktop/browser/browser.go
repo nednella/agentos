@@ -463,6 +463,7 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	target := map[string]any{"url": "about:blank", "newWindow": true, "background": true, "width": defaultViewWidth, "height": defaultViewHeight}
 	raw, err := p.cdp.call(ctx, "", "Target.createTarget", target)
 	if err != nil {
+		b.stopIfIdle(p)
 		return BrowserState{}, err
 	}
 	var created struct {
@@ -632,9 +633,15 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	t.publish()
 	b.onTabs()
 
-	p := t.proc
 	b.mu.Lock()
-	p.tabs--
+	t.proc.tabs--
+	b.mu.Unlock()
+	b.stopIfIdle(t.proc)
+}
+
+// stopIfIdle stops the browser when no session has a window in it.
+func (b *Browsers) stopIfIdle(p *browserProc) {
+	b.mu.Lock()
 	// Forgotten before it stops, so an Open meanwhile starts a new browser rather than reuse this one.
 	idle := p.tabs <= 0 && b.procs[p.key] == p
 	if idle {
