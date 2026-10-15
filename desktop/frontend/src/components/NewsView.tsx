@@ -86,7 +86,7 @@ export function NewsView() {
           <div className="mx-auto max-w-3xl pb-8">
             {issues.map((issue) => (
               <section key={issue.date}>
-                <h3 className="sticky top-0 flex flex-col gap-0.5 border-b border-line bg-surface px-6 pt-6 pb-3">
+                <h3 className="sticky top-0 z-10 flex flex-col gap-0.5 border-b border-line bg-surface px-6 pt-6 pb-3">
                   <span className="label">{dayLabel(issue.date)}</span>
                   <span className="truncate text-small text-dim">
                     {issue.title}
