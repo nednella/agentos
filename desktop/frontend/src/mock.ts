@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, UsageRow, Wait, WaitKind, WorkRow } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Memory, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, UsageRow, Wait, WaitKind, WorkRow } from './types'
 
 type Handler = (payload: never) => void
 
@@ -198,6 +198,8 @@ export function createMock(params: URLSearchParams) {
     return () => set.delete(handler as Handler)
   }
 
+  const tenthGB = 2 ** 30 / 10 // the app rounds figures up to this
+
   function view(s: MockSession): Session {
     return {
       id: s.id,
@@ -224,7 +226,15 @@ export function createMock(params: URLSearchParams) {
       tokens: s.tokens,
       cost: s.cost,
       resumable: s.resumable,
+      memory: s.state === 'ended' ? 0 : s.memory,
     }
+  }
+
+  function memory(): Memory {
+    const app = 2 * tenthGB
+    const browsers = 11 * tenthGB
+    const live = sessions.filter((s) => s.state !== 'ended').reduce((sum, s) => sum + s.memory, 0)
+    return { app, browsers, sessions: live, total: app + browsers + live, machine: 16 * 2 ** 30 }
   }
 
   function currentSessions(): Session[] {
@@ -381,6 +391,7 @@ export function createMock(params: URLSearchParams) {
       action: issue ? 'Work' : '',
       ...usageFor(chat, createdAt),
       resumable: initial === 'ended',
+      memory: (chat ? 3 : 4 + (nextN % 5) * 3) * tenthGB,
       project: owner.name,
       buffer: term.banner(owner.dir) + term.diffBlock('app-frontend/src/js/pages/[slug]/Index.tsx') + term.paragraphs[0] + '\r\n\r\n',
       opened: false,
@@ -1106,6 +1117,7 @@ export function createMock(params: URLSearchParams) {
       finishCleanup(s)
     },
     Cleanups: async () => [...current.cleanups],
+    Memory: async () => memory(),
     BrowserOpen: async (id: string, url: string) => {
       const s = find(id)
       openPage(s, url ? normalizeUrl(url) : 'https://docs.acme.test/')

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, News, Note, Project, Release, Session, PromptSend, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestSchedule, Evidence, Issue, Memory, News, Note, Project, Release, Session, PromptSend, Settings, Snapshot, ThemeSetting, Warning, ProjectList } from './types'
 
 export type Toast = {
   key: number
@@ -46,6 +46,7 @@ export type Agentos = {
   newsUnseen: number
   newsUnread: string[]
   awake: boolean
+  memory: Memory | null
   settings: Settings
   toasts: Toast[]
   overlay: Overlay
@@ -174,6 +175,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [newsSeen, setNewsSeen] = useState(() => readStored(NEWS_SEEN_KEY, 0))
   const [newsUnread, setNewsUnread] = useState(() => readStored<string[]>(NEWS_UNREAD_KEY, []))
   const [awake, setAwake] = useState(false)
+  const [memory, setMemory] = useState<Memory | null>(null)
   const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '', dataDirFixed: true })
   const [shellIds, setShellIds] = useState<string[]>([])
   const [pickedShell, setPickedShell] = useState('')
@@ -363,6 +365,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => {
     report(() => enterFrom(api.snapshot()))
     report(async () => setAwake(await api.awake()))
+    report(async () => setMemory(await api.memory()))
     report(async () => setSettings(await api.settings()))
     report(async () => {
       const notes = await api.patchNotes()
@@ -388,6 +391,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(() => on('term:exit', ({ id }) => setShellIds((ids) => ids.filter((x) => x !== id))), [])
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
   useEffect(() => on('awake', setAwake), [])
+  useEffect(() => on('memory', setMemory), [])
   useEffect(() => on('issues', ifCurrent(setRawIssues)), [])
   useEffect(() => on('news', setNews), [])
   useEffect(() => {
@@ -544,6 +548,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       newsUnseen,
       newsUnread,
       awake,
+      memory,
       settings,
       toasts,
       overlay,
@@ -802,7 +807,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
