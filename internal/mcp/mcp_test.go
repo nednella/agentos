@@ -38,7 +38,7 @@ func fakeServer(log string) {
 	for in.Scan() {
 		var m message
 		_ = json.Unmarshal(in.Bytes(), &m)
-		fmt.Fprintf(f, "%s %s\n", m.Method, m.ID)
+		fmt.Fprintln(f, strings.TrimSpace(m.Method+" "+string(m.ID)))
 		switch m.Method {
 		case "initialize":
 			fmt.Printf(`{"jsonrpc":"2.0","id":%s,"result":{"protocolVersion":"2025-06-18"}}`+"\n", m.ID)
@@ -157,7 +157,7 @@ func TestServeStartsTheServerAtTheFirstToolCallAndStopsItsGroup(t *testing.T) {
 
 	data, _ := os.ReadFile(log)
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	want := []string{`initialize "agentos-start"`, "notifications/initialized null", "tools/call 1", "tools/call 2"}
+	want := []string{`initialize "agentos-start"`, "notifications/initialized", "tools/call 1", "tools/call 2"}
 	if len(lines) != 5 || strings.Join(lines[1:], "|") != strings.Join(want, "|") {
 		t.Fatalf("the server got %q, want a child line then %q", lines, want)
 	}
