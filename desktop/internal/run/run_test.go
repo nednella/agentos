@@ -106,3 +106,55 @@ func TestStreamCloseKillsTheCommand(t *testing.T) {
 		t.Fatal("Close did not return")
 	}
 }
+
+func TestStopAllKillsEveryRunningCommandAndItsChildren(t *testing.T) {
+	dir := t.TempDir()
+	out, err := Stream(context.Background(), dir, "sh", "-c", "sleep 300 & echo $! > stream; wait")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran := make(chan error, 1)
+	go func() {
+		_, err := ExecEnv(context.Background(), dir, nil, "sh", "-c", "sleep 300 & echo $! > exec; wait")
+		ran <- err
+	}()
+	var pids []int
+	for _, file := range []string{"stream", "exec"} {
+		for range 100 {
+			data, _ := os.ReadFile(dir + "/" + file)
+			if pid, err := strconv.Atoi(strings.TrimSpace(string(data))); err == nil {
+				pids = append(pids, pid)
+				break
+			}
+			time.Sleep(20 * time.Millisecond)
+		}
+	}
+	if len(pids) != 2 {
+		t.Fatalf("the commands wrote pids %v", pids)
+	}
+	t.Cleanup(func() {
+		for _, pid := range pids {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+		}
+	})
+
+	StopAll()
+	for _, pid := range pids {
+		deadline := time.Now().Add(2 * time.Second)
+		for syscall.Kill(pid, 0) == nil && time.Now().Before(deadline) {
+			time.Sleep(20 * time.Millisecond)
+		}
+		if syscall.Kill(pid, 0) == nil {
+			t.Errorf("process %d still runs after StopAll", pid)
+		}
+	}
+	select {
+	case err := <-ran:
+		if err == nil {
+			t.Error("a killed command succeeded")
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("ExecEnv did not return")
+	}
+	_ = out.Close()
+}

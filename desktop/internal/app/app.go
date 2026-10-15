@@ -40,6 +40,7 @@ type Host struct {
 // App is the services, wired together.
 type App struct {
 	ctx      atomic.Pointer[context.Context]
+	cancel   atomic.Pointer[context.CancelFunc]
 	sessions *sessions.Sessions
 	terms    *terminal.Terms
 	notes    *notes.Notes
@@ -178,9 +179,11 @@ func (a *App) handleScoped(handlers map[string]control.Handler) {
 // Services are the structs to bind to the front end.
 func (a *App) Services() []any { return a.services }
 
-// Start begins following the sessions; it runs until ctx ends.
+// Start begins following the sessions; it runs until ctx ends or Stop.
 func (a *App) Start(ctx context.Context) error {
+	ctx, cancel := context.WithCancel(ctx)
 	a.ctx.Store(&ctx)
+	a.cancel.Store(&cancel)
 	a.browsers.StopStrays()
 	go a.events.Load()
 	if err := a.sessions.Run(ctx); err != nil {
@@ -216,8 +219,12 @@ func (a *App) followConfig(ctx context.Context) {
 	}
 }
 
-// Stop closes the terminal streams and stops answering the command line.
+// Stop closes the terminal streams, stops answering the command line and ends what Start began: Wails never
+// cancels the context it starts the app with.
 func (a *App) Stop() {
+	if cancel := a.cancel.Load(); cancel != nil {
+		(*cancel)()
+	}
 	a.terms.CloseAll()
 	a.browsers.CloseAll()
 	a.awake.Hold(false)

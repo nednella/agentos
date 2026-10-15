@@ -408,6 +408,19 @@ func TestPollWatcherFetchesOnlyWhatMoved(t *testing.T) {
 	}
 }
 
+func TestStoppingTheAppStopsItsWatchers(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
+	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
+	issueSession(h, t, 12)
+	eventually(t, "the poll to run", func() bool { return h.GH.Calls("api -i") >= 2 })
+	h.App.Stop()
+	polled := h.GH.Calls("api -i")
+	time.Sleep(2500 * time.Millisecond)
+	if got := h.GH.Calls("api -i"); got != polled {
+		t.Errorf("the poll ran %d more times after the app stopped", got-polled)
+	}
+}
+
 func TestPollWatcherKeepsLookingWhileChecksRun(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
 	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
