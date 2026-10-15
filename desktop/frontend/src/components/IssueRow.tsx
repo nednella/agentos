@@ -35,14 +35,14 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
       onDragEnd={drag.end}
     >
       <button
-        className="flex h-full min-w-0 flex-1 items-center gap-2 text-left"
+        className="@container flex h-full min-w-0 flex-1 items-center gap-2 text-left"
         title="Read the issue"
         onClick={() => setOverlay({ issue: issue.number })}
       >
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
-        <ModelTag model={labelled('model')} effort={labelled('effort')} />
+        <ModelTag model={labelled('model')} effort={labelled('effort')} className="hidden @[21rem]:inline" />
       </button>
       <span className="reveal">
         <button
