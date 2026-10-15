@@ -15,7 +15,7 @@ import { Timeline } from './Timeline'
 type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
 
 export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
-  const { select, focus, setSessionView, dismissSession, report, issues } = useAgentos()
+  const { select, focus, setSessionView, dismissSession, resumeSession, report, issues } = useAgentos()
   const now = useNow()
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
@@ -89,9 +89,16 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
             </button>
           )}
           {ended && (
-            <button className="btn ml-auto h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
-              Dismiss
-            </button>
+            <span className="ml-auto flex gap-2">
+              {session.resumable && (
+                <button className="btn h-6 px-2" title="Start a session that continues this conversation" onClick={() => report(() => resumeSession(session.id))}>
+                  Resume
+                </button>
+              )}
+              <button className="btn h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
+                Dismiss
+              </button>
+            </span>
           )}
         </div>
       )}

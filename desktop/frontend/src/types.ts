@@ -35,6 +35,7 @@ export type Session = {
   action: string
   tokens: number
   cost: number
+  resumable: boolean
 }
 
 export type Project = {
