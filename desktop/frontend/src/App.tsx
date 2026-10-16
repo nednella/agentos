@@ -5,6 +5,7 @@ import { NewsView } from './components/NewsView'
 import { Divider } from './components/Divider'
 import { IssueDialog } from './components/IssueDialog'
 import { MobileTabs } from './components/MobileTabs'
+import { OfflineSplash } from './components/OfflineSplash'
 import { Palette } from './components/Palette'
 import { PatchNotes } from './components/PatchNotes'
 import { ProjectPanel } from './components/ProjectPanel'
@@ -21,6 +22,7 @@ import { TopBar } from './components/TopBar'
 import { Viewport } from './components/Viewport'
 import { useLayout } from './LayoutContext'
 import { useFocusedPanel } from './useFocusedPanel'
+import { useNetwork } from './useNetwork'
 import { useNewsToasts } from './useNewsToasts'
 import { useShortcuts } from './useShortcuts'
 import { useUiCommands } from './useUiCommands'
@@ -32,7 +34,8 @@ const appEnterClass: Record<SplashStage, string> = {
 }
 
 export function App() {
-  useShortcuts()
+  const network = useNetwork()
+  useShortcuts(network.online)
   useUiCommands()
   useNewsToasts()
   useFocusedPanel()
@@ -45,7 +48,11 @@ export function App() {
 
   return (
     <>
-      <div className={`flex h-full flex-col bg-app ${appEnterClass[splash]}`} data-mode={mode}>
+      <div
+        className={`flex h-full flex-col bg-app ${appEnterClass[splash]}`}
+        data-mode={mode}
+        {...(network.online ? {} : { inert: '' })}
+      >
         <TopBar />
         <main className={`relative flex min-h-0 min-w-0 flex-1 ${narrow ? 'p-2' : 'p-3'}`}>
           <Sidebar />
@@ -75,6 +82,7 @@ export function App() {
         <PatchNotes />
         <Toasts />
       </div>
+      {!network.online && <OfflineSplash checking={network.checking} nextCheckIn={network.nextCheckIn} onRetry={network.check} />}
       {splash !== 'done' && <Splash stage={splash} onStage={setSplash} />}
     </>
   )
