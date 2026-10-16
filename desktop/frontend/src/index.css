@@ -706,6 +706,48 @@
     }
   }
 
+  .splash.offline {
+    --u: calc(48px / 328);
+  }
+
+  .offline-prompt {
+    display: flex;
+    align-items: baseline;
+    font: 500 40px/1 var(--font-mono);
+  }
+
+  .offline-prompt svg {
+    flex: none;
+    width: calc(224 * var(--u));
+    height: calc(328 * var(--u));
+    margin-right: calc(38 * var(--u));
+    overflow: visible;
+  }
+
+  .offline-prompt polyline {
+    fill: none;
+    stroke: var(--text-dim);
+    stroke-width: 64;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .offline-cursor {
+    flex: none;
+    width: calc(220 * var(--u));
+    height: calc(50 * var(--u));
+    border-radius: calc(16 * var(--u));
+    background: var(--waiting);
+    box-shadow: 0 0 calc(40 * var(--u)) color-mix(in srgb, var(--waiting) 45%, transparent);
+    animation: offline-blink 1.1s steps(1) infinite;
+  }
+
+  @keyframes offline-blink {
+    50% {
+      opacity: 0;
+    }
+  }
+
   .app-enter {
     opacity: 0;
     transform: scale(0.985);

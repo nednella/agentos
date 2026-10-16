@@ -4,15 +4,16 @@ import { matchShortcut, useActions } from './actions'
 import { useLayout } from './LayoutContext'
 import { isEditingText } from './useListNav'
 
-export function useShortcuts() {
+export function useShortcuts(enabled: boolean) {
   const a = useAgentos()
   const layout = useLayout()
   const actions = useActions()
-  const latest = useRef({ a, layout, actions })
-  latest.current = { a, layout, actions }
+  const latest = useRef({ a, layout, actions, enabled })
+  latest.current = { a, layout, actions, enabled }
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      if (!latest.current.enabled) return
       const { a: agentos, actions: registry } = latest.current
       const action = registry.find((x) => x.shortcut && matchShortcut(e, x.shortcut) && !(x.shortcut.unlessTyping && isEditingText(e.target)))
       if (action) {
@@ -21,7 +22,7 @@ export function useShortcuts() {
       }
     }
     const onEscape = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
+      if (e.key !== 'Escape' || !latest.current.enabled) return
       const { a: agentos, layout: lay } = latest.current
       if (agentos.overlay) {
         agentos.setOverlay(null)
