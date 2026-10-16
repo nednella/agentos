@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"maps"
 	"math/rand/v2"
 	"net"
@@ -129,20 +130,35 @@ func (b *Browsers) PIDs() []int {
 	defer b.mu.Unlock()
 	var pids []int
 	for _, p := range b.procs {
-		if p.cmd.Process != nil {
-			pids = append(pids, p.cmd.Process.Pid)
-		}
+		pids = append(pids, p.pid)
 	}
 	return pids
 }
 
+// browserProc is one project's browser: started by this app, or reclaimed in start when a run of it was left
+// behind.
 type browserProc struct {
 	key  string
-	cmd  *exec.Cmd
-	cdp  *cdp
-	gone chan struct{}
+	pid  int
+	port int
+	gone chan struct{} // closed when the process has ended
 
-	tabs int
+	mu  sync.Mutex
+	cdp *cdp // the connection in use; a dropped one is replaced by reconnect
+
+	tabs int // guarded by Browsers.mu
+}
+
+func (p *browserProc) conn() *cdp {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.cdp
+}
+
+func (p *browserProc) setConn(c *cdp) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.cdp = c
 }
 
 // tab is one session's browser: the pages it owns, and the state the front end shows.
@@ -208,6 +224,12 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	if err := os.MkdirAll(profile, 0o700); err != nil {
 		return nil, fmt.Errorf("creating the browser profile: %w", err)
 	}
+	if p := b.reclaim(ctx, key, profile); p != nil {
+		b.mu.Lock()
+		b.procs[key] = p
+		b.mu.Unlock()
+		return p, nil
+	}
 	stopStrayBrowser(profile)
 	// A browser that ended with pages open restores them at its next start, into the first session's window, which
 	// then adopts them as its own.
@@ -223,31 +245,13 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("starting the browser: %w", err)
 	}
-	p = &browserProc{key: key, cmd: cmd, gone: make(chan struct{})}
+	p = &browserProc{key: key, pid: cmd.Process.Pid, port: port, gone: make(chan struct{})}
 	go func() {
 		_ = cmd.Wait()
 		close(p.gone)
 		b.exited(p)
 	}()
-
-	wsURL, err := waitForEndpoint(ctx, port, p.gone)
-	if err != nil {
-		p.kill()
-		return nil, err
-	}
-	c, err := dialCDP(ctx, wsURL, func(sessionID, method string, params json.RawMessage) { b.event(p, sessionID, method, params) })
-	if err != nil {
-		p.kill()
-		return nil, err
-	}
-	p.cdp = c
-	// A browser that drops the connection cannot be driven any more, though it may still run: forget it, and the next
-	// start ends it as a stray.
-	go func() {
-		<-c.done
-		b.exited(p)
-	}()
-	if _, err := c.call(ctx, "", "Target.setDiscoverTargets", map[string]any{"discover": true}); err != nil {
+	if err := b.connect(ctx, p); err != nil {
 		p.kill()
 		return nil, err
 	}
@@ -255,6 +259,108 @@ func (b *Browsers) start(ctx context.Context, key string) (*browserProc, error) 
 	b.procs[key] = p
 	b.mu.Unlock()
 	return p, nil
+}
+
+// reclaim takes over a browser that still runs on the profile and answers on the project's saved port: one this app
+// forgot when its connection dropped and could not be made again in time. Its windows are matched to sessions by
+// their labels when each session next opens its browser.
+func (b *Browsers) reclaim(ctx context.Context, key, profile string) *browserProc {
+	pid, running := lockedPID(profile)
+	port := b.savedPort(key)
+	if !running || port == 0 {
+		return nil
+	}
+	if _, err := endpoint(port); err != nil {
+		return nil
+	}
+	p := &browserProc{key: key, pid: pid, port: port, gone: make(chan struct{})}
+	if err := b.connect(ctx, p); err != nil {
+		log.Printf("agentos: the browser of %s (pid %d) answers on port %d but could not be reconnected: %v", key, pid, port, err)
+		return nil
+	}
+	go func() {
+		for processRuns(pid) {
+			time.Sleep(500 * time.Millisecond)
+		}
+		close(p.gone)
+		b.exited(p)
+	}()
+	log.Printf("agentos: reconnected to the browser of %s (pid %d) that was left running", key, pid)
+	return p
+}
+
+func processRuns(pid int) bool { return syscall.Kill(pid, 0) == nil }
+
+// connect dials the browser once it answers on its port, asks it for its targets, and has reconnect remake the
+// connection when it drops.
+func (b *Browsers) connect(ctx context.Context, p *browserProc) error {
+	wsURL, err := waitForEndpoint(ctx, p.port, p.gone)
+	if err != nil {
+		return err
+	}
+	c, err := dialCDP(ctx, wsURL, func(sessionID, method string, params json.RawMessage) { b.event(p, sessionID, method, params) })
+	if err != nil {
+		return err
+	}
+	// Set before the browser is asked for its targets: their events reach the pages over this connection.
+	p.setConn(c)
+	if _, err := c.call(ctx, "", "Target.setDiscoverTargets", map[string]any{"discover": true}); err != nil {
+		c.close()
+		return err
+	}
+	go func() {
+		<-c.done
+		b.reconnect(p, c)
+	}()
+	return nil
+}
+
+// reconnect remakes a connection the browser dropped, as after the Mac slept, and attaches the sessions' pages again:
+// the browser keeps running with every window, and the pages keep their target ids. A browser that does not answer
+// in time is forgotten; the next start ends it as a stray if it still does not answer, and reclaims it if it does.
+func (b *Browsers) reconnect(p *browserProc, dropped *cdp) {
+	b.launchMu.Lock()
+	defer b.launchMu.Unlock()
+	b.mu.Lock()
+	current := b.procs[p.key] == p
+	b.mu.Unlock()
+	if !current || p.conn() != dropped {
+		return
+	}
+	dropped.close()
+	ctx, cancel := context.WithTimeout(context.Background(), browserStartLimit)
+	defer cancel()
+	if err := b.connect(ctx, p); err != nil {
+		select {
+		case <-p.gone:
+		default:
+			log.Printf("agentos: forgetting the browser of %s (pid %d): its connection dropped and %v", p.key, p.pid, err)
+			b.exited(p)
+		}
+		return
+	}
+	b.mu.Lock()
+	var tabs []*tab
+	for _, t := range b.tabs {
+		if t.proc == p {
+			tabs = append(tabs, t)
+		}
+	}
+	b.mu.Unlock()
+	for _, t := range tabs {
+		for _, pg := range t.pagesCopy() {
+			if err := t.attach(ctx, pg); err != nil {
+				t.drop(pg)
+			}
+		}
+		if len(t.pagesCopy()) == 0 {
+			b.Close(ctx, t.id)
+			continue
+		}
+		t.refreshAll(ctx)
+		t.change(func() {})
+	}
+	log.Printf("agentos: reconnected to the browser of %s (pid %d) after its connection dropped", p.key, p.pid)
 }
 
 func (b *Browsers) launchArgs(profile string, port int) []string {
@@ -351,21 +457,32 @@ func freePort() (int, error) {
 	return 0, errors.New("no free port")
 }
 
+// endpoint asks the browser on port for the websocket to its protocol.
+func endpoint(port int) (string, error) {
+	client := &http.Client{Timeout: time.Second}
+	resp, err := client.Get("http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(port)) + "/json/version")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	var info struct {
+		WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
+		return "", err
+	}
+	if info.WebSocketDebuggerURL == "" {
+		return "", errors.New("the browser named no websocket")
+	}
+	return info.WebSocketDebuggerURL, nil
+}
+
 // waitForEndpoint polls the browser on port until it names the websocket to its protocol.
 func waitForEndpoint(ctx context.Context, port int, gone <-chan struct{}) (string, error) {
 	deadline := time.After(browserStartLimit)
-	url := "http://" + net.JoinHostPort("127.0.0.1", strconv.Itoa(port)) + "/json/version"
-	client := &http.Client{Timeout: time.Second}
 	for {
-		if resp, err := client.Get(url); err == nil {
-			var info struct {
-				WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
-			}
-			err = json.NewDecoder(resp.Body).Decode(&info)
-			resp.Body.Close()
-			if err == nil && info.WebSocketDebuggerURL != "" {
-				return info.WebSocketDebuggerURL, nil
-			}
+		if wsURL, err := endpoint(port); err == nil {
+			return wsURL, nil
 		}
 		select {
 		case <-gone:
@@ -381,10 +498,10 @@ func waitForEndpoint(ctx context.Context, port int, gone <-chan struct{}) (strin
 
 // stop asks the browser to quit, so it writes its profile out, and kills it only if it has not gone within stopLimit.
 func (p *browserProc) stop() {
-	if p.cdp != nil {
+	if c := p.conn(); c != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), stopLimit)
 		defer cancel()
-		_, _ = p.cdp.call(ctx, "", "Browser.close", nil)
+		_, _ = c.call(ctx, "", "Browser.close", nil)
 		select {
 		case <-p.gone:
 		case <-ctx.Done():
@@ -394,12 +511,10 @@ func (p *browserProc) stop() {
 }
 
 func (p *browserProc) kill() {
-	if p.cmd.Process != nil {
-		// The whole group: the browser's helper processes go with it.
-		_ = syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL)
-	}
-	if p.cdp != nil {
-		p.cdp.close()
+	// The whole group: the browser's helper processes go with it.
+	_ = syscall.Kill(-p.pid, syscall.SIGKILL)
+	if c := p.conn(); c != nil {
+		c.close()
 	}
 }
 
@@ -460,29 +575,36 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	if err != nil {
 		return BrowserState{ID: id, Error: err.Error()}, err
 	}
-	target := map[string]any{"url": "about:blank", "newWindow": true, "background": true, "width": defaultViewWidth, "height": defaultViewHeight}
-	raw, err := p.cdp.call(ctx, "", "Target.createTarget", target)
-	if err != nil {
-		b.stopIfIdle(p)
-		return BrowserState{}, err
+	t := &tab{b: b, proc: p, id: id, prefix: windowLabel(b.labelFor(id)), state: BrowserState{ID: id, Open: true, URL: "about:blank"}}
+	targets := b.labelledTargets(ctx, p, t.prefix)
+	if len(targets) == 0 {
+		target := map[string]any{"url": "about:blank", "newWindow": true, "background": true, "width": defaultViewWidth, "height": defaultViewHeight}
+		raw, err := p.conn().call(ctx, "", "Target.createTarget", target)
+		if err != nil {
+			b.stopIfIdle(p)
+			return BrowserState{}, err
+		}
+		var created struct {
+			TargetID string `json:"targetId"`
+		}
+		_ = json.Unmarshal(raw, &created)
+		targets = []string{created.TargetID}
 	}
-	var created struct {
-		TargetID string `json:"targetId"`
+	for _, targetID := range targets {
+		t.pages = append(t.pages, t.newPage(targetID))
 	}
-	_ = json.Unmarshal(raw, &created)
-	t := &tab{b: b, proc: p, id: id, prefix: windowLabel(b.labelFor(id)),
-		state: BrowserState{ID: id, Open: true, URL: "about:blank", Pages: 1}}
-	first := t.newPage(created.TargetID)
-	t.pages = []*page{first}
+	t.state.Pages = len(t.pages)
 	b.mu.Lock()
 	b.tabs[id] = t
 	p.tabs++
 	b.mu.Unlock()
 	b.onTabs()
 
-	if err := t.attach(ctx, first); err != nil {
-		b.Close(ctx, id)
-		return BrowserState{}, err
+	for _, pg := range t.pagesCopy() {
+		if err := t.attach(ctx, pg); err != nil {
+			b.Close(ctx, id)
+			return BrowserState{}, err
+		}
 	}
 	go t.watch()
 	if url == "" {
@@ -496,6 +618,29 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 	}
 	t.publish()
 	return t.snapshotState(), nil
+}
+
+// labelledTargets are the pages that carry the session's label in their title and belong to no session: the windows
+// of a session that the app lost track of, in a browser that start reclaimed.
+func (b *Browsers) labelledTargets(ctx context.Context, p *browserProc, prefix string) []string {
+	raw, err := p.conn().call(ctx, "", "Target.getTargets", nil)
+	if err != nil {
+		return nil
+	}
+	var res struct {
+		TargetInfos []targetInfo `json:"targetInfos"`
+	}
+	if json.Unmarshal(raw, &res) != nil {
+		return nil
+	}
+	var ids []string
+	for _, info := range res.TargetInfos {
+		labelled := info.Title == prefix || strings.HasPrefix(info.Title, prefix+" ")
+		if info.Type == "page" && labelled && b.pageOfTarget(info.TargetID) == nil {
+			ids = append(ids, info.TargetID)
+		}
+	}
+	return ids
 }
 
 // windowLabel is the bracketed label before a window's title. Whitespace is collapsed the way document.title
@@ -622,7 +767,7 @@ func (b *Browsers) Close(ctx context.Context, id string) {
 	pages := slices.Clone(t.pages)
 	t.mu.Unlock()
 	for _, pg := range pages {
-		_, _ = t.proc.cdp.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID})
+		_, _ = t.proc.conn().call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID})
 	}
 	t.mu.Lock()
 	t.state.Open = false
@@ -657,6 +802,8 @@ func (b *Browsers) stopIfIdle(p *browserProc) {
 func (b *Browsers) CloseAll() {
 	b.mu.Lock()
 	procs := slices.Collect(maps.Values(b.procs))
+	// Forgotten first, so reconnect does not take a stopping browser for one that dropped its connection.
+	clear(b.procs)
 	b.mu.Unlock()
 	for _, p := range procs {
 		p.stop()
