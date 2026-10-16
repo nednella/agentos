@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.38.0](https://github.com/nednella/agentos/compare/v0.37.0...v0.38.0) (2026-10-16)
+
+
+### Features
+
+* **desktop:** emit network event when GitHub or git call fails ([efe448e](https://github.com/nednella/agentos/commit/efe448e4481669f8204ae7e8332dc9d22ed2acda))
+
+
+### Bug Fixes
+
+* **ui:** check network when app reports failed call ([1c92e13](https://github.com/nednella/agentos/commit/1c92e13d0e6a8c4a6fdc0760e81ce4a1378101c1))
+
 ## [0.37.0](https://github.com/nednella/agentos/compare/v0.36.1...v0.37.0) (2026-10-16)
 
 
