@@ -440,7 +440,10 @@ export function createMock(params: URLSearchParams) {
   }
 
   if (flags.warn) {
-    setTimeout(() => emit('warnings', { source: 'github', message: 'gh could not name the repo' }), 1500)
+    setTimeout(() => {
+      emit('warnings', { source: 'github', message: 'gh could not name the repo' })
+      emit('network', undefined)
+    }, 1500)
     setTimeout(() => emit('warnings', { source: 'github', message: '' }), 9000)
   }
 
