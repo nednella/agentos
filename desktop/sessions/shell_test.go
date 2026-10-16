@@ -54,8 +54,8 @@ func TestShellSession(t *testing.T) {
 	if got := h.Snapshot().Project.Sessions; got != 1 {
 		t.Errorf("project counts %d sessions", got)
 	}
-	if records := bus.ReadAll(h.State); len(records) != 0 {
-		t.Errorf("the shell or agent left state: %v", records)
+	if records := bus.ReadAll(h.State); len(records) != 1 || records[agent.ID].Title != "agent" {
+		t.Errorf("state = %v, want only the agent's", records)
 	}
 	if err := h.KillSession(shell.ID); err == nil {
 		t.Error("KillSession stopped the shell")

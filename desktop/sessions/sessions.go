@@ -348,15 +348,41 @@ type endedSession struct {
 // persist saves what the row needs to outlive the app. It needs mu.
 func (e *endedSession) record() session.Record {
 	rec := e.rec
-	rec.State = session.Ended
-	rec.Title, rec.Path, rec.EndedAt = e.info.Title, e.info.Path, e.at.UnixMilli()
-	rec.Issue, _ = strconv.Atoi(e.info.Issue)
-	rec.Chat, rec.Action = e.info.Chat, e.info.Action
-	rec.Model, rec.Effort = e.info.Model, e.info.Effort
-	if !e.info.Created.IsZero() {
-		rec.Created = e.info.Created.UnixMilli()
-	}
+	rec.State, rec.EndedAt = session.Ended, e.at.UnixMilli()
+	rec.Identity = identityOf(e.info)
 	return rec
+}
+
+func identityOf(in term.Info) session.Identity {
+	id := session.Identity{Title: in.Title, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Path: in.Path}
+	id.Issue, _ = strconv.Atoi(in.Issue)
+	if !in.Created.IsZero() {
+		id.Created = in.Created.UnixMilli()
+	}
+	return id
+}
+
+// saveIdentity writes what a live session was started as into its state file, which hooks keep. Without it, a
+// session that ends while the app is closed comes back with no title, kind or issue.
+func (s *Sessions) saveIdentity(in term.Info) {
+	id := in.Name.String()
+	unlock, err := bus.LockState(s.stateDir, id)
+	if err != nil {
+		return
+	}
+	defer unlock()
+	rec, err := bus.ReadState(s.stateDir, id)
+	if err != nil || rec.Identity == identityOf(in) {
+		return
+	}
+	if rec.Session == "" {
+		// Dated when the session was created, so its first hook is not taken for one that came too late.
+		rec = session.Record{Session: id, State: session.Idle, At: in.Created}
+	}
+	rec.Identity = identityOf(in)
+	if err := bus.WriteState(s.stateDir, rec); err != nil {
+		fmt.Fprintf(os.Stderr, "agentos: saving a session's identity: %v\n", err)
+	}
 }
 
 // adoptEnded takes in a state file whose tmux session is gone. It needs mu.
@@ -625,6 +651,7 @@ func (s *Sessions) sync() {
 			}
 			delete(s.resumed, id)
 			s.adoptHistory(id, in.Created)
+			s.saveIdentity(in)
 		}
 		opened := s.loaded && state == session.Idle && s.life.opened(id)
 		if opened {
@@ -1176,6 +1203,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		start, text = text, ""
 	}
 	name, ctx, ready := s.reserve(proj, text)
+	created := time.Now()
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
@@ -1185,7 +1213,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		s.mu.Unlock()
 		return Session{}, err
 	}
-	view := s.register(name, title, proj, issue, model, conversation != "", chat, action)
+	view := s.register(name, title, proj, issue, model, created, conversation != "", chat, action)
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
@@ -1253,13 +1281,13 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, resumed, chat bool, action string) Session {
+func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, created time.Time, resumed, chat bool, action string) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if resumed {
 		s.resumed[name.String()] = true
 	}
-	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Created: time.Now()}
+	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Created: created}
 	if _, ok := s.agent.(agent.Claude); ok {
 		in.Model, in.Effort = model.Model, model.Effort
 	}
@@ -1455,6 +1483,7 @@ func (s *Sessions) Rename(id, title string) error {
 	for i := range s.info {
 		if s.info[i].Name == name {
 			s.info[i].Title = title
+			s.saveIdentity(s.info[i])
 		}
 	}
 	s.sync()
