@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.37.0](https://github.com/nednella/agentos/compare/v0.36.1...v0.37.0) (2026-10-16)
+
+
+### Features
+
+* **ui:** show splash while network is unavailable ([1e80f13](https://github.com/nednella/agentos/commit/1e80f13a4e154fe0b63e664fcf9d569e5736f4d0)), closes [#436](https://github.com/nednella/agentos/issues/436)
+* **ui:** stack offline countdown above retry button ([c01ff00](https://github.com/nednella/agentos/commit/c01ff00f3014b536d8b2f14b73835ddfa0da77b6))
+
 ## [0.36.1](https://github.com/nednella/agentos/compare/v0.36.0...v0.36.1) (2026-10-16)
 
 
