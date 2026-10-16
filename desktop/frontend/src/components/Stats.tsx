@@ -72,7 +72,7 @@ export function Stats() {
           <Icon name="close" />
         </button>
         <div className="col-span-2 flex flex-wrap justify-self-stretch items-center justify-between gap-x-3 gap-y-2 @xl:contents">
-          <select aria-label="Project" className="btn btn-ghost h-7 px-2" value={project} onChange={(e) => pickProject(e.target.value)}>
+          <select aria-label="Project" className="btn btn-ghost h-7 px-2 [field-sizing:content]" value={project} onChange={(e) => pickProject(e.target.value)}>
             <option value="">All projects</option>
             {projects.map((p) => (
               <option key={p.key} value={p.key}>
