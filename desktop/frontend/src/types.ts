@@ -320,6 +320,7 @@ export type EventMap = {
   awake: boolean
   memory: Memory
   stats: undefined
+  network: undefined
   'ui:command': { name: string; args: string[] }
   evidence: { id: string; items: Evidence[] }
   digest: Digest

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { on } from './api'
 
 const CHECK_EVERY_S = 10
 const CHECK_TIMEOUT_MS = 5000
@@ -40,6 +41,12 @@ export function useNetwork() {
       window.removeEventListener('online', check)
     }
   }, [check])
+
+  // The app sends network when a GitHub or git call fails: Wi-Fi with no internet sends no offline event.
+  useEffect(() => {
+    if (!online) return
+    return on('network', () => void check())
+  }, [online, check])
 
   useEffect(() => {
     if (online || checking) return
