@@ -45,6 +45,7 @@ func TestApply(t *testing.T) {
 	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	t1 := t0.Add(time.Minute)
 	stop := Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Detail: "done"}
+	chat := Identity{Title: "ask", Issue: 7, Chat: true, Action: "plan", Model: "opus", Effort: "high", Path: "/p", Created: t0.UnixMilli()}
 	tests := []struct {
 		name string
 		prev Record
@@ -64,6 +65,8 @@ func TestApply(t *testing.T) {
 		{"transcript kept when the event has none", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Transcript: "/t/a.jsonl"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Transcript: "/t/a.jsonl"}},
 		{"cwd kept when the event has none", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Cwd: "/a"}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Cwd: "/a"}},
 		{"reminder with no record", Record{}, Event{Name: "Notification", NotificationType: "idle_prompt", Detail: "x"}, Record{Session: "p/1", State: Idle, Event: "Notification", At: t1}},
+		{"identity kept", Record{Session: "p/1", State: Idle, Event: "Stop", At: t0, Identity: chat}, Event{Name: "UserPromptSubmit"}, Record{Session: "p/1", State: Working, Event: "UserPromptSubmit", At: t1, Identity: chat}},
+		{"identity kept on a record with no state", Record{Session: "p/1", At: t0, Identity: chat}, Event{Name: "SessionStart"}, Record{Session: "p/1", State: Idle, Event: "SessionStart", At: t1, Identity: chat}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

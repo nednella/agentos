@@ -59,7 +59,7 @@ func TestNumbersAfterARestartFollowCreationOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	old := time.Now().Add(-2 * time.Hour)
-	rec := session.Record{Session: "main/old1", State: session.Ended, Event: "SessionEnd", At: old, Title: "old", Created: old.UnixMilli(), EndedAt: old.Add(time.Hour).UnixMilli()}
+	rec := session.Record{Session: "main/old1", State: session.Ended, Event: "SessionEnd", At: old, Identity: session.Identity{Title: "old", Created: old.UnixMilli()}, EndedAt: old.Add(time.Hour).UnixMilli()}
 	if err := bus.WriteState(h.State, rec); err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestExpiredEndedRowGoesWithItsEvidenceAndPRs(t *testing.T) {
 	h := newHarness(t)
 	const id = "main/old1"
 	long := time.Now().Add(-8 * 24 * time.Hour)
-	rec := session.Record{Session: id, State: session.Ended, Event: "SessionEnd", At: long, Title: "old", EndedAt: long.UnixMilli()}
+	rec := session.Record{Session: id, State: session.Ended, Event: "SessionEnd", At: long, Identity: session.Identity{Title: "old"}, EndedAt: long.UnixMilli()}
 	if err := bus.WriteState(h.State, rec); err != nil {
 		t.Fatal(err)
 	}

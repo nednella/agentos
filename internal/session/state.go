@@ -30,7 +30,13 @@ type Record struct {
 	Transcript   string    `json:"transcript,omitempty"`   // the file the agent writes its conversation to
 	Changes      []Change  `json:"changes,omitempty"`      // the latest state changes, oldest first, so the timeline outlives the app
 
-	// What the desktop app records when a session ends, so the row can outlive it.
+	Identity
+	EndedAt int64 `json:"endedAt,omitempty"` // unix ms, set by the desktop app when it sees the session end
+}
+
+// Identity is what the desktop app started a session as. The app writes it when the session starts, so a
+// session that ends while the app is closed comes back as itself.
+type Identity struct {
 	Title   string `json:"title,omitempty"`
 	Issue   int    `json:"issue,omitempty"`
 	Chat    bool   `json:"chat,omitempty"`
@@ -39,7 +45,6 @@ type Record struct {
 	Effort  string `json:"effort,omitempty"`
 	Path    string `json:"path,omitempty"`
 	Created int64  `json:"created,omitempty"` // unix ms
-	EndedAt int64  `json:"endedAt,omitempty"` // unix ms
 }
 
 // Change is one entry of a session's state timeline.

@@ -201,7 +201,7 @@ func TestRemovingAProjectEndsItsSessions(t *testing.T) {
 func TestNewSessionDoesNotInheritAnOlderOnesLiveFlag(t *testing.T) {
 	h := newHarness(t)
 	long := time.Now().Add(-time.Hour)
-	if err := bus.WriteState(h.State, session.Record{Session: "main/1", State: session.Ended, Event: "SessionEnd", At: long, Title: "old", Issue: 7, EndedAt: long.UnixMilli()}); err != nil {
+	if err := bus.WriteState(h.State, session.Record{Session: "main/1", State: session.Ended, Event: "SessionEnd", At: long, Identity: session.Identity{Title: "old", Issue: 7}, EndedAt: long.UnixMilli()}); err != nil {
 		t.Fatal(err)
 	}
 	prs := filepath.Join(h.State, "data", "main", "prs.json")
