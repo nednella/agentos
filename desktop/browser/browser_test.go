@@ -32,11 +32,80 @@ func TestStrayBrowserIsReplaced(t *testing.T) {
 	if _, err := first.Open(ctx, "p/1", "about:blank"); err != nil {
 		t.Fatal(err)
 	}
-	// The app was killed: a new one starts on the same profile while the old browser still runs.
+	old := first.tab("p/1").proc
+	// The app was killed: a new one starts on the same profile while the old browser still runs, but does not answer
+	// on the port the new one knows.
+	other, err := freePort()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.savePort("p", other); err != nil {
+		t.Fatal(err)
+	}
 	second := New(dir, func(string, any) {})
 	defer second.CloseAll()
 	if _, err := second.Open(ctx, "p/1", "about:blank"); err != nil {
 		t.Fatalf("the restarted app could not get a browser: %v", err)
+	}
+	select {
+	case <-old.gone:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the browser that does not answer on its port still runs")
+	}
+}
+
+func TestStartReclaimsARunningBrowserAndItsWindows(t *testing.T) {
+	dir, err := os.MkdirTemp("", "aosb")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(dir)
+	label := func(id string) string { return "demo · " + id }
+	first := New(dir, func(string, any) {})
+	if !first.Available() {
+		t.Skip("no Chrome for Testing installed")
+	}
+	first.Hook(func(string) string { return "" }, label, func() {})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("<title>Tab</title>")) }))
+	defer srv.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	defer first.CloseAll()
+	if _, err := first.Open(ctx, "p/1", srv.URL); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.AgentTab(ctx, "p/1", srv.URL+"/two"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := first.Open(ctx, "p/2", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	old := first.tab("p/1").proc
+	// The app forgot the browser while it ran on: the next start takes it back with the windows in it.
+	first.exited(old)
+	second := New(dir, func(string, any) {})
+	second.Hook(func(string) string { return "" }, label, func() {})
+	defer second.CloseAll()
+	st, err := second.Open(ctx, "p/1", "")
+	if err != nil {
+		t.Fatalf("Open in the app that reclaims: %v", err)
+	}
+	if got := second.tab("p/1").proc.pid; got != old.pid {
+		t.Errorf("the session got the browser with pid %d, want the running %d", got, old.pid)
+	}
+	if st.Pages != 2 {
+		t.Errorf("the session got %d pages back, want its 2", st.Pages)
+	}
+	if n := second.State("p/2").Pages; n != 0 {
+		t.Errorf("the other session's window was taken before it opened: %d pages", n)
+	}
+	if _, err := second.Open(ctx, "p/2", ""); err != nil || second.State("p/2").Pages != 1 {
+		t.Errorf("the other session did not get its window back: %+v, %v", second.State("p/2"), err)
+	}
+	select {
+	case <-old.gone:
+		t.Fatal("the running browser was ended")
+	default:
 	}
 }
 
@@ -83,21 +152,55 @@ func TestStartForgetsTheLastRunsPages(t *testing.T) {
 	}
 }
 
-func TestDroppedConnectionForgetsTheBrowser(t *testing.T) {
+func TestDroppedConnectionIsRemade(t *testing.T) {
 	b, ctx := newTestBrowsers(t)
-	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+	if _, err := b.Open(ctx, "p/1", "data:text/html,<title>Kept</title>"); err != nil {
 		t.Fatal(err)
 	}
-	b.tab("p/1").proc.cdp.close()
+	p := b.tab("p/1").proc
+	dropped := p.conn()
+	dropped.close()
 	deadline := time.Now().Add(10 * time.Second)
-	for b.Has("p/1") {
+	for p.conn() == dropped {
 		if time.Now().After(deadline) {
-			t.Fatal("the session kept a browser whose connection dropped")
+			t.Fatal("the connection was not remade")
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+	if !b.Has("p/1") {
+		t.Fatal("the session lost its browser when the connection dropped")
+	}
+	if got, err := b.Eval(ctx, "p/1", "document.title"); err != nil || got != `"[] Kept"` {
+		t.Errorf("Eval over the remade connection = %s, %v", got, err)
+	}
+	if _, err := b.Open(ctx, "p/2", "about:blank"); err != nil {
 		t.Fatalf("Open after the drop: %v", err)
+	}
+	select {
+	case <-p.gone:
+		t.Fatal("the browser was ended")
+	default:
+	}
+}
+
+func TestOpenLeavesAnotherSessionsPagesAlone(t *testing.T) {
+	b, ctx := newTestBrowsers(t)
+	// Every session gets the same label, as a page's would read when its session cannot be named.
+	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.Open(ctx, "p/2", "about:blank"); err != nil {
+		t.Fatal(err)
+	}
+	first, _ := b.tab("p/1").activePage()
+	second, _ := b.tab("p/2").activePage()
+	if first.targetID == second.targetID {
+		t.Fatal("the second session took the first session's page")
+	}
+	b.Close(ctx, "p/1")
+	time.Sleep(500 * time.Millisecond)
+	if st := b.State("p/2"); !st.Open || st.Pages != 1 {
+		t.Errorf("closing one session's browser left the other's as %+v", st)
 	}
 }
 
@@ -109,7 +212,7 @@ func TestPIDsAreTheRunningBrowsers(t *testing.T) {
 	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
 		t.Fatal(err)
 	}
-	if pids := b.PIDs(); len(pids) != 1 || pids[0] != b.tab("p/1").proc.cmd.Process.Pid {
+	if pids := b.PIDs(); len(pids) != 1 || pids[0] != b.tab("p/1").proc.pid {
 		t.Errorf("PIDs = %v", pids)
 	}
 }
@@ -503,7 +606,7 @@ func TestTitleScriptLabelsTheCurrentDocument(t *testing.T) {
 
 func closeTarget(t *testing.T, ctx context.Context, b *Browsers, pg *page) {
 	t.Helper()
-	if _, err := pg.t.proc.cdp.call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID}); err != nil {
+	if _, err := pg.t.proc.conn().call(ctx, "", "Target.closeTarget", map[string]any{"targetId": pg.targetID}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -539,7 +642,7 @@ func TestSessionClosesWithItsLastPage(t *testing.T) {
 
 	// A page nobody opened for the session (no opener, and its own window) is not the session's.
 	other := b.procs["p"]
-	if _, err := other.cdp.call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank", "newWindow": true}); err != nil {
+	if _, err := other.conn().call(ctx, "", "Target.createTarget", map[string]any{"url": "about:blank", "newWindow": true}); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(500 * time.Millisecond)

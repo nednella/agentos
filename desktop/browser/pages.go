@@ -45,7 +45,7 @@ func (pg *page) call(ctx context.Context, method string, params any) (json.RawMe
 	pg.t.mu.Lock()
 	sessionID := pg.sessionID
 	pg.t.mu.Unlock()
-	return pg.t.proc.cdp.call(ctx, sessionID, method, params)
+	return pg.t.proc.conn().call(ctx, sessionID, method, params)
 }
 
 // stopDialog forgets the open dialog's timer. The tab's mutex must be held.
@@ -129,7 +129,7 @@ func (t *tab) change(fn func()) bool {
 
 // attach subscribes to a page's events and gives its documents the title label.
 func (t *tab) attach(ctx context.Context, pg *page) error {
-	raw, err := t.proc.cdp.call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": pg.targetID, "flatten": true})
+	raw, err := t.proc.conn().call(ctx, "", "Target.attachToTarget", map[string]any{"targetId": pg.targetID, "flatten": true})
 	if err != nil {
 		return err
 	}
@@ -247,7 +247,7 @@ func (pg *page) goTo(ctx context.Context, address string) error {
 
 // activate selects the page in its window and raises the window.
 func (pg *page) activate(ctx context.Context) error {
-	_, err := pg.t.proc.cdp.call(ctx, "", "Target.activateTarget", map[string]any{"targetId": pg.targetID})
+	_, err := pg.t.proc.conn().call(ctx, "", "Target.activateTarget", map[string]any{"targetId": pg.targetID})
 	return err
 }
 
@@ -269,7 +269,7 @@ func (pg *page) window(ctx context.Context) (int, error) {
 }
 
 func windowOf(ctx context.Context, p *browserProc, targetID string) (int, error) {
-	raw, err := p.cdp.call(ctx, "", "Browser.getWindowForTarget", map[string]any{"targetId": targetID})
+	raw, err := p.conn().call(ctx, "", "Browser.getWindowForTarget", map[string]any{"targetId": targetID})
 	if err != nil {
 		return 0, err
 	}
