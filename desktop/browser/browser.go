@@ -328,6 +328,21 @@ func (b *Browsers) reconnect(p *browserProc, dropped *cdp) {
 		return
 	}
 	dropped.close()
+	b.mu.Lock()
+	var tabs []*tab
+	for _, t := range b.tabs {
+		if t.proc == p {
+			tabs = append(tabs, t)
+		}
+	}
+	b.mu.Unlock()
+	for _, t := range tabs {
+		t.mu.Lock()
+		for _, pg := range t.pages {
+			pg.detach()
+		}
+		t.mu.Unlock()
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), browserStartLimit)
 	defer cancel()
 	if err := b.connect(ctx, p); err != nil {
@@ -337,16 +352,13 @@ func (b *Browsers) reconnect(p *browserProc, dropped *cdp) {
 			log.Printf("agentos: forgetting the browser of %s (pid %d): its connection dropped and %v", p.key, p.pid, err)
 			b.exited(p)
 		}
+		for _, t := range tabs {
+			for _, pg := range t.pagesCopy() {
+				t.drop(pg)
+			}
+		}
 		return
 	}
-	b.mu.Lock()
-	var tabs []*tab
-	for _, t := range b.tabs {
-		if t.proc == p {
-			tabs = append(tabs, t)
-		}
-	}
-	b.mu.Unlock()
 	for _, t := range tabs {
 		for _, pg := range t.pagesCopy() {
 			if err := t.attach(ctx, pg); err != nil {

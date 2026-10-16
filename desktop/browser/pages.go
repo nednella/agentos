@@ -34,7 +34,8 @@ type page struct {
 	loadedAt  int64
 	shown     bool // document.visibilityState was "visible" at the last look: the selected tab of its window
 	requests  map[string]string
-	dialog    *time.Timer // set while a JavaScript dialog is open
+	dialog    *time.Timer   // set while a JavaScript dialog is open
+	reattach  chan struct{} // set while the page waits to be attached over a remade connection; closed once it is, or is dropped
 }
 
 func (t *tab) newPage(targetID string) *page {
@@ -43,9 +44,40 @@ func (t *tab) newPage(targetID string) *page {
 
 func (pg *page) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	pg.t.mu.Lock()
+	wait := pg.reattach
+	pg.t.mu.Unlock()
+	if wait != nil {
+		select {
+		case <-wait:
+		case <-ctx.Done():
+			return nil, fmt.Errorf("%s: %w", method, ctx.Err())
+		}
+	}
+	pg.t.mu.Lock()
 	sessionID := pg.sessionID
 	pg.t.mu.Unlock()
+	if sessionID == "" && wait != nil {
+		return nil, errors.New("the page is gone")
+	}
 	return pg.t.proc.conn().call(ctx, sessionID, method, params)
+}
+
+// detach marks the page as waiting to be attached again: calls on it wait until attached lets them go. The tab's
+// mutex must be held.
+func (pg *page) detach() {
+	pg.sessionID = ""
+	if pg.reattach == nil {
+		pg.reattach = make(chan struct{})
+	}
+}
+
+// attached lets the calls that wait on the page go on, with its session or, when it has none, an error. The tab's
+// mutex must be held.
+func (pg *page) attached() {
+	if pg.reattach != nil {
+		close(pg.reattach)
+		pg.reattach = nil
+	}
 }
 
 // stopDialog forgets the open dialog's timer. The tab's mutex must be held.
@@ -139,6 +171,7 @@ func (t *tab) attach(ctx context.Context, pg *page) error {
 	_ = json.Unmarshal(raw, &attached)
 	t.mu.Lock()
 	pg.sessionID = attached.SessionID
+	pg.attached()
 	t.mu.Unlock()
 
 	for _, method := range []string{"Page.enable", "Runtime.enable", "Network.enable"} {
@@ -441,6 +474,7 @@ func (t *tab) drop(pg *page) int {
 	t.mu.Lock()
 	t.pages = slices.DeleteFunc(t.pages, func(x *page) bool { return x == pg })
 	pg.stopDialog()
+	pg.attached()
 	left := len(t.pages)
 	t.mu.Unlock()
 	return left
