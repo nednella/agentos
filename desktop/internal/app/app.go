@@ -13,6 +13,7 @@ import (
 	"github.com/nednella/agentos/desktop/digest"
 	"github.com/nednella/agentos/desktop/evidence"
 	"github.com/nednella/agentos/desktop/internal/media"
+	"github.com/nednella/agentos/desktop/internal/network"
 	"github.com/nednella/agentos/desktop/internal/run"
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
@@ -69,6 +70,8 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 		}
 		return context.Background()
 	}
+	watch := network.New(h.Emit)
+	runner = watch.Runner(runner)
 	events := stats.NewLog(c.DataDir, c.Machine)
 	waits := stats.New(events)
 	proofs := evidence.New(c.DataDir, events)
@@ -113,7 +116,7 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	}, sess.Touch)
 	mgr := digest.NewManager(digest.New(c.DataDir), sess, store, claude, h.Emit, c.StateDir, ctx)
 	a.digests = mgr
-	a.news = news.NewManager(news.NewStore(c.DataDir), news.HTTPFetch(&http.Client{Timeout: 30 * time.Second}), h.Emit, ctx)
+	a.news = news.NewManager(news.NewStore(c.DataDir), news.HTTPFetch(&http.Client{Timeout: 30 * time.Second, Transport: watch.Transport(http.DefaultTransport)}), h.Emit, ctx)
 	a.updates = update.New(func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return runner(ctx, "", name, args...)
 	}, c.StateDir, Bundle(), h.Emit, upd.Relaunch, h.Quit)
