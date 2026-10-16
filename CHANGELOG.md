@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.36.1](https://github.com/nednella/agentos/compare/v0.36.0...v0.36.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **desktop:** hold page calls until the page is attached again ([fde4119](https://github.com/nednella/agentos/commit/fde4119c902faaccc95544e380e53318bbf7fe43))
+* **desktop:** reconnect to a browser whose connection dropped ([83d1dd5](https://github.com/nednella/agentos/commit/83d1dd509fee75ac4707876baf2352c2ecf600ca)), closes [#434](https://github.com/nednella/agentos/issues/434)
+* **ui:** size stat project dropdown to its choice ([8a93c5e](https://github.com/nednella/agentos/commit/8a93c5e6f0b776a33d5370112288939b6938d595))
+
 ## [0.36.0](https://github.com/nednella/agentos/compare/v0.35.0...v0.36.0) (2026-10-15)
 
 
