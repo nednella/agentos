@@ -1,11 +1,14 @@
 package sessions_test
 
 import (
+	"os/exec"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/bus"
 )
 
 // ended is a session that had the conversation abc and has ended.
@@ -54,6 +57,73 @@ func TestResumeContinuesAnEndedSession(t *testing.T) {
 			}
 			if _, ok := h.Session(old.ID); ok {
 				t.Error("the ended row stayed")
+			}
+		})
+	}
+}
+
+// endedWhileClosed quits the app, ends the session as a computer restart would, and opens the app again a minute later.
+func endedWhileClosed(t *testing.T, h *apptest.Harness, id string) *apptest.Harness {
+	t.Helper()
+	h.Hook(t, id, "Stop", `{"session_id":"abc"}`)
+	h.App.Stop()
+	if err := exec.Command("tmux", "-L", h.Socket, "kill-session", "-t", "="+id).Run(); err != nil {
+		t.Fatal(err)
+	}
+	rec, err := bus.ReadState(h.State, id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rec.At = rec.At.Add(-time.Minute)
+	if err := bus.WriteState(h.State, rec); err != nil {
+		t.Fatal(err)
+	}
+	return h.Restart(t)
+}
+
+func TestSessionThatEndedWhileTheAppWasClosedResumesAsItself(t *testing.T) {
+	dir := apptest.ClaudeOnPath(t)
+	for _, tt := range []struct {
+		name  string
+		start func(h *apptest.Harness) (sessions.Session, error)
+	}{
+		{"chat", func(h *apptest.Harness) (sessions.Session, error) { return h.NewChat("ask") }},
+		{"issue task", func(h *apptest.Harness) (sessions.Session, error) {
+			return h.Sessions().Create("#12 work", "", false, 12)
+		}},
+		{"renamed task", func(h *apptest.Harness) (sessions.Session, error) {
+			s, err := h.NewSession("work", "")
+			if err != nil {
+				return s, err
+			}
+			if err := h.RenameSession(s.ID, "better"); err != nil {
+				return s, err
+			}
+			s, _ = h.Session(s.ID)
+			return s, nil
+		}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+			old, err := tt.start(h)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fresh := endedWhileClosed(t, h, old.ID)
+			var gone sessions.Session
+			eventually(t, "the ended row", func() bool { gone, _ = fresh.Session(old.ID); return gone.State == "ended" })
+			if gone.Title != old.Title || gone.Issue != old.Issue || gone.Chat != old.Chat || !gone.Resumable {
+				t.Errorf("ended row %+v of %+v", gone, old)
+			}
+			resumed, err := fresh.ResumeSession(old.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resumed.Title != old.Title || resumed.Issue != old.Issue || resumed.Chat != old.Chat {
+				t.Errorf("resumed %+v from %+v", resumed, old)
+			}
+			if args := claudeArgs(t, dir, resumed.ID); old.Chat != slices.Contains(args, "--permission-mode") {
+				t.Errorf("args of a resumed chat=%v: %q", old.Chat, args)
 			}
 		})
 	}

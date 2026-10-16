@@ -513,7 +513,7 @@ func TestCleanupWithoutCommandRemovesOnlyTheSession(t *testing.T) {
 		t.Errorf("worktree exists: %v, branches: %q", exists(wt), branches(t, h.Dir))
 	}
 	log := h.Cleanups()
-	if len(log) != 1 || log[0].Status != "done" || !slices.Equal(log[0].Removed, []string{"session"}) {
+	if len(log) != 1 || log[0].Status != "done" || !slices.Equal(log[0].Removed, []string{"temp files", "session"}) {
 		t.Errorf("log = %+v", log)
 	}
 }

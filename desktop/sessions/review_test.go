@@ -122,7 +122,7 @@ func TestRefreshRevivesASessionTmuxStillLists(t *testing.T) {
 	if got := stateOf(h, s.ID); got != "idle" {
 		t.Errorf("a session tmux lists again is %s, want idle", got)
 	}
-	if exists(filepath.Join(h.State, "sessions", s.ID+".json")) {
+	if rec, _ := bus.ReadState(h.State, s.ID); rec.State == "ended" {
 		t.Error("the saved ended record outlived the revival")
 	}
 }
