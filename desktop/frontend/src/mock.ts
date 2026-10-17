@@ -172,6 +172,7 @@ export function createMock(params: URLSearchParams) {
     toast: params.has('toast'),
     done: params.has('done'),
     warn: params.has('warn'),
+    offline: params.has('offline'),
     update: params.has('update'),
     patchNotes: params.has('patchnotes'),
     fullDataDir: params.has('fulldata'),
@@ -442,7 +443,6 @@ export function createMock(params: URLSearchParams) {
   if (flags.warn) {
     setTimeout(() => {
       emit('warnings', { source: 'github', message: 'gh could not name the repo' })
-      emit('network', undefined)
     }, 1500)
     setTimeout(() => emit('warnings', { source: 'github', message: '' }), 9000)
   }
@@ -840,6 +840,25 @@ export function createMock(params: URLSearchParams) {
 
   const delay = <T,>(value: T, ms = 220) => new Promise<T>((resolve) => setTimeout(() => resolve(value), ms))
 
+  // With ?offline, GitHub calls get no answer for the first 12 seconds, as when the Mac has no network.
+  const networkBackAt = flags.offline ? Date.now() + 12_000 : 0
+  let offline = false
+  const github = async <T,>(value: T, ms: number): Promise<T> => {
+    await delay(undefined, ms)
+    if (Date.now() < networkBackAt) {
+      offline = true
+      emit('network', { online: false })
+      throw new Error('error connecting to api.github.com')
+    }
+    if (offline) {
+      offline = false
+      emit('network', { online: true })
+    }
+    return value
+  }
+  // The app's first gh calls, such as the PR fetch, start when it does.
+  if (flags.offline) github(undefined, 1000).catch(() => {})
+
   let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '~/.local/share/agentos', dataDirFixed: false }
 
   const backend = {
@@ -1014,7 +1033,7 @@ export function createMock(params: URLSearchParams) {
       const note = noteById(id)
       return startSessionFor(note.text.split('\n')[0], 0, note.text)
     },
-    Issues: async (refresh: boolean) => delay(currentIssues(), refresh ? 700 : 220),
+    Issues: async (refresh: boolean) => (refresh ? github(currentIssues(), 700) : delay(currentIssues())),
     StartIssue: async (number: number, action: string) => {
       const issue = current.issues.find((i) => i.number === number)
       if (!issue) throw 'No such issue'
@@ -1106,7 +1125,7 @@ export function createMock(params: URLSearchParams) {
     },
     Stats: async (days: number, project: string) => delay(statsFor(days, project), 150),
     Ledger: async (days: number, project: string) => delay(ledgerFor(days, project), 300),
-    RefreshPRs: async () => delay(undefined, 500),
+    RefreshPRs: async () => github(undefined, 500),
     AckPR: async (id: string) => {
       find(id).prAttention = ''
       publish()

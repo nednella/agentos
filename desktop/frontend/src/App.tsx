@@ -82,7 +82,7 @@ export function App() {
         <PatchNotes />
         <Toasts />
       </div>
-      {!network.online && <OfflineSplash checking={network.checking} nextCheckIn={network.nextCheckIn} onRetry={network.check} />}
+      {!network.online && <OfflineSplash retrying={network.retrying} onRetry={() => void network.retry()} />}
       {splash !== 'done' && <Splash stage={splash} onStage={setSplash} />}
     </>
   )
