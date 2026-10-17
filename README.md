@@ -49,3 +49,5 @@ To change the config by hand, edit `~/.config/agentos/config.yaml`; the app pick
 ## Update
 
 Click `Update` in the top bar, or run `agentos update`. Sessions keep running.
+
+Releases are signed with one certificate, so macOS keeps the permissions you gave agentos across updates. The first signed release asks for each permission one last time. To clear the entries that earlier releases left behind, run `tccutil reset All io.github.nednella.agentos`, then approve the prompts once more.
