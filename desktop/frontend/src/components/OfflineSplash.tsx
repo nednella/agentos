@@ -20,7 +20,7 @@ export function OfflineSplash({ retrying, onRetry }: OfflineSplashProps) {
             <span className="spinner" role="status" aria-label="Checking the network" />
           ) : (
             <button className="btn" autoFocus onClick={onRetry}>
-              Try now
+              Retry
             </button>
           )}
         </div>
