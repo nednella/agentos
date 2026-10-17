@@ -9,45 +9,57 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 )
 
-const releaseJSON = `{"tag_name":"v1.2.3","assets":[
-	{"name":"agentos-darwin-arm64.zip","browser_download_url":"https://x/agentos-darwin-arm64.zip"},
-	{"name":"agentos-darwin-arm64.zip.sha256","browser_download_url":"https://x/agentos-darwin-arm64.zip.sha256"}]}`
+const latestTag = "https://github.com/nednella/agentos/releases/tag/v1.2.3"
 
-func TestLatestReadsTheReleaseAndItsAssets(t *testing.T) {
-	run := func(_ context.Context, name string, args ...string) ([]byte, error) {
-		if name != "curl" || args[len(args)-1] != latestURL {
-			return nil, fmt.Errorf("unexpected %s %v", name, args)
+// fakeGitHub answers the latest release's redirect with tag, and has only the assets in sums.
+func fakeGitHub(tag string, sums ...string) Runner {
+	return func(_ context.Context, name string, args ...string) ([]byte, error) {
+		url := args[len(args)-1]
+		switch {
+		case name != "curl":
+		case url == latestURL:
+			return []byte(tag), nil
+		case slices.Contains(sums, url):
+			return nil, nil
 		}
-		return []byte(releaseJSON), nil
+		return nil, fmt.Errorf("curl: (56) The requested URL returned error: 404 for %s %v", name, args)
 	}
-	rel, err := Latest(context.Background(), run)
+}
+
+func TestLatestReadsTheReleaseFromTheRedirect(t *testing.T) {
+	sum := "https://github.com/nednella/agentos/releases/download/v1.2.3/agentos-darwin-arm64.zip.sha256"
+	rel, err := Latest(context.Background(), fakeGitHub(latestTag, sum))
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := Release{Version: "1.2.3", Zip: "https://x/agentos-darwin-arm64.zip", Sum: "https://x/agentos-darwin-arm64.zip.sha256"}
+	want := Release{Version: "1.2.3", Zip: "https://github.com/nednella/agentos/releases/download/v1.2.3/agentos-darwin-arm64.zip", Sum: sum}
 	if rel != want {
 		t.Errorf("got %+v, want %+v", rel, want)
 	}
 
-	run = func(context.Context, string, ...string) ([]byte, error) {
-		return []byte(`{"tag_name":"v2.0.0","assets":[]}`), nil
-	}
-	if _, err := Latest(context.Background(), run); err == nil || !strings.Contains(err.Error(), "no agentos-darwin-arm64.zip") {
+	if _, err := Latest(context.Background(), fakeGitHub(latestTag)); err == nil || !strings.Contains(err.Error(), "no agentos-darwin-arm64.zip") {
 		t.Errorf("a release without the bundle: %v", err)
+	}
+	if _, err := Latest(context.Background(), fakeGitHub("", sum)); err == nil {
+		t.Error("no redirect gave a release")
 	}
 }
 
 func TestCheckAsksAgainOnlyWhenTheAnswerIsOld(t *testing.T) {
 	state := t.TempDir()
 	calls := 0
-	run := func(context.Context, string, ...string) ([]byte, error) {
-		calls++
-		return []byte(releaseJSON), nil
+	github := fakeGitHub(latestTag, "https://github.com/nednella/agentos/releases/download/v1.2.3/agentos-darwin-arm64.zip.sha256")
+	run := func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		if args[len(args)-1] == latestURL {
+			calls++
+		}
+		return github(ctx, name, args...)
 	}
 	now := time.Date(2026, 10, 5, 12, 0, 0, 0, time.UTC)
 	for i := 0; i < 2; i++ {

@@ -12,12 +12,8 @@ import (
 
 func TestMain(m *testing.M) { os.Exit(apptest.Main(m)) }
 
-const releaseJSON = `{"tag_name":"v9.0.0","assets":[
-	{"name":"agentos-darwin-arm64.zip","browser_download_url":"https://x/zip"},
-	{"name":"agentos-darwin-arm64.zip.sha256","browser_download_url":"https://x/zip.sha256"}]}`
-
 func TestANewerReleaseIsAnnouncedOnceAndShowsInTheSnapshot(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{UpdateTick: 50 * time.Millisecond, Releases: releaseJSON, Version: "1.0.0"})
+	h := apptest.NewWith(t, apptest.Options{UpdateTick: 50 * time.Millisecond, Releases: "v9.0.0", Version: "1.0.0"})
 	apptest.Eventually(t, "the update event", func() bool { return h.Rec.Count("update") == 1 })
 	if got := h.Rec.Last("update"); got != (update.Available{Version: "9.0.0"}) {
 		t.Errorf("update event = %+v", got)
