@@ -291,7 +291,7 @@ type FakeGH struct {
 	Create        string            // what gh issue create prints
 	CreateErr     error             // what gh issue create fails with, if set; it still prints Create
 	Delay         time.Duration     // how long gh issue create takes
-	Releases      string            // what the releases API answers; "" fails the check
+	Releases      string            // the latest release's tag; "" fails the check
 	pr            string            // what gh pr list prints
 	prByHead      map[string]string // what gh pr list --head <branch> prints instead, by branch
 	PRErr         error             // what gh pr list fails with, if set
@@ -387,15 +387,20 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 	return nil, fmt.Errorf("unexpected %s %v", name, args)
 }
 
-// curl answers the release check with Releases, as GitHub's API would, and refuses anything else.
+// curl answers the release check as GitHub would for the release Releases, and refuses anything else.
 func (f *FakeGH) curl(args []string) ([]byte, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, "curl "+strings.Join(args, " "))
-	if f.Releases == "" || !strings.HasSuffix(args[len(args)-1], "/releases/latest") {
-		return nil, fmt.Errorf("curl: no network in tests: %v", args)
+	url := args[len(args)-1]
+	switch {
+	case f.Releases == "":
+	case strings.HasSuffix(url, "/releases/latest"):
+		return []byte("https://github.com/nednella/agentos/releases/tag/" + f.Releases), nil
+	case strings.HasSuffix(url, "/releases/download/"+f.Releases+"/agentos-darwin-arm64.zip.sha256"):
+		return nil, nil
 	}
-	return []byte(f.Releases), nil
+	return nil, fmt.Errorf("curl: no network in tests: %v", args)
 }
 
 func (f *FakeGH) IssueCalls() int { return f.Calls("issue list") }
@@ -545,7 +550,7 @@ type Options struct {
 	DigestFirst    time.Duration // wait before the first automatic digest check; an hour by default
 	DigestTick     time.Duration
 	UpdateTick     time.Duration // how often to check the releases; an hour by default, and an hour before the first check
-	Releases       string        // what the releases API answers; "" fails the check
+	Releases       string        // the latest release's tag; "" fails the check
 	Version        string        // the version the app believes it runs; "dev" by default
 	DataDirConfig  bool          // put the data folder in the config's data_dir, not AGENTOS_DEV_DATA_DIR, and home in the state dir
 	NoProject      bool          // leave the project out of the config, so the app starts in a folder it does not know

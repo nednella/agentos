@@ -27,9 +27,12 @@ const (
 	// Asset is the zip of the app bundle attached to each release; its sha256 sits beside it as Asset + ".sha256".
 	Asset = "agentos-darwin-arm64.zip"
 
-	latestURL = "https://api.github.com/repos/" + Repo + "/releases/latest"
-	cacheFile = "update.json"
-	bundle    = "agentos.app"
+	// latestURL redirects to the newest release's page. It is github.com, not the API, which allows
+	// only 60 requests an hour from an IP without a token.
+	latestURL   = "https://github.com/" + Repo + "/releases/latest"
+	downloadURL = "https://github.com/" + Repo + "/releases/download/"
+	cacheFile   = "update.json"
+	bundle      = "agentos.app"
 )
 
 // Runner runs a command and returns its stdout: curl and ditto. Tests inject one that never
@@ -45,31 +48,18 @@ type Release struct {
 
 // Latest asks GitHub for the newest release.
 func Latest(ctx context.Context, run Runner) (Release, error) {
-	out, err := run(ctx, "curl", "-fsSL", "--max-time", "10", "-H", "Accept: application/vnd.github+json", latestURL)
+	out, err := run(ctx, "curl", "-fsS", "-o", "/dev/null", "--max-time", "10", "-w", "%{redirect_url}", latestURL)
 	if err != nil {
 		return Release{}, fmt.Errorf("asking GitHub for the latest release: %w", err)
 	}
-	var body struct {
-		Tag    string `json:"tag_name"`
-		Assets []struct {
-			Name string `json:"name"`
-			URL  string `json:"browser_download_url"`
-		} `json:"assets"`
+	_, tag, ok := strings.Cut(string(out), "/releases/tag/")
+	if !ok || tag == "" {
+		return Release{}, fmt.Errorf("GitHub sent no latest release, only %q", out)
 	}
-	if err := json.Unmarshal(out, &body); err != nil {
-		return Release{}, fmt.Errorf("reading the latest release: %w", err)
-	}
-	rel := Release{Version: strings.TrimPrefix(body.Tag, "v")}
-	for _, a := range body.Assets {
-		switch a.Name {
-		case Asset:
-			rel.Zip = a.URL
-		case Asset + ".sha256":
-			rel.Sum = a.URL
-		}
-	}
-	if rel.Version == "" || rel.Zip == "" || rel.Sum == "" {
-		return Release{}, fmt.Errorf("release %q has no %s with its sha256", body.Tag, Asset)
+	rel := Release{Version: strings.TrimPrefix(tag, "v"), Zip: downloadURL + tag + "/" + Asset, Sum: downloadURL + tag + "/" + Asset + ".sha256"}
+	// A release is published before its assets are uploaded.
+	if _, err := run(ctx, "curl", "-fsSI", "-o", "/dev/null", "--max-time", "10", rel.Sum); err != nil {
+		return Release{}, fmt.Errorf("release %s has no %s with its sha256 yet: %w", tag, Asset, err)
 	}
 	return rel, nil
 }

@@ -13,17 +13,18 @@ import (
 	"github.com/nednella/agentos/internal/update"
 )
 
-const releaseJSON = `{"tag_name":"v9.0.0","assets":[
-	{"name":"agentos-darwin-arm64.zip","browser_download_url":"https://x/zip"},
-	{"name":"agentos-darwin-arm64.zip.sha256","browser_download_url":"https://x/sum"}]}`
-
 func releasesRunner(calls *int) update.Runner {
 	return func(_ context.Context, name string, args ...string) ([]byte, error) {
-		*calls++
-		if name != "curl" || !strings.HasSuffix(args[len(args)-1], "/releases/latest") {
-			return nil, fmt.Errorf("unexpected %s %v", name, args)
+		url := args[len(args)-1]
+		switch {
+		case name != "curl":
+		case strings.HasSuffix(url, "/releases/latest"):
+			*calls++
+			return []byte("https://github.com/nednella/agentos/releases/tag/v9.0.0"), nil
+		case strings.HasSuffix(url, "/v9.0.0/agentos-darwin-arm64.zip.sha256"):
+			return nil, nil
 		}
-		return []byte(releaseJSON), nil
+		return nil, fmt.Errorf("unexpected %s %v", name, args)
 	}
 }
 
