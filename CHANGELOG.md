@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.39.0](https://github.com/nednella/agentos/compare/v0.38.1...v0.39.0) (2026-10-17)
+
+
+### Features
+
+* **cli:** add --chat flag to new ([25c7925](https://github.com/nednella/agentos/commit/25c7925ea5980a0a5afffec17742ab57b1f79225))
+* **desktop:** start chat from new command when asked ([e53b91a](https://github.com/nednella/agentos/commit/e53b91ac2788f09a8d8e6f1150e385dabc81c78b))
+* **internal:** name agentos new --chat in session prompt ([8aaace4](https://github.com/nednella/agentos/commit/8aaace429ca172757e47efd0bf830490bf4200c9))
+
 ## [0.38.1](https://github.com/nednella/agentos/compare/v0.38.0...v0.38.1) (2026-10-17)
 
 
