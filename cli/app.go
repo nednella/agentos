@@ -92,17 +92,23 @@ func newIssueCmd() *cobra.Command {
 
 func newNewCmd() *cobra.Command {
 	var prompt string
+	var chat bool
 	cmd := &cobra.Command{
-		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin)", GroupID: groupWork,
+		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin; --chat: a chat)", GroupID: groupWork,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			text, err := readPrompt(cmd, prompt)
 			if err != nil {
 				return err
 			}
-			return askApp(cmd, control.Request{Cmd: "new", Args: args, Opts: map[string]string{"prompt": text}})
+			opts := map[string]string{"prompt": text}
+			if chat {
+				opts["chat"] = "true"
+			}
+			return askApp(cmd, control.Request{Cmd: "new", Args: args, Opts: opts})
 		},
 	}
 	cmd.Flags().StringVar(&prompt, "prompt", "", "the first message of the new session")
+	cmd.Flags().BoolVar(&chat, "chat", false, "start a chat, which only reads, instead of a task")
 	return cmd
 }
 
