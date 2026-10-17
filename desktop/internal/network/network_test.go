@@ -6,95 +6,103 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
-	"time"
 )
 
-func newWatch() (*Watch, *int, *time.Time) {
-	events := 0
-	now := time.Unix(1000, 0)
+func newWatch() (*Watch, *[]bool) {
+	var events []bool
 	w := New(func(event string, payload any) {
-		if event != "network" || payload != nil {
+		s, ok := payload.(Status)
+		if event != "network" || !ok {
 			panic(fmt.Sprintf("emitted %q %v", event, payload))
 		}
-		events++
+		events = append(events, s.Online)
 	})
-	w.now = func() time.Time { return now }
-	return w, &events, &now
+	return w, &events
 }
 
-func TestRunnerReportsOnlyNetworkCommands(t *testing.T) {
-	failed := errors.New("exit status 1")
+func TestRunnerTellsNoAnswerFromAnAnswer(t *testing.T) {
+	noHost := errors.New("exit status 1: error connecting to api.github.com\ncheck your internet connection or https://githubstatus.com")
+	refused := errors.New(`exit status 1: Get "https://api.github.com/graphql": dial tcp 140.82.121.6:443: connect: connection refused`)
+	notFound := errors.New("exit status 1: GraphQL: Could not resolve to a Repository with the name 'me/new'. (repository)")
+	limited := errors.New("exit status 1: gh: API rate limit exceeded (HTTP 403)")
+	gitNoHost := errors.New("exit status 128: fatal: unable to access 'https://github.com/me/x/': Could not resolve host: github.com")
+	gitDenied := errors.New("exit status 128: fatal: unable to access 'https://github.com/me/x/': The requested URL returned error: 403")
+	sshNoHost := errors.New("exit status 128: ssh: Could not resolve hostname github.com: nodename nor servname provided, or not known")
 	cases := []struct {
 		name string
 		args []string
 		err  error
-		want int
+		want []bool
 	}{
-		{"gh", []string{"issue", "list"}, failed, 1},
-		{"gh", []string{"issue", "list"}, nil, 0},
-		{"gh", []string{"issue", "list"}, fmt.Errorf("gh issue: %w", context.Canceled), 0},
-		{"gh", []string{"issue", "list"}, context.DeadlineExceeded, 1},
-		{"git", []string{"fetch", "origin"}, failed, 1},
-		{"git", []string{"push", "-u", "origin", "x"}, failed, 1},
-		{"git", []string{"-C", "/repo", "ls-remote", "origin"}, failed, 1},
-		{"git", []string{"-c", "core.x=1", "fetch"}, failed, 1},
-		{"git", []string{"rev-parse", "fetch"}, failed, 0},
-		{"git", []string{"-C", "fetch", "status"}, failed, 0},
-		{"git", []string{"worktree", "list"}, failed, 0},
-		{"tmux", []string{"fetch"}, failed, 0},
+		{"gh", []string{"issue", "list"}, noHost, []bool{false}},
+		{"gh", []string{"issue", "list"}, refused, []bool{false}},
+		{"gh", []string{"issue", "list"}, context.DeadlineExceeded, []bool{false}},
+		{"gh", []string{"repo", "view"}, notFound, nil},
+		{"gh", []string{"issue", "list"}, limited, nil},
+		{"gh", []string{"issue", "list"}, nil, nil},
+		{"gh", []string{"issue", "list"}, fmt.Errorf("gh issue: %w", context.Canceled), nil},
+		{"git", []string{"fetch", "origin"}, gitNoHost, []bool{false}},
+		{"git", []string{"push", "-u", "origin", "x"}, sshNoHost, []bool{false}},
+		{"git", []string{"-C", "/repo", "ls-remote", "origin"}, gitNoHost, []bool{false}},
+		{"git", []string{"-c", "core.x=1", "fetch"}, gitNoHost, []bool{false}},
+		{"git", []string{"fetch", "origin"}, gitDenied, nil},
+		{"git", []string{"rev-parse", "fetch"}, gitNoHost, nil},
+		{"git", []string{"-C", "fetch", "status"}, gitNoHost, nil},
+		{"git", []string{"worktree", "list"}, gitNoHost, nil},
+		{"tmux", []string{"fetch"}, gitNoHost, nil},
 	}
 	for _, c := range cases {
-		w, events, _ := newWatch()
+		w, events := newWatch()
 		run := w.Runner(func(context.Context, string, string, ...string) ([]byte, error) { return nil, c.err })
 		_, err := run(context.Background(), "", c.name, c.args...)
 		if err != c.err {
 			t.Errorf("%s %v: the runner changed the error to %v", c.name, c.args, err)
 		}
-		if *events != c.want {
-			t.Errorf("%s %v failing with %v: %d events, want %d", c.name, c.args, c.err, *events, c.want)
+		if !slices.Equal(*events, c.want) {
+			t.Errorf("%s %v failing with %v: events %v, want %v", c.name, c.args, c.err, *events, c.want)
 		}
 	}
 }
 
-func TestFailuresEmitOnceInEachGap(t *testing.T) {
-	w, events, now := newWatch()
-	failed := errors.New("down")
-	w.Failed(failed)
-	w.Failed(failed)
-	*now = now.Add(gap - time.Second)
-	w.Failed(failed)
-	if *events != 1 {
-		t.Fatalf("a burst emitted %d events, want 1", *events)
-	}
-	*now = now.Add(time.Second)
-	w.Failed(failed)
-	if *events != 2 {
-		t.Errorf("a failure after the gap emitted %d events in all, want 2", *events)
+func TestAnAnswerAfterNoAnswerSetsOnlineOnce(t *testing.T) {
+	w, events := newWatch()
+	var err error
+	run := w.Runner(func(context.Context, string, string, ...string) ([]byte, error) { return nil, err })
+	call := func() { _, _ = run(context.Background(), "", "gh", "pr", "list") }
+
+	err = errors.New("exit status 1: error connecting to api.github.com")
+	call()
+	call()
+	err = errors.New("exit status 1: gh: Not Found (HTTP 404)")
+	call()
+	err = nil
+	call()
+	if want := []bool{false, false, true}; !slices.Equal(*events, want) {
+		t.Errorf("events %v, want %v", *events, want)
 	}
 }
 
-func TestTransportReportsOnlyRequestsWithNoAnswer(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+func TestTransportTellsNoAnswerFromAnAnswer(t *testing.T) {
+	live := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		rw.WriteHeader(http.StatusServiceUnavailable)
 	}))
-	w, events, _ := newWatch()
+	defer live.Close()
+	gone := httptest.NewServer(http.NotFoundHandler())
+	gone.Close()
+	w, events := newWatch()
 	client := &http.Client{Transport: w.Transport(http.DefaultTransport)}
-
-	resp, err := client.Get(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if *events != 0 {
-		t.Errorf("an error status emitted %d events, want 0", *events)
+	get := func(url string) {
+		if resp, err := client.Get(url); err == nil {
+			resp.Body.Close()
+		}
 	}
 
-	server.Close()
-	if _, err := client.Get(server.URL); err == nil {
-		t.Fatal("a closed server answered")
-	}
-	if *events != 1 {
-		t.Errorf("a request with no answer emitted %d events, want 1", *events)
+	get(live.URL)
+	get(gone.URL)
+	get(live.URL)
+	if want := []bool{false, true}; !slices.Equal(*events, want) {
+		t.Errorf("an error status, no answer, an error status: events %v, want %v", *events, want)
 	}
 }
