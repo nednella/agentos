@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.1](https://github.com/nednella/agentos/compare/v0.39.0...v0.39.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **build:** sign releases with stable certificate ([544e81c](https://github.com/nednella/agentos/commit/544e81ca12df7dbbaa4161d0a48d902632921458))
+
 ## [0.39.0](https://github.com/nednella/agentos/compare/v0.38.1...v0.39.0) (2026-10-17)
 
 
