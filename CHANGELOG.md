@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.38.1](https://github.com/nednella/agentos/compare/v0.38.0...v0.38.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **desktop:** save session identity at start and rename ([dd005f3](https://github.com/nednella/agentos/commit/dd005f3cb5d8433fd64124806dd361f13d433c1d))
+* **internal:** keep session identity through hooks ([a9645b5](https://github.com/nednella/agentos/commit/a9645b50521dc613260711b424a06e2a18345f60))
+
 ## [0.38.0](https://github.com/nednella/agentos/compare/v0.37.0...v0.38.0) (2026-10-16)
 
 
