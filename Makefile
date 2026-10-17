@@ -15,6 +15,9 @@ desktop: desktop-frontend
 
 APP := bin/agentos.app
 
+# A release signs with a stable certificate so macOS keeps its permission grants across updates; "-" signs ad-hoc.
+SIGN_IDENTITY ?= -
+
 # A local build gets its own name so it never passes for the installed agentos.app.
 desktop-app: bin/agentos-dev.app
 
@@ -31,7 +34,7 @@ bin/%.app: desktop
 	done
 	iconutil -c icns bin/icon.iconset -o $@/Contents/Resources/agentos.icns
 	rm -rf bin/icon.iconset bin/icon.png
-	codesign --force --sign - $@
+	codesign --force --sign "$(SIGN_IDENTITY)" $@
 
 # The app and the command are one binary: the command is a link into the bundle.
 desktop-install: $(APP)
