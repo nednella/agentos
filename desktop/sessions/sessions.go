@@ -1079,9 +1079,10 @@ func (s *Sessions) Create(title, text string, send bool, issue int) (Session, er
 	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false, "")
 }
 
-// CreateChat starts a chat in the current project: an agent that only reads, for questions about the project.
-func (s *Sessions) CreateChat(title string) (Session, error) {
-	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), "", false, 0, project.Model{}, "", "", "", true, "")
+// CreateChat starts a chat in the current project: an agent that only reads, for questions about the project. A
+// non-empty text is given to it as Create gives it.
+func (s *Sessions) CreateChat(title, text string, send bool) (Session, error) {
+	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), text, send, 0, project.Model{}, "", "", "", true, "")
 }
 
 // CreateBriefed is Create for a session with a job of its own: brief is added to the agent's system prompt, and the

@@ -70,6 +70,23 @@ func TestSessionCommands(t *testing.T) {
 		pane := h.Pane(t, fourth.ID)
 		return strings.Contains(pane, "APPLICATION_PROMPT: Another session asked for this task") && strings.Contains(pane, "what the side session found")
 	})
+	if fourth.Chat {
+		t.Error("new without --chat started a chat")
+	}
+
+	req = ctl.Request{Cmd: "new", Session: third.ID, Args: []string{"ask"}, Opts: map[string]string{"prompt": "what the chat should look at", "chat": "true"}}
+	if resp := h.Ask(t, req); !resp.OK || resp.Out != "started session 5: ask" {
+		t.Fatalf("new --chat from a session = %+v", resp)
+	}
+	list = h.Sessions().List()
+	fifth := list[slices.IndexFunc(list, func(s sessions.Session) bool { return s.N == 5 })]
+	if !fifth.Chat {
+		t.Errorf("new --chat started %+v", fifth)
+	}
+	eventually(t, "the handover in the new chat", func() bool {
+		pane := h.Pane(t, fifth.ID)
+		return strings.Contains(pane, "APPLICATION_PROMPT: Another session asked") && strings.Contains(pane, "what the chat should look at")
+	})
 
 	if resp := h.Ask(t, ctl.Request{Cmd: "kill", Args: []string{"2"}}); !resp.OK || resp.Out != "killed session 2: fix logout" {
 		t.Errorf("kill = %+v", resp)
