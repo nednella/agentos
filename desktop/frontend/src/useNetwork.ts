@@ -1,62 +1,27 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAgentos } from './AgentosContext'
 import { on } from './api'
+import { useMinimumLoading } from './useMinimumLoading'
 
-const CHECK_EVERY_S = 10
-const CHECK_TIMEOUT_MS = 5000
-// navigator.onLine only says the Mac has a link; a request shows the link reaches GitHub, which the queue and PRs need.
-const CHECK_URL = 'https://api.github.com/'
-
-async function reachable(): Promise<boolean> {
-  if (!navigator.onLine) return false
-  try {
-    await fetch(CHECK_URL, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: AbortSignal.timeout(CHECK_TIMEOUT_MS) })
-    return true
-  } catch {
-    return false
-  }
-}
-
+// The app says it is offline when its GitHub and git calls get no answer, and online at the next answer.
 export function useNetwork() {
+  const { refreshIssues, refreshPRs } = useAgentos()
   const [online, setOnline] = useState(navigator.onLine)
-  const [checking, setChecking] = useState(false)
-  const [nextCheckIn, setNextCheckIn] = useState(CHECK_EVERY_S)
+  const [retrying, setRetrying] = useState(false)
 
-  const check = useCallback(async () => {
-    setChecking(true)
-    const ok = await reachable()
-    setChecking(false)
-    setOnline(ok)
-    setNextCheckIn(CHECK_EVERY_S)
+  useEffect(() => on('network', (status) => setOnline(status.online)), [])
+
+  useEffect(() => {
+    const goOffline = () => setOnline(false)
+    window.addEventListener('offline', goOffline)
+    return () => window.removeEventListener('offline', goOffline)
   }, [])
 
-  useEffect(() => {
-    const goOffline = () => {
-      setOnline(false)
-      setNextCheckIn(CHECK_EVERY_S)
-    }
-    window.addEventListener('offline', goOffline)
-    window.addEventListener('online', check)
-    return () => {
-      window.removeEventListener('offline', goOffline)
-      window.removeEventListener('online', check)
-    }
-  }, [check])
+  const retry = useCallback(async () => {
+    setRetrying(true)
+    await Promise.allSettled([refreshIssues(), refreshPRs()])
+    setRetrying(false)
+  }, [refreshIssues, refreshPRs])
 
-  // The app sends network when a GitHub or git call fails: Wi-Fi with no internet sends no offline event.
-  useEffect(() => {
-    if (!online) return
-    return on('network', () => void check())
-  }, [online, check])
-
-  useEffect(() => {
-    if (online || checking) return
-    if (nextCheckIn === 0) {
-      void check()
-      return
-    }
-    const timer = setTimeout(() => setNextCheckIn(nextCheckIn - 1), 1000)
-    return () => clearTimeout(timer)
-  }, [online, checking, nextCheckIn, check])
-
-  return { online, checking, nextCheckIn, check }
+  return { online, retrying: useMinimumLoading(retrying), retry }
 }
