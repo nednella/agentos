@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.39.2](https://github.com/nednella/agentos/compare/v0.39.1...v0.39.2) (2026-10-18)
+
+
+### Bug Fixes
+
+* **desktop:** tell no answer from an API error in gh and git calls ([6aab606](https://github.com/nednella/agentos/commit/6aab606da8a509ec9f0dfec564e4133db52bc49a))
+* **internal:** read latest release from github.com redirect ([08f7b9d](https://github.com/nednella/agentos/commit/08f7b9d7c19cb3da26497d9f8f17d072bf2f3e08))
+* **ui:** drop GitHub probe and countdown from offline splash ([339f7eb](https://github.com/nednella/agentos/commit/339f7ebb6c93450a79bbc0ea33dac580a6323fb6))
+* **ui:** label offline splash button Retry ([0a258a1](https://github.com/nednella/agentos/commit/0a258a1f54c136c3fb0f111271f64f01d598f7ad))
+
 ## [0.39.1](https://github.com/nednella/agentos/compare/v0.39.0...v0.39.1) (2026-10-17)
 
 
