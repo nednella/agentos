@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.4](https://github.com/nednella/agentos/compare/v0.39.3...v0.39.4) (2026-10-19)
+
+
+### Bug Fixes
+
+* **ui:** scroll queue while issue is dragged near its edge ([53742fa](https://github.com/nednella/agentos/commit/53742fa4e6044759a4063fab494a8385ae1998ba))
+
 ## [0.39.3](https://github.com/nednella/agentos/compare/v0.39.2...v0.39.3) (2026-10-19)
 
 
