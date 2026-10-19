@@ -6,6 +6,7 @@ import { readStored, writeStored } from '../storage'
 import type { Issue } from '../types'
 import { useListNav } from '../useListNav'
 import { useMinimumLoading } from '../useMinimumLoading'
+import { useDragEdgeScroll } from '../useDragEdgeScroll'
 import { useIssueDrag } from '../useIssueDrag'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
 import { Collapse } from './Collapse'
@@ -150,6 +151,7 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   }, [nav, listNav.handle])
 
   useScrollCursorIntoView(list, listNav.cursorKey)
+  useDragEdgeScroll(list, drag.dragging !== null)
   const loading = useMinimumLoading(issuesLoading && issues.length === 0)
 
   if (loading) return <Loading />
