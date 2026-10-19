@@ -1214,10 +1214,10 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 		s.mu.Unlock()
 		return Session{}, err
 	}
-	view := s.register(name, title, proj, issue, model, created, conversation != "", chat, action)
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
+	view := s.register(name, title, proj, issue, model, created, conversation != "", chat, action)
 	if branch := proj.BranchFor(issue); issue > 0 && branch != "" && !chat {
 		s.life.claim(proj, name.String(), branch)
 	}

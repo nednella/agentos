@@ -62,6 +62,28 @@ func TestResumeContinuesAnEndedSession(t *testing.T) {
 	}
 }
 
+func TestResumedSessionShowsTheEndedOnesPRAtOnce(t *testing.T) {
+	apptest.ClaudeOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+	old, err := h.Sessions().Create("#12 work", "", false, 12)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	if got, _ := h.Session(old.ID); got.PR == nil {
+		t.Fatalf("the session has no PR: %+v", got)
+	}
+	ended(t, h, old)
+	fresh, err := h.ResumeSession(old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh.PR == nil || fresh.PR.Number != 12 || fresh.Branch != "issue-12" {
+		t.Errorf("resumed row = %+v, want the PR of %s", fresh, old.ID)
+	}
+}
+
 // endedWhileClosed quits the app, ends the session as a computer restart would, and opens the app again a minute later.
 func endedWhileClosed(t *testing.T, h *apptest.Harness, id string) *apptest.Harness {
 	t.Helper()
