@@ -1332,11 +1332,15 @@ func (f *prsFile) ownedByOther(id, branch string) bool {
 }
 
 // inherit gives the session the branches another one worked on, reported and saw open, older than its own,
-// so a session that takes over an ended one knows its PR as the ended one did.
+// so a session that takes over an ended one knows its PR as the ended one did. A session with no track yet
+// also gets the ended one's branch, worktree and PR, so its row shows them before the next fetch.
 func (l *Lifecycle) inherit(proj project.Project, from, to string) {
 	key := proj.Key()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if old := l.tracks[from]; old != nil && l.tracks[to] == nil {
+		l.tracks[to] = &track{branch: old.branch, worktree: old.worktree, pr: old.pr}
+	}
 	f := l.prs(key)
 	for _, m := range []map[string][]string{f.Branches, f.Reported, f.SawOpen} {
 		older := slices.DeleteFunc(slices.Clone(m[from]), func(b string) bool { return slices.Contains(m[to], b) })
