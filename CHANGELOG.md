@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.3](https://github.com/nednella/agentos/compare/v0.39.2...v0.39.3) (2026-10-19)
+
+
+### Bug Fixes
+
+* **desktop:** show PR of resumed session at once ([506c513](https://github.com/nednella/agentos/commit/506c513d82b907dafd30173638a861062528b6b0))
+
 ## [0.39.2](https://github.com/nednella/agentos/compare/v0.39.1...v0.39.2) (2026-10-18)
 
 
