@@ -40,7 +40,7 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 		assistant("msg_2", "claude-opus-5-5", t0.Add(2*time.Second), 1, 1, 1, 0))
 
 	c := NewCursor(t0)
-	parts, err := c.Read(path)
+	parts, err := c.Read(path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,12 +57,12 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 		t.Errorf("after = %v", c.After())
 	}
 
-	again, _ := c.Read(path)
+	again, _ := c.Read(path, "")
 	if len(again) != 0 {
 		t.Errorf("a second read with nothing new = %+v", again)
 	}
 	appendTo(t, path, assistant("msg_3", "claude-opus-5-5", t0.Add(3*time.Second), 0, 7, 0, 0))
-	next, _ := c.Read(path)
+	next, _ := c.Read(path, "")
 	if len(next) != 1 || next[0].Output != 7 {
 		t.Errorf("new line read = %+v, want 7 output tokens", next)
 	}
@@ -73,7 +73,7 @@ func TestReadSkipsWhatCameBefore(t *testing.T) {
 	appendTo(t, path,
 		assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 500, 500, 0, 0),
 		assistant("msg_new", "claude-opus-5-5", t0.Add(time.Minute), 1, 2, 0, 0))
-	parts, _ := NewCursor(t0).Read(path)
+	parts, _ := NewCursor(t0).Read(path, "")
 	if len(parts) != 1 || parts[0].Input != 1 || parts[0].Output != 2 {
 		t.Errorf("parts = %+v, want only the message after the start", parts)
 	}
@@ -84,11 +84,11 @@ func TestReadLeavesAPartLine(t *testing.T) {
 	full := assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 2, 0, 0)
 	appendTo(t, path, full[:40])
 	c := NewCursor(t0)
-	if parts, _ := c.Read(path); len(parts) != 0 {
+	if parts, _ := c.Read(path, ""); len(parts) != 0 {
 		t.Fatalf("a part line was counted: %+v", parts)
 	}
 	appendTo(t, path, full[40:])
-	if parts, _ := c.Read(path); len(parts) != 1 || parts[0].Output != 2 {
+	if parts, _ := c.Read(path, ""); len(parts) != 1 || parts[0].Output != 2 {
 		t.Errorf("the finished line = %+v", parts)
 	}
 }
@@ -99,7 +99,7 @@ func TestReadAddsSubagents(t *testing.T) {
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
 	appendTo(t, filepath.Join(dir, "abc", "subagents", "agent-x.jsonl"),
 		assistant("msg_2", "claude-haiku-5-5", t0.Add(2*time.Second), 3, 3, 0, 0))
-	parts, err := NewCursor(t0).Read(path)
+	parts, err := NewCursor(t0).Read(path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestReadAddsSubagents(t *testing.T) {
 }
 
 func TestReadMissingFile(t *testing.T) {
-	parts, err := NewCursor(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"))
+	parts, err := NewCursor(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "")
 	if err != nil || len(parts) != 0 {
 		t.Errorf("Read = %+v, %v; want nothing and no error", parts, err)
 	}
@@ -120,22 +120,22 @@ func TestCost(t *testing.T) {
 	u.InputTokens, u.OutputTokens, u.CacheReadInputTokens = 1_000_000, 1_000_000, 1_000_000
 	u.CacheCreationInputTokens, u.CacheCreation.Ephemeral1h = 1_000_000, 1_000_000
 	// Claude Opus 5.5: $4 in, $20 out, $0.20 cache read, $8 for an hour-long cache write.
-	if got := cost("claude-opus-5-5", u); got != 32_200_000 {
+	if got := cost("claude-opus-5-5", u, t0); got != 32_200_000 {
 		t.Errorf("opus 5.5 cost = %d, want 32200000", got)
 	}
 	u.Speed = "fast"
-	if got := cost("claude-opus-5-5", u); got != 64_400_000 {
+	if got := cost("claude-opus-5-5", u, t0); got != 64_400_000 {
 		t.Errorf("fast cost = %d, want twice the standard", got)
 	}
 	u.Speed = ""
 	u.CacheCreation.Ephemeral1h = 0 // no split: a 5-minute write at 1.25 times input
-	if got := cost("claude-opus-5", u); got != 5_000_000+25_000_000+500_000+6_250_000 {
+	if got := cost("claude-opus-5", u, t0); got != 5_000_000+25_000_000+500_000+6_250_000 {
 		t.Errorf("opus 5 cost = %d", got)
 	}
-	if got := cost("claude-haiku-5-5", apiUsage{InputTokens: 200_000}); got != 100_000 {
+	if got := cost("claude-haiku-5-5", apiUsage{InputTokens: 200_000}, t0); got != 100_000 {
 		t.Errorf("long haiku prompt = %d, want 200000 tokens at $0.50", got)
 	}
-	if got := cost("<synthetic>", u); got != 0 {
+	if got := cost("<synthetic>", u, t0); got != 0 {
 		t.Errorf("unknown model cost = %d, want 0", got)
 	}
 }
@@ -145,7 +145,25 @@ func TestReadAfterARestartSkipsTheLatestCounted(t *testing.T) {
 	at := t0.Add(1234567 * time.Microsecond)
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", at, 1, 1, 0, 0))
 	// The event log keeps the time of the latest message counted in milliseconds.
-	if parts, _ := NewCursor(time.UnixMilli(at.UnixMilli())).Read(path); len(parts) != 0 {
+	if parts, _ := NewCursor(time.UnixMilli(at.UnixMilli())).Read(path, ""); len(parts) != 0 {
 		t.Errorf("the message counted before the restart was counted again: %+v", parts)
+	}
+}
+
+func TestCostOfAgyModels(t *testing.T) {
+	u := apiUsage{InputTokens: 1_000_000, OutputTokens: 1_000_000, CacheReadInputTokens: 1_000_000}
+	// Gemini 4 Argon: $2 in, $10 out, $0.10 cached until the end of November 2026, then twice that.
+	if got := cost("gemini-4-argon-medium", u, time.Date(2026, 11, 30, 23, 59, 59, 0, time.UTC)); got != 12_100_000 {
+		t.Errorf("argon cost = %d, want 12100000", got)
+	}
+	if got := cost("gemini-4-argon-high", u, argonRise); got != 24_200_000 {
+		t.Errorf("argon cost from December = %d, want 24200000", got)
+	}
+	if got := cost("gemini-3.8-flash-low", u, t0); got != 4_500_000 {
+		t.Errorf("flash cost = %d, want 4500000", got)
+	}
+	// A claude id from agy ends in its effort and still prices as that claude model.
+	if got := cost("claude-opus-5-5-low", apiUsage{InputTokens: 1_000_000}, t0); got != 4_000_000 {
+		t.Errorf("claude through agy cost = %d, want 4000000", got)
 	}
 }
