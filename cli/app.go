@@ -71,9 +71,9 @@ func newProjectCmd() *cobra.Command {
 }
 
 func newIssueCmd() *cobra.Command {
-	var prompt string
+	var prompt, agent string
 	cmd := &cobra.Command{
-		Use: "issue <number...>", Short: "Start a session for each issue (--prompt: context for one issue, - reads it from stdin)", GroupID: groupWork,
+		Use: "issue <number...>", Short: "Start a session for each issue (--prompt: context for one issue, - reads it from stdin; --agent: its provider)", GroupID: groupWork,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if prompt != "" && len(args) > 1 {
@@ -83,24 +83,25 @@ func newIssueCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return askApp(cmd, control.Request{Cmd: "issue", Args: args, Opts: map[string]string{"prompt": text}})
+			return askApp(cmd, control.Request{Cmd: "issue", Args: args, Opts: map[string]string{"prompt": text, "agent": agent}})
 		},
 	}
 	cmd.Flags().StringVar(&prompt, "prompt", "", "context for the new session, from the session that starts it")
+	cmd.Flags().StringVar(&agent, "agent", "", "the provider the new session runs, instead of the default: claude")
 	return cmd
 }
 
 func newNewCmd() *cobra.Command {
-	var prompt string
+	var prompt, agent string
 	var chat bool
 	cmd := &cobra.Command{
-		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin; --chat: a chat)", GroupID: groupWork,
+		Use: "new [title]", Short: "Start a session (--prompt: what it starts with, - reads it from stdin; --chat: a chat; --agent: its provider)", GroupID: groupWork,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			text, err := readPrompt(cmd, prompt)
 			if err != nil {
 				return err
 			}
-			opts := map[string]string{"prompt": text}
+			opts := map[string]string{"prompt": text, "agent": agent}
 			if chat {
 				opts["chat"] = "true"
 			}
@@ -109,6 +110,7 @@ func newNewCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&prompt, "prompt", "", "the first message of the new session")
 	cmd.Flags().BoolVar(&chat, "chat", false, "start a chat, which only reads, instead of a task")
+	cmd.Flags().StringVar(&agent, "agent", "", "the provider the new session runs, instead of the default: claude")
 	return cmd
 }
 
