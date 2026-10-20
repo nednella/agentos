@@ -35,7 +35,7 @@ type Config struct {
 	LocalDir     string // PR tracking and the clean-up log: never synced
 	DataDirFixed bool   // AGENTOS_DEV_DATA_DIR sets the data folder, so the settings cannot change it
 	Tmux         *term.Tmux
-	Agent        agent.Provider
+	Agents       agent.Registry
 }
 
 // Load reads the config file and the environment. The project is the one holding AGENTOS_DIR
@@ -101,7 +101,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, Machine: machine, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agent: pickAgent(cfg.Agent, slices.Compact([]string{dataDir, localDir}))}, nil
+	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, Machine: machine, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agents: agents(slices.Compact([]string{dataDir, localDir}))}, nil
 }
 
 // machineID is this machine's id, made on first use and kept in the state folder, which is never synced.
@@ -121,16 +121,13 @@ func machineID(stateDir string) (string, error) {
 	return id, nil
 }
 
-// pickAgent builds the agent provider. Without the agentos command on PATH the
+// agents is the registry the sessions pick their provider from. Without the agentos command on PATH the
 // agents' hooks cannot call back, so Claude runs plain and sessions stay idle.
-func pickAgent(name string, dirs []string) agent.Provider {
+func agents(dirs []string) agent.Registry {
 	exe, err := exec.LookPath("agentos")
-	if err == nil {
-		return agent.New(name, exe, dirs...)
+	if err != nil {
+		log.Printf("agentos: the agentos command is not on PATH, so agents will not report their state: %v", err)
+		return agent.Registry{}
 	}
-	log.Printf("agentos: the agentos command is not on PATH, so agents will not report their state: %v", err)
-	if name == "" || name == "claude" {
-		return agent.Plain{Argv: []string{"claude"}}
-	}
-	return agent.New(name, "")
+	return agent.Registry{Exe: exe, Dirs: dirs}
 }

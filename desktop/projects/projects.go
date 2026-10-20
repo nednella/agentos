@@ -125,6 +125,21 @@ func (r *Registry) SetDataDir(dir string) error {
 	})
 }
 
+// Agent is the provider, or the plain command, a session starts with unless one is named; "" is claude.
+func (r *Registry) Agent() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cfg.Agent
+}
+
+// SetAgent saves the provider, or the plain command, sessions start with by default.
+func (r *Registry) SetAgent(command string) error {
+	return r.edit(func(c *project.Config) error {
+		c.Agent = command
+		return nil
+	})
+}
+
 // KeepsAwake is the config's own choice on idle sleep, which a project may override.
 func (r *Registry) KeepsAwake() bool {
 	r.mu.Lock()

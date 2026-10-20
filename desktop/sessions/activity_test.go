@@ -7,7 +7,7 @@ import (
 
 func TestActivityIsCounted(t *testing.T) {
 	h := newHarness(t)
-	s, err := h.Sessions().Create("#4 work", "", false, 4)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "")
 	if err != nil {
 		t.Fatal(err)
 	}

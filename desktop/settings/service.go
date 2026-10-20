@@ -2,9 +2,13 @@
 package settings
 
 import (
+	"cmp"
+	"errors"
 	"fmt"
 	"slices"
+	"strings"
 
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/project"
 )
 
@@ -21,6 +25,8 @@ type Store interface {
 	SetTextScale(scale float64) error
 	KeepsAwake() bool
 	SetKeepAwake(on bool) error
+	Agent() string
+	SetAgent(command string) error
 	Cleanup(projectKey string) project.Cleanup
 	SetCleanup(projectKey, event, mode string) error
 	PromptSend(projectKey string) string
@@ -42,6 +48,8 @@ type Settings struct {
 	Theme     string          `json:"theme"`          // system, light or dark
 	TextScale float64         `json:"textScale"`      // a multiple of the default text size
 	KeepAwake bool            `json:"keepAwake"`      // hold off idle sleep while a session works, for projects that do not say otherwise
+	Agent     string          `json:"agent"`          // the provider, or the plain command, a new session starts with unless one is named
+	Agents    []string        `json:"agents"`         // the providers a session can be started with by name
 	Cleanup   project.Cleanup `json:"cleanup"`        // the current project's: auto or manual, for merge and close
 	Prompt    string          `json:"promptSend"`     // the current project's: auto or manual
 	Browser   bool            `json:"browserEnabled"` // the current project's sessions get the browser and evidence commands
@@ -79,6 +87,8 @@ func (s *Service) Settings() Settings {
 		Theme:     theme,
 		TextScale: scale,
 		KeepAwake: s.store.KeepsAwake(),
+		Agent:     cmp.Or(s.store.Agent(), agent.Names[0]),
+		Agents:    slices.Clone(agent.Names),
 		Cleanup:   s.store.Cleanup(key),
 		Prompt:    s.store.PromptSend(key),
 		Browser:   s.store.BrowserEnabled(key),
@@ -118,6 +128,16 @@ func (s *Service) SetTextScale(scale float64) (Settings, error) {
 // SetKeepAwake saves whether a working session holds off idle sleep. A project's own setting still wins.
 func (s *Service) SetKeepAwake(on bool) (Settings, error) {
 	return s.saved(s.store.SetKeepAwake(on))
+}
+
+// SetAgent saves the provider, or the plain command, new sessions start with by default. The next session starts
+// with it.
+func (s *Service) SetAgent(command string) (Settings, error) {
+	command = strings.Join(strings.Fields(command), " ")
+	if command == "" {
+		return Settings{}, errors.New("the agent must be a provider's name or a command")
+	}
+	return s.saved(s.store.SetAgent(command))
 }
 
 // SetPromptSend saves whether the current project sends the text a session starts with at once: "auto" or "manual".

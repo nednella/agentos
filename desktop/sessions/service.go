@@ -13,11 +13,11 @@ func NewService(s *Sessions, ctx func() context.Context) *Service { return &Serv
 
 // NewSession starts the agent in the current project; a non-empty prefill is typed in, not sent, once the agent is ready.
 func (v *Service) NewSession(title, prefill string) (Session, error) {
-	return v.s.Create(title, prefill, false, 0)
+	return v.s.Create(title, prefill, false, 0, "")
 }
 
 // NewChat starts a chat in the current project: a read-only session for questions about it.
-func (v *Service) NewChat(title string) (Session, error) { return v.s.CreateChat(title, "", false) }
+func (v *Service) NewChat(title string) (Session, error) { return v.s.CreateChat(title, "", false, "") }
 
 // ShellInfo names a shell session.
 type ShellInfo struct {

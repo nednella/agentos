@@ -25,7 +25,7 @@ type Projects interface{ Current() project.Project }
 
 // Sessions starts sessions.
 type Sessions interface {
-	Create(title, text string, send bool, issue int) (sessions.Session, error)
+	Create(title, text string, send bool, issue int, agent string) (sessions.Session, error)
 }
 
 // Issues knows a folder's GitHub repo and can reload a project's issues.
@@ -190,7 +190,7 @@ func (s *Service) NoteToSession(id string) (sessions.Session, error) {
 	if err != nil {
 		return sessions.Session{}, err
 	}
-	return s.sessions.Create(n.title(), cur.NoteCommand(n.Text), cur.SendsPrompt(), 0)
+	return s.sessions.Create(n.title(), cur.NoteCommand(n.Text), cur.SendsPrompt(), 0, "")
 }
 
 // issueBody is the issue template filled with the note's text; gh appends the pictures.

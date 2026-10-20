@@ -11,7 +11,7 @@ import (
 
 func TestTimelineAndWorkOutliveTheApp(t *testing.T) {
 	h := newHarness(t)
-	s, err := h.Sessions().Create("#5 work", "", false, 5)
+	s, err := h.Sessions().Create("#5 work", "", false, 5, "")
 	if err != nil {
 		t.Fatal(err)
 	}

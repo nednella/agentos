@@ -25,7 +25,7 @@ func (s *Service) Issues(refresh bool) ([]Issue, error) {
 // StartIssue opens a session for the issue and types the command of the action with that name, the section's
 // default for ""; an issue that has a live session gets it back.
 func (s *Service) StartIssue(number int, action string) (sessions.Session, error) {
-	v, _, err := s.issues.Start(s.ctx(), number, action, "")
+	v, _, err := s.issues.Start(s.ctx(), number, action, "", "")
 	return v, err
 }
 
