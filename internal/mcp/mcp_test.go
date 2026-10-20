@@ -34,7 +34,7 @@ func fakeServer(log string) {
 	}
 	f, _ := os.OpenFile(log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	dir, _ := os.Getwd()
-	fmt.Fprintf(f, "child %d\ndir %s\n", child.Process.Pid, dir)
+	fmt.Fprintf(f, "child %d\ndir %s\nenv %s\n", child.Process.Pid, dir, os.Getenv("MCP_FAKE_ENV"))
 	in := bufio.NewScanner(os.Stdin)
 	for in.Scan() {
 		var m message
@@ -64,7 +64,7 @@ func serve(t *testing.T, argv []string) *client {
 	outR, outW := io.Pipe()
 	c := &client{t: t, in: inW, out: bufio.NewReader(outR), err: make(chan error, 1)}
 	go func() {
-		c.err <- Serve(context.Background(), Browser, argv, inR, outW, io.Discard)
+		c.err <- Serve(context.Background(), Browser, argv, []string{"MCP_FAKE_ENV=set"}, inR, outW, io.Discard)
 		_ = outW.Close()
 	}()
 	return c
@@ -159,8 +159,8 @@ func TestServeStartsTheServerAtTheFirstToolCallAndStopsItsGroup(t *testing.T) {
 	data, _ := os.ReadFile(log)
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	want := []string{`initialize "agentos-start"`, "notifications/initialized", "tools/call 1", "tools/call 2"}
-	if len(lines) != 6 || lines[1] != "dir /" || strings.Join(lines[2:], "|") != strings.Join(want, "|") {
-		t.Fatalf("the server got %q, want a child line, \"dir /\", then %q", lines, want)
+	if len(lines) != 7 || lines[1] != "dir /" || lines[2] != "env set" || strings.Join(lines[3:], "|") != strings.Join(want, "|") {
+		t.Fatalf("the server got %q, want a child line, \"dir /\", \"env set\", then %q", lines, want)
 	}
 	child, _ := strconv.Atoi(strings.TrimPrefix(lines[0], "child "))
 	if !gone(child) {
