@@ -198,6 +198,17 @@ func TestHookKeepsTheStateChanges(t *testing.T) {
 	}
 }
 
+func TestHookReadsAnUnknownAgentAsClaude(t *testing.T) {
+	dir, _ := hookSetup(t)
+	seedStart(t, dir)
+	t.Setenv("AGENTOS_AGENT", "my-claude-wrapper")
+
+	reportHook("PreToolUse", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`), io.Discard)
+	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Working || rec.Detail != "Bash ls" {
+		t.Errorf("state = %+v", rec)
+	}
+}
+
 func TestHookPrintsWhatAgyReads(t *testing.T) {
 	dir, _ := hookSetup(t)
 	seedStart(t, dir)

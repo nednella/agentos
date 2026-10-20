@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"reflect"
+	"slices"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -38,8 +39,9 @@ func reportHook(event string, stdin io.Reader, stdout io.Writer) {
 }
 
 // reportHookAt records the event as of at, the moment the hook started: a hook that waited
-// for the lock must not undo a later event that got in first. The session's provider, AGENTOS_AGENT
-// (claude when unset, as sessions started before it was set are), reads the payload and says what to print.
+// for the lock must not undo a later event that got in first. The session's provider, AGENTOS_AGENT,
+// reads the payload and says what to print. A name that is not a provider's, or none, is read as claude:
+// sessions started before it was set have none, and a claude wrapper script's hooks are claude's.
 func reportHookAt(event string, stdin io.Reader, stdout io.Writer, at time.Time) {
 	name := os.Getenv("AGENTOS_SESSION")
 	socket := os.Getenv("AGENTOS_SOCKET")
@@ -49,7 +51,11 @@ func reportHookAt(event string, stdin io.Reader, stdout io.Writer, at time.Time)
 		return
 	}
 	dir := bus.DirOf(socket)
-	ev, reply, ok := agent.New(os.Getenv("AGENTOS_AGENT"), "").ParseEvent(event, stdin)
+	provider := os.Getenv("AGENTOS_AGENT")
+	if !slices.Contains(agent.Names, provider) {
+		provider = "claude"
+	}
+	ev, reply, ok := agent.New(provider, "").ParseEvent(event, stdin)
 	fmt.Fprint(stdout, reply)
 	if !ok {
 		return
