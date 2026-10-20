@@ -10,6 +10,7 @@ export AGENTOS_TMUX_SOCKET=aos-test-$$      # never "agentos", the owner's socke
 export AGENTOS_STATE_DIR=$S                 # never ~/.local/state/agentos
 export AGENTOS_DEV_DATA_DIR=$S/data             # never ~/.local/share/agentos (also moves notes and the event log)
 export AGENTOS_CONFIG=$S/config.yaml        # never ~/.config/agentos/config.yaml
+export AGENTOS_AGY_CONFIG_DIR=$S/agy        # never ~/.gemini/config, the owner's own agy hooks
 ```
 
 A throwaway config with a plain shell as the agent keeps Claude out of it:

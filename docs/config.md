@@ -6,7 +6,7 @@
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos. The settings panel writes it; the app reads it when it starts
-agent_command: claude          # what a new session runs unless --agent names a provider: a provider's name (claude, the default, with hooks) or any command, which runs plain. The settings panel writes it; the next session uses it
+agent_command: claude          # what a new session runs unless --agent names a provider: a provider's name (claude, the default, or agy, both with hooks) or any command, which runs plain. The settings panel writes it; the next session uses it
 keep_mac_awake: true           # stop the Mac idle-sleeping while a session works; a project may set its own. The settings panel writes it
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
 app_text_scale: 1.2            # text size as a multiple of the default, 0.85 to 1.5; unset is 1. The settings panel writes it
@@ -90,17 +90,25 @@ The old `lanes`, `commands`, `models`, `session_model` and `session_effort` keys
 
 ### How a session picks its model
 
-Only the `claude` agent gets `--model` and `--effort`; any other agent runs as configured. The choice comes from the first of these that sets a value, model and effort each on their own:
+Only the `claude` and `agy` providers get `--model` and `--effort`; a plain command runs as configured. The choice comes from the first of these that sets a value, model and effort each on their own:
 
-1. the issue's `model:<x>` or `effort:<y>` label (a value claude would not accept is ignored);
+1. the issue's `model:<x>` or `effort:<y>` label (a value the provider would not accept is ignored);
 2. the action's `model` and `effort`;
 3. claude's own settings, read when the session starts: `model`, and the effort in `modelSettings.<model>.effortLevel` for the model chosen, else `effortLevel`, from the project folder's `.claude/settings.local.json`, then its `.claude/settings.json`, then `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`.
 
-A new session, or one started from a note, has no action and no labels. When nothing sets a value, no flag is passed and claude uses its own default.
+A new session, or one started from a note, has no action and no labels. When nothing sets a value, no flag is passed and the agent uses its own default.
+
+For agy the model is the full id as `agy models` prints it, such as `gemini-4-argon-medium`, whose last part is its effort; `--effort` is agy's own override, one of `low`, `medium`, `high`, `xhigh` or `max`. The app checks a model against `agy models` once per start, and takes any id when agy cannot answer, as when it is not signed in.
 
 ### How a session picks its agent
 
-`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` is the only one. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider.
+`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` or `agy`. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider.
+
+### The agy provider
+
+`agy` is the Antigravity CLI. agy takes no hooks or MCP servers on its command line: it reads them from `~/.gemini/config/hooks.json` and `~/.gemini/config/mcp_config.json`, for every conversation. When an agy session starts, the app writes into those files one hook named `agentos`, for `SessionStart`, `PreInvocation`, `PreToolUse`, `PostToolUse` and `Stop`, and one MCP server named `browser`, both running the installed `~/.local/bin/agentos`, and leaves every other entry alone. It writes again only when its entries differ, so an update of agentos updates them. Only the installed app writes the owner's files; a build run from elsewhere, and every test, writes to `AGENTOS_AGY_CONFIG_DIR` instead, and skips the files when it is not set. Outside an agentos session the hooks and the server answer agy with nothing, so the owner's own agy use is unchanged.
+
+An agy session gets the agentos prompts as a system message the `SessionStart` hook injects, from a file in the session's temp folder (`AGENTOS_PROMPT`), on a fresh start only: the message stays in the conversation, so a resume (`--conversation <id>`) has it already. The app's folders go in with `--add-dir`. A chat runs with `--mode plan`, and its `PreToolUse` hook (`AGENTOS_CHAT`) refuses the tools that write files, answers `allow` for the `agentos` and `gh issue` commands that hand work on and `ask` for any other command; agy's own permissions decide the rest. agy 1.4.3 still asks before an allowed command, so a chat is prompted for `agentos` commands too, unless agy's own settings allow them. The row's state comes from the hooks: `working` from the first model call of a turn and each tool call, `idle` at `Stop`, and `waiting` when the reply, read from agy's transcript, ends in a question. agy has no event for a permission prompt, so the row stays `working` while one is open. Tokens and cost come from the `PLANNER_RESPONSE` lines of the transcript, priced for the model agy reports (`gemini-4-argon`, `gemini-3.8-flash`, or the `claude-*` list prices), with no subagents.
 
 ### Keeping the Mac awake
 
@@ -141,3 +149,4 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 | `AGENTOS_BROWSER` | the browser to drive, as a path; by default Chrome for Testing in `~/Applications` or `/Applications`, which `install.sh` installs. agentos never falls back to another browser: macOS sends clicked links to any running copy of your default browser's app, and one that agentos runs has no window to show them |
 | `AGENTOS_DIR` | the project folder to start in, instead of the current folder |
 | `AGENTOS_TMUX_SOCKET`, `AGENTOS_STATE_DIR`, `AGENTOS_DEV_DATA_DIR` | the tmux socket, the state folder, and one folder in place of both data folders; for tests |
+| `AGENTOS_AGY_CONFIG_DIR` | the folder the app writes agy's hooks and MCP entry to, in place of `~/.gemini/config`; for tests and a build run from elsewhere, which never write the real folder |
