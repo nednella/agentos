@@ -6,7 +6,7 @@ import (
 	"github.com/nednella/agentos/internal/prompts"
 )
 
-// SetupCleanupCommand is the clean-up command that SetUp writes. {worktree} is '' for a branch with no worktree.
+// SetupCleanupCommand is the clean-up command that SetUp writes. {worktree} is ” for a branch with no worktree.
 const SetupCleanupCommand = "{ [ -z {worktree} ] || git worktree remove {force} {worktree}; } && git branch -D {branch}"
 
 // NeedsSetup says whether the project lacks the queue sections that setting it up writes.
