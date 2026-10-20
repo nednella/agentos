@@ -1095,12 +1095,15 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 }
 
 // CreateIssue starts the agent for an issue, in a task or a chat as the action says, and types text into it once it
-// is ready; the project says whether that is sent. The action and the issue's labels pick the model, and the agent
-// is the provider named, or the default for "". A handover from the session that asked for this one is added to the
-// agent's system prompt. An issue that has a live session of that kind gets that session back, and created is false.
+// is ready; the project says whether that is sent. The agent is the provider named, else the one the issue's labels
+// and the action pick, else the default; the labels and the action pick the model it takes. A handover from the
+// session that asked for this one is added to the agent's system prompt. An issue that has a live session of that
+// kind gets that session back, and created is false.
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover, agentName string) (view Session, created bool, err error) {
 	proj := s.Current()
-	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat(), action.Name, agentName)
+	agentName = cmp.Or(agentName, project.PickAgent(action, labels))
+	model := project.Pick(action, labels, s.provider(agentName).ValidModel)
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, model, "", handover, action.Chat(), action.Name, agentName)
 	if live == "" {
 		return view, err == nil, err
 	}

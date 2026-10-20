@@ -9,17 +9,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/prompts"
 )
 
 // DefaultPRPoll is how often pull requests are polled when pr_poll_interval is not set.
 const DefaultPRPoll = 10 * time.Second
 
-// Action is a way to start a session for an issue: a command to type, run with its own model and effort, in a
-// task or a chat.
+// Action is a way to start a session for an issue: a command to type, run by its own provider with its own model
+// and effort, in a task or a chat.
 type Action struct {
 	Name    string `yaml:"name"`
 	Command string `yaml:"command,omitempty"` // {n} is the issue number, {title} its title
+	Agent   string `yaml:"agent,omitempty"`   // a provider's name; the default unless set
 	Model   string `yaml:"model,omitempty"`
 	Effort  string `yaml:"effort,omitempty"`
 	Kind    string `yaml:"kind,omitempty"` // KindTask unless set
@@ -185,6 +187,9 @@ func (p Project) validateQueue() error {
 				return fmt.Errorf("queue_sections.%s: two actions are named %q", s.Name, a.Name)
 			}
 			actions = append(actions, a.Name)
+			if err := agent.CheckName(a.Agent); err != nil {
+				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
+			}
 			if err := (Model{Model: a.Model, Effort: a.Effort}).Validate(); err != nil {
 				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
 			}
