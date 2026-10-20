@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/usage"
 	"github.com/nednella/agentos/internal/util"
@@ -121,9 +120,7 @@ func deniedTools(m MCPServer) string {
 // Env sets claude's temp folder to the session's own.
 func (c Claude) Env(l Launch) []string { return []string{"CLAUDE_CODE_TMPDIR=" + l.TmpDir} }
 
-func (c Claude) ValidModel(model, effort string) error {
-	return project.Model{Model: model, Effort: effort}.Validate()
-}
+func (c Claude) ValidModel(model, effort string) error { return CheckModel(model, effort) }
 
 func (c Claude) Prepare(Launch) error { return nil }
 

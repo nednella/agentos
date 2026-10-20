@@ -124,13 +124,11 @@ func promptFile(l Launch) string {
 // Fill leaves the choice to agy: it keeps no default model agentos can read.
 func (a Agy) Fill(_ string, l Launch) Launch { return l }
 
-var agyEfforts = []string{"low", "medium", "high", "xhigh", "max"}
-
 // ValidModel checks the model against what agy models lists; any id passes when agy cannot say, as when it is not
 // signed in.
 func (a Agy) ValidModel(model, effort string) error {
-	if effort != "" && !slices.Contains(agyEfforts, effort) {
-		return fmt.Errorf("effort must be one of %s, not %q", strings.Join(agyEfforts, ", "), effort)
+	if err := CheckModel(model, effort); err != nil {
+		return err
 	}
 	if model == "" || a.Models == nil {
 		return nil
