@@ -1,4 +1,4 @@
-// Package usage reads the tokens a Claude Code session used from its transcripts, and prices them.
+// Package usage reads the tokens a session's agent used from its transcripts, and prices them.
 package usage
 
 import (
@@ -49,8 +49,9 @@ type Part struct {
 
 // Reader reads what a session's agent used from its transcript, a little at a time, as its provider knows how.
 type Reader interface {
-	// Read counts what was written to the transcript at path since the last read, one part for each model.
-	Read(path string) ([]Part, error)
+	// Read counts what was written to the transcript at path since the last read, one part for each model. model
+	// is the one the agent reports it runs now, for a transcript whose lines name none.
+	Read(path, model string) ([]Part, error)
 	// After is the time of the latest message read.
 	After() time.Time
 }
@@ -58,15 +59,15 @@ type Reader interface {
 // Cursor reads a session's transcripts a little at a time. Claude Code writes each API response
 // once per content block, so a message is counted once by its id.
 type Cursor struct {
-	after   time.Time // a file read for the first time is counted from this time on
-	offsets map[string]int64
-	seen    map[string]bool
+	after time.Time // a file read for the first time is counted from this time on
+	tail
+	seen map[string]bool
 }
 
 // NewCursor counts only the messages written after the time given: the ones before were counted
 // by an earlier run of the app or belong to an earlier session of a resumed conversation.
 func NewCursor(after time.Time) *Cursor {
-	return &Cursor{after: after, offsets: map[string]int64{}, seen: map[string]bool{}}
+	return &Cursor{after: after, tail: newTail(), seen: map[string]bool{}}
 }
 
 // After is the time of the latest message read.
@@ -74,19 +75,21 @@ func (c *Cursor) After() time.Time { return c.after }
 
 // Read counts what was written since the last read to the transcript at path and to the transcripts
 // of its subagents, which Claude Code keeps in <session id>/subagents beside it. It returns one part
-// for each model, the session's own before its subagents'.
-func (c *Cursor) Read(path string) ([]Part, error) {
+// for each model, the session's own before its subagents'. The lines name their model, so the one given is not used.
+func (c *Cursor) Read(path, _ string) ([]Part, error) {
 	sums := map[Part]*Tokens{}
 	var order []Part
 	latest := c.after
 	add := func(file string, subagent bool) error {
-		return c.readFile(file, &latest, func(model string, t Tokens) {
-			key := Part{Model: model, Subagent: subagent}
-			if sums[key] == nil {
-				sums[key] = &Tokens{}
-				order = append(order, key)
-			}
-			sums[key].Add(t)
+		return c.lines(file, func(b []byte, known bool) {
+			c.count(b, known, &latest, func(model string, t Tokens) {
+				key := Part{Model: model, Subagent: subagent}
+				if sums[key] == nil {
+					sums[key] = &Tokens{}
+					order = append(order, key)
+				}
+				sums[key].Add(t)
+			})
 		})
 	}
 	if err := add(path, false); err != nil {
@@ -141,10 +144,14 @@ type apiUsage struct {
 	Speed string `json:"speed"`
 }
 
-// readFile reads the whole lines added to file since the last read. A line still being written is
-// left for the next read. A file that is not there yet has nothing to count. latest moves to the
-// time of the latest line read.
-func (c *Cursor) readFile(file string, latest *time.Time, each func(model string, t Tokens)) error {
+// tail reads a set of files a little at a time: each read gives the whole lines added since the last one.
+type tail struct{ offsets map[string]int64 }
+
+func newTail() tail { return tail{offsets: map[string]int64{}} }
+
+// lines gives each whole line added to file since the last read, and whether the file was read before. A
+// line still being written is left for the next read. A file that is not there yet has nothing to give.
+func (t tail) lines(file string, each func(b []byte, known bool)) error {
 	f, err := os.Open(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
@@ -153,7 +160,7 @@ func (c *Cursor) readFile(file string, latest *time.Time, each func(model string
 		return err
 	}
 	defer f.Close()
-	start, known := c.offsets[file]
+	start, known := t.offsets[file]
 	if info, err := f.Stat(); err == nil && info.Size() < start {
 		start = 0 // the file was replaced
 	}
@@ -167,14 +174,14 @@ func (c *Cursor) readFile(file string, latest *time.Time, each func(model string
 			break
 		}
 		start += int64(len(b))
-		c.count(b, known, latest, each)
+		each(b, known)
 	}
-	c.offsets[file] = start
+	t.offsets[file] = start
 	return nil
 }
 
 // count counts the line's message, once. In a file read before, every new line is new; in a file
-// read for the first time, only the lines after c.after are.
+// read for the first time, only the lines after c.after are. latest moves to the time of the latest line counted.
 func (c *Cursor) count(b []byte, known bool, latest *time.Time, each func(model string, t Tokens)) {
 	if !bytes.Contains(b, []byte(`"usage"`)) {
 		return
@@ -197,7 +204,7 @@ func (c *Cursor) count(b []byte, known bool, latest *time.Time, each func(model 
 	u := *l.Message.Usage
 	t := Tokens{
 		Input: u.InputTokens, Output: u.OutputTokens, CacheRead: u.CacheReadInputTokens, CacheWrite: u.CacheCreationInputTokens,
-		Thinking: u.OutputTokensDetails.ThinkingTokens, Cost: cost(l.Message.Model, u),
+		Thinking: u.OutputTokensDetails.ThinkingTokens, Cost: cost(l.Message.Model, u, l.Timestamp),
 	}
 	if t.Total() == 0 {
 		return
