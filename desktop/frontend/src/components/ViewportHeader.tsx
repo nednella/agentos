@@ -14,7 +14,7 @@ import { Timeline } from './Timeline'
 type ViewportHeaderProps = { session: Session }
 
 export function ViewportHeader({ session }: ViewportHeaderProps) {
-  const { renameSession, report, focus, killSession } = useAgentos()
+  const { renameSession, report, focus, killSession, settings } = useAgentos()
   const now = useNow()
   const [renaming, setRenaming] = useState(false)
   const kill = useArmedConfirm()
@@ -87,6 +87,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
         <ActionTag action={session.action} />
         {session.chat && <ChatTag />}
         <ModelTag
+          agent={session.agent === settings.agent ? '' : session.agent}
           model={session.model}
           effort={session.effort}
           spend={session.tokens > 0 ? `${tokenCount(session.tokens)} tokens · ~${dollars(session.cost)}` : ''}

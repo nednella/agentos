@@ -70,6 +70,7 @@ type Backend = {
   SetCleanup(event: CleanupEvent, mode: CleanupMode): Promise<Settings>
   SetTextScale(scale: number): Promise<Settings>
   SetKeepAwake(on: boolean): Promise<Settings>
+  SetAgent(command: string): Promise<Settings>
   SetPromptSend(mode: PromptSend): Promise<Settings>
   SetBrowserEnabled(on: boolean): Promise<Settings>
   SetDigestSchedule(schedule: DigestSchedule): Promise<Settings>
@@ -106,7 +107,7 @@ const namespaces = {
   news: ['News', 'RefreshNews'],
   update: ['Update', 'PatchNotes', 'Changelog'],
   awake: ['Awake'],
-  settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule', 'PickDataDir', 'SetDataDir'],
+  settings: ['Settings', 'SetTheme', 'SetCleanup', 'SetTextScale', 'SetKeepAwake', 'SetAgent', 'SetPromptSend', 'SetBrowserEnabled', 'SetDigestSchedule', 'PickDataDir', 'SetDataDir'],
 }
 
 // The Go side has no method for this: the window runtime opens web addresses itself.
@@ -192,6 +193,7 @@ export const api = {
   setCleanup: (event: CleanupEvent, mode: CleanupMode) => backend.SetCleanup(event, mode),
   setTextScale: (scale: number) => backend.SetTextScale(scale),
   setKeepAwake: (on: boolean) => backend.SetKeepAwake(on),
+  setAgent: (command: string) => backend.SetAgent(command),
   setPromptSend: (mode: PromptSend) => backend.SetPromptSend(mode),
   setBrowserEnabled: (on: boolean) => backend.SetBrowserEnabled(on),
   setDigestSchedule: (schedule: DigestSchedule) => backend.SetDigestSchedule(schedule),
