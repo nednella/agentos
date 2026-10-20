@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.39.5](https://github.com/nednella/agentos/compare/v0.39.4...v0.39.5) (2026-10-20)
+
+
+### Bug Fixes
+
+* **internal:** start browser server from root folder ([1a45aa6](https://github.com/nednella/agentos/commit/1a45aa6d15af065a6dc9124683e21288de3dbbf8)), closes [#460](https://github.com/nednella/agentos/issues/460)
+
 ## [0.39.4](https://github.com/nednella/agentos/compare/v0.39.3...v0.39.4) (2026-10-19)
 
 
