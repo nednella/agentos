@@ -142,7 +142,7 @@ func TestPlainCanNothing(t *testing.T) {
 			t.Errorf("claude cannot %d", c)
 		}
 	}
-	if _, ok := (Plain{}).ParseEvent("Stop", strings.NewReader("{}")); ok {
+	if _, _, ok := (Plain{}).ParseEvent("Stop", strings.NewReader("{}")); ok {
 		t.Error("a plain agent's hook was recorded")
 	}
 }
@@ -188,7 +188,10 @@ func TestClaudeParseEvent(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := (Claude{}).ParseEvent(tt.event, strings.NewReader(tt.body))
+			got, reply, ok := (Claude{}).ParseEvent(tt.event, strings.NewReader(tt.body))
+			if reply != "" {
+				t.Errorf("reply = %q, want none for claude", reply)
+			}
 			if !ok || got != tt.want {
 				t.Errorf("got %+v, %v, want %+v", got, ok, tt.want)
 			}
@@ -233,8 +236,8 @@ func TestCheckName(t *testing.T) {
 			t.Errorf("CheckName(%q) = %v", name, err)
 		}
 	}
-	for _, name := range []string{"agy", "bash", "claude --resume"} {
-		if err := CheckName(name); err == nil || !strings.Contains(err.Error(), "the agents are claude") {
+	for _, name := range []string{"codex", "bash", "claude --resume"} {
+		if err := CheckName(name); err == nil || !strings.Contains(err.Error(), "the agents are claude, agy") {
 			t.Errorf("CheckName(%q) = %v", name, err)
 		}
 	}

@@ -28,6 +28,7 @@ type Record struct {
 	Cwd          string    `json:"cwd,omitempty"`          // where the agent was working at the latest event
 	Conversation string    `json:"conversation,omitempty"` // the agent's id for its conversation, to resume it
 	Transcript   string    `json:"transcript,omitempty"`   // the file the agent writes its conversation to
+	AgentModel   string    `json:"agentModel,omitempty"`   // the model the agent says it runs, when its hooks say; prices a transcript that names none
 	Changes      []Change  `json:"changes,omitempty"`      // the latest state changes, oldest first, so the timeline outlives the app
 
 	Identity

@@ -125,6 +125,8 @@ func (c Claude) ValidModel(model, effort string) error {
 	return project.Model{Model: model, Effort: effort}.Validate()
 }
 
+func (c Claude) Prepare(Launch) error { return nil }
+
 func (c Claude) Usage(after time.Time) usage.Reader { return usage.NewCursor(after) }
 
 type payload struct {
@@ -140,8 +142,8 @@ type payload struct {
 }
 
 // ParseEvent reads the hook JSON from r. A body that is not JSON still gives a
-// usable event, because the event name alone moves the state.
-func (c Claude) ParseEvent(name string, r io.Reader) (session.Event, bool) {
+// usable event, because the event name alone moves the state. Claude reads nothing from a hook that only reports.
+func (c Claude) ParseEvent(name string, r io.Reader) (session.Event, string, bool) {
 	var p payload
 	_ = json.NewDecoder(io.LimitReader(r, 1<<20)).Decode(&p)
 	ev := session.Event{Name: name, NotificationType: p.NotificationType, Message: p.Message, Cwd: p.Cwd, Conversation: p.SessionID, Transcript: p.TranscriptPath}
@@ -154,7 +156,7 @@ func (c Claude) ParseEvent(name string, r io.Reader) (session.Event, bool) {
 		ev.Detail = p.Prompt
 	case "Stop":
 		ev.Detail = p.LastAssistantMessage
-		ev.Asks = strings.HasSuffix(strings.TrimRight(p.LastAssistantMessage, " \t\n*_"), "?")
+		ev.Asks = asks(p.LastAssistantMessage)
 	}
 	ev.Detail = oneLine(ev.Detail, 120)
 	if name == "PreToolUse" || name == "PostToolUse" {
@@ -163,8 +165,11 @@ func (c Claude) ParseEvent(name string, r io.Reader) (session.Event, bool) {
 			ev.Command = oneLine(cmd, 200)
 		}
 	}
-	return ev, true
+	return ev, "", true
 }
+
+// asks says whether a reply ends in a question to the owner.
+func asks(reply string) bool { return strings.HasSuffix(strings.TrimRight(reply, " \t\n*_"), "?") }
 
 func toolDetail(p payload) string {
 	for _, key := range []string{"command", "file_path", "pattern", "url", "description"} {

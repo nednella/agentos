@@ -58,25 +58,29 @@ type Provider interface {
 	Fill(dir string, l Launch) Launch
 	// ValidModel reports a model or effort the agent would not accept; an empty value is accepted.
 	ValidModel(model, effort string) error
-	// ParseEvent reads the agent's hook payload for its event name into the canonical event. It reports false for a
-	// hook agentos does not record.
-	ParseEvent(name string, r io.Reader) (session.Event, bool)
+	// Prepare makes what the agent needs before it starts and its command line cannot carry; nothing for most.
+	Prepare(l Launch) error
+	// ParseEvent reads the agent's hook payload for its event name into the canonical event, and gives the reply the
+	// hook prints on stdout, "" for an agent that reads none. It reports false for a hook agentos does not record.
+	ParseEvent(name string, r io.Reader) (ev session.Event, reply string, ok bool)
 	// Usage reads what the agent's transcripts say it used after the time given.
 	Usage(after time.Time) usage.Reader
 }
 
-// New returns the provider for the configured agent. "claude" (or empty) gets
-// hooks and the use of dirs; any other value runs as a plain command with no state reports.
+// New returns the provider for the configured agent. "claude" (or empty) gets hooks from exe and the use of dirs;
+// "agy" gets its hooks from the installed agentos; any other value runs as a plain command with no state reports.
 func New(name, exe string, dirs ...string) Provider {
 	switch name {
 	case "", "claude":
 		return Claude{Exe: exe, ConfigDir: claudeConfigDir(), Dirs: dirs}
+	case "agy":
+		return NewAgy(dirs)
 	}
 	return Plain{Argv: strings.Fields(name)}
 }
 
 // Names are the providers a session may be started with by name.
-var Names = []string{"claude"}
+var Names = []string{"claude", "agy"}
 
 // CheckName rejects a name that is no provider's. "" names the default and passes.
 func CheckName(name string) error {
@@ -105,20 +109,23 @@ func (r Registry) Provider(command string) Provider {
 // Plain runs a command as is. Its sessions stay idle because nothing reports for them.
 type Plain struct{ Argv []string }
 
-func (p Plain) Name() string                                       { return strings.Join(p.Argv, " ") }
-func (p Plain) Can(Capability) bool                                { return false }
-func (p Plain) Command(Launch) []string                            { return p.Argv }
-func (p Plain) Env(Launch) []string                                { return nil }
-func (p Plain) Fill(_ string, l Launch) Launch                     { return l }
-func (p Plain) ValidModel(string, string) error                    { return nil }
-func (p Plain) ParseEvent(string, io.Reader) (session.Event, bool) { return session.Event{}, false }
-func (p Plain) Usage(after time.Time) usage.Reader                 { return noUsage{after} }
+func (p Plain) Name() string                    { return strings.Join(p.Argv, " ") }
+func (p Plain) Can(Capability) bool             { return false }
+func (p Plain) Command(Launch) []string         { return p.Argv }
+func (p Plain) Env(Launch) []string             { return nil }
+func (p Plain) Fill(_ string, l Launch) Launch  { return l }
+func (p Plain) ValidModel(string, string) error { return nil }
+func (p Plain) Prepare(Launch) error            { return nil }
+func (p Plain) ParseEvent(string, io.Reader) (session.Event, string, bool) {
+	return session.Event{}, "", false
+}
+func (p Plain) Usage(after time.Time) usage.Reader { return noUsage{after} }
 
 // noUsage reads nothing: a plain agent has no transcript agentos knows.
 type noUsage struct{ after time.Time }
 
-func (n noUsage) Read(string) ([]usage.Part, error) { return nil, nil }
-func (n noUsage) After() time.Time                  { return n.after }
+func (n noUsage) Read(string, string) ([]usage.Part, error) { return nil, nil }
+func (n noUsage) After() time.Time                          { return n.after }
 
 // claudeConfigDir is where claude keeps the user's settings, "" when there is no home.
 func claudeConfigDir() string {
