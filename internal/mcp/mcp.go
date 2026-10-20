@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -42,6 +43,13 @@ var Browser = func() Server {
 	return s
 }()
 
+// None is a server with no tools, for a session that has no browser.
+var None = func() Server {
+	s := Server{Capabilities: json.RawMessage(`{"tools":{}}`), Tools: json.RawMessage(`[]`)}
+	s.ServerInfo.Name, s.ServerInfo.Version = "agentos", "0"
+	return s
+}()
+
 type message struct {
 	ID     json.RawMessage `json:"id,omitempty"`
 	Method string          `json:"method,omitempty"`
@@ -54,11 +62,11 @@ const stopWait = 3 * time.Second
 // startID is the id of the initialize request replayed to the real server, whose answer the client already had.
 const startID = `"agentos-start"`
 
-// Serve answers initialize, tools/list and ping from s, and starts the real server, argv, at the first other
-// request. The real server then gets the client's initialize and every message from that one on, and its
-// output goes to out. Serve returns when in ends, the real server exits or ctx ends, and stops the real
-// server's whole process group first.
-func Serve(ctx context.Context, s Server, argv []string, in io.Reader, out, errOut io.Writer) error {
+// Serve answers initialize, tools/list and ping from s, and starts the real server, argv with env added to its
+// environment, at the first other request. The real server then gets the client's initialize and every message
+// from that one on, and its output goes to out. Serve returns when in ends, the real server exits or ctx ends,
+// and stops the real server's whole process group first.
+func Serve(ctx context.Context, s Server, argv, env []string, in io.Reader, out, errOut io.Writer) error {
 	lines := readLines(in)
 	var initialize []byte
 	for {
@@ -88,7 +96,7 @@ func Serve(ctx context.Context, s Server, argv []string, in io.Reader, out, errO
 		case m.ID == nil:
 			// A notification, such as initialized, means nothing to a server that is not running yet.
 		default:
-			real, startErr := start(argv, initialize, errOut)
+			real, startErr := start(argv, env, initialize, errOut)
 			if startErr == nil {
 				return real.relay(ctx, line, lines, out)
 			}
@@ -139,7 +147,7 @@ type realServer struct {
 }
 
 // start runs argv in its own process group and gives it the client's initialize, waiting for its answer.
-func start(argv []string, initialize []byte, errOut io.Writer) (*realServer, error) {
+func start(argv, env []string, initialize []byte, errOut io.Writer) (*realServer, error) {
 	if len(argv) == 0 {
 		return nil, errors.New("no server command")
 	}
@@ -150,6 +158,7 @@ func start(argv []string, initialize []byte, errOut io.Writer) (*realServer, err
 	// npx refuses to run under a package.json whose devEngines names another package manager, and the server
 	// gets the project through --workspace, so it starts where no package.json is above it.
 	cmd.Dir = "/"
+	cmd.Env = append(os.Environ(), env...)
 	cmd.Stderr = errOut
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdin, err := cmd.StdinPipe()
