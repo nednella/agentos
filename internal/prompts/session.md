@@ -9,7 +9,7 @@ The `agentos` command reaches the app; `agentos --help` lists every command. Any
 - `agentos new "<short title>" --prompt -`: the same for a task with no issue, only when the owner wants one. Work that has an issue goes through `agentos issue`: only it links the task to its issue.
 - `agentos new "<short title>" --chat --prompt -`: the same for a chat, only when the owner wants one.
 
-When you stop for an answer from the owner, ask with `AskUserQuestion`: agentos then shows the session as waiting for the owner. Do not end a reply with a question in text.
+When you stop for an answer from the owner, ask with `AskUserQuestion` when you have that tool, and do not end a reply with a question in text. Without that tool, end your reply with the question. Either way agentos then shows the session as waiting for the owner.
 
 After you change an issue's labels, run `agentos refresh` so the owner's queue shows the new ones.
 
