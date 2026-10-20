@@ -13,7 +13,7 @@ export function AgentControl({ agents, value, onChange }: AgentControlProps) {
         key={value}
         defaultValue={value}
         list="agent-names"
-        aria-label="Agent"
+        aria-label="Default inference provider"
         spellCheck={false}
         className="field mono h-7 w-48 flex-none text-small"
         onKeyDown={(e) => {
