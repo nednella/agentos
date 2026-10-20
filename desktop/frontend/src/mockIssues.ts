@@ -11,7 +11,7 @@ const storefrontSeeds: Seed[] = [
   [326, 'ready', 'bug', 'Cart total is a cent off on large orders', 'alex-r', [], ['model:haiku']],
   [412, 'ready', 'chore', 'Sweep the locale keys for the account pages', 'sam-p', ['sam-p']],
   [389, 'ready', 'feature', 'Payment webhook retries with backoff', 'nednella', []],
-  [401, 'ready', 'bug', 'Sign-in prompt flashes before the cart loads', 'alex-r', ['alex-r'], ['effort:high']],
+  [401, 'ready', 'bug', 'Sign-in prompt flashes before the cart loads', 'alex-r', ['alex-r'], ['agent:agy', 'effort:high']],
   [405, 'plan', 'feature', 'Discount codes with an expiry date', 'dev-bot', []],
   [398, 'plan', 'feature', 'Wishlist on the product page', 'sam-p', ['nednella']],
   [372, 'plan', 'refactor', 'One price table for every checkout surface', 'nednella', []],
