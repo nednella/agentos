@@ -2,13 +2,11 @@ package session
 
 import (
 	"cmp"
-	"encoding/json"
-	"io"
 	"strings"
 	"time"
 )
 
-// Event is a Claude Code hook call.
+// Event is a hook call, in Claude Code's event names, which every agent's provider maps its own onto.
 type Event struct {
 	Name             string
 	NotificationType string
@@ -20,62 +18,6 @@ type Event struct {
 	Conversation     string // the agent's id for its conversation
 	Transcript       string // the file the agent writes its conversation to
 	Asks             bool   // a Stop whose reply ends in a question to the owner
-}
-
-type payload struct {
-	NotificationType     string         `json:"notification_type"`
-	Message              string         `json:"message"`
-	ToolName             string         `json:"tool_name"`
-	ToolInput            map[string]any `json:"tool_input"`
-	Prompt               string         `json:"prompt"`
-	LastAssistantMessage string         `json:"last_assistant_message"`
-	Cwd                  string         `json:"cwd"`
-	SessionID            string         `json:"session_id"`
-	TranscriptPath       string         `json:"transcript_path"`
-}
-
-// ParseEvent reads the hook JSON from r. A body that is not JSON still gives a
-// usable event, because the event name alone moves the state.
-func ParseEvent(name string, r io.Reader) Event {
-	var p payload
-	_ = json.NewDecoder(io.LimitReader(r, 1<<20)).Decode(&p)
-	ev := Event{Name: name, NotificationType: p.NotificationType, Message: p.Message, Cwd: p.Cwd, Conversation: p.SessionID, Transcript: p.TranscriptPath}
-	switch name {
-	case "Notification":
-		ev.Detail = p.Message
-	case "PreToolUse", "PostToolUse":
-		ev.Detail = toolDetail(p)
-	case "UserPromptSubmit":
-		ev.Detail = p.Prompt
-	case "Stop":
-		ev.Detail = p.LastAssistantMessage
-		ev.Asks = strings.HasSuffix(strings.TrimRight(p.LastAssistantMessage, " \t\n*_"), "?")
-	}
-	ev.Detail = oneLine(ev.Detail, 120)
-	if name == "PreToolUse" || name == "PostToolUse" {
-		ev.Tool = p.ToolName
-		if cmd, ok := p.ToolInput["command"].(string); ok {
-			ev.Command = oneLine(cmd, 200)
-		}
-	}
-	return ev
-}
-
-func toolDetail(p payload) string {
-	for _, key := range []string{"command", "file_path", "pattern", "url", "description"} {
-		if v, ok := p.ToolInput[key].(string); ok && v != "" {
-			return p.ToolName + " " + v
-		}
-	}
-	return p.ToolName
-}
-
-func oneLine(s string, max int) string {
-	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > max {
-		return string(r[:max-1]) + "…"
-	}
-	return s
 }
 
 // Next is the state reducer: the state after ev, given the state before it.

@@ -5,15 +5,17 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/nednella/agentos/internal/prompts"
+	"github.com/nednella/agentos/internal/session"
 )
 
 func TestClaudeCommand(t *testing.T) {
-	argv := Claude{Exe: "/opt/it's here/agentos"}.Command("p/1", Launch{})
+	argv := Claude{Exe: "/opt/it's here/agentos"}.Command(Launch{})
 	if len(argv) != 3 || argv[0] != "claude" || argv[1] != "--settings" {
 		t.Fatalf("argv = %q", argv)
 	}
@@ -40,13 +42,13 @@ func TestClaudeLetsAChatUseTheBrowser(t *testing.T) {
 		l    Launch
 		want bool
 	}{
-		{"chat with a browser", Launch{Chat: true, Browser: true}, true},
+		{"chat with a browser", Launch{Chat: true, MCP: MCPServer{Command: "npx"}}, true},
 		{"chat without one", Launch{Chat: true}, false},
-		{"task with a browser", Launch{Browser: true}, false},
+		{"task with a browser", Launch{MCP: MCPServer{Command: "npx"}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
+			argv := Claude{Exe: "/x"}.Command(tt.l)
 			type group struct {
 				Matcher string
 				Hooks   []struct{ Command string }
@@ -81,7 +83,7 @@ func TestClaudeLetsAChatUseTheBrowser(t *testing.T) {
 }
 
 func TestClaudeGrantsDirs(t *testing.T) {
-	argv := Claude{Exe: "/x", Dirs: []string{"/data", "/local"}}.Command("p/1", Launch{})
+	argv := Claude{Exe: "/x", Dirs: []string{"/data", "/local"}}.Command(Launch{})
 	var settings struct {
 		Permissions struct{ AdditionalDirectories []string }
 	}
@@ -105,9 +107,16 @@ func TestClaudeLaunch(t *testing.T) {
 		{"both", Launch{Model: "sonnet", Effort: "medium"}, []string{"--model", "sonnet", "--effort", "medium"}},
 		{"resume", Launch{Resume: "abc"}, []string{"--resume", "abc"}},
 		{"chat", Launch{Chat: true}, []string{"--permission-mode", "plan", "--allowedTools", "Bash(agentos issue:*),Bash(agentos new:*),Bash(agentos note:*),Bash(agentos refresh:*),Bash(agentos browser:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*)"}},
+		{"browser", Launch{MCP: MCPServer{Command: "npx", Args: []string{"-y", "x"}, Env: map[string]string{"A": "1"}, Denied: []string{"new_page", "close_page"}}},
+			[]string{"--mcp-config", `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--","npx","-y","x"],"env":{"A":"1"}}}}`, "--disallowedTools", "mcp__browser__new_page mcp__browser__close_page"}},
+		{"prompt", Launch{Prompt: "where you run"}, []string{"--append-system-prompt", "where you run"}},
+		{"start", Launch{Start: "-v is a flag"}, []string{"--", "-v is a flag"}},
+		{"all, in order", Launch{Chat: true, MCP: MCPServer{Command: "npx"}, Prompt: "p", Start: "s"},
+			[]string{"--permission-mode", "plan", "--allowedTools", "Bash(agentos issue:*),Bash(agentos new:*),Bash(agentos note:*),Bash(agentos refresh:*),Bash(agentos browser:*),Bash(gh issue create:*),Bash(gh issue comment:*),Bash(gh issue edit:*)",
+				"--mcp-config", `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--","npx"],"env":null}}}`, "--disallowedTools", "", "--append-system-prompt", "p", "--", "s"}},
 	}
 	for _, tt := range tests {
-		argv := Claude{Exe: "/x"}.Command("p/1", tt.l)
+		argv := Claude{Exe: "/x"}.Command(tt.l)
 		if got := argv[3:]; !slices.Equal(got, tt.want) && (len(got) != 0 || len(tt.want) != 0) {
 			t.Errorf("%s: flags = %q, want %q", tt.name, got, tt.want)
 		}
@@ -115,9 +124,75 @@ func TestClaudeLaunch(t *testing.T) {
 }
 
 func TestPlainIgnoresLaunch(t *testing.T) {
-	argv := Plain{Argv: []string{"bash"}}.Command("p/1", Launch{Model: "opus", Effort: "high", Resume: "abc", Chat: true})
-	if !slices.Equal(argv, []string{"bash"}) {
+	l := Launch{Model: "opus", Effort: "high", Resume: "abc", Chat: true, Prompt: "p", Start: "s", MCP: MCPServer{Command: "npx"}, TmpDir: "/tmp/s"}
+	if argv := (Plain{Argv: []string{"bash"}}).Command(l); !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
+	}
+	if env := (Plain{Argv: []string{"bash"}}).Env(l); env != nil {
+		t.Errorf("env = %q", env)
+	}
+}
+
+func TestPlainCanNothing(t *testing.T) {
+	for _, c := range []Capability{Resume, StartArg, ModelEffort, Browser} {
+		if (Plain{}).Can(c) {
+			t.Errorf("a plain agent can %d", c)
+		}
+		if !(Claude{}).Can(c) {
+			t.Errorf("claude cannot %d", c)
+		}
+	}
+	if _, ok := (Plain{}).ParseEvent("Stop", strings.NewReader("{}")); ok {
+		t.Error("a plain agent's hook was recorded")
+	}
+}
+
+func TestClaudeEnv(t *testing.T) {
+	if got := (Claude{}).Env(Launch{TmpDir: "/tmp/s"}); !slices.Equal(got, []string{"CLAUDE_CODE_TMPDIR=/tmp/s"}) {
+		t.Errorf("env = %q", got)
+	}
+}
+
+func TestNames(t *testing.T) {
+	for _, name := range []string{"claude", "bash", "bash -l"} {
+		if got := New(name, "/x").Name(); got != name {
+			t.Errorf("New(%q).Name() = %q", name, got)
+		}
+	}
+}
+
+func TestClaudeParseEvent(t *testing.T) {
+	tests := []struct {
+		name  string
+		event string
+		body  string
+		want  session.Event
+	}{
+		{"permission notification", "Notification", `{"message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}`,
+			session.Event{Name: "Notification", NotificationType: "permission_prompt", Message: "Claude needs your permission to use Bash", Detail: "Claude needs your permission to use Bash"}},
+		{"tool with command", "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"echo hi","description":"Print hi"}}`,
+			session.Event{Name: "PreToolUse", Detail: "Bash echo hi", Tool: "Bash", Command: "echo hi"}},
+		{"tool without known input", "PostToolUse", `{"tool_name":"Task","tool_input":{"x":1}}`,
+			session.Event{Name: "PostToolUse", Detail: "Task", Tool: "Task"}},
+		{"prompt on many lines", "UserPromptSubmit", `{"prompt":"fix\n  the   bug"}`,
+			session.Event{Name: "UserPromptSubmit", Detail: "fix the bug"}},
+		{"working directory", "Stop", `{"cwd":"/tmp/p"}`, session.Event{Name: "Stop", Cwd: "/tmp/p"}},
+		{"conversation", "Stop", `{"session_id":"abc"}`, session.Event{Name: "Stop", Conversation: "abc"}},
+		{"transcript", "Stop", `{"transcript_path":"/t/abc.jsonl"}`, session.Event{Name: "Stop", Transcript: "/t/abc.jsonl"}},
+		{"not json", "Stop", `garbage`, session.Event{Name: "Stop"}},
+		{"reply ends in a question", "Stop", `{"last_assistant_message":"Done.\n\n**Do you want me to push?**\n"}`,
+			session.Event{Name: "Stop", Detail: "Done. **Do you want me to push?**", Asks: true}},
+		{"question inside the reply", "Stop", `{"last_assistant_message":"Why? The test was flaky. I fixed it."}`,
+			session.Event{Name: "Stop", Detail: "Why? The test was flaky. I fixed it."}},
+		{"empty", "SessionStart", ``, session.Event{Name: "SessionStart"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := (Claude{}).ParseEvent(tt.event, strings.NewReader(tt.body))
+			if !ok || got != tt.want {
+				t.Errorf("got %+v, %v, want %+v", got, ok, tt.want)
+			}
+		})
 	}
 }
 
@@ -127,7 +202,7 @@ func TestNew(t *testing.T) {
 		want string
 	}{{"", "claude"}, {"claude", "claude"}, {"bash", "bash"}, {"bash -l", "bash"}}
 	for _, tt := range tests {
-		if got := New(tt.name, "/x").Command("p/1", Launch{})[0]; got != tt.want {
+		if got := New(tt.name, "/x").Command(Launch{})[0]; got != tt.want {
 			t.Errorf("New(%q) runs %q, want %q", tt.name, got, tt.want)
 		}
 	}
@@ -187,14 +262,14 @@ func TestClaudeFill(t *testing.T) {
 				write(t, path, body)
 			}
 		}
-		if got := (Claude{ConfigDir: user}).Fill(dir, tt.l); got != tt.want {
+		if got := (Claude{ConfigDir: user}).Fill(dir, tt.l); !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("%s: Fill = %+v, want %+v", tt.name, got, tt.want)
 		}
 	}
 }
 
 func TestPlainFillsNothing(t *testing.T) {
-	if got := (Plain{}).Fill(t.TempDir(), Launch{Effort: "high"}); got != (Launch{Effort: "high"}) {
+	if got := (Plain{}).Fill(t.TempDir(), Launch{Effort: "high"}); !reflect.DeepEqual(got, Launch{Effort: "high"}) {
 		t.Errorf("Fill = %+v", got)
 	}
 }

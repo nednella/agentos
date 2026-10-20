@@ -23,6 +23,17 @@ func (f fakeBrowsers) Close(context.Context, string) {}
 func (f fakeBrowsers) Port(string) int               { return 23456 }
 func (f fakeBrowsers) PIDs() []int                   { return nil }
 
+// commandFor is the argv the session's agent starts with.
+func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
+	return s.agent.Command(s.launchFor(name, proj, model, conversation, brief, handover, start, chat))
+}
+
+// mcpConfigOf is the --mcp-config claude gets for the server.
+func mcpConfigOf(server agent.MCPServer) string {
+	argv := agent.Claude{Exe: "/x"}.Command(agent.Launch{MCP: server})
+	return argv[slices.Index(argv, "--mcp-config")+1]
+}
+
 const wantMCPConfig = `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--","npx","-y","--prefer-offline","chrome-devtools-mcp@1.10.1",` +
 	`"--browser-url=http://127.0.0.1:23456","--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],` +
 	`"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
@@ -31,7 +42,7 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 	off := false
 	tests := []struct {
 		name    string
-		agent   agent.Agent
+		agent   agent.Provider
 		proj    project.Project
 		browser bool
 		want    bool
@@ -129,7 +140,7 @@ func TestMCPServerRunsFromTheNpxCacheWhenThePinnedVersionIsThere(t *testing.T) {
 	bin := filepath.Join(cache, "_npx", "bbbb", "node_modules", ".bin", "chrome-devtools-mcp")
 	want := `{"mcpServers":{"browser":{"command":"/x","args":["mcp-browser","--",` + strconv.Quote(bin) + `,"--browser-url=http://127.0.0.1:23456",` +
 		`"--no-usage-statistics","--no-performance-crux","--workspace=/work/p"],"env":{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS":"1"}}}}`
-	if got := browserMCPConfig("/x", 23456, "/work/p", cache); got != want {
+	if got := mcpConfigOf(browserMCP(23456, "/work/p", cache)); got != want {
 		t.Errorf("config = %s\nwant %s", got, want)
 	}
 }
@@ -152,7 +163,7 @@ func TestMCPServerFallsBackToNpx(t *testing.T) {
 			if tt.hashes != nil {
 				cache = fakeNpxCache(t, tt.hashes, tt.bin)
 			}
-			if got := browserMCPConfig("/x", 23456, "/work/p", cache); got != wantMCPConfig {
+			if got := mcpConfigOf(browserMCP(23456, "/work/p", cache)); got != wantMCPConfig {
 				t.Errorf("config = %s\nwant %s", got, wantMCPConfig)
 			}
 		})

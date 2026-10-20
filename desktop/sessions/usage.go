@@ -17,8 +17,8 @@ import (
 // reader reads one session's transcripts, one read at a time.
 type reader struct {
 	mu      sync.Mutex
-	cursor  *usage.Cursor // nil until the event log told what was counted before
-	pending []usage.Part  // read and in the session's total, but not in the event log yet
+	cursor  usage.Reader // nil until the event log told what was counted before
+	pending []usage.Part // read and in the session's total, but not in the event log yet
 }
 
 // countUsage adds what the session's agent used since the last count to the session's total. With
@@ -55,7 +55,7 @@ func (s *Sessions) countUsage(id, transcript string, record bool) {
 				after = at
 			}
 		})
-		r.cursor = usage.NewCursor(after)
+		r.cursor = s.agent.Usage(after)
 	}
 	parts, err := r.cursor.Read(transcript)
 	if err != nil {

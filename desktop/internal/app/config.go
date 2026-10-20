@@ -35,7 +35,7 @@ type Config struct {
 	LocalDir     string // PR tracking and the clean-up log: never synced
 	DataDirFixed bool   // AGENTOS_DEV_DATA_DIR sets the data folder, so the settings cannot change it
 	Tmux         *term.Tmux
-	Agent        agent.Agent
+	Agent        agent.Provider
 }
 
 // Load reads the config file and the environment. The project is the one holding AGENTOS_DIR
@@ -121,9 +121,9 @@ func machineID(stateDir string) (string, error) {
 	return id, nil
 }
 
-// pickAgent builds the agent adapter. Without the agentos command on PATH the
+// pickAgent builds the agent provider. Without the agentos command on PATH the
 // agents' hooks cannot call back, so Claude runs plain and sessions stay idle.
-func pickAgent(name string, dirs []string) agent.Agent {
+func pickAgent(name string, dirs []string) agent.Provider {
 	exe, err := exec.LookPath("agentos")
 	if err == nil {
 		return agent.New(name, exe, dirs...)

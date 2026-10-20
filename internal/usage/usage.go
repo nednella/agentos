@@ -47,6 +47,14 @@ type Part struct {
 	Tokens
 }
 
+// Reader reads what a session's agent used from its transcript, a little at a time, as its provider knows how.
+type Reader interface {
+	// Read counts what was written to the transcript at path since the last read, one part for each model.
+	Read(path string) ([]Part, error)
+	// After is the time of the latest message read.
+	After() time.Time
+}
+
 // Cursor reads a session's transcripts a little at a time. Claude Code writes each API response
 // once per content block, so a message is counted once by its id.
 type Cursor struct {

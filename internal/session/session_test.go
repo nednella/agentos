@@ -113,40 +113,6 @@ func TestApplyChanges(t *testing.T) {
 	}
 }
 
-func TestParseEvent(t *testing.T) {
-	tests := []struct {
-		name  string
-		event string
-		body  string
-		want  Event
-	}{
-		{"permission notification", "Notification", `{"message":"Claude needs your permission to use Bash","notification_type":"permission_prompt"}`,
-			Event{Name: "Notification", NotificationType: "permission_prompt", Message: "Claude needs your permission to use Bash", Detail: "Claude needs your permission to use Bash"}},
-		{"tool with command", "PreToolUse", `{"tool_name":"Bash","tool_input":{"command":"echo hi","description":"Print hi"}}`,
-			Event{Name: "PreToolUse", Detail: "Bash echo hi", Tool: "Bash", Command: "echo hi"}},
-		{"tool without known input", "PostToolUse", `{"tool_name":"Task","tool_input":{"x":1}}`,
-			Event{Name: "PostToolUse", Detail: "Task", Tool: "Task"}},
-		{"prompt on many lines", "UserPromptSubmit", `{"prompt":"fix\n  the   bug"}`,
-			Event{Name: "UserPromptSubmit", Detail: "fix the bug"}},
-		{"working directory", "Stop", `{"cwd":"/tmp/p"}`, Event{Name: "Stop", Cwd: "/tmp/p"}},
-		{"conversation", "Stop", `{"session_id":"abc"}`, Event{Name: "Stop", Conversation: "abc"}},
-		{"transcript", "Stop", `{"transcript_path":"/t/abc.jsonl"}`, Event{Name: "Stop", Transcript: "/t/abc.jsonl"}},
-		{"not json", "Stop", `garbage`, Event{Name: "Stop"}},
-		{"reply ends in a question", "Stop", `{"last_assistant_message":"Done.\n\n**Do you want me to push?**\n"}`,
-			Event{Name: "Stop", Detail: "Done. **Do you want me to push?**", Asks: true}},
-		{"question inside the reply", "Stop", `{"last_assistant_message":"Why? The test was flaky. I fixed it."}`,
-			Event{Name: "Stop", Detail: "Why? The test was flaky. I fixed it."}},
-		{"empty", "SessionStart", ``, Event{Name: "SessionStart"}},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := ParseEvent(tt.event, strings.NewReader(tt.body)); got != tt.want {
-				t.Errorf("got %+v, want %+v", got, tt.want)
-			}
-		})
-	}
-}
-
 func TestSort(t *testing.T) {
 	t0 := time.Date(2026, 10, 2, 12, 0, 0, 0, time.UTC)
 	mk := func(n int, s State, ago time.Duration) Session {
