@@ -13,12 +13,13 @@ import { TypeMark } from './TypeMark'
 type IssueRowProps = { issue: Issue; cursor: boolean; drag: IssueDrag }
 
 export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
-  const { sessions, overlay, select, startIssue, setOverlay, report } = useAgentos()
+  const { sessions, settings, overlay, select, startIssue, setOverlay, report } = useAgentos()
   const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
   const chat = sessions.find((s) => s.chat && s.issue === issue.number)
   const dense = mode === 'compact'
   const labelled = (key: string) => issue.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1) ?? ''
+  const agent = labelled('agent')
   const open = typeof overlay === 'object' && overlay?.issue === issue.number
 
   return (
@@ -42,7 +43,7 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
-        <ModelTag model={labelled('model')} effort={labelled('effort')} className="hidden @[21rem]:inline" />
+        <ModelTag agent={agent === settings.agent ? '' : agent} model={labelled('model')} effort={labelled('effort')} className="hidden @[21rem]:inline" />
       </button>
       <span className="reveal">
         <button
