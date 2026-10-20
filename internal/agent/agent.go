@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -71,6 +73,33 @@ func New(name, exe string, dirs ...string) Provider {
 		return Claude{Exe: exe, ConfigDir: claudeConfigDir(), Dirs: dirs}
 	}
 	return Plain{Argv: strings.Fields(name)}
+}
+
+// Names are the providers a session may be started with by name.
+var Names = []string{"claude"}
+
+// CheckName rejects a name that is no provider's. "" names the default and passes.
+func CheckName(name string) error {
+	if name != "" && !slices.Contains(Names, name) {
+		return fmt.Errorf("no agent %q: the agents are %s", name, strings.Join(Names, ", "))
+	}
+	return nil
+}
+
+// Registry makes the provider each session starts with. Exe is the agentos command the agents' hooks call, "" when
+// it is not on PATH: claude then runs plain, since nothing could report for it. Dirs are the app's folders the
+// agent may use.
+type Registry struct {
+	Exe  string
+	Dirs []string
+}
+
+// Provider is the provider for command: a provider's name, "" for claude, or any other command, which runs plain.
+func (r Registry) Provider(command string) Provider {
+	if r.Exe == "" && (command == "" || command == "claude") {
+		return Plain{Argv: []string{"claude"}}
+	}
+	return New(command, r.Exe, r.Dirs...)
 }
 
 // Plain runs a command as is. Its sessions stay idle because nothing reports for them.
