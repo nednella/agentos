@@ -52,6 +52,7 @@ queue_sections:
     actions:
       - {name: Plan, command: "/plan {n}", model: opus, effort: high, kind: chat}
       - {name: Work, command: "/work {n}"}
+      - {name: Work on agy, command: "/work {n}", agent: agy}
   - name: Needs plan
     labels: [plan]
     draggable_from: [Inbox]     # only issues of these sections can be dropped here; unset takes any
@@ -76,7 +77,7 @@ queue_sections:
 - An issue goes in the first section it matches: it has any of the section's `labels`, or the section's `labels` is empty and the issue has none, or the section's `labels` holds `"*"`, which matches every issue.
 - So a `"*"` section placed last takes every issue the sections above it did not. A section after it would never be reached, so a config with one does not load.
 - An issue no section matches goes under one folded row below the last section, `<n> more issues match no section`, with the `Start` action. A last `"*"` section is only needed to give those issues a name or other actions.
-- In a command, `{n}` is the issue number, `{title}` its title and `{branch}` its `session_branch_fallback`. The `Start` action names the branch when the project sets one. An empty `command` starts the agent with nothing typed. `model` and `effort` are optional.
+- In a command, `{n}` is the issue number, `{title}` its title and `{branch}` its `session_branch_fallback`. The `Start` action names the branch when the project sets one. An empty `command` starts the agent with nothing typed. `agent`, `model` and `effort` are optional: `agent` is a provider's name, `claude` or `agy`, and a config that names another does not load.
 - `kind` is `task` (the default) or `chat`. A chat action starts a read-only chat for the issue: it gets `AGENTOS_ISSUE`, but no branch, no pull request commands and no clean-up. An issue can have one live task and one live chat; starting an action of a kind that already runs on the issue opens that session. The queue row links to the task.
 - A session started by an action is titled `#<n> <title>`, with the action's name as a badge beside it.
 - The first action of a section is its default. A section needs a name, an action needs a name, and each is unique in its list; a config that breaks this does not load.
@@ -102,7 +103,7 @@ For agy the model is the full id as `agy models` prints it, such as `gemini-4-ar
 
 ### How a session picks its agent
 
-`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` or `agy`. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider.
+`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` or `agy`. Any other name is refused. Without the flag, a session for an issue runs the first of these that names a provider: the issue's `agent:<name>` label (a name that is no provider's is ignored), the action's `agent`, then `agent_command`; the labels and the action then pick its model as above, and a `model:` or `effort:` label that this provider would not accept is ignored. The queue row names the provider a label picks when it is not `agent_command`. From the app's buttons, and for a session with no issue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider.
 
 ### The agy provider
 
