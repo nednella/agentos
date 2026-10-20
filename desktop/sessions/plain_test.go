@@ -17,7 +17,7 @@ import (
 
 func plainSession(h *apptest.Harness, t *testing.T) sessions.Session {
 	t.Helper()
-	s, err := h.Sessions().Create("my work", "", false, 0)
+	s, err := h.Sessions().Create("my work", "", false, 0, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestIssueSessionWithoutBranchPatternFollowsItsFolder(t *testing.T) {
 	repoFixture(t, h)
 	ownBranch(t, h.Dir)
 	gitIn(t, h.Dir, "checkout", "main")
-	s, err := h.Sessions().Create("#5 work", "", false, 5)
+	s, err := h.Sessions().Create("#5 work", "", false, 5, "")
 	if err != nil {
 		t.Fatal(err)
 	}

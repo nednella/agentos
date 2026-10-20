@@ -61,6 +61,7 @@ type Session struct {
 	Action      string           `json:"action"` // the queue action the session was started with, "" when none
 	Model       string           `json:"model"`  // the model the agent was started with, "" when unknown
 	Effort      string           `json:"effort"` // the effort the agent was started with, "" when unknown
+	Agent       string           `json:"agent"`  // the provider, or the plain command, the session was started with
 	History     []session.Change `json:"history"`
 	Evidence    int              `json:"evidence"`
 	Browser     bool             `json:"browser"`
@@ -98,7 +99,7 @@ type Project struct {
 // Sessions tracks the agents in the private tmux server and tells the front end when they change.
 type Sessions struct {
 	tmux     *term.Tmux
-	agent    agent.Provider
+	agents   agent.Registry
 	run      run.Runner
 	stateDir string
 	localDir string
@@ -154,6 +155,7 @@ type Sessions struct {
 type ProjectList interface {
 	List() []project.Project
 	Remove(name string) (bool, error)
+	Agent() string // the provider, or the plain command, a session starts with unless one is named
 }
 
 // Tally records when a session waits on the user.
@@ -191,7 +193,7 @@ type Awake interface {
 // Options is what a Sessions needs from outside.
 type Options struct {
 	Tmux          *term.Tmux
-	Agent         agent.Provider
+	Agents        agent.Registry
 	StateDir      string
 	LocalDir      string // pull-request tracking and the clean-up log: never synced
 	Projects      ProjectList
@@ -232,7 +234,7 @@ func (s *Sessions) Touch() { s.changed() }
 
 func newSessions(o Options) *Sessions {
 	return &Sessions{
-		tmux: o.Tmux, agent: o.Agent, run: o.Run, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
+		tmux: o.Tmux, agents: o.Agents, run: o.Run, stateDir: o.StateDir, localDir: o.LocalDir, emit: o.Emit, warn: warn.New(o.Emit),
 		project: o.Current, configured: o.Projects, tally: o.Tally, activity: o.Activity, closeTerm: o.CloseTerminal, evidence: o.Evidence, browsers: o.Browsers, awake: o.Awake, keepAwake: o.KeepAwake,
 		repoOf: func(string) string { return "" }, onIssues: func() {},
 		known: map[string]term.Info{}, ended: map[string]*endedSession{}, dismissed: map[string]bool{},
@@ -354,7 +356,7 @@ func (e *endedSession) record() session.Record {
 }
 
 func identityOf(in term.Info) session.Identity {
-	id := session.Identity{Title: in.Title, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Path: in.Path}
+	id := session.Identity{Title: in.Title, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Agent: in.Agent, Path: in.Path}
 	id.Issue, _ = strconv.Atoi(in.Issue)
 	if !in.Created.IsZero() {
 		id.Created = in.Created.UnixMilli()
@@ -412,7 +414,7 @@ func (s *Sessions) adoptEnded(name string, rec session.Record) {
 		s.drop(name)
 		return
 	}
-	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort, Chat: rec.Chat, Action: rec.Action}
+	info := term.Info{Name: n, Title: rec.Title, Path: rec.Path, Model: rec.Model, Effort: rec.Effort, Agent: rec.Agent, Chat: rec.Chat, Action: rec.Action}
 	if rec.Issue > 0 {
 		info.Issue = strconv.Itoa(rec.Issue)
 	}
@@ -888,7 +890,7 @@ func (s *Sessions) list() []Session {
 		view := Session{
 			ID: id, N: ss.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
-			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
+			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Agent: in.Agent, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
 		}
 		if !ss.At.IsZero() {
@@ -896,7 +898,7 @@ func (s *Sessions) list() []Session {
 		}
 		if ss.State == session.Ended {
 			view.EndedAt = ss.At.UnixMilli()
-			view.Resumable = s.resumes() && s.conversationOf(id) != ""
+			view.Resumable = s.provider(in.Agent).Can(agent.Resume) && s.conversationOf(id) != ""
 		}
 		f := s.life.fields(id)
 		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
@@ -1074,31 +1076,31 @@ func (s *Sessions) IssueSessions() map[int]string {
 }
 
 // Create starts the agent in the current project. A non-empty text is given to the agent: sent when send is set,
-// else typed into its prompt once the agent is ready.
-func (s *Sessions) Create(title, text string, send bool, issue int) (Session, error) {
-	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false, "")
+// else typed into its prompt once the agent is ready. The agent is the provider named, or the default for "".
+func (s *Sessions) Create(title, text string, send bool, issue int, agentName string) (Session, error) {
+	return s.createIn(s.Current(), title, text, send, issue, project.Model{}, "", "", "", false, "", agentName)
 }
 
 // CreateChat starts a chat in the current project: an agent that only reads, for questions about the project. A
-// non-empty text is given to it as Create gives it.
-func (s *Sessions) CreateChat(title, text string, send bool) (Session, error) {
-	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), text, send, 0, project.Model{}, "", "", "", true, "")
+// non-empty text is given to it as Create gives it, and the agent is chosen as Create chooses it.
+func (s *Sessions) CreateChat(title, text string, send bool, agentName string) (Session, error) {
+	return s.createIn(s.Current(), cmp.Or(strings.TrimSpace(title), chatTitle), text, send, 0, project.Model{}, "", "", "", true, "", agentName)
 }
 
 // CreateBriefed is Create for a session with a job of its own: brief is added to the agent's system prompt, and the
 // project says whether text is sent.
 func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 	proj := s.Current()
-	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief, "", false, "")
+	return s.createIn(proj, title, fromApp(text), proj.SendsPrompt(), 0, project.Model{}, "", brief, "", false, "", "")
 }
 
 // CreateIssue starts the agent for an issue, in a task or a chat as the action says, and types text into it once it
-// is ready; the project says whether that is sent. The action and the issue's labels pick the model. A handover from
-// the session that asked for this one is added to the agent's system prompt. An issue that has a live session of
-// that kind gets that session back, and created is false.
-func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover string) (view Session, created bool, err error) {
+// is ready; the project says whether that is sent. The action and the issue's labels pick the model, and the agent
+// is the provider named, or the default for "". A handover from the session that asked for this one is added to the
+// agent's system prompt. An issue that has a live session of that kind gets that session back, and created is false.
+func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover, agentName string) (view Session, created bool, err error) {
 	proj := s.Current()
-	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat(), action.Name)
+	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, project.Pick(action, labels), "", handover, action.Chat(), action.Name, agentName)
 	if live == "" {
 		return view, err == nil, err
 	}
@@ -1133,7 +1135,7 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	switch {
 	case !ended:
 		return Session{}, fmt.Errorf("session %s has not ended", id)
-	case !s.resumes() || conversation == "":
+	case !s.provider(in.Agent).Can(agent.Resume) || conversation == "":
 		return Session{}, fmt.Errorf("session %s has no conversation to resume", id)
 	case !known:
 		return Session{}, fmt.Errorf("the project of session %s is gone", id)
@@ -1144,12 +1146,12 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	var err error
 	if issue > 0 {
 		var live string
-		view, live, err = s.createForIssue(proj, title, "", false, issue, model, id, handover, in.Chat, in.Action)
+		view, live, err = s.createForIssue(proj, title, "", false, issue, model, id, handover, in.Chat, in.Action, in.Agent)
 		if live != "" {
 			return s.liveRow(live, issue)
 		}
 	} else {
-		view, err = s.createIn(proj, title, "", false, 0, model, id, "", handover, in.Chat, in.Action)
+		view, err = s.createIn(proj, title, "", false, 0, model, id, "", handover, in.Chat, in.Action, in.Agent)
 	}
 	if err != nil {
 		return Session{}, err
@@ -1158,18 +1160,20 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	return view, nil
 }
 
-// resumes says whether the agent can continue a conversation.
-func (s *Sessions) resumes() bool { return s.agent.Can(agent.Resume) }
+// provider is the provider of a session started with the agent named, or with the default for "".
+func (s *Sessions) provider(name string) agent.Provider {
+	return s.agents.Provider(cmp.Or(name, s.configured.Agent()))
+}
 
 // createForIssue starts a task or a chat for the issue, unless the project has a live one of that kind for it: then
 // it names that one.
-func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string, chat bool, action string) (view Session, live string, err error) {
+func (s *Sessions) createForIssue(proj project.Project, title, text string, send bool, issue int, model project.Model, from, handover string, chat bool, action, agentName string) (view Session, live string, err error) {
 	s.issueMu.Lock()
 	defer s.issueMu.Unlock()
 	if live := s.liveIssueSession(proj.Key(), issue, chat); live != "" {
 		return Session{}, live, nil
 	}
-	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, chat, action)
+	view, err = s.createIn(proj, title, text, send, issue, model, from, "", handover, chat, action, agentName)
 	return view, "", err
 }
 
@@ -1182,10 +1186,10 @@ func fromApp(text string) string {
 	return "APPLICATION_PROMPT: " + text
 }
 
-// createIn is Create in the project given, which need not be the current one, with the model given.
-// A session from an earlier one continues its conversation and takes over its branches; a brief or a handover is
-// added to the agent's system prompt.
-func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, from, brief, handover string, chat bool, action string) (Session, error) {
+// createIn is Create in the project given, which need not be the current one, with the model given and the agent
+// named. A session from an earlier one continues its conversation and takes over its branches; a brief or a handover
+// is added to the agent's system prompt.
+func (s *Sessions) createIn(proj project.Project, title, text string, send bool, issue int, model project.Model, from, brief, handover string, chat bool, action, agentName string) (Session, error) {
 	s.createMu.Lock()
 	defer s.createMu.Unlock()
 
@@ -1193,11 +1197,12 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	conversation := s.conversationOf(from)
 	s.mu.Unlock()
 
-	model = s.fill(proj.Dir, model)
+	p := s.provider(agentName)
+	model = fill(p, proj.Dir, model)
 	// Typed in while the agent still starts, the text and Enter reach it as one paste, where Enter is a newline. An
 	// agent that takes a prompt on its command line submits it itself once it is ready.
 	start := ""
-	if s.agent.Can(agent.StartArg) && send {
+	if p.Can(agent.StartArg) && send {
 		start, text = text, ""
 	}
 	name, ctx, ready := s.reserve(proj, text)
@@ -1205,7 +1210,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	title = cmp.Or(strings.TrimSpace(title), defaultTitle)
 	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
 	defer cancel()
-	if err := s.launch(tctx, name, title, proj, issue, model, conversation, brief, handover, start, chat, action); err != nil {
+	if err := s.launch(tctx, p, name, title, proj, issue, model, conversation, brief, handover, start, chat, action); err != nil {
 		s.mu.Lock()
 		delete(s.ready, name.String())
 		s.mu.Unlock()
@@ -1214,7 +1219,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
-	view := s.register(name, title, proj, issue, model, created, conversation != "", chat, action)
+	view := s.register(p, name, title, proj, issue, model, created, conversation != "", chat, action)
 	if branch := proj.BranchFor(issue); issue > 0 && branch != "" && !chat {
 		s.life.claim(proj, name.String(), branch)
 	}
@@ -1228,12 +1233,12 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 }
 
 // fill sets what model leaves unset from the agent's own settings, skipping a value the agent would not accept.
-func (s *Sessions) fill(dir string, model project.Model) project.Model {
-	l := s.agent.Fill(dir, agent.Launch{Model: model.Model, Effort: model.Effort})
-	if s.agent.ValidModel(l.Model, "") == nil {
+func fill(p agent.Provider, dir string, model project.Model) project.Model {
+	l := p.Fill(dir, agent.Launch{Model: model.Model, Effort: model.Effort})
+	if p.ValidModel(l.Model, "") == nil {
 		model.Model = l.Model
 	}
-	if s.agent.ValidModel("", l.Effort) == nil {
+	if p.ValidModel("", l.Effort) == nil {
 		model.Effort = l.Effort
 	}
 	return model
@@ -1254,11 +1259,11 @@ func (s *Sessions) reserve(proj project.Project, prefill string) (name session.N
 }
 
 // launch starts the agent of the session in tmux.
-func (s *Sessions) launch(ctx context.Context, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover, start string, chat bool, action string) error {
+func (s *Sessions) launch(ctx context.Context, p agent.Provider, name session.Name, title string, proj project.Project, issue int, model project.Model, conversation, brief, handover, start string, chat bool, action string) error {
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
-		"AGENTOS_AGENT=" + s.agent.Name(),
+		"AGENTOS_AGENT=" + p.Name(),
 	}
 	if issue > 0 {
 		env = append(env, "AGENTOS_ISSUE="+strconv.Itoa(issue))
@@ -1273,24 +1278,24 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 			return fmt.Errorf("saving the handover: %w", err)
 		}
 	}
-	l := s.launchFor(name, proj, model, conversation, brief, handover, start, chat)
+	l := s.launchFor(p, name, proj, model, conversation, brief, handover, start, chat)
 	l.TmpDir = tmp
-	env = append(env, s.agent.Env(l)...)
-	if !s.agent.Can(agent.ModelEffort) {
+	env = append(env, p.Env(l)...)
+	if !p.Can(agent.ModelEffort) {
 		model = project.Model{} // the agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.agent.Command(l), issue, model, chat, action)
+	return s.start(ctx, name, title, proj.Dir, env, p.Command(l), issue, model, chat, action, p.Name())
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(name session.Name, title string, proj project.Project, issue int, model project.Model, created time.Time, resumed, chat bool, action string) Session {
+func (s *Sessions) register(p agent.Provider, name session.Name, title string, proj project.Project, issue int, model project.Model, created time.Time, resumed, chat bool, action string) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if resumed {
 		s.resumed[name.String()] = true
 	}
-	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Created: created}
-	if s.agent.Can(agent.ModelEffort) {
+	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Agent: p.Name(), Created: created}
+	if p.Can(agent.ModelEffort) {
 		in.Model, in.Effort = model.Model, model.Effort
 	}
 	if issue > 0 {
@@ -1309,7 +1314,7 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 	return Session{}
 }
 
-func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model, chat bool, action string) error {
+func (s *Sessions) start(ctx context.Context, name session.Name, title, dir string, env, argv []string, issue int, model project.Model, chat bool, action, agentName string) error {
 	if err := s.tmux.NewSession(ctx, name, title, dir, env, argv, startCols, startRows); err != nil {
 		return err
 	}
@@ -1337,6 +1342,9 @@ func (s *Sessions) start(ctx context.Context, name session.Name, title, dir stri
 		if err := tag(s.tmux.SetAction(ctx, name, action)); err != nil {
 			return err
 		}
+	}
+	if err := tag(s.tmux.SetAgent(ctx, name, agentName)); err != nil {
+		return err
 	}
 	if model != (project.Model{}) {
 		return tag(s.tmux.SetModel(ctx, name, model.Model, model.Effort))
@@ -1394,7 +1402,7 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 		return
 	}
 	if t.ended {
-		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id), false, t.action)
+		_, live, err := s.createForIssue(t.proj, t.title, prompt, t.proj.SendsPrompt(), t.issue, t.model, t.id, s.handoverOf(t.id), false, t.action, t.agent)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "agentos: starting a session for #%d: %v\n", t.issue, err)
 		}
@@ -1566,7 +1574,7 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	if len(branches) == 0 {
 		return target{}, false
 	}
-	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, created: in.Created}, true
+	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, agent: in.Agent, created: in.Created}, true
 }
 
 // conversationOf is the agent's conversation id of a session, running or ended. It needs mu.
@@ -1797,7 +1805,7 @@ func browserMCP(port int, workspace, npmCache string) agent.MCPServer {
 // app, and about the browser when it can use one, the project allows it and one exists; a session with a brief
 // learns only the brief. A task started by another session gets that session's handover last. An agent that takes
 // its first prompt on its command line gets start.
-func (s *Sessions) launchFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) agent.Launch {
+func (s *Sessions) launchFor(p agent.Provider, name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) agent.Launch {
 	l := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat, Start: start}
 	if brief != "" {
 		l.Prompt = brief
@@ -1807,7 +1815,7 @@ func (s *Sessions) launchFor(name session.Name, proj project.Project, model proj
 	if chat {
 		l.Prompt = prompts.Session() + "\n\n" + prompts.Chat()
 	}
-	if s.agent.Can(agent.Browser) && proj.BrowserOn() && s.browsers.Available() {
+	if p.Can(agent.Browser) && proj.BrowserOn() && s.browsers.Available() {
 		if port := s.browsers.Port(name.Project); port != 0 {
 			l.MCP = browserMCP(port, proj.Dir, npmCacheDir())
 			l.Prompt += "\n\n" + prompts.Browser()

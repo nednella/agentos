@@ -157,7 +157,7 @@ func TestClaudeGetsASentPromptOnItsCommandLine(t *testing.T) {
 		{"not sent", false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			s, err := h.Sessions().Create("#7 work", "/work 7", tt.send, 7)
+			s, err := h.Sessions().Create("#7 work", "/work 7", tt.send, 7, "")
 			if err != nil {
 				t.Fatal(err)
 			}

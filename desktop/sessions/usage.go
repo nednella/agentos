@@ -55,7 +55,7 @@ func (s *Sessions) countUsage(id, transcript string, record bool) {
 				after = at
 			}
 		})
-		r.cursor = s.agent.Usage(after)
+		r.cursor = s.provider(in.Agent).Usage(after)
 	}
 	parts, err := r.cursor.Read(transcript)
 	if err != nil {

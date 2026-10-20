@@ -931,6 +931,9 @@ func (h *Harness) SetKeepAwake(on bool) (settings.Settings, error) {
 	return h.settings.SetKeepAwake(on)
 }
 
+func (h *Harness) SetAgent(command string) (settings.Settings, error) {
+	return h.settings.SetAgent(command)
+}
 func (h *Harness) SetPromptSend(mode string) (settings.Settings, error) {
 	return h.settings.SetPromptSend(mode)
 }

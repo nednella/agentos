@@ -23,9 +23,9 @@ func (f fakeBrowsers) Close(context.Context, string) {}
 func (f fakeBrowsers) Port(string) int               { return 23456 }
 func (f fakeBrowsers) PIDs() []int                   { return nil }
 
-// commandFor is the argv the session's agent starts with.
-func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
-	return s.agent.Command(s.launchFor(name, proj, model, conversation, brief, handover, start, chat))
+// commandFor is the argv the session's agent p starts with.
+func (s *Sessions) commandFor(p agent.Provider, name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
+	return p.Command(s.launchFor(p, name, proj, model, conversation, brief, handover, start, chat))
 }
 
 // mcpConfigOf is the --mcp-config claude gets for the server.
@@ -55,9 +55,9 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("npm_config_cache", t.TempDir())
-			s := &Sessions{agent: tt.agent, browsers: fakeBrowsers{tt.browser}}
+			s := &Sessions{browsers: fakeBrowsers{tt.browser}}
 			tt.proj.Dir = "/work/p"
-			argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "", "", "", "", false)
+			argv := s.commandFor(tt.agent, session.Name{Project: "p", Token: "a1"}, tt.proj, project.Model{}, "", "", "", "", false)
 			prompt, config, denied := slices.Index(argv, "--append-system-prompt"), slices.Index(argv, "--mcp-config"), slices.Index(argv, "--disallowedTools")
 			if (config >= 0) != tt.want || (denied >= 0) != tt.want {
 				t.Fatalf("argv = %q", argv)
@@ -84,13 +84,13 @@ func TestClaudeGetsTheBrowserToolsAndPrompt(t *testing.T) {
 
 func TestCommandResumesAConversation(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
-	claude := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
-	argv := claude.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc", "", "", "", false)
+	claude := &Sessions{browsers: fakeBrowsers{}}
+	argv := claude.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p"}, project.Model{}, "abc", "", "", "", false)
 	if i := slices.Index(argv, "--resume"); i < 0 || argv[i+1] != "abc" {
 		t.Errorf("argv = %q", argv)
 	}
-	plain := &Sessions{agent: agent.Plain{Argv: []string{"bash"}}, browsers: fakeBrowsers{}}
-	if argv := plain.commandFor(name, project.Project{Name: "p"}, project.Model{}, "abc", "", "", "", false); !slices.Equal(argv, []string{"bash"}) {
+	plain := &Sessions{browsers: fakeBrowsers{}}
+	if argv := plain.commandFor(agent.Plain{Argv: []string{"bash"}}, name, project.Project{Name: "p"}, project.Model{}, "abc", "", "", "", false); !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
 	}
 }
@@ -184,8 +184,8 @@ func TestNpmCacheDir(t *testing.T) {
 
 func TestCommandGivesABriefedSessionOnlyTheBrief(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
-	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{available: true}}
-	argv := s.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", "set it up", "", "", false)
+	s := &Sessions{browsers: fakeBrowsers{available: true}}
+	argv := s.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p"}, project.Model{}, "", "set it up", "", "", false)
 	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != "set it up" || slices.Contains(argv, "--mcp-config") {
 		t.Errorf("argv = %q", argv)
 	}
@@ -193,23 +193,23 @@ func TestCommandGivesABriefedSessionOnlyTheBrief(t *testing.T) {
 
 func TestCommandEndsWithTheStartPrompt(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
-	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
+	s := &Sessions{browsers: fakeBrowsers{}}
 	for _, brief := range []string{"", "set it up"} {
-		argv := s.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", brief, "", "-v is a flag", false)
+		argv := s.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p"}, project.Model{}, "", brief, "", "-v is a flag", false)
 		if !slices.Equal(argv[len(argv)-2:], []string{"--", "-v is a flag"}) {
 			t.Errorf("argv with brief %q = %q", brief, argv)
 		}
 	}
-	plain := &Sessions{agent: agent.Plain{Argv: []string{"bash"}}, browsers: fakeBrowsers{}}
-	if argv := plain.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", "", "", "/work 7", false); !slices.Equal(argv, []string{"bash"}) {
+	plain := &Sessions{browsers: fakeBrowsers{}}
+	if argv := plain.commandFor(agent.Plain{Argv: []string{"bash"}}, name, project.Project{Name: "p"}, project.Model{}, "", "", "", "/work 7", false); !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
 	}
 }
 
 func TestCommandEndsATasksPromptWithTheHandover(t *testing.T) {
 	name := session.Name{Project: "p", Token: "a1"}
-	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{}}
-	argv := s.commandFor(name, project.Project{Name: "p"}, project.Model{}, "", "", "the patch is in /tmp/x", "", false)
+	s := &Sessions{browsers: fakeBrowsers{}}
+	argv := s.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p"}, project.Model{}, "", "", "the patch is in /tmp/x", "", false)
 	want := prompts.Session() + "\n\n" + prompts.Task() + "\n\n" + prompts.Handover("the patch is in /tmp/x")
 	if i := slices.Index(argv, "--append-system-prompt"); i < 0 || argv[i+1] != want {
 		t.Errorf("argv = %q", argv)
@@ -219,8 +219,8 @@ func TestCommandEndsATasksPromptWithTheHandover(t *testing.T) {
 func TestCommandMakesAChatReadOnlyWithTheBrowser(t *testing.T) {
 	t.Setenv("npm_config_cache", t.TempDir())
 	name := session.Name{Project: "p", Token: "a1"}
-	s := &Sessions{agent: agent.Claude{Exe: "/x"}, browsers: fakeBrowsers{available: true}}
-	argv := s.commandFor(name, project.Project{Name: "p", Dir: "/work/p"}, project.Model{}, "", "", "", "", true)
+	s := &Sessions{browsers: fakeBrowsers{available: true}}
+	argv := s.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p", Dir: "/work/p"}, project.Model{}, "", "", "", "", true)
 	if i := slices.Index(argv, "--permission-mode"); i < 0 || argv[i+1] != "plan" {
 		t.Errorf("no plan mode: %q", argv)
 	}
@@ -236,15 +236,15 @@ func TestCommandMakesAChatReadOnlyWithTheBrowser(t *testing.T) {
 		t.Errorf("system prompt = %q", argv)
 	}
 
-	work := s.commandFor(name, project.Project{Name: "p", Dir: "/work/p"}, project.Model{}, "", "", "", "", false)
+	work := s.commandFor(agent.Claude{Exe: "/x"}, name, project.Project{Name: "p", Dir: "/work/p"}, project.Model{}, "", "", "", "", false)
 	if slices.Contains(work, "--permission-mode") || slices.Contains(work, "--allowedTools") {
 		t.Errorf("a session runs read-only: %q", work)
 	}
 }
 
 func TestCommandOfAPlainAgentIgnoresChat(t *testing.T) {
-	s := &Sessions{agent: agent.Plain{Argv: []string{"bash"}}, browsers: fakeBrowsers{}}
-	if argv := s.commandFor(session.Name{Project: "p", Token: "a1"}, project.Project{Name: "p"}, project.Model{}, "", "", "", "", true); !slices.Equal(argv, []string{"bash"}) {
+	s := &Sessions{browsers: fakeBrowsers{}}
+	if argv := s.commandFor(agent.Plain{Argv: []string{"bash"}}, session.Name{Project: "p", Token: "a1"}, project.Project{Name: "p"}, project.Model{}, "", "", "", "", true); !slices.Equal(argv, []string{"bash"}) {
 		t.Errorf("argv = %q", argv)
 	}
 }
