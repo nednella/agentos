@@ -76,7 +76,7 @@ export function SettingsPanel() {
         <SettingRow label="Keep Mac awake" hint="Stops the Mac idle-sleeping while a session works. A project that sets its own in the config file keeps it.">
           <SegmentedControl label="Keep Mac awake" options={SWITCH} value={settings.keepAwake ? 'on' : 'off'} onChange={(value) => report(() => setKeepAwake(value === 'on'))} />
         </SettingRow>
-        <SettingRow label="Default inference provider" hint="The command that launches the tool a new session runs, unless agentos new or issue names one with --agent. claude runs with hooks; any other command runs plain, with no state or usage.">
+        <SettingRow label="Default inference provider" hint="The command that launches the tool a new session runs.">
           <AgentControl agents={settings.agents} value={settings.agent} onChange={(command) => report(() => setAgent(command))} />
         </SettingRow>
         {project && (
