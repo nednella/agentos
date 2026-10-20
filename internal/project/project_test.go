@@ -283,6 +283,17 @@ func TestLoadRejectsAnUnknownCleanupMode(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsAnUnknownActionAgent(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	body := "projects:\n  - name: a\n    directory: /a\n    queue_sections:\n      - name: Inbox\n        actions:\n          - {name: Work, command: \"/work {n}\", agent: codex}\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), `queue_sections.Inbox.Work: no agent "codex"`) {
+		t.Errorf("Load = %v, want an error naming the action and the agent", err)
+	}
+}
+
 func TestLoadTextScale(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.yaml")
 	for scale, ok := range map[string]bool{"1.2": true, "0.85": true, "1.5": true, "0.5": false, "3": false, "-1": false} {
