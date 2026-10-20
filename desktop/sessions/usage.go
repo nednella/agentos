@@ -21,11 +21,11 @@ type reader struct {
 	pending []usage.Part // read and in the session's total, but not in the event log yet
 }
 
-// countUsage adds what the session's agent used since the last count to the session's total. With
-// record, it also records all that is not in the event log yet, one event for each model. The first
-// count of a run of the app starts after the latest usage the event log holds for the session, so a
-// restart reads again what was not recorded, and counts nothing twice.
-func (s *Sessions) countUsage(id, transcript string, record bool) {
+// countUsage adds what the session's agent used since the last count to the session's total. model is the one
+// the agent reports, for a transcript that names none. With record, it also records all that is not in the
+// event log yet, one event for each model. The first count of a run of the app starts after the latest usage the
+// event log holds for the session, so a restart reads again what was not recorded, and counts nothing twice.
+func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	s.mu.Lock()
 	in, ok := s.infoOf(id)
 	r := s.readers[id]
@@ -57,7 +57,7 @@ func (s *Sessions) countUsage(id, transcript string, record bool) {
 		})
 		r.cursor = s.provider(in.Agent).Usage(after)
 	}
-	parts, err := r.cursor.Read(transcript)
+	parts, err := r.cursor.Read(transcript, model)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: reading the usage of %s: %v\n", id, err)
 	}

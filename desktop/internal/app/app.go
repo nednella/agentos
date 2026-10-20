@@ -126,15 +126,16 @@ func New(c Config, h Host, runner run.Runner, stream run.Streamer, claude run.En
 	changes := evidence.Changes{Emit: h.Emit, Touch: sess.Touch}
 	digests, sc, ic := digest.NewCommands(mgr, a.router), sessions.NewCommands(sess, a.router), issues.NewCommands(iss, sessSvc)
 	a.handle(map[string]control.Handler{
-		"digest-add": digests.Add,
-		"digest":     digests.Digest,
-		"track":      sc.Track,
-		"note":       notes.NewCommands(store, a.router, sess, h.Emit).Note,
-		"show":       evidence.NewCommands(proofs, a.router, changes).Show,
-		"browser":    browser.NewCommands(browsers, a.router, a.router, proofs, changes).Browser,
-		"stats":      stats.NewCommands(waits, a.router, a.router).Stats,
-		"project":    projects.NewCommands(proj).Project,
-		"relaunch":   update.NewCommands(a.updates).Relaunch,
+		"digest-add":  digests.Add,
+		"digest":      digests.Digest,
+		"track":       sc.Track,
+		"mcp-browser": sc.MCPBrowser,
+		"note":        notes.NewCommands(store, a.router, sess, h.Emit).Note,
+		"show":        evidence.NewCommands(proofs, a.router, changes).Show,
+		"browser":     browser.NewCommands(browsers, a.router, a.router, proofs, changes).Browser,
+		"stats":       stats.NewCommands(waits, a.router, a.router).Stats,
+		"project":     projects.NewCommands(proj).Project,
+		"relaunch":    update.NewCommands(a.updates).Relaunch,
 	})
 	a.handleScoped(map[string]control.Handler{
 		"issue":   ic.Issue,

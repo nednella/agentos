@@ -633,7 +633,8 @@ func NewWith(t *testing.T, o Options) *Harness {
 	} else {
 		t.Setenv("AGENTOS_DEV_DATA_DIR", filepath.Join(state, "data"))
 	}
-	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(state, "claude")) // never the user's own settings
+	t.Setenv("CLAUDE_CONFIG_DIR", filepath.Join(state, "claude"))   // never the user's own settings
+	t.Setenv("AGENTOS_AGY_CONFIG_DIR", filepath.Join(state, "agy")) // nor agy's own hooks and MCP servers
 
 	h := &Harness{Rec: &Recorder{}, GH: &FakeGH{Releases: o.Releases}, Claude: &FakeClaude{}, Socket: socket, Dir: dir, State: state, Conf: confPath}
 	h.App = h.build(t)
@@ -723,23 +724,35 @@ func (h *Harness) Notes() *notes.Notes { return h.App.Notes() }
 
 // Hook runs the built agentos command as Claude Code would. A live session has had its
 // SessionStart, which creates the state file, so one is sent first when the file is missing.
-func (h *Harness) Hook(t *testing.T, id, event, stdin string) {
+func (h *Harness) Hook(t *testing.T, id, event, stdin string, env ...string) {
 	t.Helper()
 	live := exec.Command("tmux", "-L", h.Socket, "has-session", "-t", "="+id).Run() == nil
 	if rec, _ := bus.ReadState(h.State, id); live && event != "SessionStart" && rec.Session == "" {
-		h.hook(t, id, "SessionStart", "{}")
+		h.hook(t, id, "SessionStart", "{}", env)
 	}
-	h.hook(t, id, event, stdin)
+	h.hook(t, id, event, stdin, env)
 }
 
-func (h *Harness) hook(t *testing.T, id, event, stdin string) {
+// hook runs the hook as the session's agent would: with the provider the session was started with, which the app
+// wrote into its state file, and env on top. It returns what the hook printed.
+func (h *Harness) hook(t *testing.T, id, event, stdin string, env []string) string {
 	t.Helper()
+	rec, _ := bus.ReadState(h.State, id)
 	cmd := exec.Command(CLIPath(t), "hook", event)
-	cmd.Env = append(os.Environ(), "AGENTOS_SESSION="+id, "AGENTOS_SOCKET="+filepath.Join(h.State, "agentos.sock"))
+	cmd.Env = append(os.Environ(), "AGENTOS_SESSION="+id, "AGENTOS_SOCKET="+filepath.Join(h.State, "agentos.sock"), "AGENTOS_AGENT="+rec.Agent)
+	cmd.Env = append(cmd.Env, env...)
 	cmd.Stdin = strings.NewReader(stdin)
-	if out, err := cmd.CombinedOutput(); err != nil {
+	out, err := cmd.Output()
+	if err != nil {
 		t.Fatalf("agentos hook: %v: %s", err, out)
 	}
+	return string(out)
+}
+
+// HookReply is Hook, and what the hook printed for its agent.
+func (h *Harness) HookReply(t *testing.T, id, event, stdin string, env ...string) string {
+	t.Helper()
+	return h.hook(t, id, event, stdin, env)
 }
 
 // Pane is what the session's terminal shows now.
@@ -795,12 +808,30 @@ func CLIPath(t *testing.T) string {
 // ClaudeOnPath puts a stand-in `claude` and the built agentos command first on PATH, so the app runs its Claude
 // adapter and tmux starts the stand-in. The stand-in writes its arguments to <dir>/<session id, "/" as "_">.args and
 // waits. Call it before New. It returns dir.
-func ClaudeOnPath(t *testing.T) string {
+func ClaudeOnPath(t *testing.T) string { return agentOnPath(t, "claude", "") }
+
+// AgyModels is what the stand-in agy answers to agy models.
+var AgyModels = []string{"gemini-4-argon-medium", "gemini-3.8-flash-low", "claude-opus-5-5-high"}
+
+// AgyOnPath is ClaudeOnPath for a stand-in `agy`, which also answers `agy models` with AgyModels and writes the
+// AGENTOS_PROMPT and AGENTOS_CHAT it was started with to <dir>/<session id, "/" as "_">.env.
+func AgyOnPath(t *testing.T) string {
+	models := ""
+	for _, id := range AgyModels {
+		models += id + "\tname\n"
+	}
+	return agentOnPath(t, "agy", "if [ \"$1\" = models ]; then printf '"+models+"'; exit 0; fi\nprintf 'AGENTOS_PROMPT=%s\\nAGENTOS_CHAT=%s\\n' \"$AGENTOS_PROMPT\" \"$AGENTOS_CHAT\" > \"$f.env\"\n")
+}
+
+// agentOnPath writes the stand-in named so, with first run before it records its arguments, and puts it first on
+// PATH. first may use f, the path of the args file without its extension.
+func agentOnPath(t *testing.T, name, first string) string {
 	t.Helper()
 	dir := t.TempDir()
 	// The rename makes the args file appear whole, so a test never reads it half written.
-	script := "#!/bin/sh\nf=\"" + dir + "/$(echo \"$AGENTOS_SESSION\" | tr / _).args\"\nprintf '%s\\n' \"$@\" > \"$f.tmp\" && mv \"$f.tmp\" \"$f\"\nexec sleep 60\n"
-	if err := os.WriteFile(filepath.Join(dir, "claude"), []byte(script), 0o700); err != nil {
+	script := "#!/bin/sh\nf=\"" + dir + "/$(echo \"$AGENTOS_SESSION\" | tr / _)\"\n" + first +
+		"printf '%s\\n' \"$@\" > \"$f.args.tmp\" && mv \"$f.args.tmp\" \"$f.args\"\nexec sleep 60\n"
+	if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+filepath.Dir(CLIPath(t))+string(os.PathListSeparator)+os.Getenv("PATH"))
