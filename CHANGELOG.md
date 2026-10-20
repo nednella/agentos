@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.40.0](https://github.com/nednella/agentos/compare/v0.39.5...v0.40.0) (2026-10-20)
+
+
+### Features
+
+* **cli:** add --agent to new and issue ([c897ded](https://github.com/nednella/agentos/commit/c897ded0d721cc61dce30447f30ee43ed17b97e5))
+* **cli:** answer agy hooks and find session browser for mcp-browser ([bcc6eec](https://github.com/nednella/agentos/commit/bcc6eece72eeb94ceb5252bf4ec19e29075b80ca))
+* **desktop:** pick agent provider per session ([6861d55](https://github.com/nednella/agentos/commit/6861d553150e624302c1434d2e3c2287b378e292))
+* **desktop:** start agy sessions with prompt file, hooks and usage ([7263679](https://github.com/nednella/agentos/commit/7263679a7532e770ecce4ecbd4c3b886bcaeb3b4))
+* **internal:** add agent registry and record a session's provider ([e62aac6](https://github.com/nednella/agentos/commit/e62aac6f593b34caabca6aeee0b3ba7ee5a9a5eb))
+* **internal:** add agy provider ([3ecfa56](https://github.com/nednella/agentos/commit/3ecfa563d22b6e0a69840b004918f2cee866bf60))
+* **internal:** let MCP stand-in pass env and serve no tools ([1d0e595](https://github.com/nednella/agentos/commit/1d0e595414f8eb5feb08710cfa634d3729b6f800))
+* **internal:** read agy transcripts and price Gemini models ([ca39dcd](https://github.com/nednella/agentos/commit/ca39dcda864729bba1582cc45ca81d3b0d6e354c))
+* **ui:** always name the provider and take the agent as one field ([d9b82e0](https://github.com/nednella/agentos/commit/d9b82e011eacdc10d05f4b5aa3f47080c3acfe3c))
+* **ui:** name the agent setting as the default inference provider ([46313df](https://github.com/nednella/agentos/commit/46313df4487d8e494f48339312bd6eac2a1af0a3))
+* **ui:** offer agy in the provider setting mock ([6fe26c9](https://github.com/nednella/agentos/commit/6fe26c943f35ebacab57dff88ebaf3e480a1c3c9))
+* **ui:** set default agent in settings and show provider on row ([4828787](https://github.com/nednella/agentos/commit/482878736c41b5805a8bd182315a24932ae85070))
+
+
+### Bug Fixes
+
+* **cli:** read hooks of an unknown agent name as claude ([0371e63](https://github.com/nednella/agentos/commit/0371e63828f48c0ef9658cba38801375980a18fe))
+* **ui:** keep the provider setting's hint to what it sets ([9cf0ba8](https://github.com/nednella/agentos/commit/9cf0ba89267f0e228e9af77ec19c77dad933bae1))
+
 ## [0.39.5](https://github.com/nednella/agentos/compare/v0.39.4...v0.39.5) (2026-10-20)
 
 
