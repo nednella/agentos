@@ -147,6 +147,9 @@ func start(argv []string, initialize []byte, errOut io.Writer) (*realServer, err
 		return nil, errors.New("a request came before initialize")
 	}
 	cmd := exec.Command(argv[0], argv[1:]...)
+	// npx refuses to run under a package.json whose devEngines names another package manager, and the server
+	// gets the project through --workspace, so it starts where no package.json is above it.
+	cmd.Dir = "/"
 	cmd.Stderr = errOut
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	stdin, err := cmd.StdinPipe()
