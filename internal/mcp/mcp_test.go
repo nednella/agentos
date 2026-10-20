@@ -17,8 +17,8 @@ import (
 	"time"
 )
 
-// TestMain runs this test binary as the real server when the tests start it with MCP_FAKE_LOG set: it logs each
-// message it gets, answers initialize and tools/call, and leaves a child that ignores SIGTERM in its process group.
+// TestMain runs this test binary as the real server when the tests start it with MCP_FAKE_LOG set: it logs its
+// folder and each message it gets, answers initialize and tools/call, and leaves a child that ignores SIGTERM in its process group.
 func TestMain(m *testing.M) {
 	if log := os.Getenv("MCP_FAKE_LOG"); log != "" {
 		fakeServer(log)
@@ -33,7 +33,8 @@ func fakeServer(log string) {
 		os.Exit(1)
 	}
 	f, _ := os.OpenFile(log, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-	fmt.Fprintf(f, "child %d\n", child.Process.Pid)
+	dir, _ := os.Getwd()
+	fmt.Fprintf(f, "child %d\ndir %s\n", child.Process.Pid, dir)
 	in := bufio.NewScanner(os.Stdin)
 	for in.Scan() {
 		var m message
@@ -158,8 +159,8 @@ func TestServeStartsTheServerAtTheFirstToolCallAndStopsItsGroup(t *testing.T) {
 	data, _ := os.ReadFile(log)
 	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
 	want := []string{`initialize "agentos-start"`, "notifications/initialized", "tools/call 1", "tools/call 2"}
-	if len(lines) != 5 || strings.Join(lines[1:], "|") != strings.Join(want, "|") {
-		t.Fatalf("the server got %q, want a child line then %q", lines, want)
+	if len(lines) != 6 || lines[1] != "dir /" || strings.Join(lines[2:], "|") != strings.Join(want, "|") {
+		t.Fatalf("the server got %q, want a child line, \"dir /\", then %q", lines, want)
 	}
 	child, _ := strconv.Atoi(strings.TrimPrefix(lines[0], "child "))
 	if !gone(child) {
