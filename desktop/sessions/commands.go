@@ -2,6 +2,7 @@ package sessions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
@@ -63,6 +64,16 @@ func (c *Commands) New(_ context.Context, req ctl.Request) (string, error) {
 		return "", err
 	}
 	return started(s), nil
+}
+
+// MCPBrowser answers agentos mcp-browser with the server of the asking session's page tools, as JSON.
+func (c *Commands) MCPBrowser(_ context.Context, req ctl.Request) (string, error) {
+	m, err := c.s.BrowserMCP(req.Session)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(m)
+	return string(out), err
 }
 
 // Track tells the app which branch the asking session works on.

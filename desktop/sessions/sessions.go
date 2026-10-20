@@ -573,9 +573,9 @@ func (s *Sessions) take(rec session.Record) {
 	// first refresh's usage at once: it catches up on turns while the app was closed.
 	if rec.Transcript != "" {
 		if rec.Event == "Stop" {
-			time.AfterFunc(stopSettle, func() { s.countUsage(rec.Session, rec.Transcript, true) })
+			time.AfterFunc(stopSettle, func() { s.countUsage(rec.Session, rec.Transcript, rec.AgentModel, true) })
 		} else {
-			go s.countUsage(rec.Session, rec.Transcript, rec.Event == "SessionEnd" || !s.loaded)
+			go s.countUsage(rec.Session, rec.Transcript, rec.AgentModel, rec.Event == "SessionEnd" || !s.loaded)
 		}
 	}
 	if ch, ok := s.ready[rec.Session]; ok && rec.Event == "SessionStart" {
@@ -702,8 +702,8 @@ func (s *Sessions) sync() {
 			if in := s.known[id]; !in.Created.IsZero() {
 				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionEnd, Ms: time.Since(in.Created).Milliseconds()})
 			}
-			if t := s.records[id].Transcript; t != "" {
-				go s.countUsage(id, t, true)
+			if rec := s.records[id]; rec.Transcript != "" {
+				go s.countUsage(id, rec.Transcript, rec.AgentModel, true)
 			}
 			go s.closeBrowser(id)
 			s.endSession(id, time.Now())
@@ -1280,6 +1280,9 @@ func (s *Sessions) launch(ctx context.Context, p agent.Provider, name session.Na
 	}
 	l := s.launchFor(p, name, proj, model, conversation, brief, handover, start, chat)
 	l.TmpDir = tmp
+	if err := p.Prepare(l); err != nil {
+		return err
+	}
 	env = append(env, p.Env(l)...)
 	if !p.Can(agent.ModelEffort) {
 		model = project.Model{} // the agent takes no model flags, so none was chosen
@@ -1749,10 +1752,6 @@ const chromeDevToolsMCPName = "chrome-devtools-mcp"
 
 var chromeDevToolsMCPVersion = mcp.Browser.ServerInfo.Version
 
-// browserToolsDenied are the page tools the agent must not have: new_page and close_page would open and close pages
-// outside the session's own, in a window of another session.
-var browserToolsDenied = []string{"new_page", "close_page"}
-
 // npmCacheDir is npm's cache folder: where $npm_config_cache points, else ~/.npm.
 func npmCacheDir() string {
 	if dir := os.Getenv("npm_config_cache"); dir != "" {
@@ -1798,7 +1797,7 @@ func browserMCP(port int, workspace, npmCache string) agent.MCPServer {
 		command = "npx"
 		args = append([]string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion}, args...)
 	}
-	return agent.MCPServer{Command: command, Args: args, Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"}, Denied: browserToolsDenied}
+	return agent.MCPServer{Command: command, Args: args, Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"}, Denied: agent.BrowserToolsDenied}
 }
 
 // launchFor is what the session's agent starts with. The agent learns where it runs and the commands that reach the
@@ -1815,14 +1814,41 @@ func (s *Sessions) launchFor(p agent.Provider, name session.Name, proj project.P
 	if chat {
 		l.Prompt = prompts.Session() + "\n\n" + prompts.Chat()
 	}
-	if p.Can(agent.Browser) && proj.BrowserOn() && s.browsers.Available() {
-		if port := s.browsers.Port(name.Project); port != 0 {
-			l.MCP = browserMCP(port, proj.Dir, npmCacheDir())
-			l.Prompt += "\n\n" + prompts.Browser()
-		}
+	if m, ok := s.browserMCPFor(proj); ok && p.Can(agent.Browser) {
+		l.MCP = m
+		l.Prompt += "\n\n" + prompts.Browser()
 	}
 	if handover != "" {
 		l.Prompt += "\n\n" + prompts.Handover(handover)
 	}
 	return l
+}
+
+// browserMCPFor is the server of the page tools for the project's browser, when the project allows one and one exists.
+func (s *Sessions) browserMCPFor(proj project.Project) (agent.MCPServer, bool) {
+	if !proj.BrowserOn() || !s.browsers.Available() {
+		return agent.MCPServer{}, false
+	}
+	port := s.browsers.Port(proj.Key())
+	if port == 0 {
+		return agent.MCPServer{}, false
+	}
+	return browserMCP(port, proj.Dir, npmCacheDir()), true
+}
+
+// BrowserMCP is the server of the page tools for the session's project, zero when the session has no browser. An
+// agent whose MCP servers are global, like agy, asks for it through agentos mcp-browser.
+func (s *Sessions) BrowserMCP(id string) (agent.MCPServer, error) {
+	s.mu.Lock()
+	in, ok := s.infoOf(id)
+	s.mu.Unlock()
+	if !ok {
+		return agent.MCPServer{}, fmt.Errorf("session %s is not running", id)
+	}
+	proj, ok := s.projectOf(in)
+	if !ok {
+		return agent.MCPServer{}, fmt.Errorf("session %s has no project", id)
+	}
+	m, _ := s.browserMCPFor(proj)
+	return m, nil
 }

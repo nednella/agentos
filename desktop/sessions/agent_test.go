@@ -43,9 +43,9 @@ func TestNewWithAgentClaudeStartsAsWithoutTheFlag(t *testing.T) {
 func TestNewAndIssueRefuseAnUnknownAgent(t *testing.T) {
 	h := newHarness(t)
 	for _, cmd := range []string{"new", "issue"} {
-		resp := h.Ask(t, ctl.Request{Cmd: cmd, Args: []string{"12"}, Opts: map[string]string{"agent": "agy"}})
-		if resp.OK || !strings.Contains(resp.Error, `no agent "agy": the agents are claude`) {
-			t.Errorf("%s --agent agy = %+v", cmd, resp)
+		resp := h.Ask(t, ctl.Request{Cmd: cmd, Args: []string{"12"}, Opts: map[string]string{"agent": "codex"}})
+		if resp.OK || !strings.Contains(resp.Error, `no agent "codex": the agents are claude, agy`) {
+			t.Errorf("%s --agent codex = %+v", cmd, resp)
 		}
 	}
 	if len(h.Sessions().List()) != 0 {
@@ -56,7 +56,7 @@ func TestNewAndIssueRefuseAnUnknownAgent(t *testing.T) {
 func TestAgentSettingAppliesToTheNextSession(t *testing.T) {
 	dir := apptest.ClaudeOnPath(t)
 	h := newHarness(t)
-	if got := h.Settings(); got.Agent != "bash" || !slices.Equal(got.Agents, []string{"claude"}) {
+	if got := h.Settings(); got.Agent != "bash" || !slices.Equal(got.Agents, []string{"claude", "agy"}) {
 		t.Fatalf("settings = %+v", got)
 	}
 	plain := plainSession(h, t)
