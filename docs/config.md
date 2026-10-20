@@ -2,11 +2,11 @@
 
 ## Config file
 
-`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, when a setting changes and when a project is set up, and keeps every key below, its comments and its `~` paths. It checks the file every 2 seconds and takes in a hand edit while it runs; a file that does not load shows a warning and leaves the config as it was, and the app does not save over it until it loads again. Before each save the app reads the file again, so a setting changed in the app keeps a hand edit. `data_dir` and `agent_command` still take effect only when the app starts.
+`~/.config/agentos/config.yaml` (`AGENTOS_CONFIG` overrides the path). The app writes it when projects are added or removed, when a setting changes and when a project is set up, and keeps every key below, its comments and its `~` paths. It checks the file every 2 seconds and takes in a hand edit while it runs; a file that does not load shows a warning and leaves the config as it was, and the app does not save over it until it loads again. Before each save the app reads the file again, so a setting changed in the app keeps a hand edit. `data_dir` still takes effect only when the app starts.
 
 ```yaml
 data_dir: ~/Library/Mobile Documents/com~apple~CloudDocs/agentos   # optional; default ~/.local/share/agentos. The settings panel writes it; the app reads it when it starts
-agent_command: claude          # claude (the default, with hooks) or any command, which runs plain
+agent_command: claude          # what a new session runs unless --agent names a provider: a provider's name (claude, the default, with hooks) or any command, which runs plain. The settings panel writes it; the next session uses it
 keep_mac_awake: true           # stop the Mac idle-sleeping while a session works; a project may set its own. The settings panel writes it
 app_theme: dark                # light or dark; unset follows the macOS appearance. The settings panel writes it
 app_text_scale: 1.2            # text size as a multiple of the default, 0.85 to 1.5; unset is 1. The settings panel writes it
@@ -98,6 +98,10 @@ Only the `claude` agent gets `--model` and `--effort`; any other agent runs as c
 
 A new session, or one started from a note, has no action and no labels. When nothing sets a value, no flag is passed and claude uses its own default.
 
+### How a session picks its agent
+
+`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` is the only one. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider when it is not `agent_command`.
+
 ### Keeping the Mac awake
 
 While at least one session is working, in any project whose `keep_mac_awake` is on (the project's own setting, else the top-level one, else on), the app runs `caffeinate -i -w <app pid>`: the Mac does not idle-sleep and the display still may. It does not stop a closed lid from sleeping the Mac unless the Mac is in clamshell mode (external display and power connected), and it does not stop a manual sleep or a sleep from low battery.
@@ -120,8 +124,8 @@ While at least one session is working, in any project whose `keep_mac_awake` is 
 
 | Group | Command | Does |
 |---|---|---|
-| Work | `issue <n...> [--prompt <text>\|-]` | starts a session per issue; an issue with a live session is reported as already running. `--prompt` takes one issue: its text (`-` reads stdin), at most 6 KB, is added to the new session's system prompt as a handover from the session that asked, and a running session does not get it |
-| Work | `new [title] [--chat] [--prompt <text>\|-]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--chat` starts a chat instead of a task. `--prompt` gives its text (`-` reads stdin), at most 6 KB, to the new session, sent unless `session_prompt_send` is `manual`; from a session, the text is framed as that session's handover |
+| Work | `issue <n...> [--prompt <text>\|-] [--agent <name>]` | starts a session per issue; an issue with a live session is reported as already running. `--prompt` takes one issue: its text (`-` reads stdin), at most 6 KB, is added to the new session's system prompt as a handover from the session that asked, and a running session does not get it. `--agent` names the provider the new sessions run, instead of `agent_command` |
+| Work | `new [title] [--chat] [--prompt <text>\|-] [--agent <name>]`, `kill <n>`, `open <n\|title>`, `next` | start, stop, show a session, or show the one that needs you most. `--chat` starts a chat instead of a task. `--prompt` gives its text (`-` reads stdin), at most 6 KB, to the new session, sent unless `session_prompt_send` is `manual`; from a session, the text is framed as that session's handover. `--agent` names the provider, instead of `agent_command` |
 | Work | `refresh`, `pr [n]`, `cleanup [n]` | reload issues and PRs, show PRs, clean up or list what waits |
 | Views | `queue`, `notes`, `evidence`, `term`, `browser`, `digest`, `news`, `stats --open`, `filter [query]` | show that view; `digest --run` starts a run |
 | Projects | `project [name]`, `project add [path]`, `project remove <name>` | list, switch, add (the current folder by default), forget |
