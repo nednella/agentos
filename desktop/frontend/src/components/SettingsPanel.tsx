@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import type { CleanupMode, DigestSchedule, ThemeSetting } from '../types'
+import { AgentControl } from './AgentControl'
 import { DataDirRow } from './DataDirRow'
 import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
@@ -43,7 +44,7 @@ function SettingRow({ label, hint, children }: SettingRowProps) {
 }
 
 export function SettingsPanel() {
-  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setCleanup, setPromptSend, setBrowserEnabled, setDigestSchedule, report } = useAgentos()
+  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setAgent, setCleanup, setPromptSend, setBrowserEnabled, setDigestSchedule, report } = useAgentos()
   const { scale, zoom } = useLayout()
   if (overlay !== 'settings') return null
 
@@ -74,6 +75,9 @@ export function SettingsPanel() {
         </SettingRow>
         <SettingRow label="Keep Mac awake" hint="Stops the Mac idle-sleeping while a session works. A project that sets its own in the config file keeps it.">
           <SegmentedControl label="Keep Mac awake" options={SWITCH} value={settings.keepAwake ? 'on' : 'off'} onChange={(value) => report(() => setKeepAwake(value === 'on'))} />
+        </SettingRow>
+        <SettingRow label="Agent" hint="What a new session runs unless agentos new or issue names one with --agent. A command runs plain, with no state or usage.">
+          <AgentControl agents={settings.agents} value={settings.agent} onChange={(command) => report(() => setAgent(command))} />
         </SettingRow>
         {project && (
           <>

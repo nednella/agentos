@@ -213,6 +213,7 @@ export function createMock(params: URLSearchParams) {
       issue: s.issue,
       model: s.model,
       effort: s.effort,
+      agent: s.agent,
       history: s.history.map((h) => ({ ...h })),
       branch: s.branch,
       worktree: s.worktree,
@@ -379,6 +380,7 @@ export function createMock(params: URLSearchParams) {
       createdAt,
       issue,
       ...modelFor(owner, issue),
+      agent: 'claude',
       history,
       branch: issue ? `issue-${issue}` : '',
       worktree: issue ? `${owner.dir}/trees/issue-${issue}` : '',
@@ -859,7 +861,7 @@ export function createMock(params: URLSearchParams) {
   // The app's first gh calls, such as the PR fetch, start when it does.
   if (flags.offline) github(undefined, 1000).catch(() => {})
 
-  let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '~/.local/share/agentos', dataDirFixed: false }
+  let settings: Settings = { theme: 'system', textScale: 1, keepAwake: true, agent: 'claude', agents: ['claude'], cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '~/.local/share/agentos', dataDirFixed: false }
 
   const backend = {
     Snapshot: async () => snapshot(),
@@ -887,6 +889,7 @@ export function createMock(params: URLSearchParams) {
       s.action = old.action
       s.model = old.model
       s.effort = old.effort
+      s.agent = old.agent
       s.buffer = old.buffer + term.promptLine('')
       sessions.splice(sessions.indexOf(old), 1)
       publish()
@@ -1226,6 +1229,11 @@ export function createMock(params: URLSearchParams) {
     },
     SetKeepAwake: async (keepAwake: boolean) => {
       settings = { ...settings, keepAwake }
+      return settings
+    },
+    SetAgent: async (agent: string) => {
+      if (!agent.trim()) throw "the agent must be a provider's name or a command"
+      settings = { ...settings, agent: agent.trim() }
       return settings
     },
     SetPromptSend: async (promptSend: PromptSend) => {

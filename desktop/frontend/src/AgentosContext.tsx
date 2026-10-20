@@ -116,6 +116,7 @@ export type Agentos = {
   setCleanup(event: CleanupEvent, mode: CleanupMode): Promise<void>
   setTextScale(scale: number): Promise<void>
   setKeepAwake(on: boolean): Promise<void>
+  setAgent(command: string): Promise<void>
   setPromptSend(mode: PromptSend): Promise<void>
   setBrowserEnabled(on: boolean): Promise<void>
   setDigestSchedule(schedule: DigestSchedule): Promise<void>
@@ -176,7 +177,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [newsUnread, setNewsUnread] = useState(() => readStored<string[]>(NEWS_UNREAD_KEY, []))
   const [awake, setAwake] = useState(false)
   const [memory, setMemory] = useState<Memory | null>(null)
-  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '', dataDirFixed: true })
+  const [settings, setSettings] = useState<Settings>({ theme: 'system', textScale: 1, keepAwake: true, agent: 'claude', agents: ['claude'], cleanup: { merge: 'auto', close: 'manual' }, promptSend: 'auto', browserEnabled: true, digestSchedule: 'weekly', dataDir: '', dataDirFixed: true })
   const [shellIds, setShellIds] = useState<string[]>([])
   const [pickedShell, setPickedShell] = useState('')
   const shellId = shellIds.includes(pickedShell) ? pickedShell : (shellIds[0] ?? '')
@@ -787,6 +788,9 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async setKeepAwake(on) {
         setSettings(await api.setKeepAwake(on))
+      },
+      async setAgent(command) {
+        setSettings(await api.setAgent(command))
       },
       async setPromptSend(mode) {
         setSettings(await api.setPromptSend(mode))
