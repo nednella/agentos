@@ -543,6 +543,7 @@ const queueSections = `    queue_sections:
 // Options changes the harness's config.
 type Options struct {
 	ProjectExtra   string        // yaml lines added under the project "main"
+	Queue          string        // the project's queue_sections block, in place of the usual one
 	NoBranch       bool          // leave out the project's `session_branch_fallback: "issue-{n}"` pattern
 	CleanupCommand string        // the project's session_cleanup_command; none by default
 	Agent          string        // the config's agent; bash by default
@@ -612,7 +613,7 @@ func NewWith(t *testing.T, o Options) *Harness {
 	if o.DataDirConfig {
 		top += "data_dir: " + filepath.Join(state, "data") + "\n"
 	}
-	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), top, dir, branch, cleanup, queueSections, o.ProjectExtra)
+	conf := fmt.Sprintf("agent_command: %s\n%sprojects:\n  - name: main\n    directory: %s\n%s%s%s%s", cmp.Or(o.Agent, "bash"), top, dir, branch, cleanup, cmp.Or(o.Queue, queueSections), o.ProjectExtra)
 	if o.NoProject {
 		conf = fmt.Sprintf("agent_command: %s\n%sprojects: []\n", cmp.Or(o.Agent, "bash"), top)
 		if o.AbsentProject != "" {
