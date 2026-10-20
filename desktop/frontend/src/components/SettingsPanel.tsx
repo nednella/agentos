@@ -76,7 +76,7 @@ export function SettingsPanel() {
         <SettingRow label="Keep Mac awake" hint="Stops the Mac idle-sleeping while a session works. A project that sets its own in the config file keeps it.">
           <SegmentedControl label="Keep Mac awake" options={SWITCH} value={settings.keepAwake ? 'on' : 'off'} onChange={(value) => report(() => setKeepAwake(value === 'on'))} />
         </SettingRow>
-        <SettingRow label="Agent" hint="What a new session runs unless agentos new or issue names one with --agent. A command runs plain, with no state or usage.">
+        <SettingRow label="Agent" hint="What a new session runs unless agentos new or issue names one with --agent: a provider's name, or a command, which runs plain with no state or usage.">
           <AgentControl agents={settings.agents} value={settings.agent} onChange={(command) => report(() => setAgent(command))} />
         </SettingRow>
         {project && (

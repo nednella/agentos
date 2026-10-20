@@ -100,7 +100,7 @@ A new session, or one started from a note, has no action and no labels. When not
 
 ### How a session picks its agent
 
-`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` is the only one. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider when it is not `agent_command`.
+`agentos new` and `agentos issue` take `--agent <name>`, a provider's name: `claude` is the only one. Any other name is refused. Without the flag, and from the app's buttons and the queue, a session runs `agent_command`. A session keeps its provider for its life: the app writes it into the session's identity in the state file, like the model and the effort, so a restart of the app, a resume and the hooks (`AGENTOS_AGENT`) use the same one, and a resumed session runs the provider of the one it continues. The row names the provider.
 
 ### Keeping the Mac awake
 
