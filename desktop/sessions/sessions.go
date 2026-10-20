@@ -98,7 +98,7 @@ type Project struct {
 // Sessions tracks the agents in the private tmux server and tells the front end when they change.
 type Sessions struct {
 	tmux     *term.Tmux
-	agent    agent.Agent
+	agent    agent.Provider
 	run      run.Runner
 	stateDir string
 	localDir string
@@ -191,7 +191,7 @@ type Awake interface {
 // Options is what a Sessions needs from outside.
 type Options struct {
 	Tmux          *term.Tmux
-	Agent         agent.Agent
+	Agent         agent.Provider
 	StateDir      string
 	LocalDir      string // pull-request tracking and the clean-up log: never synced
 	Projects      ProjectList
@@ -1158,11 +1158,8 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	return view, nil
 }
 
-// resumes says whether the agent can continue a conversation: only Claude takes --resume.
-func (s *Sessions) resumes() bool {
-	_, ok := s.agent.(agent.Claude)
-	return ok
-}
+// resumes says whether the agent can continue a conversation.
+func (s *Sessions) resumes() bool { return s.agent.Can(agent.Resume) }
 
 // createForIssue starts a task or a chat for the issue, unless the project has a live one of that kind for it: then
 // it names that one.
@@ -1197,10 +1194,10 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	s.mu.Unlock()
 
 	model = s.fill(proj.Dir, model)
-	// Typed in while Claude still runs its start hooks, the text and Enter reach it as one paste, where Enter is a
-	// newline. Claude submits a prompt given on its command line itself once it is ready.
+	// Typed in while the agent still starts, the text and Enter reach it as one paste, where Enter is a newline. An
+	// agent that takes a prompt on its command line submits it itself once it is ready.
 	start := ""
-	if _, ok := s.agent.(agent.Claude); ok && send {
+	if s.agent.Can(agent.StartArg) && send {
 		start, text = text, ""
 	}
 	name, ctx, ready := s.reserve(proj, text)
@@ -1233,10 +1230,10 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 // fill sets what model leaves unset from the agent's own settings, skipping a value the agent would not accept.
 func (s *Sessions) fill(dir string, model project.Model) project.Model {
 	l := s.agent.Fill(dir, agent.Launch{Model: model.Model, Effort: model.Effort})
-	if (project.Model{Model: l.Model}).Validate() == nil {
+	if s.agent.ValidModel(l.Model, "") == nil {
 		model.Model = l.Model
 	}
-	if (project.Model{Effort: l.Effort}).Validate() == nil {
+	if s.agent.ValidModel("", l.Effort) == nil {
 		model.Effort = l.Effort
 	}
 	return model
@@ -1261,6 +1258,7 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	env := []string{
 		"AGENTOS_SESSION=" + name.String(),
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
+		"AGENTOS_AGENT=" + s.agent.Name(),
 	}
 	if issue > 0 {
 		env = append(env, "AGENTOS_ISSUE="+strconv.Itoa(issue))
@@ -1269,16 +1267,19 @@ func (s *Sessions) launch(ctx context.Context, name session.Name, title string, 
 	if err := os.MkdirAll(tmp, 0o700); err != nil {
 		return fmt.Errorf("making the session's temp folder: %w", err)
 	}
-	env = append(env, "TMPDIR="+tmp, "CLAUDE_CODE_TMPDIR="+tmp)
+	env = append(env, "TMPDIR="+tmp)
 	if handover != "" {
 		if err := atomicfile.Write(s.handoverPath(name), []byte(handover), 0o600); err != nil {
 			return fmt.Errorf("saving the handover: %w", err)
 		}
 	}
-	if _, ok := s.agent.(agent.Claude); !ok {
-		model = project.Model{} // another agent takes no model flags, so none was chosen
+	l := s.launchFor(name, proj, model, conversation, brief, handover, start, chat)
+	l.TmpDir = tmp
+	env = append(env, s.agent.Env(l)...)
+	if !s.agent.Can(agent.ModelEffort) {
+		model = project.Model{} // the agent takes no model flags, so none was chosen
 	}
-	return s.start(ctx, name, title, proj.Dir, env, s.commandFor(name, proj, model, conversation, brief, handover, start, chat), issue, model, chat, action)
+	return s.start(ctx, name, title, proj.Dir, env, s.agent.Command(l), issue, model, chat, action)
 }
 
 // register adds the new session to the list and returns its row. It takes mu.
@@ -1289,7 +1290,7 @@ func (s *Sessions) register(name session.Name, title string, proj project.Projec
 		s.resumed[name.String()] = true
 	}
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Created: created}
-	if _, ok := s.agent.(agent.Claude); ok {
+	if s.agent.Can(agent.ModelEffort) {
 		in.Model, in.Effort = model.Model, model.Effort
 	}
 	if issue > 0 {
@@ -1740,9 +1741,9 @@ const chromeDevToolsMCPName = "chrome-devtools-mcp"
 
 var chromeDevToolsMCPVersion = mcp.Browser.ServerInfo.Version
 
-// browserToolsDenied are the page tools Claude must not have: new_page and close_page would open and close pages
+// browserToolsDenied are the page tools the agent must not have: new_page and close_page would open and close pages
 // outside the session's own, in a window of another session.
-const browserToolsDenied = "mcp__browser__new_page mcp__browser__close_page"
+var browserToolsDenied = []string{"new_page", "close_page"}
 
 // npmCacheDir is npm's cache folder: where $npm_config_cache points, else ~/.npm.
 func npmCacheDir() string {
@@ -1779,68 +1780,41 @@ func cachedMCPBin(npmCache string) string {
 	return ""
 }
 
-// browserMCPConfig is the --mcp-config JSON that adds the page tools as the MCP server "browser", attached to the
-// project's browser on port. workspace is the folder the tools may read upload files from. agentos, at exe, stands
-// in for the server and starts it at the first tool call, so a session that never uses the browser never runs it.
-// The server runs from npmCache when the pinned version is there; otherwise npx runs it, which also fills the
-// cache for the next session.
-func browserMCPConfig(exe string, port int, workspace, npmCache string) string {
-	type server struct {
-		Command string            `json:"command"`
-		Args    []string          `json:"args"`
-		Env     map[string]string `json:"env"`
-	}
+// browserMCP is the MCP server of the page tools, attached to the project's browser on port. workspace is the
+// folder the tools may read upload files from. The server runs from npmCache when the pinned version is there;
+// otherwise npx runs it, which also fills the cache for the next session.
+func browserMCP(port int, workspace, npmCache string) agent.MCPServer {
 	args := []string{"--browser-url=http://127.0.0.1:" + strconv.Itoa(port), "--no-usage-statistics", "--no-performance-crux", "--workspace=" + workspace}
 	command := cachedMCPBin(npmCache)
 	if command == "" {
 		command = "npx"
 		args = append([]string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion}, args...)
 	}
-	config, _ := json.Marshal(map[string]map[string]server{"mcpServers": {"browser": {
-		Command: exe, Args: append([]string{"mcp-browser", "--", command}, args...),
-		Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"},
-	}}})
-	return string(config)
+	return agent.MCPServer{Command: command, Args: args, Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"}, Denied: browserToolsDenied}
 }
 
-// commandFor is the agent's command line. Claude learns where it runs and the commands that reach the app, and
-// about the browser when the project allows it and one exists; a session with a brief learns only the brief. A
-// task started by another session gets that session's handover last. Claude submits start, when set, as its first
-// prompt.
-func (s *Sessions) commandFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) []string {
-	launch := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat}
-	claude, ok := s.agent.(agent.Claude)
-	if !ok {
-		return s.agent.Command(name.String(), launch)
-	}
+// launchFor is what the session's agent starts with. The agent learns where it runs and the commands that reach the
+// app, and about the browser when it can use one, the project allows it and one exists; a session with a brief
+// learns only the brief. A task started by another session gets that session's handover last. An agent that takes
+// its first prompt on its command line gets start.
+func (s *Sessions) launchFor(name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) agent.Launch {
+	l := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat, Start: start}
 	if brief != "" {
-		return withStart(append(s.agent.Command(name.String(), launch), "--append-system-prompt", brief), start)
+		l.Prompt = brief
+		return l
 	}
-	port := 0
-	if proj.BrowserOn() && s.browsers.Available() {
-		port = s.browsers.Port(name.Project)
-	}
-	launch.Browser = port != 0
-	argv := s.agent.Command(name.String(), launch)
-	prompt := prompts.Session() + "\n\n" + prompts.Task()
+	l.Prompt = prompts.Session() + "\n\n" + prompts.Task()
 	if chat {
-		prompt = prompts.Session() + "\n\n" + prompts.Chat()
+		l.Prompt = prompts.Session() + "\n\n" + prompts.Chat()
 	}
-	if port != 0 {
-		argv = append(argv, "--mcp-config", browserMCPConfig(claude.Exe, port, proj.Dir, npmCacheDir()), "--disallowedTools", browserToolsDenied)
-		prompt += "\n\n" + prompts.Browser()
+	if s.agent.Can(agent.Browser) && proj.BrowserOn() && s.browsers.Available() {
+		if port := s.browsers.Port(name.Project); port != 0 {
+			l.MCP = browserMCP(port, proj.Dir, npmCacheDir())
+			l.Prompt += "\n\n" + prompts.Browser()
+		}
 	}
 	if handover != "" {
-		prompt += "\n\n" + prompts.Handover(handover)
+		l.Prompt += "\n\n" + prompts.Handover(handover)
 	}
-	return withStart(append(argv, "--append-system-prompt", prompt), start)
-}
-
-// withStart ends Claude's argv with its first prompt. The "--" keeps a prompt that starts with "-" from being read
-// as a flag, and from being taken as one more value of a list flag such as --allowedTools.
-func withStart(argv []string, start string) []string {
-	if start == "" {
-		return argv
-	}
-	return append(argv, "--", start)
+	return l
 }

@@ -102,7 +102,7 @@ func TestChatFlagSurvivesARestart(t *testing.T) {
 }
 
 func TestChatStaysOutOfTheStats(t *testing.T) {
-	h := newHarness(t)
+	h := newClaudeHarness(t)
 	chat, err := h.NewChat("ask")
 	if err != nil {
 		t.Fatal(err)

@@ -28,7 +28,7 @@ func appendLines(t *testing.T, path string, lines ...string) {
 }
 
 func TestUsageIsCountedOncePerMessage(t *testing.T) {
-	h := newHarness(t)
+	h := newClaudeHarness(t)
 	s, err := h.Sessions().Create("#4 work", "", false, 4)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestUsageIsCountedOncePerMessage(t *testing.T) {
 }
 
 func TestUsageIsCountedAtEachHookAndRecordedAtTheEndOfATurn(t *testing.T) {
-	h := newHarness(t)
+	h := newClaudeHarness(t)
 	s, err := h.Sessions().Create("#4 work", "", false, 4)
 	if err != nil {
 		t.Fatal(err)

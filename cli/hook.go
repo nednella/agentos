@@ -9,13 +9,14 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/bus"
 	"github.com/nednella/agentos/internal/session"
 )
 
 const hookBudget = 200 * time.Millisecond
 
-// newHookCmd is what Claude Code runs on each hook event. It must never break a
+// newHookCmd is what the agent runs on each hook event. It must never break a
 // turn, so it reports nothing on stdout and always exits 0.
 func newHookCmd() *cobra.Command {
 	return &cobra.Command{
@@ -34,7 +35,8 @@ func newHookCmd() *cobra.Command {
 func reportHook(event string, stdin io.Reader) { reportHookAt(event, stdin, time.Now()) }
 
 // reportHookAt records the event as of at, the moment the hook started: a hook that waited
-// for the lock must not undo a later event that got in first.
+// for the lock must not undo a later event that got in first. The session's provider, AGENTOS_AGENT
+// (claude when unset, as sessions started before it was set are), reads the payload.
 func reportHookAt(event string, stdin io.Reader, at time.Time) {
 	name := os.Getenv("AGENTOS_SESSION")
 	socket := os.Getenv("AGENTOS_SOCKET")
@@ -42,7 +44,10 @@ func reportHookAt(event string, stdin io.Reader, at time.Time) {
 		return
 	}
 	dir := bus.DirOf(socket)
-	ev := session.ParseEvent(event, stdin)
+	ev, ok := agent.New(os.Getenv("AGENTOS_AGENT"), "").ParseEvent(event, stdin)
+	if !ok {
+		return
+	}
 	rec, ok := saveHook(dir, name, ev, at)
 	if !ok {
 		return
