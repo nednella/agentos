@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"reflect"
 	"strings"
@@ -65,14 +66,14 @@ func TestHookSavesAndReportsTheNewState(t *testing.T) {
 	dir, received := hookSetup(t)
 	seedStart(t, dir)
 
-	reportHook("PreToolUse", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`))
+	reportHook("PreToolUse", strings.NewReader(`{"tool_name":"Bash","tool_input":{"command":"ls"}}`), io.Discard)
 	rec, err := bus.ReadState(dir, "demo/a1")
 	if err != nil || rec.State != session.Working || rec.Detail != "Bash ls" {
 		t.Fatalf("saved state = %+v, %v", rec, err)
 	}
 	waitFor(t, "the app to hear of it", func() bool { return len(received()) == 1 })
 
-	reportHook("Stop", strings.NewReader(`{}`))
+	reportHook("Stop", strings.NewReader(`{}`), io.Discard)
 	if rec, _ = bus.ReadState(dir, "demo/a1"); rec.State != session.Idle {
 		t.Errorf("state after Stop = %s", rec.State)
 	}
@@ -81,10 +82,10 @@ func TestHookSavesAndReportsTheNewState(t *testing.T) {
 
 func TestHookSaysNothingWhenTheStateHasNotChanged(t *testing.T) {
 	_, received := hookSetup(t)
-	reportHook("SessionStart", strings.NewReader(`{}`))
+	reportHook("SessionStart", strings.NewReader(`{}`), io.Discard)
 	waitFor(t, "the first report", func() bool { return len(received()) == 1 })
 	// An idle reminder after a start changes nothing, so it is not sent again.
-	reportHook("Notification", strings.NewReader(`{"notification_type":"idle_prompt"}`))
+	reportHook("Notification", strings.NewReader(`{"notification_type":"idle_prompt"}`), io.Discard)
 	time.Sleep(150 * time.Millisecond)
 	if n := len(received()); n != 1 {
 		t.Errorf("%d reports, want 1", n)
@@ -94,10 +95,10 @@ func TestHookSaysNothingWhenTheStateHasNotChanged(t *testing.T) {
 func TestHookIgnoresWhatIsNotASession(t *testing.T) {
 	dir, received := hookSetup(t)
 	t.Setenv("AGENTOS_SESSION", "not a session")
-	reportHook("Stop", strings.NewReader(`{}`))
+	reportHook("Stop", strings.NewReader(`{}`), io.Discard)
 	t.Setenv("AGENTOS_SESSION", "demo/a1")
 	t.Setenv("AGENTOS_SOCKET", "")
-	reportHook("Stop", strings.NewReader(`{}`))
+	reportHook("Stop", strings.NewReader(`{}`), io.Discard)
 	time.Sleep(100 * time.Millisecond)
 	if len(bus.ReadAll(dir)) != 0 || len(received()) != 0 {
 		t.Error("the hook reported for something that is not a session")
@@ -113,7 +114,7 @@ func TestHookWithoutAnAppStillSavesTheState(t *testing.T) {
 	t.Setenv("AGENTOS_SESSION", "demo/a1")
 	t.Setenv("AGENTOS_SOCKET", bus.SocketPath(dir))
 	seedStart(t, dir)
-	reportHook("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`))
+	reportHook("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`), io.Discard)
 	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Working {
 		t.Errorf("state = %+v", rec)
 	}
@@ -127,7 +128,7 @@ func TestOnlySessionStartCreatesTheStateFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.event, func(t *testing.T) {
 			dir, received := hookSetup(t)
-			reportHook(tt.event, strings.NewReader(`{}`))
+			reportHook(tt.event, strings.NewReader(`{}`), io.Discard)
 			time.Sleep(50 * time.Millisecond)
 			rec, err := bus.ReadState(dir, "demo/a1")
 			if err != nil || (rec.Session != "") != tt.want || (len(received()) == 1) != tt.want {
@@ -154,8 +155,8 @@ func TestLateHookDoesNotUndoALaterEvent(t *testing.T) {
 	dir, _ := hookSetup(t)
 	seedStart(t, dir)
 	t0 := time.Now()
-	reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
-	reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0)
+	reportHookAt("Stop", strings.NewReader(`{}`), io.Discard, t0.Add(time.Second))
+	reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), io.Discard, t0)
 	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
 		t.Errorf("a late PostToolUse overwrote Stop: %+v", rec)
 	}
@@ -170,11 +171,11 @@ func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
-			reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0)
+			reportHookAt("PostToolUse", strings.NewReader(`{"tool_name":"Bash"}`), io.Discard, t0)
 		}()
 		go func() {
 			defer wg.Done()
-			reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(time.Second))
+			reportHookAt("Stop", strings.NewReader(`{}`), io.Discard, t0.Add(time.Second))
 		}()
 		wg.Wait()
 		if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
@@ -186,13 +187,50 @@ func TestConcurrentHooksKeepTheLatestEvent(t *testing.T) {
 func TestHookKeepsTheStateChanges(t *testing.T) {
 	dir, _ := hookSetup(t)
 	t0 := time.Now()
-	reportHookAt("SessionStart", strings.NewReader(`{}`), t0)
-	reportHookAt("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`), t0.Add(time.Second))
-	reportHookAt("PreToolUse", strings.NewReader(`{"tool_name":"Bash"}`), t0.Add(2*time.Second))
-	reportHookAt("Stop", strings.NewReader(`{}`), t0.Add(3*time.Second))
+	reportHookAt("SessionStart", strings.NewReader(`{}`), io.Discard, t0)
+	reportHookAt("UserPromptSubmit", strings.NewReader(`{"prompt":"go"}`), io.Discard, t0.Add(time.Second))
+	reportHookAt("PreToolUse", strings.NewReader(`{"tool_name":"Bash"}`), io.Discard, t0.Add(2*time.Second))
+	reportHookAt("Stop", strings.NewReader(`{}`), io.Discard, t0.Add(3*time.Second))
 	rec, _ := bus.ReadState(dir, "demo/a1")
 	want := []session.Change{{State: session.Idle, At: t0.UnixMilli()}, {State: session.Working, At: t0.Add(time.Second).UnixMilli()}, {State: session.Idle, At: t0.Add(3 * time.Second).UnixMilli()}}
 	if !reflect.DeepEqual(rec.Changes, want) {
 		t.Errorf("changes = %+v, want %+v", rec.Changes, want)
+	}
+}
+
+func TestHookPrintsWhatAgyReads(t *testing.T) {
+	dir, _ := hookSetup(t)
+	seedStart(t, dir)
+	t.Setenv("AGENTOS_AGENT", "agy")
+	tests := []struct {
+		event, body, want string
+	}{
+		{"PreInvocation", `{"invocationNum":0}`, "{}"},
+		{"PreInvocation", `{"invocationNum":1}`, "{}"},
+		{"PreToolUse", `{"toolCall":{"name":"run_command","args":{"CommandLine":"ls"}}}`, ""}, // an empty object would deny the tool
+		{"PostToolUse", `{"toolCall":{"name":"run_command"}}`, "{}"},
+		{"Stop", `{}`, "{}"},
+	}
+	for _, tt := range tests {
+		var out bytes.Buffer
+		reportHook(tt.event, strings.NewReader(tt.body), &out)
+		if out.String() != tt.want {
+			t.Errorf("%s printed %q, want %q", tt.event, out.String(), tt.want)
+		}
+	}
+	if rec, _ := bus.ReadState(dir, "demo/a1"); rec.State != session.Idle || rec.Event != "Stop" {
+		t.Errorf("state = %+v", rec)
+	}
+}
+
+func TestHookOutsideASessionAnswersTheOwnersOwnAgy(t *testing.T) {
+	t.Setenv("AGENTOS_SESSION", "")
+	t.Setenv("AGENTOS_SOCKET", "")
+	for event, want := range map[string]string{"SessionStart": "{}", "PreToolUse": "", "Stop": "{}"} {
+		var out bytes.Buffer
+		reportHook(event, strings.NewReader(`{"conversationId":"x"}`), &out)
+		if out.String() != want {
+			t.Errorf("%s printed %q, want %q", event, out.String(), want)
+		}
 	}
 }

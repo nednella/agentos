@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -16,8 +17,8 @@ import (
 
 const hookBudget = 200 * time.Millisecond
 
-// newHookCmd is what the agent runs on each hook event. It must never break a
-// turn, so it reports nothing on stdout and always exits 0.
+// newHookCmd is what the agent runs on each hook event. It must never break a turn, so it always exits 0 and
+// prints only the reply its agent reads.
 func newHookCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:    "hook <event>",
@@ -25,26 +26,31 @@ func newHookCmd() *cobra.Command {
 		Hidden: true,
 		Args:   cobra.ExactArgs(1),
 		Run: func(cmd *cobra.Command, args []string) {
-			reportHook(args[0], cmd.InOrStdin())
+			reportHook(args[0], cmd.InOrStdin(), cmd.OutOrStdout())
 		},
 	}
 }
 
 // reportHook saves the session's new state and tells the app, within a short
 // budget: the file is already saved, so a miss costs only a delay.
-func reportHook(event string, stdin io.Reader) { reportHookAt(event, stdin, time.Now()) }
+func reportHook(event string, stdin io.Reader, stdout io.Writer) {
+	reportHookAt(event, stdin, stdout, time.Now())
+}
 
 // reportHookAt records the event as of at, the moment the hook started: a hook that waited
 // for the lock must not undo a later event that got in first. The session's provider, AGENTOS_AGENT
-// (claude when unset, as sessions started before it was set are), reads the payload.
-func reportHookAt(event string, stdin io.Reader, at time.Time) {
+// (claude when unset, as sessions started before it was set are), reads the payload and says what to print.
+func reportHookAt(event string, stdin io.Reader, stdout io.Writer, at time.Time) {
 	name := os.Getenv("AGENTOS_SESSION")
 	socket := os.Getenv("AGENTOS_SOCKET")
 	if _, err := session.ParseName(name); err != nil || socket == "" {
+		// Outside a session only agy's global hooks run, for the owner's own agy, which reads the reply.
+		fmt.Fprint(stdout, agent.AgyNoReply(event))
 		return
 	}
 	dir := bus.DirOf(socket)
-	ev, ok := agent.New(os.Getenv("AGENTOS_AGENT"), "").ParseEvent(event, stdin)
+	ev, reply, ok := agent.New(os.Getenv("AGENTOS_AGENT"), "").ParseEvent(event, stdin)
+	fmt.Fprint(stdout, reply)
 	if !ok {
 		return
 	}
