@@ -208,6 +208,38 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestRegistryProvider(t *testing.T) {
+	tests := []struct {
+		exe, command string
+		want         Provider
+	}{
+		{"/x", "", Claude{Exe: "/x", ConfigDir: claudeConfigDir(), Dirs: []string{"/d"}}},
+		{"/x", "claude", Claude{Exe: "/x", ConfigDir: claudeConfigDir(), Dirs: []string{"/d"}}},
+		{"/x", "bash -l", Plain{Argv: []string{"bash", "-l"}}},
+		{"", "", Plain{Argv: []string{"claude"}}},
+		{"", "claude", Plain{Argv: []string{"claude"}}},
+		{"", "bash", Plain{Argv: []string{"bash"}}},
+	}
+	for _, tt := range tests {
+		if got := (Registry{Exe: tt.exe, Dirs: []string{"/d"}}).Provider(tt.command); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("Registry{Exe: %q}.Provider(%q) = %#v, want %#v", tt.exe, tt.command, got, tt.want)
+		}
+	}
+}
+
+func TestCheckName(t *testing.T) {
+	for _, name := range []string{"", "claude"} {
+		if err := CheckName(name); err != nil {
+			t.Errorf("CheckName(%q) = %v", name, err)
+		}
+	}
+	for _, name := range []string{"agy", "bash", "claude --resume"} {
+		if err := CheckName(name); err == nil || !strings.Contains(err.Error(), "the agents are claude") {
+			t.Errorf("CheckName(%q) = %v", name, err)
+		}
+	}
+}
+
 func TestBrowserPromptNamesTheCommands(t *testing.T) {
 	for _, want := range []string{"agentos browser help", "agentos browser open", "agentos browser screenshot", "agentos browser close"} {
 		if !strings.Contains(prompts.Browser(), want) {
