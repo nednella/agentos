@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -86,6 +87,22 @@ var Names = []string{"claude", "agy"}
 func CheckName(name string) error {
 	if name != "" && !slices.Contains(Names, name) {
 		return fmt.Errorf("no agent %q: the agents are %s", name, strings.Join(Names, ", "))
+	}
+	return nil
+}
+
+var efforts = []string{"low", "medium", "high", "xhigh", "max"}
+
+// modelName keeps a value from being read as a flag when it reaches the agent's command line.
+var modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._\[\]-]*$`)
+
+// CheckModel reports a model or effort no provider would take on its command line; an empty value passes.
+func CheckModel(model, effort string) error {
+	if model != "" && !modelName.MatchString(model) {
+		return fmt.Errorf("model %q is not a model name", model)
+	}
+	if effort != "" && !slices.Contains(efforts, effort) {
+		return fmt.Errorf("effort must be one of %s, not %q", strings.Join(efforts, ", "), effort)
 	}
 	return nil
 }
