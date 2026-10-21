@@ -95,11 +95,11 @@ Only the `claude` and `agy` providers get `--model` and `--effort`; a plain comm
 
 1. the issue's `model:<x>` or `effort:<y>` label (a value the provider would not accept is ignored);
 2. the action's `model` and `effort`;
-3. claude's own settings, read when the session starts: `model`, and the effort in `modelSettings.<model>.effortLevel` for the model chosen, else `effortLevel`, from the project folder's `.claude/settings.local.json`, then its `.claude/settings.json`, then `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`.
+3. the agent's own settings, read when the session starts. For claude: `model`, and the effort in `modelSettings.<model>.effortLevel` for the model chosen, else `effortLevel`, from the project folder's `.claude/settings.local.json`, then its `.claude/settings.json`, then `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`. For agy: `model` in `~/.gemini/antigravity-cli/settings.json`, which holds the name `agy models` prints beside the id, so it sets the model and its effort; a name that `agy models` does not list, as when agy is not signed in, sets nothing.
 
 A new session, or one started from a note, has no action and no labels. When nothing sets a value, no flag is passed and the agent uses its own default.
 
-For agy the model is the full id as `agy models` prints it, such as `gemini-4-argon-medium`, whose last part is its effort; `--effort` is agy's own override, one of `low`, `medium`, `high`, `xhigh` or `max`. The app checks a model against `agy models` once per start, and takes any id when agy cannot answer, as when it is not signed in.
+For agy the id `agy models` prints, such as `gemini-4-argon-medium`, is a model and the effort it ends in. The app keeps the two apart, as it does for claude: the row shows model `gemini-4-argon` and effort `medium`. A `model:` label or an action's `model` may be the full id, which sets the effort too unless an effort is set as well, or the model alone. The app joins the model and an effort of `low`, `medium` or `high` into `--model`; `xhigh` and `max`, which no id ends in, go to `--effort`. The app checks the joined id against `agy models`, read once per start, and a model alone when agy lists it at some effort; it takes any id when agy cannot answer, as when it is not signed in.
 
 ### How a session picks its agent
 
