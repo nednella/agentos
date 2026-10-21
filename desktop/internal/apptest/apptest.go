@@ -816,12 +816,19 @@ var AgyModels = [][2]string{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}
 
 // AgyOnPath is ClaudeOnPath for a stand-in `agy`, which also answers `agy models` with AgyModels and writes the
 // AGENTOS_PROMPT and AGENTOS_CHAT it was started with to <dir>/<session id, "/" as "_">.env.
-func AgyOnPath(t *testing.T) string {
+func AgyOnPath(t *testing.T) string { return agyOnPath(t, "") }
+
+// AgyAskingOnPath is AgyOnPath with a stand-in that shows agy's permission prompt in its pane.
+func AgyAskingOnPath(t *testing.T) string {
+	return agyOnPath(t, "────────\nRequesting permission for:\n   touch made.txt\nRun this command?\n> 1. Yes, run command\n  2. No, cancel\nesc to cancel\n")
+}
+
+func agyOnPath(t *testing.T, pane string) string {
 	models := ""
 	for _, m := range AgyModels {
 		models += m[0] + "\t" + m[1] + "\n"
 	}
-	return agentOnPath(t, "agy", "if [ \"$1\" = models ]; then printf '"+models+"'; exit 0; fi\nprintf 'AGENTOS_PROMPT=%s\\nAGENTOS_CHAT=%s\\n' \"$AGENTOS_PROMPT\" \"$AGENTOS_CHAT\" > \"$f.env\"\n")
+	return agentOnPath(t, "agy", "if [ \"$1\" = models ]; then printf '"+models+"'; exit 0; fi\nprintf 'AGENTOS_PROMPT=%s\\nAGENTOS_CHAT=%s\\n' \"$AGENTOS_PROMPT\" \"$AGENTOS_CHAT\" > \"$f.env\"\nprintf '%s' '"+pane+"'\n")
 }
 
 // agentOnPath writes the stand-in named so, with first run before it records its arguments, and puts it first on

@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
+	"github.com/nednella/agentos/internal/agent"
+	"github.com/nednella/agentos/internal/bus"
 	ctl "github.com/nednella/agentos/internal/control"
 	"github.com/nednella/agentos/internal/prompts"
 )
@@ -173,5 +175,45 @@ func TestResumedAgySessionContinuesItsConversation(t *testing.T) {
 	}
 	if env := agyEnv(t, dir, fresh.ID); env["AGENTOS_PROMPT"] != "" {
 		t.Errorf("a resumed session got a prompt to inject again: %v", env)
+	}
+}
+
+func TestAgySessionWaitsWhileItsPaneAsksForPermission(t *testing.T) {
+	apptest.AgyAskingOnPath(t)
+	h := newHarness(t)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "agy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript := filepath.Join(t.TempDir(), "transcript_full.jsonl")
+	h.Hook(t, s.ID, "SessionStart", agyPayload(h, transcript, ""))
+	eventually(t, "the prompt in the pane", func() bool { return strings.Contains(h.Pane(t, s.ID), "Run this command?") })
+	tool := `,"toolCall":{"name":"run_command","args":{"CommandLine":"touch made.txt"}}`
+	h.Hook(t, s.ID, "PreToolUse", agyPayload(h, transcript, tool))
+	eventually(t, "the row waiting on the prompt", func() bool {
+		row, _ := h.Session(s.ID)
+		return row.State == "waiting" && row.Detail == "Run this command?"
+	})
+	rec, _ := bus.ReadState(h.State, s.ID)
+	if rec.Notify != "permission_prompt" || rec.Tool != "run_command" || rec.Command != "touch made.txt" {
+		t.Errorf("record = %+v, want the permission prompt about the tool call", rec)
+	}
+	h.Hook(t, s.ID, "PostToolUse", agyPayload(h, transcript, tool))
+	eventually(t, "the row working once the tool ran", func() bool { row, _ := h.Session(s.ID); return row.State == "working" })
+}
+
+func TestAgySessionKeepsWorkingWhenItsPaneAsksNothing(t *testing.T) {
+	apptest.AgyOnPath(t)
+	h := newHarness(t)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "agy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript := filepath.Join(t.TempDir(), "transcript_full.jsonl")
+	h.Hook(t, s.ID, "PreToolUse", agyPayload(h, transcript, `,"toolCall":{"name":"run_command","args":{"CommandLine":"go test ./..."}}`))
+	eventually(t, "the row working", func() bool { row, _ := h.Session(s.ID); return row.State == "working" })
+	time.Sleep(agent.Agy{}.PromptWait() + time.Second)
+	if row, _ := h.Session(s.ID); row.State != "working" {
+		t.Errorf("state = %s after a long tool call that asked nothing", row.State)
 	}
 }
