@@ -17,6 +17,7 @@ import (
 	"github.com/nednella/agentos/desktop/internal/scoped"
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/util"
 )
@@ -27,6 +28,7 @@ type Sessions interface {
 	IssueSessions() map[int]string
 	List() []sessions.Session
 	CreateIssue(title, text string, issue int, action project.Action, labels []string, handover, agent string) (view sessions.Session, created bool, err error)
+	Provider(name string) agent.Provider
 }
 
 // Issue is a GitHub issue placed in a section of the queue.
@@ -42,6 +44,7 @@ type Issue struct {
 	Author    string   `json:"author"`
 	Assignees []string `json:"assignees"`
 	Labels    []string `json:"labels"`
+	Ignored   []string `json:"ignored"` // why each model: and effort: label the default action's provider rejects is skipped
 	CreatedAt int64    `json:"createdAt"`
 	UpdatedAt int64    `json:"updatedAt"`
 }
@@ -171,7 +174,7 @@ func (i *Issues) List(ctx context.Context, proj project.Project, refresh bool) (
 		}
 		return nil, fmt.Errorf("listing issues: %w", err)
 	}
-	list, err := parseIssues(out, proj)
+	list, err := i.parseIssues(out, proj)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +188,7 @@ type ghLogin struct {
 	Login string `json:"login"`
 }
 
-func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
+func (i *Issues) parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 	var raw []struct {
 		Number    int       `json:"number"`
 		Title     string    `json:"title"`
@@ -216,9 +219,17 @@ func parseIssues(data []byte, proj project.Project) ([]Issue, error) {
 			assignees[k] = a.Login
 		}
 		at, section := proj.Section(labels)
+		action, _ := pickAction(section, "", proj.Branch != "")
+		valid := func(model, effort string) error {
+			return i.sessions.Provider(project.PickAgent(action, labels)).ValidModel(model, effort)
+		}
+		_, ignored := project.Pick(action, labels, valid)
+		if ignored == nil {
+			ignored = []string{}
+		}
 		list = append(list, placed{at, Issue{
 			Number: r.Number, Title: r.Title, URL: r.URL, Section: section.Name, Actions: actionNames(section), Moves: proj.Moves(labels), Type: typeOf(labels),
-			Author: r.Author.Login, Assignees: assignees, Labels: labels,
+			Author: r.Author.Login, Assignees: assignees, Labels: labels, Ignored: ignored,
 			CreatedAt: util.Millis(r.CreatedAt), UpdatedAt: util.Millis(r.UpdatedAt),
 		}})
 	}

@@ -15,9 +15,15 @@ import (
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/internal/warn"
 	"github.com/nednella/agentos/desktop/issues"
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/session"
 )
+
+// noSessions is a session list with nothing in it, for tests that only read issues.
+type noSessions struct{ issues.Sessions }
+
+func (noSessions) Provider(string) agent.Provider { return agent.Claude{} }
 
 func TestIssues(t *testing.T) {
 	h := newHarness(t)
@@ -140,7 +146,7 @@ func TestStartsAtOnceMakeOneSession(t *testing.T) {
 
 func TestIssuesWithoutRepo(t *testing.T) {
 	gh := &apptest.FakeGH{Repo: errors.New("gh repo view: exit status 1: not a git repository")}
-	is := issues.New(gh.Run, nil, func(string, any) {})
+	is := issues.New(gh.Run, noSessions{}, func(string, any) {})
 	list, err := is.List(context.Background(), project.Project{Dir: "/x"}, false)
 	if err != nil || list == nil || len(list) != 0 {
 		t.Errorf("List = %v, %v", list, err)
@@ -152,7 +158,7 @@ func TestIssuesWithoutRepo(t *testing.T) {
 
 func TestIssuesDisabled(t *testing.T) {
 	gh := &apptest.FakeGH{IssuesErr: errors.New("gh issue list: exit status 1: the 'acme/widgets' repository has disabled issues")}
-	is := issues.New(gh.Run, nil, func(string, any) {})
+	is := issues.New(gh.Run, noSessions{}, func(string, any) {})
 	if _, err := is.List(context.Background(), project.Project{Dir: "/x"}, false); err != issues.ErrIssuesDisabled {
 		t.Errorf("List error = %v, want ErrIssuesDisabled", err)
 	}
@@ -263,7 +269,7 @@ func TestManualPromptSendTypesWithoutSending(t *testing.T) {
 func TestRepoFailureIsWarnedAboutAndNotRemembered(t *testing.T) {
 	gh := &apptest.FakeGH{Repo: errors.New("gh repo view: exit status 1: error connecting to api.github.com\nsecond line")}
 	var warnings []warn.Warning
-	is := issues.New(gh.Run, nil, func(event string, payload any) {
+	is := issues.New(gh.Run, noSessions{}, func(event string, payload any) {
 		if w, ok := payload.(warn.Warning); ok && event == "warnings" {
 			warnings = append(warnings, w)
 		}
@@ -306,7 +312,7 @@ func TestRefreshKeepsTheKnownRepo(t *testing.T) {
 		}
 		return gh.Run(ctx, dir, name, args...)
 	}
-	is := issues.New(runner, nil, func(string, any) {})
+	is := issues.New(runner, noSessions{}, func(string, any) {})
 	ctx, proj := context.Background(), project.Project{Dir: "/x"}
 	if _, err := is.List(ctx, proj, false); err != nil {
 		t.Fatal(err)

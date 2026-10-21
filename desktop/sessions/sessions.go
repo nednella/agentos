@@ -898,7 +898,7 @@ func (s *Sessions) list() []Session {
 		}
 		if ss.State == session.Ended {
 			view.EndedAt = ss.At.UnixMilli()
-			view.Resumable = s.provider(in.Agent).Can(agent.Resume) && s.conversationOf(id) != ""
+			view.Resumable = s.Provider(in.Agent).Can(agent.Resume) && s.conversationOf(id) != ""
 		}
 		f := s.life.fields(id)
 		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
@@ -1102,7 +1102,7 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover, agentName string) (view Session, created bool, err error) {
 	proj := s.Current()
 	agentName = cmp.Or(agentName, project.PickAgent(action, labels))
-	model, _ := project.Pick(action, labels, s.provider(agentName).ValidModel)
+	model, _ := project.Pick(action, labels, s.Provider(agentName).ValidModel)
 	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, model, "", handover, action.Chat(), action.Name, agentName)
 	if live == "" {
 		return view, err == nil, err
@@ -1138,7 +1138,7 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	switch {
 	case !ended:
 		return Session{}, fmt.Errorf("session %s has not ended", id)
-	case !s.provider(in.Agent).Can(agent.Resume) || conversation == "":
+	case !s.Provider(in.Agent).Can(agent.Resume) || conversation == "":
 		return Session{}, fmt.Errorf("session %s has no conversation to resume", id)
 	case !known:
 		return Session{}, fmt.Errorf("the project of session %s is gone", id)
@@ -1163,8 +1163,8 @@ func (s *Sessions) Resume(id string) (Session, error) {
 	return view, nil
 }
 
-// provider is the provider of a session started with the agent named, or with the default for "".
-func (s *Sessions) provider(name string) agent.Provider {
+// Provider is the provider of a session started with the agent named, or with the default for "".
+func (s *Sessions) Provider(name string) agent.Provider {
 	return s.agents.Provider(cmp.Or(name, s.configured.Agent()))
 }
 
@@ -1200,7 +1200,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	conversation := s.conversationOf(from)
 	s.mu.Unlock()
 
-	p := s.provider(agentName)
+	p := s.Provider(agentName)
 	model = fill(p, proj.Dir, model)
 	// Typed in while the agent still starts, the text and Enter reach it as one paste, where Enter is a newline. An
 	// agent that takes a prompt on its command line submits it itself once it is ready.
