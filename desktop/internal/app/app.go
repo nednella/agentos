@@ -25,6 +25,7 @@ import (
 	"github.com/nednella/agentos/desktop/stats"
 	"github.com/nednella/agentos/desktop/terminal"
 	"github.com/nednella/agentos/desktop/update"
+	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/session"
 	upd "github.com/nednella/agentos/internal/update"
 )
@@ -201,7 +202,8 @@ func (a *App) Start(ctx context.Context) error {
 	return nil
 }
 
-// followConfig picks up hand edits to the config file while the app runs.
+// followConfig picks up hand edits to the config file while the app runs, and warns while the default agent is not
+// installed.
 func (a *App) followConfig(ctx context.Context) {
 	tick := time.NewTicker(2 * time.Second)
 	defer tick.Stop()
@@ -210,6 +212,11 @@ func (a *App) followConfig(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-tick.C:
+		}
+		if err := agent.CheckInstalled(a.sessions.Provider("")); err != nil {
+			a.warn.Report("agent", err.Error())
+		} else {
+			a.warn.Clear("agent")
 		}
 		changed, err := a.registry.Reload()
 		if err != nil {
