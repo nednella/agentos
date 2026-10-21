@@ -93,7 +93,7 @@ The old `lanes`, `commands`, `models`, `session_model` and `session_effort` keys
 
 Only the `claude` and `agy` providers get `--model` and `--effort`; a plain command runs as configured. The choice comes from the first of these that sets a value, model and effort each on their own:
 
-1. the issue's `model:<x>` or `effort:<y>` label (a value the provider would not accept is ignored);
+1. the issue's `model:<x>` or `effort:<y>` label (a value the provider would not accept is ignored, and the queue row shows the label in red, with the reason when you point at it);
 2. the action's `model` and `effort`;
 3. the agent's own settings, read when the session starts. For claude: `model`, and the effort in `modelSettings.<model>.effortLevel` for the model chosen, else `effortLevel`, from the project folder's `.claude/settings.local.json`, then its `.claude/settings.json`, then `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`. For agy: `model` in `~/.gemini/antigravity-cli/settings.json`, which holds the name `agy models` prints beside the id, so it sets the model and its effort; a name that `agy models` does not list, as when agy is not signed in, or a model that is not Google's sets nothing.
 

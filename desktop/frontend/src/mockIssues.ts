@@ -10,7 +10,7 @@ const storefrontSeeds: Seed[] = [
   [444, 'ready', 'refactor', 'Restructure the checkout route and providers', 'nednella', ['ned']],
   [326, 'ready', 'bug', 'Cart total is a cent off on large orders', 'alex-r', [], ['model:haiku']],
   [412, 'ready', 'chore', 'Sweep the locale keys for the account pages', 'sam-p', ['sam-p']],
-  [389, 'ready', 'feature', 'Payment webhook retries with backoff', 'nednella', []],
+  [389, 'ready', 'feature', 'Payment webhook retries with backoff', 'nednella', [], ['effort:hgih']],
   [401, 'ready', 'bug', 'Sign-in prompt flashes before the cart loads', 'alex-r', ['alex-r'], ['agent:agy', 'effort:high']],
   [405, 'plan', 'feature', 'Discount codes with an expiry date', 'dev-bot', []],
   [398, 'plan', 'feature', 'Wishlist on the product page', 'sam-p', ['nednella']],
@@ -78,10 +78,18 @@ export function moveIssue(issue: Issue, section: string): Issue {
   return { ...issue, section, actions: sections[lane].actions, moves: movesFrom(section), labels }
 }
 
+const efforts = ['low', 'medium', 'high', 'xhigh', 'max']
+
+const ignoredBy = (labels: string[]) =>
+  labels
+    .filter((l) => l.startsWith('effort:') && !efforts.includes(l.slice('effort:'.length)))
+    .map((l) => `${l} is ignored: claude takes an effort of ${efforts.join(', ')}, not "${l.slice('effort:'.length)}"`)
+
 export function buildIssues(repo: string): Issue[] {
   const now = Date.now()
   const issues = (seedsByRepo[repo] ?? []).map(([number, lane, type, title, author, assignees, extra = []], i) => {
     const label = labelFor(lane)
+    const labels = [label, type ? `type:${type}` : '', ...extra].filter(Boolean)
     return {
       number,
       title,
@@ -93,7 +101,8 @@ export function buildIssues(repo: string): Issue[] {
       sessionId: '',
       author,
       assignees,
-      labels: [label, type ? `type:${type}` : '', ...extra].filter(Boolean),
+      labels,
+      ignored: ignoredBy(labels),
       createdAt: now - (i + 2) * day,
       updatedAt: now - (i % 5) * day,
     }
