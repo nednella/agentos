@@ -384,3 +384,72 @@ func TestAgyNoReply(t *testing.T) {
 		t.Error("the empty reply is wrong for an event")
 	}
 }
+
+// The panes below are what agy 1.4.4 drew, trimmed of blank lines and the logo.
+const (
+	agyAsksToRun = `> Run the shell command: touch made.txt
+● Ran (touch made.txt) (ctrl+o to expand)
+Command
+────────────────────────────────────────────────────────────
+Requesting permission for:
+   touch made.txt
+Run this command?
+> 1. Yes, run command
+  2. Yes, and always allow in this conversation for commands that start with 'touch'
+  3. Yes, and always allow for commands that start with 'touch' (Persist to settings.json)
+  4. No, cancel
+  ↑/↓ Navigate · tab Amend · ctrl+g edit/expand command
+esc to cancel                                                    Gemini 4 Argon · medium
+`
+	agyAsksToRead = `> Read the file /etc/shells with your file read tool.
+● Used ReadFile (ctrl+o to expand)
+File access
+────────────────────────────────────────────────────────────
+Read: /private/etc/shells
+Reason: outside workspace
+Allow access to this file?
+  1. Yes, allow access
+  2. Yes, and always allow non-workspace access
+> 3. No, deny access
+  ↑/↓ Navigate
+esc to cancel                                                    Gemini 4 Argon · medium
+`
+	agyRuns = `> Run the shell command: sleep 8 && touch made.txt
+● Running (sleep 8 && touch made.txt) (ctrl+o to expand)
+⣻  Running command...
+────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────
+esc to cancel                                                    Gemini 4 Argon · medium
+`
+	agyRepliedWithChoices = `> Should I run it?
+  Run this command?
+  1. Yes, run it
+  2. No, leave it
+────────────────────────────────────────────────────────────
+>
+────────────────────────────────────────────────────────────
+? for shortcuts                                                  Gemini 4 Argon · medium
+`
+)
+
+func TestAgyPermissionPrompt(t *testing.T) {
+	tests := []struct {
+		name, pane, want string
+		ok               bool
+	}{
+		{"a command", agyAsksToRun, "Run this command?", true},
+		{"a file outside the workspace, the cursor on no", agyAsksToRead, "Allow access to this file?", true},
+		{"a tool running", agyRuns, "", false},
+		{"choices in a reply above the input box", agyRepliedWithChoices, "", false},
+		{"an empty pane", "", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := Agy{}.PermissionPrompt(tt.pane)
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("PermissionPrompt = %q, %v, want %q, %v", got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
