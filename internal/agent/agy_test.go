@@ -166,10 +166,14 @@ func TestNewAgyWritesOnlyWhereTheEnvironmentPoints(t *testing.T) {
 
 func TestAgyFill(t *testing.T) {
 	models := func() []agyModel {
-		return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}}
+		return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}, {"claude-opus-5-5-low", "Claude Opus 5.5 (Low)"}}
 	}
 	settings := filepath.Join(t.TempDir(), "settings.json")
 	if err := os.WriteFile(settings, []byte(`{"model": "Gemini 4 Argon (Medium)"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	claude := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(claude, []byte(`{"model": "Claude Opus 5.5 (Low)"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	unlisted := filepath.Join(t.TempDir(), "settings.json")
@@ -187,6 +191,7 @@ func TestAgyFill(t *testing.T) {
 		{"a set effort stays", Agy{Settings: settings, Models: models}, Launch{Effort: "xhigh", Resume: "abc"}, Launch{Model: "gemini-4-argon", Effort: "xhigh", Resume: "abc"}},
 		{"a full id is split", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low"}, Launch{Model: "gemini-3.8-flash", Effort: "low"}},
 		{"a set effort wins over the id's", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low", Effort: "high"}, Launch{Model: "gemini-3.8-flash", Effort: "high"}},
+		{"a Claude model", Agy{Settings: claude, Models: models}, Launch{}, Launch{}},
 		{"a name agy does not list", Agy{Settings: unlisted, Models: models}, Launch{}, Launch{}},
 		{"agy cannot say", Agy{Settings: settings, Models: func() []agyModel { return nil }}, Launch{}, Launch{}},
 		{"no settings", Agy{Settings: filepath.Join(t.TempDir(), "none.json"), Models: models}, Launch{}, Launch{}},
@@ -206,7 +211,9 @@ func TestNewAgyFindsTheSettingsBesideTheConfig(t *testing.T) {
 }
 
 func TestAgyValidModel(t *testing.T) {
-	known := Agy{Models: func() []agyModel { return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}} }}
+	known := Agy{Models: func() []agyModel {
+		return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"claude-opus-5-5-low", "Claude Opus 5.5 (Low)"}}
+	}}
 	unknown := Agy{Models: func() []agyModel { return nil }}
 	tests := []struct {
 		name          string
@@ -220,7 +227,11 @@ func TestAgyValidModel(t *testing.T) {
 		{"a listed model alone", known, "gemini-4-argon", "", true},
 		{"a listed model at an effort no id ends in", known, "gemini-4-argon", "max", true},
 		{"an unlisted model", known, "gemini-9", "", false},
+		{"a Claude model agy lists", known, "claude-opus-5-5-low", "", false},
+		{"a Claude model and its effort", known, "claude-opus-5-5", "low", false},
 		{"any model when agy cannot say", unknown, "gemini-9", "", true},
+		{"no Claude model when agy cannot say", unknown, "claude-opus-5-5", "", false},
+		{"no GPT-OSS model", unknown, "gpt-oss-120b-medium", "", false},
 		{"an effort agy takes", known, "", "xhigh", true},
 		{"an effort it does not", known, "", "extreme", false},
 		{"nothing", known, "", "", true},
