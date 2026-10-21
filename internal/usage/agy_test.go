@@ -21,9 +21,12 @@ func TestAgyReadCountsEachStepOnce(t *testing.T) {
 		planner(3, t0.Add(2*time.Second), 1, 1, 1))
 
 	r := NewAgyReader(t0)
-	parts, err := r.Read(path, "gemini-4-argon-medium")
+	parts, cur, err := r.Read(path, "gemini-4-argon-medium")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if cur != (Current{}) {
+		t.Errorf("current = %+v, want none: the lines name no model", cur)
 	}
 	if len(parts) != 1 {
 		t.Fatalf("parts = %+v, want one", parts)
@@ -38,11 +41,11 @@ func TestAgyReadCountsEachStepOnce(t *testing.T) {
 		t.Errorf("after = %v", r.After())
 	}
 
-	if again, _ := r.Read(path, "gemini-4-argon-medium"); len(again) != 0 {
+	if again, _, _ := r.Read(path, "gemini-4-argon-medium"); len(again) != 0 {
 		t.Errorf("a second read with nothing new = %+v", again)
 	}
 	appendTo(t, path, planner(5, t0.Add(3*time.Second), 0, 0, 7))
-	next, _ := r.Read(path, "gemini-3.8-flash-low")
+	next, _, _ := r.Read(path, "gemini-3.8-flash-low")
 	if len(next) != 1 || next[0].Output != 7 || next[0].Model != "gemini-3.8-flash-low" || next[0].Cost != 26 {
 		t.Errorf("new line read = %+v, want 7 output tokens of gemini-3.8-flash-low at $3.75", next)
 	}
@@ -51,7 +54,7 @@ func TestAgyReadCountsEachStepOnce(t *testing.T) {
 func TestAgyReadSkipsWhatCameBefore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "transcript_full.jsonl")
 	appendTo(t, path, planner(1, t0.Add(-time.Hour), 500, 0, 500), planner(3, t0.Add(time.Minute), 1, 0, 2))
-	parts, _ := NewAgyReader(t0).Read(path, "gemini-4-argon-medium")
+	parts, _, _ := NewAgyReader(t0).Read(path, "gemini-4-argon-medium")
 	if len(parts) != 1 || parts[0].Input != 1 || parts[0].Output != 2 {
 		t.Errorf("parts = %+v, want only the step after the start", parts)
 	}
@@ -62,17 +65,17 @@ func TestAgyReadLeavesAPartLine(t *testing.T) {
 	full := planner(1, t0.Add(time.Second), 1, 0, 2)
 	appendTo(t, path, full[:40])
 	r := NewAgyReader(t0)
-	if parts, _ := r.Read(path, "gemini-4-argon-medium"); len(parts) != 0 {
+	if parts, _, _ := r.Read(path, "gemini-4-argon-medium"); len(parts) != 0 {
 		t.Fatalf("a part line was counted: %+v", parts)
 	}
 	appendTo(t, path, full[40:])
-	if parts, _ := r.Read(path, "gemini-4-argon-medium"); len(parts) != 1 || parts[0].Output != 2 {
+	if parts, _, _ := r.Read(path, "gemini-4-argon-medium"); len(parts) != 1 || parts[0].Output != 2 {
 		t.Errorf("the finished line = %+v", parts)
 	}
 }
 
 func TestAgyReadMissingFile(t *testing.T) {
-	parts, err := NewAgyReader(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "gemini-4-argon-medium")
+	parts, _, err := NewAgyReader(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "gemini-4-argon-medium")
 	if err != nil || len(parts) != 0 {
 		t.Errorf("Read = %+v, %v; want nothing and no error", parts, err)
 	}
@@ -81,7 +84,7 @@ func TestAgyReadMissingFile(t *testing.T) {
 func TestAgyReadPricesOnlyGoogleModels(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "transcript_full.jsonl")
 	appendTo(t, path, planner(1, t0.Add(time.Second), 0, 0, 7))
-	parts, _ := NewAgyReader(t0).Read(path, "claude-opus-5-5-low")
+	parts, _, _ := NewAgyReader(t0).Read(path, "claude-opus-5-5-low")
 	if len(parts) != 1 || parts[0].Output != 7 || parts[0].Cost != 0 {
 		t.Errorf("parts = %+v, want 7 output tokens at no price", parts)
 	}

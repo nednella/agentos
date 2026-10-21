@@ -47,11 +47,18 @@ type Part struct {
 	Tokens
 }
 
+// Current is the model and effort the agent used last, "" while it has not run a turn yet.
+type Current struct {
+	Model  string
+	Effort string
+}
+
 // Reader reads what a session's agent used from its transcript, a little at a time, as its provider knows how.
 type Reader interface {
-	// Read counts what was written to the transcript at path since the last read, one part for each model. model
-	// is the one the agent reports it runs now, for a transcript whose lines name none.
-	Read(path, model string) ([]Part, error)
+	// Read counts what was written to the transcript at path since the last read, one part for each model, and
+	// says what the agent used last. model is the one the agent reports it runs now, for a transcript whose lines
+	// name none.
+	Read(path, model string) ([]Part, Current, error)
 	// After is the time of the latest message read.
 	After() time.Time
 }
@@ -61,7 +68,9 @@ type Reader interface {
 type Cursor struct {
 	after time.Time // a file read for the first time is counted from this time on
 	tail
-	seen map[string]bool
+	seen      map[string]bool
+	current   Current
+	currentAt time.Time
 }
 
 // NewCursor counts only the messages written after the time given: the ones before were counted
@@ -75,14 +84,15 @@ func (c *Cursor) After() time.Time { return c.after }
 
 // Read counts what was written since the last read to the transcript at path and to the transcripts
 // of its subagents, which Claude Code keeps in <session id>/subagents beside it. It returns one part
-// for each model, the session's own before its subagents'. The lines name their model, so the one given is not used.
-func (c *Cursor) Read(path, _ string) ([]Part, error) {
+// for each model, the session's own before its subagents'. The lines name their model, so the one given is not used;
+// the newest line of the session's own transcript says what it used last.
+func (c *Cursor) Read(path, _ string) ([]Part, Current, error) {
 	sums := map[Part]*Tokens{}
 	var order []Part
 	latest := c.after
 	add := func(file string, subagent bool) error {
 		return c.lines(file, func(b []byte, known bool) {
-			c.count(b, known, &latest, func(model string, t Tokens) {
+			c.count(b, known, subagent, &latest, func(model string, t Tokens) {
 				key := Part{Model: model, Subagent: subagent}
 				if sums[key] == nil {
 					sums[key] = &Tokens{}
@@ -93,12 +103,12 @@ func (c *Cursor) Read(path, _ string) ([]Part, error) {
 		})
 	}
 	if err := add(path, false); err != nil {
-		return nil, err
+		return nil, c.current, err
 	}
 	agents, _ := filepath.Glob(filepath.Join(strings.TrimSuffix(path, ".jsonl"), "subagents", "agent-*.jsonl"))
 	for _, f := range agents {
 		if err := add(f, true); err != nil {
-			return nil, err
+			return nil, c.current, err
 		}
 	}
 	c.after = latest
@@ -115,13 +125,14 @@ func (c *Cursor) Read(path, _ string) ([]Part, error) {
 	for i, key := range order {
 		out[i] = Part{Model: key.Model, Subagent: key.Subagent, Tokens: *sums[key]}
 	}
-	return out, nil
+	return out, c.current, nil
 }
 
 // line is the part of a transcript line that tells what an API response used.
 type line struct {
 	Type      string    `json:"type"`
 	Timestamp time.Time `json:"timestamp"`
+	Effort    string    `json:"effort"`
 	Message   struct {
 		ID    string    `json:"id"`
 		Model string    `json:"model"`
@@ -181,8 +192,9 @@ func (t tail) lines(file string, each func(b []byte, known bool)) error {
 }
 
 // count counts the line's message, once. In a file read before, every new line is new; in a file
-// read for the first time, only the lines after c.after are. latest moves to the time of the latest line counted.
-func (c *Cursor) count(b []byte, known bool, latest *time.Time, each func(model string, t Tokens)) {
+// read for the first time, only the lines after c.after are. latest moves to the time of the latest line counted,
+// and the session's own newest line, not a subagent's, sets what the agent used last.
+func (c *Cursor) count(b []byte, known, subagent bool, latest *time.Time, each func(model string, t Tokens)) {
 	if !bytes.Contains(b, []byte(`"usage"`)) {
 		return
 	}
@@ -208,6 +220,9 @@ func (c *Cursor) count(b []byte, known bool, latest *time.Time, each func(model 
 	}
 	if t.Total() == 0 {
 		return
+	}
+	if !subagent && l.Timestamp.After(c.currentAt) {
+		c.current, c.currentAt = Current{Model: l.Message.Model, Effort: l.Effort}, l.Timestamp
 	}
 	each(l.Message.Model, t)
 }

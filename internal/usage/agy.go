@@ -34,8 +34,9 @@ type agyLine struct {
 	OutputTokens    int64     `json:"output_tokens"`
 }
 
-// Read counts the model calls written to the transcript at path since the last read, as one part of model.
-func (a *AgyReader) Read(path, model string) ([]Part, error) {
+// Read counts the model calls written to the transcript at path since the last read, as one part of model. What the
+// agent used last is left empty: the lines name no model, and the agy provider knows it from its hooks.
+func (a *AgyReader) Read(path, model string) ([]Part, Current, error) {
 	var sum Tokens
 	latest := a.after
 	err := a.lines(path, func(b []byte, known bool) {
@@ -64,11 +65,11 @@ func (a *AgyReader) Read(path, model string) ([]Part, error) {
 		sum.Add(Tokens{Input: l.InputTokens, Output: l.OutputTokens, CacheRead: l.CacheReadTokens, Cost: c})
 	})
 	if err != nil {
-		return nil, err
+		return nil, Current{}, err
 	}
 	a.after = latest
 	if sum.Total() == 0 {
-		return nil, nil
+		return nil, Current{}, nil
 	}
-	return []Part{{Model: model, Tokens: sum}}, nil
+	return []Part{{Model: model, Tokens: sum}}, Current{}, nil
 }
