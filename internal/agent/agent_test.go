@@ -308,3 +308,26 @@ func TestPlainFillsNothing(t *testing.T) {
 		t.Errorf("Fill = %+v", got)
 	}
 }
+
+func TestClaudeValidModel(t *testing.T) {
+	tests := []struct {
+		name          string
+		model, effort string
+		ok            bool
+	}{
+		{"an alias", "opus", "max", true},
+		{"an alias with the long context", "sonnet[1m]", "", true},
+		{"a full id claude has no list for", "claude-opus-5-5", "high", true},
+		{"a full id with the long context", "claude-opus-5-5[1m]", "", true},
+		{"a Google model", "gemini-4-argon", "", false},
+		{"an effort alone", "", "xhigh", true},
+		{"a misspelt effort", "", "hgih", false},
+		{"a flag", "--x", "", false},
+		{"nothing", "", "", true},
+	}
+	for _, tt := range tests {
+		if err := (Claude{}).ValidModel(tt.model, tt.effort); (err == nil) != tt.ok {
+			t.Errorf("%s: ValidModel(%q, %q) = %v", tt.name, tt.model, tt.effort, err)
+		}
+	}
+}

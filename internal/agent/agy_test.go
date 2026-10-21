@@ -186,15 +186,15 @@ func TestAgyFill(t *testing.T) {
 		l    Launch
 		want Launch
 	}{
-		{"agy's default", Agy{Settings: settings, Models: models}, Launch{}, Launch{Model: "gemini-4-argon", Effort: "medium"}},
-		{"a set model keeps the default's effort", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash"}, Launch{Model: "gemini-3.8-flash", Effort: "medium"}},
-		{"a set effort stays", Agy{Settings: settings, Models: models}, Launch{Effort: "xhigh", Resume: "abc"}, Launch{Model: "gemini-4-argon", Effort: "xhigh", Resume: "abc"}},
-		{"a full id is split", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low"}, Launch{Model: "gemini-3.8-flash", Effort: "low"}},
-		{"a set effort wins over the id's", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low", Effort: "high"}, Launch{Model: "gemini-3.8-flash", Effort: "high"}},
-		{"a Claude model", Agy{Settings: claude, Models: models}, Launch{}, Launch{}},
-		{"a name agy does not list", Agy{Settings: unlisted, Models: models}, Launch{}, Launch{}},
-		{"agy cannot say", Agy{Settings: settings, Models: func() []agyModel { return nil }}, Launch{}, Launch{}},
-		{"no settings", Agy{Settings: filepath.Join(t.TempDir(), "none.json"), Models: models}, Launch{}, Launch{}},
+		{"agy's default", Agy{Settings: settings, ListModels: models}, Launch{}, Launch{Model: "gemini-4-argon", Effort: "medium"}},
+		{"a set model keeps the default's effort", Agy{Settings: settings, ListModels: models}, Launch{Model: "gemini-3.8-flash"}, Launch{Model: "gemini-3.8-flash", Effort: "medium"}},
+		{"a set effort stays", Agy{Settings: settings, ListModels: models}, Launch{Effort: "xhigh", Resume: "abc"}, Launch{Model: "gemini-4-argon", Effort: "xhigh", Resume: "abc"}},
+		{"a full id is split", Agy{Settings: settings, ListModels: models}, Launch{Model: "gemini-3.8-flash-low"}, Launch{Model: "gemini-3.8-flash", Effort: "low"}},
+		{"a set effort wins over the id's", Agy{Settings: settings, ListModels: models}, Launch{Model: "gemini-3.8-flash-low", Effort: "high"}, Launch{Model: "gemini-3.8-flash", Effort: "high"}},
+		{"a Claude model", Agy{Settings: claude, ListModels: models}, Launch{}, Launch{}},
+		{"a name agy does not list", Agy{Settings: unlisted, ListModels: models}, Launch{}, Launch{}},
+		{"agy cannot say", Agy{Settings: settings, ListModels: func() []agyModel { return nil }}, Launch{}, Launch{}},
+		{"no settings", Agy{Settings: filepath.Join(t.TempDir(), "none.json"), ListModels: models}, Launch{}, Launch{}},
 	}
 	for _, tt := range tests {
 		if got := tt.a.Fill(t.TempDir(), tt.l); !reflect.DeepEqual(got, tt.want) {
@@ -211,10 +211,10 @@ func TestNewAgyFindsTheSettingsBesideTheConfig(t *testing.T) {
 }
 
 func TestAgyValidModel(t *testing.T) {
-	known := Agy{Models: func() []agyModel {
+	known := Agy{ListModels: func() []agyModel {
 		return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"claude-opus-5-5-low", "Claude Opus 5.5 (Low)"}}
 	}}
-	unknown := Agy{Models: func() []agyModel { return nil }}
+	unknown := Agy{ListModels: func() []agyModel { return nil }}
 	tests := []struct {
 		name          string
 		a             Agy
@@ -222,6 +222,7 @@ func TestAgyValidModel(t *testing.T) {
 		ok            bool
 	}{
 		{"a listed id", known, "gemini-4-argon-medium", "", true},
+		{"a listed id and an effort that wins over its own", known, "gemini-4-argon-medium", "max", true},
 		{"a listed model and its effort", known, "gemini-4-argon", "medium", true},
 		{"a model listed at another effort", known, "gemini-4-argon", "high", false},
 		{"a listed model alone", known, "gemini-4-argon", "", true},
@@ -240,6 +241,22 @@ func TestAgyValidModel(t *testing.T) {
 		if err := tt.a.ValidModel(tt.model, tt.effort); (err == nil) != tt.ok {
 			t.Errorf("%s: ValidModel(%q, %q) = %v", tt.name, tt.model, tt.effort, err)
 		}
+	}
+}
+
+func TestAgyModelsAreTheGoogleOnesWithTheirEfforts(t *testing.T) {
+	a := Agy{ListModels: func() []agyModel {
+		return []agyModel{{"gemini-4-argon-medium", ""}, {"gemini-4-argon-low", ""}, {"gemini-3.8-flash", ""}, {"claude-opus-5-5-low", ""}, {"gpt-oss-120b-medium", ""}}
+	}}
+	want := []Model{
+		{ID: "gemini-4-argon", Efforts: []string{"low", "medium", "xhigh", "max"}},
+		{ID: "gemini-3.8-flash", Efforts: []string{"xhigh", "max"}},
+	}
+	if got := a.Models(); !reflect.DeepEqual(got, want) {
+		t.Errorf("Models = %+v, want %+v", got, want)
+	}
+	if got := (Agy{ListModels: func() []agyModel { return nil }}).Models(); got != nil {
+		t.Errorf("Models when agy cannot say = %+v, want nil", got)
 	}
 }
 

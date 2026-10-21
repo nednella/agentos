@@ -126,7 +126,7 @@ func Load(path string) (Config, error) {
 		if err := p.CleanupMode.validate(); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
-		if err := p.validateQueue(); err != nil {
+		if err := p.validateQueue(cfg.Agent); err != nil {
 			return Config{}, fmt.Errorf("%s: project %s: %w", path, p.Name, err)
 		}
 		if _, err := p.PRPollEvery(); err != nil {

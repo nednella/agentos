@@ -28,8 +28,8 @@ import (
 // files in ConfigDir, which Prepare writes with the installed agentos, Installed, as their command, so one file
 // serves every build of the app. Writes says whether this build may write them: the installed app always, any other
 // only when AGENTOS_AGY_CONFIG_DIR named ConfigDir, so a dev or test build never touches the owner's own files.
-// Settings is agy's own settings file, where it keeps its default model. Models lists the models agy accepts, nil
-// when agy cannot say.
+// Settings is agy's own settings file, where it keeps its default model. ListModels reads agy models, nil when agy
+// cannot say.
 //
 // In a hook, HookPrompt and HookChat come from the session's environment: the file holding the prompt that
 // SessionStart injects, and whether the PreToolUse hook keeps the session read-only.
@@ -39,7 +39,7 @@ type Agy struct {
 	Writes     bool
 	Dirs       []string
 	Settings   string
-	Models     func() []agyModel
+	ListModels func() []agyModel
 	HookPrompt string
 	HookChat   bool
 }
@@ -51,7 +51,7 @@ func NewAgy(dirs []string) Agy {
 	home, _ := os.UserHomeDir()
 	a := Agy{
 		ConfigDir: os.Getenv(agyConfigDirEnv), Installed: filepath.Join(home, ".local", "bin", "agentos"), Writes: true, Dirs: dirs,
-		Models: agyModels, HookPrompt: os.Getenv("AGENTOS_PROMPT"), HookChat: os.Getenv("AGENTOS_CHAT") != "",
+		ListModels: agyModels, HookPrompt: os.Getenv("AGENTOS_PROMPT"), HookChat: os.Getenv("AGENTOS_CHAT") != "",
 	}
 	if a.ConfigDir == "" {
 		a.ConfigDir = filepath.Join(home, ".gemini", "config")
@@ -140,7 +140,7 @@ func (a Agy) Fill(_ string, l Launch) Launch {
 // defaultModel is the id of the model agy's settings name, "" when they name none of the Google models agy lists.
 func (a Agy) defaultModel() string {
 	data, err := os.ReadFile(a.Settings)
-	if err != nil || a.Models == nil {
+	if err != nil || a.ListModels == nil {
 		return ""
 	}
 	var settings struct {
@@ -149,7 +149,7 @@ func (a Agy) defaultModel() string {
 	if json.Unmarshal(data, &settings) != nil || settings.Model == "" {
 		return ""
 	}
-	for _, m := range a.Models() {
+	for _, m := range a.ListModels() {
 		if m.Name == settings.Model && googleModel(m.ID) {
 			return m.ID
 		}
@@ -159,6 +159,9 @@ func (a Agy) defaultModel() string {
 
 // agyEfforts are the efforts a model id of agy ends in.
 var agyEfforts = []string{"low", "medium", "high"}
+
+// agyEffortFlag are the efforts agy's --effort takes.
+var agyEffortFlag = []string{"low", "medium", "high", "xhigh", "max"}
 
 // splitModel parts a model id of agy into the model and the effort it ends in, "" when it ends in none.
 func splitModel(id string) (model, effort string) {
@@ -178,28 +181,56 @@ func joinModel(model, effort string) (id, rest string) {
 	return model, effort
 }
 
-// ValidModel checks the id that model and effort join into: a Google model that agy models lists, or a model alone that
-// agy lists at some effort. Any Google id passes when agy cannot say, as when it is not signed in.
+// Models are the Google models agy models lists, with the efforts their ids end in and those only --effort takes;
+// nil when agy cannot say.
+func (a Agy) Models() []Model {
+	if a.ListModels == nil {
+		return nil
+	}
+	listed := a.ListModels()
+	if len(listed) == 0 {
+		return nil
+	}
+	var bases []string
+	ends := map[string][]string{}
+	for _, m := range listed {
+		if !googleModel(m.ID) {
+			continue
+		}
+		base, effort := splitModel(m.ID)
+		if !slices.Contains(bases, base) {
+			bases = append(bases, base)
+		}
+		ends[base] = append(ends[base], effort)
+	}
+	models := make([]Model, len(bases))
+	for i, base := range bases {
+		models[i] = Model{ID: base}
+		for _, e := range agyEffortFlag {
+			if !slices.Contains(agyEfforts, e) || slices.Contains(ends[base], e) {
+				models[i].Efforts = append(models[i].Efforts, e)
+			}
+		}
+	}
+	return models
+}
+
+// ValidModel takes the model as Fill does: a full id sets the effort too, unless an effort is given. Any Google model
+// passes when agy cannot say, as when it is not signed in.
 func (a Agy) ValidModel(model, effort string) error {
-	if err := CheckModel(model, effort); err != nil {
-		return err
-	}
-	if model == "" {
+	if model == "" && effort == "" {
 		return nil
 	}
-	id, _ := joinModel(model, effort)
-	if !googleModel(id) {
-		return fmt.Errorf("agy runs only Google models, not %q", id)
-	}
-	if a.Models == nil {
-		return nil
+	model, own := splitModel(model)
+	effort = cmp.Or(effort, own)
+	if model != "" && !googleModel(model) {
+		return fmt.Errorf("agy runs only Google models, not %q", model)
 	}
 	models := a.Models()
-	listed := func(m agyModel) bool { base, _ := splitModel(m.ID); return m.ID == id || base == id }
-	if len(models) > 0 && !slices.ContainsFunc(models, listed) {
-		return fmt.Errorf("agy has no model %q: run agy models", id)
+	if models == nil {
+		models = []Model{{ID: model, Efforts: agyEffortFlag}}
 	}
-	return nil
+	return checkModel("agy", models, model, effort)
 }
 
 // agyModel is one line of agy models: the id agy takes and the name its settings keep.
