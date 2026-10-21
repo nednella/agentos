@@ -1102,7 +1102,7 @@ func (s *Sessions) CreateBriefed(title, text, brief string) (Session, error) {
 func (s *Sessions) CreateIssue(title, text string, issue int, action project.Action, labels []string, handover, agentName string) (view Session, created bool, err error) {
 	proj := s.Current()
 	agentName = cmp.Or(agentName, project.PickAgent(action, labels))
-	model := project.Pick(action, labels, s.provider(agentName).ValidModel)
+	model, _ := project.Pick(action, labels, s.provider(agentName).ValidModel)
 	view, live, err := s.createForIssue(proj, title, fromApp(text), proj.SendsPrompt(), issue, model, "", handover, action.Chat(), action.Name, agentName)
 	if live == "" {
 		return view, err == nil, err

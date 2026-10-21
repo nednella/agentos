@@ -333,3 +333,28 @@ func TestLoadDraggable(t *testing.T) {
 		t.Errorf("draggable_from = %v", c.DraggableFrom)
 	}
 }
+
+func TestLoadChecksAnActionsModelWithItsAgent(t *testing.T) {
+	t.Setenv("PATH", t.TempDir()) // no agy to list its models, so any Google model passes
+	tests := []struct {
+		name, config, action, err string
+	}{
+		{"a claude model on claude", "", "{name: Work, model: opus, effort: max}", ""},
+		{"a Google model on claude", "", "{name: Work, model: gemini-4-argon}", `claude has no model "gemini-4-argon"`},
+		{"a Google model on agy", "", "{name: Work, agent: agy, model: gemini-4-argon-high}", ""},
+		{"a claude model on agy", "", "{name: Work, agent: agy, model: opus}", `agy runs only Google models, not "opus"`},
+		{"the default agent checks an action that names none", "agent_command: agy\n", "{name: Work, model: opus}", `agy runs only Google models, not "opus"`},
+		{"a plain command takes any model", "agent_command: codex\n", "{name: Work, model: gpt-9}", ""},
+	}
+	for _, tt := range tests {
+		path := filepath.Join(t.TempDir(), "config.yaml")
+		body := tt.config + "projects:\n  - name: a\n    directory: /a\n    queue_sections:\n      - name: Inbox\n        actions: [" + tt.action + "]\n"
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		_, err := Load(path)
+		if tt.err == "" && err != nil || tt.err != "" && (err == nil || !strings.Contains(err.Error(), tt.err)) {
+			t.Errorf("%s: Load = %v, want %q", tt.name, err, tt.err)
+		}
+	}
+}

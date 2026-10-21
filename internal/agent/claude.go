@@ -120,7 +120,31 @@ func deniedTools(m MCPServer) string {
 // Env sets claude's temp folder to the session's own.
 func (c Claude) Env(l Launch) []string { return []string{"CLAUDE_CODE_TMPDIR=" + l.TmpDir} }
 
-func (c Claude) ValidModel(model, effort string) error { return CheckModel(model, effort) }
+// claudeAliases are the names claude takes for its latest models besides their full ids.
+var claudeAliases = []string{"default", "best", "fable", "opus", "sonnet", "haiku", "opusplan"}
+
+// claudeEfforts are the efforts claude takes, for every model.
+var claudeEfforts = []string{"low", "medium", "high", "xhigh", "max"}
+
+// Models are claude's aliases. claude has no command that lists its models, so a full id, which starts with
+// "claude-", is taken without a list: a new model works before agentos knows of it.
+func (c Claude) Models() []Model {
+	models := make([]Model, len(claudeAliases))
+	for i, alias := range claudeAliases {
+		models[i] = Model{ID: alias, Efforts: claudeEfforts}
+	}
+	return models
+}
+
+// ValidModel takes an alias or a full id, either with the [1m] that asks for the long context.
+func (c Claude) ValidModel(model, effort string) error {
+	model = strings.TrimSuffix(model, "[1m]")
+	models := c.Models()
+	if strings.HasPrefix(model, "claude-") {
+		models = append(models, Model{ID: model, Efforts: claudeEfforts})
+	}
+	return checkModel("claude", models, model, effort)
+}
 
 func (c Claude) Prepare(Launch) error { return nil }
 

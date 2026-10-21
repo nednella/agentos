@@ -2,6 +2,7 @@ package project
 
 import (
 	"cmp"
+	"fmt"
 	"slices"
 	"strings"
 
@@ -18,9 +19,6 @@ func (m Model) over(base Model) Model {
 	return Model{Model: cmp.Or(m.Model, base.Model), Effort: cmp.Or(m.Effort, base.Effort)}
 }
 
-// Validate reports a model or effort no agent would accept.
-func (m Model) Validate() error { return agent.CheckModel(m.Model, m.Effort) }
-
 // PickAgent chooses the provider for a session: the issue's `agent:<name>` label, then the action's agent, "" for the
 // default. A label that names no provider is skipped.
 func PickAgent(action Action, labels []string) string {
@@ -34,9 +32,10 @@ func PickAgent(action Action, labels []string) string {
 
 // Pick chooses the model and effort for a session. From weakest to strongest: the action's, then the issue's
 // `model:<x>` and `effort:<y>` labels. A label value that valid rejects is skipped, so each is checked by the
-// provider PickAgent chose. A session for no issue passes an empty action and no labels.
-func Pick(action Action, labels []string, valid func(model, effort string) error) Model {
-	m := Model{Model: action.Model, Effort: action.Effort}
+// provider PickAgent chose, and ignored says why, a sentence per label. A session for no issue passes an empty action
+// and no labels.
+func Pick(action Action, labels []string, valid func(model, effort string) error) (m Model, ignored []string) {
+	m = Model{Model: action.Model, Effort: action.Effort}
 	for _, l := range slices.Backward(labels) {
 		var override Model
 		switch {
@@ -44,10 +43,15 @@ func Pick(action Action, labels []string, valid func(model, effort string) error
 			override.Model = strings.TrimPrefix(l, "model:")
 		case strings.HasPrefix(l, "effort:"):
 			override.Effort = strings.TrimPrefix(l, "effort:")
+		default:
+			continue
 		}
-		if valid(override.Model, override.Effort) == nil {
-			m = override.over(m)
+		if err := valid(override.Model, override.Effort); err != nil {
+			ignored = append(ignored, fmt.Sprintf("%s is ignored: %v", l, err))
+			continue
 		}
+		m = override.over(m)
 	}
-	return m
+	slices.Reverse(ignored)
+	return m, ignored
 }

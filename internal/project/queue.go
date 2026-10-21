@@ -159,7 +159,9 @@ func (p Project) PromptSend() string {
 	return PromptManual
 }
 
-func (p Project) validateQueue() error {
+// validateQueue checks the queue settings. An action's model is checked by the action's provider, else by
+// defaultAgent's.
+func (p Project) validateQueue(defaultAgent string) error {
 	if p.SessionPromptSend != "" && p.SessionPromptSend != PromptAuto && p.SessionPromptSend != PromptManual {
 		return fmt.Errorf("session_prompt_send must be %s or %s, not %q", PromptAuto, PromptManual, p.SessionPromptSend)
 	}
@@ -190,7 +192,7 @@ func (p Project) validateQueue() error {
 			if err := agent.CheckName(a.Agent); err != nil {
 				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
 			}
-			if err := (Model{Model: a.Model, Effort: a.Effort}).Validate(); err != nil {
+			if err := agent.New(cmp.Or(a.Agent, defaultAgent), "").ValidModel(a.Model, a.Effort); err != nil {
 				return fmt.Errorf("queue_sections.%s.%s: %w", s.Name, a.Name, err)
 			}
 			if a.Kind != "" && a.Kind != KindTask && a.Kind != KindChat {

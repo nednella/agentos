@@ -57,6 +57,8 @@ type Provider interface {
 	Env(l Launch) []string
 	// Fill sets the model and effort l leaves empty to what the agent's own settings for dir choose.
 	Fill(dir string, l Launch) Launch
+	// Models are the models the agent takes, each with the efforts it takes for it; nil when the agent cannot say.
+	Models() []Model
 	// ValidModel reports a model or effort the agent would not accept; an empty value is accepted.
 	ValidModel(model, effort string) error
 	// Prepare makes what the agent needs before it starts and its command line cannot carry; nothing for most.
@@ -91,18 +93,43 @@ func CheckName(name string) error {
 	return nil
 }
 
-var efforts = []string{"low", "medium", "high", "xhigh", "max"}
+// Model is a model an agent takes, with the efforts it takes for it.
+type Model struct {
+	ID      string
+	Efforts []string
+}
 
 // modelName keeps a value from being read as a flag when it reaches the agent's command line.
 var modelName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._\[\]-]*$`)
 
-// CheckModel reports a model or effort no provider would take on its command line; an empty value passes.
-func CheckModel(model, effort string) error {
+// checkModel reports a model that models leave out, or an effort the model does not take; with no model, an effort
+// that none of them takes, named in the order the models give them. An empty value passes.
+func checkModel(agent string, models []Model, model, effort string) error {
 	if model != "" && !modelName.MatchString(model) {
 		return fmt.Errorf("model %q is not a model name", model)
 	}
+	var efforts []string
+	if model == "" {
+		for _, m := range models {
+			at := 0
+			for _, e := range m.Efforts {
+				if i := slices.Index(efforts, e); i >= 0 {
+					at = i + 1
+					continue
+				}
+				efforts = slices.Insert(efforts, at, e)
+				at++
+			}
+		}
+	} else {
+		i := slices.IndexFunc(models, func(m Model) bool { return m.ID == model })
+		if i < 0 {
+			return fmt.Errorf("%s has no model %q", agent, model)
+		}
+		efforts = models[i].Efforts
+	}
 	if effort != "" && !slices.Contains(efforts, effort) {
-		return fmt.Errorf("effort must be one of %s, not %q", strings.Join(efforts, ", "), effort)
+		return fmt.Errorf("%s takes an effort of %s, not %q", agent, strings.Join(efforts, ", "), effort)
 	}
 	return nil
 }
@@ -131,6 +158,7 @@ func (p Plain) Can(Capability) bool             { return false }
 func (p Plain) Command(Launch) []string         { return p.Argv }
 func (p Plain) Env(Launch) []string             { return nil }
 func (p Plain) Fill(_ string, l Launch) Launch  { return l }
+func (p Plain) Models() []Model                 { return nil }
 func (p Plain) ValidModel(string, string) error { return nil }
 func (p Plain) Prepare(Launch) error            { return nil }
 func (p Plain) ParseEvent(string, io.Reader) (session.Event, string, bool) {
