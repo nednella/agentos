@@ -12,7 +12,6 @@ const drag = { '--wails-draggable': 'drag' } as CSSProperties
 const noDrag = { '--wails-draggable': 'no-drag' } as CSSProperties
 
 const DOTS_MIN = 640
-const NEXT_FULL_MIN = 780
 const HELP_MIN = 560
 const MORE_MIN = 480
 
@@ -83,8 +82,22 @@ export function TopBar() {
       <div className="ml-auto flex items-center justify-end gap-1" style={noDrag}>
         {!badge && <MemoryTotal />}
         {update && (
-          <button className="btn btn-accent max-h-[32px]" disabled={updating} title={`Install agentos v${update} and relaunch`} onClick={() => report(applyUpdate)}>
-            {updating ? 'Updating…' : width >= NEXT_FULL_MIN ? `v${update} available · Update` : 'Update'}
+          <button
+            className={`${iconButton} relative`}
+            style={{ color: 'var(--accent)' }}
+            disabled={updating}
+            title={updating ? `Installing agentos v${update}…` : `Install agentos v${update} and relaunch`}
+            aria-label={updating ? 'Updating' : `Update to v${update}`}
+            onClick={() => report(applyUpdate)}
+          >
+            {updating ? (
+              <span className="spinner" role="status" />
+            ) : (
+              <>
+                <Icon name="update" />
+                <span className="absolute top-[5px] right-[5px] h-[7px] w-[7px] rounded-full bg-accent" />
+              </>
+            )}
           </button>
         )}
         <button className={iconButton} title={`Next that needs you (${keys('next-attention')})`} aria-label="Next that needs you" onClick={() => find('next-attention').run([])}>

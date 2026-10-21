@@ -30,6 +30,7 @@ type IconName =
   | 'issue'
   | 'chat'
   | 'branch'
+  | 'update'
 
 type IconProps = { name: IconName; size?: number }
 
@@ -71,6 +72,7 @@ function IconShape({ name }: IconShapeProps) {
   if (name === 'pin') return <path d="M9.5 2.5 13.5 6.5 11 7l-2 3-.5 3-5-5 3-.5 3-2ZM5.5 10.5 2.5 13.5" />
   if (name === 'archive') return <path d="M2 3.5h12v3H2ZM3 6.5V13h10V6.5M6.5 9h3" />
   if (name === 'broom') return <path d="M9.5 2.5 13 6M8 5l3 3-4.5 5.5H2.5V9.5ZM5 8l3 3" />
+  if (name === 'update') return <path d="M8 10V2.5M5 5.5l3-3 3 3M2.5 9.5v4h11v-4" />
   if (name === 'next') return <path d="M3 3v10l6-5ZM11.5 3v10" />
   if (name === 'queue') return <path d="M2.5 4h11M2.5 8h11M2.5 12h7" />
   if (name === 'x') return <path d="m4.5 4.5 7 7M11.5 4.5l-7 7" />
