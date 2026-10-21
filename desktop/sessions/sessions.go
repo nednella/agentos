@@ -59,8 +59,8 @@ type Session struct {
 	Issue       int              `json:"issue"`
 	Chat        bool             `json:"chat"`
 	Action      string           `json:"action"` // the queue action the session was started with, "" when none
-	Model       string           `json:"model"`  // the model the agent was started with, "" when unknown
-	Effort      string           `json:"effort"` // the effort the agent was started with, "" when unknown
+	Model       string           `json:"model"`  // the model the agent runs: the start choice until its first turn, then what it used last; "" when unknown
+	Effort      string           `json:"effort"` // the effort the agent runs, kept like Model; "" when unknown
 	Agent       string           `json:"agent"`  // the provider, or the plain command, the session was started with
 	History     []session.Change `json:"history"`
 	Evidence    int              `json:"evidence"`

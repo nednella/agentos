@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/nednella/agentos/internal/bus"
 )
 
 func assistantLine(id string, at time.Time, input, output int64) string {
@@ -71,6 +73,43 @@ func TestUsageIsCountedOncePerMessage(t *testing.T) {
 	}
 	if len(led.Work) != 1 || led.Work[0].Issue != 4 || led.Work[0].Tokens != 1111 || led.Usage.Totals.Sessions != 1 {
 		t.Errorf("work = %+v, usage = %+v: a message was counted twice or lost", led.Work, led.Usage)
+	}
+}
+
+func TestRowShowsTheModelAndEffortTheAgentUsedLast(t *testing.T) {
+	h := newClaudeHarness(t)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Model != "" || s.Effort != "" {
+		t.Fatalf("row at start = %s %s, want no choice", s.Model, s.Effort)
+	}
+	transcript := filepath.Join(t.TempDir(), "conv.jsonl")
+	stop := fmt.Sprintf(`{"transcript_path":%q}`, transcript)
+	line := func(id, model, effort string, at time.Time) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"effort":%q,"message":{"id":%q,"model":%q,"usage":{"input_tokens":1,"output_tokens":1}}}`+"\n",
+			at.UTC().Format(time.RFC3339Nano), effort, id, model)
+	}
+	reply := time.Now().Add(100 * time.Millisecond)
+	appendLines(t, transcript, line("msg_1", "claude-opus-5-5", "high", reply), line("msg_2", "claude-fable-5-1", "medium", reply.Add(time.Millisecond)))
+	h.Hook(t, s.ID, "Stop", stop)
+	eventually(t, "the row showing the newest line's model", func() bool {
+		row, _ := h.Session(s.ID)
+		return row.Model == "claude-fable-5-1" && row.Effort == "medium"
+	})
+	eventually(t, "the state file keeping it", func() bool {
+		rec, err := bus.ReadState(h.State, s.ID)
+		return err == nil && rec.Model == "claude-fable-5-1" && rec.Effort == "medium"
+	})
+
+	second := h.Restart(t)
+	eventually(t, "the row after a restart", func() bool {
+		row, ok := second.Session(s.ID)
+		return ok && row.Model == "claude-fable-5-1" && row.Effort == "medium"
+	})
+	if events := second.Events(t, "usage"); len(events) != 2 || events[1].Model != "claude-fable-5-1" || events[1].Effort != "medium" {
+		t.Errorf("usage events = %+v, want one per model, with the effort the turn ran on", events)
 	}
 }
 

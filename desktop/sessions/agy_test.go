@@ -31,7 +31,11 @@ func agyEnv(t *testing.T, dir, id string) map[string]string {
 }
 
 func agyPayload(h *apptest.Harness, transcript string, extra string) string {
-	return fmt.Sprintf(`{"conversationId":"conv-1","workspacePaths":[%q],"transcriptPath":%q,"modelName":"gemini-4-argon-medium"%s}`, h.Dir, transcript, extra)
+	return agyPayloadOn(h, transcript, "gemini-4-argon-medium", extra)
+}
+
+func agyPayloadOn(h *apptest.Harness, transcript, model, extra string) string {
+	return fmt.Sprintf(`{"conversationId":"conv-1","workspacePaths":[%q],"transcriptPath":%q,"modelName":%q%s}`, h.Dir, transcript, model, extra)
 }
 
 func TestAgySessionStartsWithItsPromptInAFileAndItsHooksInAgysConfig(t *testing.T) {
@@ -119,6 +123,14 @@ func TestAgyHooksMoveTheRowAndCountItsUsage(t *testing.T) {
 	eventually(t, "the usage in the event log", func() bool {
 		events := h.Events(t, "usage")
 		return len(events) == 1 && events[0].Model == "gemini-4-argon-medium" && events[0].Tokens.Total() == 2111
+	})
+	if row.Model != "gemini-4-argon" || row.Effort != "medium" {
+		t.Errorf("row = %s %s, want the model and effort the hooks report", row.Model, row.Effort)
+	}
+	h.Hook(t, s.ID, "PreInvocation", agyPayloadOn(h, transcript, "gemini-3.8-flash-low", `,"invocationNum":0`))
+	eventually(t, "the row following a change of model", func() bool {
+		row, _ := h.Session(s.ID)
+		return row.Model == "gemini-3.8-flash" && row.Effort == "low"
 	})
 }
 
