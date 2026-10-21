@@ -2,8 +2,21 @@ package main
 
 import (
 	"os"
+	"path/filepath"
+	"slices"
 	"testing"
 )
+
+func TestAgentProgramsHoldEveryProviderAndTheConfiguredAgent(t *testing.T) {
+	conf := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(conf, []byte("agent_command: my-agent --fast\nprojects: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("AGENTOS_CONFIG", conf)
+	if got := agentPrograms(); !slices.Equal(got, []string{"claude", "agy", "my-agent"}) {
+		t.Errorf("programs = %q", got)
+	}
+}
 
 func TestFixLocale(t *testing.T) {
 	t.Setenv("LANG", "")
