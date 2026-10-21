@@ -126,3 +126,13 @@ func TestSessionKeepsItsAgentOverARestartAndAResume(t *testing.T) {
 		t.Errorf("the resumed session did not run claude: %q", args)
 	}
 }
+
+func TestSessionWithAnAgentNotOnPathDoesNotStart(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{Agent: "absent-agent --flag"})
+	if _, err := h.Sessions().Create("work", "", false, 0, ""); err == nil || !strings.Contains(err.Error(), "absent-agent is not installed") {
+		t.Fatalf("start error = %v", err)
+	}
+	if list := h.Sessions().List(); len(list) != 0 {
+		t.Errorf("the failed start left rows: %+v", list)
+	}
+}
