@@ -16,7 +16,7 @@ type price struct {
 }
 
 // prices is matched by prefix, first match wins, so a model comes before the shorter name it starts with. A model
-// id from agy ends in its effort (claude-opus-5-5-low, gemini-4-argon-medium), which the prefix match passes over.
+// id from agy ends in its effort (gemini-4-argon-medium), which the prefix match passes over.
 var prices = []struct {
 	prefix string
 	price
