@@ -293,5 +293,14 @@ func (t *Tmux) Submit(ctx context.Context, name session.Name) error {
 	return nil
 }
 
+// Capture is the text the session's pane shows now.
+func (t *Tmux) Capture(ctx context.Context, name session.Name) (string, error) {
+	out, err := t.run(ctx, "capture-pane", "-p", "-t", target(name))
+	if err != nil {
+		return "", fmt.Errorf("reading session %s: %w", name, err)
+	}
+	return out, nil
+}
+
 // oneLine keeps a title from breaking the tab-separated list: tabs and line breaks become spaces.
 func oneLine(title string) string { return strings.Join(strings.Fields(title), " ") }
