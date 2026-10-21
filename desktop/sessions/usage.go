@@ -2,8 +2,10 @@ package sessions
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -21,13 +23,16 @@ type reader struct {
 	pending []usage.Part // read and in the session's total, but not in the event log yet
 }
 
-// countUsage adds what the session's agent used since the last count to the session's total. model is the one
-// the agent reports, for a transcript that names none. With record, it also records all that is not in the
-// event log yet, one event for each model. The first count of a run of the app starts after the latest usage the
-// event log holds for the session, so a restart reads again what was not recorded, and counts nothing twice.
+// countUsage adds what the session's agent used since the last count to the session's total, and shows on the row
+// what it used last. model is the one the agent reports, for a transcript that names none. With record, it also
+// records all that is not in the event log yet, one event for each model. The first count of a run of the app starts
+// after the latest usage the event log holds for the session, so a restart reads again what was not recorded, and
+// counts nothing twice.
 func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	s.mu.Lock()
 	in, ok := s.infoOf(id)
+	live := slices.ContainsFunc(s.info, func(i term.Info) bool { return i.Name.String() == id })
+	ctx := s.ctx
 	r := s.readers[id]
 	if r == nil {
 		r = &reader{}
@@ -57,9 +62,13 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 		})
 		r.cursor = s.provider(in.Agent).Usage(after)
 	}
-	parts, err := r.cursor.Read(transcript, model)
+	parts, cur, err := r.cursor.Read(transcript, model)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: reading the usage of %s: %v\n", id, err)
+	}
+	if live && cur.Model != "" && (in.Model != cur.Model || in.Effort != cur.Effort) {
+		in.Model, in.Effort = cur.Model, cur.Effort
+		s.ran(ctx, in)
 	}
 	for _, p := range parts {
 		r.pending = addPart(r.pending, p)
@@ -88,6 +97,25 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	if _, kept := s.readers[id]; kept { // a dismissed session has no row to show it
 		s.spent[id] = total
 		s.sync()
+	}
+}
+
+// ran shows on the row the model and effort the agent used last, and keeps them where the start choice is kept, the
+// tmux session and the state file, so a restart of the app shows them without a new turn.
+func (s *Sessions) ran(ctx context.Context, in term.Info) {
+	ctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	defer cancel()
+	if err := s.tmux.SetModel(ctx, in.Name, in.Model, in.Effort); err != nil {
+		fmt.Fprintf(os.Stderr, "agentos: %v\n", err)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.info {
+		if s.info[i].Name == in.Name {
+			s.info[i].Model, s.info[i].Effort = in.Model, in.Effort
+			s.saveIdentity(s.info[i])
+			s.sync()
+		}
 	}
 }
 
