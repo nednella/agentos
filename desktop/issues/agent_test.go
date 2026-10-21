@@ -3,6 +3,7 @@ package issues_test
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
@@ -60,6 +61,30 @@ func TestIssueSessionsGetTheirActionsAgent(t *testing.T) {
 		}
 		if err := h.KillSession(s.ID); err != nil {
 			t.Fatal(err)
+		}
+	}
+}
+
+func TestTheQueueSaysWhichLabelsTheProviderIgnores(t *testing.T) {
+	apptest.AgyOnPath(t)
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude", Queue: agentQueue})
+	h.GH.SetIssues(`[
+		{"number":7,"title":"Labels agy takes","url":"https://x/7","labels":[{"name":"ready"},{"name":"model:gemini-4-argon"},{"name":"effort:medium"}]},
+		{"number":8,"title":"Labels agy refuses","url":"https://x/8","labels":[{"name":"ready"},{"name":"model:opus"},{"name":"effort:hgih"}]},
+		{"number":9,"title":"A Google model on claude","url":"https://x/9","labels":[{"name":"ready"},{"name":"agent:claude"},{"name":"model:gemini-4-argon"}]}
+	]`)
+	list, err := h.Issues(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[int][]string{
+		7: {},
+		8: {`model:opus is ignored: agy runs only Google models, not "opus"`, `effort:hgih is ignored: agy takes an effort of low, medium, xhigh, max, not "hgih"`},
+		9: {`model:gemini-4-argon is ignored: claude has no model "gemini-4-argon"`},
+	}
+	for _, is := range list {
+		if !slices.Equal(is.Ignored, want[is.Number]) || is.Ignored == nil {
+			t.Errorf("#%d ignored = %q, want %q", is.Number, is.Ignored, want[is.Number])
 		}
 	}
 }
