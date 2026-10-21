@@ -161,6 +161,33 @@ func TestNames(t *testing.T) {
 	}
 }
 
+func TestCheckInstalled(t *testing.T) {
+	bin := t.TempDir()
+	for _, name := range []string{"claude", "fake-agent"} {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\n"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin)
+	tests := []struct {
+		agent, missing string
+	}{
+		{"claude", ""},
+		{"fake-agent --flag", ""},
+		{"agy", "agy"},
+		{"absent-agent --flag", "absent-agent"},
+	}
+	for _, tt := range tests {
+		err := CheckInstalled(New(tt.agent, "/x"))
+		if tt.missing == "" && err != nil {
+			t.Errorf("%q: %v", tt.agent, err)
+		}
+		if tt.missing != "" && (err == nil || !strings.HasPrefix(err.Error(), tt.missing+" ")) {
+			t.Errorf("%q: error %v, want one naming %s", tt.agent, err, tt.missing)
+		}
+	}
+}
+
 func TestClaudeParseEvent(t *testing.T) {
 	tests := []struct {
 		name  string
