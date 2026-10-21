@@ -812,9 +812,7 @@ func CLIPath(t *testing.T) string {
 func ClaudeOnPath(t *testing.T) string { return agentOnPath(t, "claude", "") }
 
 // AgyModels is what the stand-in agy answers to agy models: each model's id and name.
-var AgyModels = [][2]string{
-	{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}, {"claude-opus-5-5-high", "Claude Opus 5.5 (High)"},
-}
+var AgyModels = [][2]string{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}}
 
 // AgyOnPath is ClaudeOnPath for a stand-in `agy`, which also answers `agy models` with AgyModels and writes the
 // AGENTOS_PROMPT and AGENTOS_CHAT it was started with to <dir>/<session id, "/" as "_">.env.
