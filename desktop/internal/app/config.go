@@ -42,14 +42,11 @@ type Config struct {
 // or the current folder. An app started from Finder (folder "/") gets the first
 // configured project, else the home folder.
 func Load() (Config, error) {
-	path := os.Getenv("AGENTOS_CONFIG")
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return Config{}, fmt.Errorf("finding home dir: %w", err)
 	}
-	if path == "" {
-		path = filepath.Join(home, ".config", "agentos", "config.yaml")
-	}
+	path := ConfigPath(home)
 	cfg, err := project.Load(path)
 	if err != nil {
 		return Config{}, fmt.Errorf("loading config: %w", err)
@@ -102,6 +99,11 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{Registry: projects.NewRegistry(path, cfg), Project: current, StateDir: stateDir, Machine: machine, DataDir: dataDir, LocalDir: localDir, DataDirFixed: override != "", Tmux: tmux, Agents: agents(slices.Compact([]string{dataDir, localDir}))}, nil
+}
+
+// ConfigPath is the config file: AGENTOS_CONFIG, else the one in home's config folder.
+func ConfigPath(home string) string {
+	return cmp.Or(os.Getenv("AGENTOS_CONFIG"), filepath.Join(home, ".config", "agentos", "config.yaml"))
 }
 
 // machineID is this machine's id, made on first use and kept in the state folder, which is never synced.
