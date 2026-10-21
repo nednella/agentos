@@ -141,8 +141,10 @@ func (p Plain) Usage(after time.Time) usage.Reader { return noUsage{after} }
 // noUsage reads nothing: a plain agent has no transcript agentos knows.
 type noUsage struct{ after time.Time }
 
-func (n noUsage) Read(string, string) ([]usage.Part, error) { return nil, nil }
-func (n noUsage) After() time.Time                          { return n.after }
+func (n noUsage) Read(string, string) ([]usage.Part, usage.Current, error) {
+	return nil, usage.Current{}, nil
+}
+func (n noUsage) After() time.Time { return n.after }
 
 // claudeConfigDir is where claude keeps the user's settings, "" when there is no home.
 func claudeConfigDir() string {

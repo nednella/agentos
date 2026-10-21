@@ -40,7 +40,7 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 		assistant("msg_2", "claude-opus-5-5", t0.Add(2*time.Second), 1, 1, 1, 0))
 
 	c := NewCursor(t0)
-	parts, err := c.Read(path, "")
+	parts, _, err := c.Read(path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,14 +57,41 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 		t.Errorf("after = %v", c.After())
 	}
 
-	again, _ := c.Read(path, "")
+	again, _, _ := c.Read(path, "")
 	if len(again) != 0 {
 		t.Errorf("a second read with nothing new = %+v", again)
 	}
 	appendTo(t, path, assistant("msg_3", "claude-opus-5-5", t0.Add(3*time.Second), 0, 7, 0, 0))
-	next, _ := c.Read(path, "")
+	next, _, _ := c.Read(path, "")
 	if len(next) != 1 || next[0].Output != 7 {
 		t.Errorf("new line read = %+v, want 7 output tokens", next)
+	}
+}
+
+func TestReadSaysWhatTheAgentUsedLast(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendTo(t, path, assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 1, 1, 0, 0))
+	c := NewCursor(t0)
+	if _, cur, _ := c.Read(path, ""); cur != (Current{}) {
+		t.Errorf("current from a line before the start = %+v, want none", cur)
+	}
+	withEffort := func(id, model, effort string, at time.Time) string {
+		return fmt.Sprintf(`{"type":"assistant","timestamp":%q,"effort":%q,"message":{"id":%q,"model":%q,"usage":{"input_tokens":1,"output_tokens":1}}}`+"\n",
+			at.Format(time.RFC3339Nano), effort, id, model)
+	}
+	appendTo(t, path, withEffort("msg_1", "claude-opus-5-5", "high", t0.Add(time.Second)),
+		withEffort("msg_2", "claude-fable-5-1", "medium", t0.Add(2*time.Second)), withEffort("msg_2", "claude-fable-5-1", "medium", t0.Add(2*time.Second)))
+	appendTo(t, filepath.Join(t.TempDir(), "conv", "subagents", "agent-x.jsonl"),
+		withEffort("msg_3", "claude-haiku-5-5", "low", t0.Add(3*time.Second)))
+	_, cur, err := c.Read(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cur != (Current{Model: "claude-fable-5-1", Effort: "medium"}) {
+		t.Errorf("current = %+v, want the newest line of the session's own transcript", cur)
+	}
+	if _, again, _ := c.Read(path, ""); again != cur {
+		t.Errorf("current after a read with nothing new = %+v, want %+v", again, cur)
 	}
 }
 
@@ -73,7 +100,7 @@ func TestReadSkipsWhatCameBefore(t *testing.T) {
 	appendTo(t, path,
 		assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 500, 500, 0, 0),
 		assistant("msg_new", "claude-opus-5-5", t0.Add(time.Minute), 1, 2, 0, 0))
-	parts, _ := NewCursor(t0).Read(path, "")
+	parts, _, _ := NewCursor(t0).Read(path, "")
 	if len(parts) != 1 || parts[0].Input != 1 || parts[0].Output != 2 {
 		t.Errorf("parts = %+v, want only the message after the start", parts)
 	}
@@ -84,11 +111,11 @@ func TestReadLeavesAPartLine(t *testing.T) {
 	full := assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 2, 0, 0)
 	appendTo(t, path, full[:40])
 	c := NewCursor(t0)
-	if parts, _ := c.Read(path, ""); len(parts) != 0 {
+	if parts, _, _ := c.Read(path, ""); len(parts) != 0 {
 		t.Fatalf("a part line was counted: %+v", parts)
 	}
 	appendTo(t, path, full[40:])
-	if parts, _ := c.Read(path, ""); len(parts) != 1 || parts[0].Output != 2 {
+	if parts, _, _ := c.Read(path, ""); len(parts) != 1 || parts[0].Output != 2 {
 		t.Errorf("the finished line = %+v", parts)
 	}
 }
@@ -99,7 +126,7 @@ func TestReadAddsSubagents(t *testing.T) {
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
 	appendTo(t, filepath.Join(dir, "abc", "subagents", "agent-x.jsonl"),
 		assistant("msg_2", "claude-haiku-5-5", t0.Add(2*time.Second), 3, 3, 0, 0))
-	parts, err := NewCursor(t0).Read(path, "")
+	parts, _, err := NewCursor(t0).Read(path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +136,7 @@ func TestReadAddsSubagents(t *testing.T) {
 }
 
 func TestReadMissingFile(t *testing.T) {
-	parts, err := NewCursor(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "")
+	parts, _, err := NewCursor(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "")
 	if err != nil || len(parts) != 0 {
 		t.Errorf("Read = %+v, %v; want nothing and no error", parts, err)
 	}
@@ -145,7 +172,7 @@ func TestReadAfterARestartSkipsTheLatestCounted(t *testing.T) {
 	at := t0.Add(1234567 * time.Microsecond)
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", at, 1, 1, 0, 0))
 	// The event log keeps the time of the latest message counted in milliseconds.
-	if parts, _ := NewCursor(time.UnixMilli(at.UnixMilli())).Read(path, ""); len(parts) != 0 {
+	if parts, _, _ := NewCursor(time.UnixMilli(at.UnixMilli())).Read(path, ""); len(parts) != 0 {
 		t.Errorf("the message counted before the restart was counted again: %+v", parts)
 	}
 }

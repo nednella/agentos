@@ -328,7 +328,16 @@ func setIn(obj *map[string]json.RawMessage, keys []string, value json.RawMessage
 	return true, nil
 }
 
-func (a Agy) Usage(after time.Time) usage.Reader { return usage.NewAgyReader(after) }
+func (a Agy) Usage(after time.Time) usage.Reader { return agyUsage{usage.NewAgyReader(after)} }
+
+// agyUsage says with each read what the agent used last: the id its hooks report, parted into model and effort.
+type agyUsage struct{ *usage.AgyReader }
+
+func (u agyUsage) Read(path, id string) ([]usage.Part, usage.Current, error) {
+	parts, _, err := u.AgyReader.Read(path, id)
+	model, effort := splitModel(id)
+	return parts, usage.Current{Model: model, Effort: effort}, err
+}
 
 type agyPayload struct {
 	ConversationID string   `json:"conversationId"`

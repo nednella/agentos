@@ -36,7 +36,8 @@ type Record struct {
 }
 
 // Identity is what the desktop app started a session as. The app writes it when the session starts, so a
-// session that ends while the app is closed comes back as itself.
+// session that ends while the app is closed comes back as itself. Model and Effort follow the agent: the start
+// choice until its first turn, then what its transcript or its hooks say it used last.
 type Identity struct {
 	Title   string `json:"title,omitempty"`
 	Issue   int    `json:"issue,omitempty"`

@@ -66,8 +66,8 @@ type Info struct {
 	Title   string
 	Path    string
 	Issue   string // the GitHub issue number the session was started for, or ""
-	Model   string // the model the agent was started with, or ""
-	Effort  string // the effort the agent was started with, or ""
+	Model   string // the model the agent runs: the start choice until its first turn, then what it used last, or ""
+	Effort  string // the effort the agent runs, kept like Model, or ""
 	Agent   string // the provider, or the plain command, the session was started with, or ""
 	Chat    bool   // a chat: a read-only session for questions, not work
 	Action  string // the queue action the session was started with, or ""
@@ -253,7 +253,7 @@ func (t *Tmux) SetAgent(ctx context.Context, name session.Name, agent string) er
 	return nil
 }
 
-// SetModel records the model and effort a session's agent was started with.
+// SetModel records the model and effort a session's agent runs.
 func (t *Tmux) SetModel(ctx context.Context, name session.Name, model, effort string) error {
 	if _, err := t.run(ctx, "set-option", "-t", target(name), modelOption, model, ";", "set-option", "-t", target(name), effortOption, effort); err != nil {
 		return fmt.Errorf("recording the model of session %s: %w", name, err)
