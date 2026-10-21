@@ -137,7 +137,7 @@ func (a Agy) Fill(_ string, l Launch) Launch {
 	return l
 }
 
-// defaultModel is the id of the model agy's settings name, "" when they name none that agy lists.
+// defaultModel is the id of the model agy's settings name, "" when they name none of the Google models agy lists.
 func (a Agy) defaultModel() string {
 	data, err := os.ReadFile(a.Settings)
 	if err != nil || a.Models == nil {
@@ -150,7 +150,7 @@ func (a Agy) defaultModel() string {
 		return ""
 	}
 	for _, m := range a.Models() {
-		if m.Name == settings.Model {
+		if m.Name == settings.Model && googleModel(m.ID) {
 			return m.ID
 		}
 	}
@@ -178,17 +178,23 @@ func joinModel(model, effort string) (id, rest string) {
 	return model, effort
 }
 
-// ValidModel checks the id that model and effort join into against what agy models lists; a model alone passes when
-// agy lists it at some effort. Any id passes when agy cannot say, as when it is not signed in.
+// ValidModel checks the id that model and effort join into: a Google model that agy models lists, or a model alone that
+// agy lists at some effort. Any Google id passes when agy cannot say, as when it is not signed in.
 func (a Agy) ValidModel(model, effort string) error {
 	if err := CheckModel(model, effort); err != nil {
 		return err
 	}
-	if model == "" || a.Models == nil {
+	if model == "" {
+		return nil
+	}
+	id, _ := joinModel(model, effort)
+	if !googleModel(id) {
+		return fmt.Errorf("agy runs only Google models, not %q", id)
+	}
+	if a.Models == nil {
 		return nil
 	}
 	models := a.Models()
-	id, _ := joinModel(model, effort)
 	listed := func(m agyModel) bool { base, _ := splitModel(m.ID); return m.ID == id || base == id }
 	if len(models) > 0 && !slices.ContainsFunc(models, listed) {
 		return fmt.Errorf("agy has no model %q: run agy models", id)
@@ -198,6 +204,10 @@ func (a Agy) ValidModel(model, effort string) error {
 
 // agyModel is one line of agy models: the id agy takes and the name its settings keep.
 type agyModel struct{ ID, Name string }
+
+// googleModel says whether the model id is one of Google's, the only models an agy session runs. agy also lists
+// Claude models, which run through the claude provider on the owner's subscription, and GPT-OSS.
+func googleModel(id string) bool { return strings.HasPrefix(id, "gemini-") }
 
 // agyModels asks agy once per process which models it has.
 var agyModels = sync.OnceValue(listAgyModels)
