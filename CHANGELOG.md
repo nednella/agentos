@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.42.1](https://github.com/nednella/agentos/compare/v0.42.0...v0.42.1) (2026-10-21)
+
+
+### Bug Fixes
+
+* **ui:** save default provider when a name is picked ([3fddb37](https://github.com/nednella/agentos/commit/3fddb3732b038c7d6a7d782974026677729b2c35))
+* **ui:** show update as icon in top bar row ([8ca9677](https://github.com/nednella/agentos/commit/8ca9677458d21e1ec837384fe48ec5fbb3323db7))
+
 ## [0.42.0](https://github.com/nednella/agentos/compare/v0.41.0...v0.42.0) (2026-10-21)
 
 
