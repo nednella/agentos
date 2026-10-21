@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.41.0](https://github.com/nednella/agentos/compare/v0.40.0...v0.41.0) (2026-10-21)
+
+
+### Features
+
+* **internal:** fill agy model and effort from agy's settings ([15bad27](https://github.com/nednella/agentos/commit/15bad27a256328da232e4d18984c435a0941018b)), closes [#474](https://github.com/nednella/agentos/issues/474)
+* **internal:** pick provider per action and issue label ([1d6ef48](https://github.com/nednella/agentos/commit/1d6ef488d0a7d727856f6c8cbf87f4fa18f18485))
+* **ui:** show agent label on queue row ([4650e35](https://github.com/nednella/agentos/commit/4650e35fee71255684cf42774b71942b11348a60))
+
 ## [0.40.0](https://github.com/nednella/agentos/compare/v0.39.5...v0.40.0) (2026-10-20)
 
 
