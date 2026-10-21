@@ -48,10 +48,10 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         </span>
         {!compact && !dense && (
           <span className="flex w-full items-center gap-2 pl-[1.625rem]">
-            <span className="min-w-0 flex-1 truncate text-small font-medium" data-state={session.state} style={{ color: 'var(--c)' }}>
+            <span className="min-w-0 truncate text-small font-medium" data-state={session.state} style={{ color: 'var(--c)' }}>
               {stateLabel(session.state, session.chat)}
             </span>
-            <span className="min-w-0 truncate">
+            <span className="min-w-0 flex-1 truncate text-right">
               <ModelTag agent={session.agent} model={session.model} effort={session.effort} spend={spend} />
               {session.memory > 0 && (
                 <span className="mono text-small whitespace-nowrap text-dim" title={`The agent and every process under it. ${memoryNote}`}>
