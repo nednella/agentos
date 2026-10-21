@@ -1,3 +1,4 @@
+import { shortModel } from '../model'
 import { dollars, priceNote, tokenCount } from '../spend'
 import type { Ledger } from '../types'
 
@@ -29,7 +30,7 @@ export function LedgerUsage({ usage, limit }: LedgerUsageProps) {
           {byModel.slice(0, limit).map((r) => (
             <tr key={`${r.model} ${r.effort}`} className="border-t border-line">
               <td className="mono py-1.5 whitespace-nowrap" title={r.model}>
-                {r.model.replace(/^claude-/, '') || 'unknown'}
+                {shortModel(r.model) || 'unknown'}
               </td>
               <td className="py-1.5 pl-3 text-soft">{r.effort || 'default'}</td>
               <td className="mono py-1.5 pl-3 text-right whitespace-nowrap">{r.sessions.toLocaleString()}</td>
