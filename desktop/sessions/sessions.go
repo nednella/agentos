@@ -1247,6 +1247,9 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	s.mu.Unlock()
 
 	p := s.Provider(agentName)
+	if err := agent.CheckInstalled(p); err != nil {
+		return Session{}, err
+	}
 	model = fill(p, proj.Dir, model)
 	// Typed in while the agent still starts, the text and Enter reach it as one paste, where Enter is a newline. An
 	// agent that takes a prompt on its command line submits it itself once it is ready.
