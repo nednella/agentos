@@ -1025,6 +1025,7 @@ export function createMock(params: URLSearchParams) {
         author: 'nednella',
         assignees: [],
         labels: [],
+        ignored: [],
         createdAt: now,
         updatedAt: now,
       })

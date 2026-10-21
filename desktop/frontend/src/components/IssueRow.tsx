@@ -43,7 +43,13 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />
         <span className="min-w-0 flex-1 truncate text-body">{issue.title}</span>
-        <ModelTag agent={agent === settings.agent ? '' : agent} model={labelled('model')} effort={labelled('effort')} className="hidden @[21rem]:inline" />
+        <ModelTag
+          agent={agent === settings.agent ? '' : agent}
+          model={labelled('model')}
+          effort={labelled('effort')}
+          problem={issue.ignored.join('\n')}
+          className="hidden @[21rem]:inline"
+        />
       </button>
       <span className="reveal">
         <button

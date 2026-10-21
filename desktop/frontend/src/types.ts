@@ -84,6 +84,7 @@ export type Issue = {
   author: string
   assignees: string[]
   labels: string[]
+  ignored: string[]
   createdAt: number
   updatedAt: number
 }
