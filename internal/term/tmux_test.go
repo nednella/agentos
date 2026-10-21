@@ -296,7 +296,7 @@ func TestTrailingSemicolonSurvives(t *testing.T) {
 		}
 	}
 	time.Sleep(300 * time.Millisecond)
-	out, err := tmux.run(ctx, "capture-pane", "-p", "-t", target(name))
+	out, err := tmux.Capture(ctx, name)
 	if err != nil || !strings.Contains(out, "one line;") || !strings.Contains(out, "lines;") {
 		t.Errorf("pane = %q, %v", out, err)
 	}
