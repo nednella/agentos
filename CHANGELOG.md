@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.43.0](https://github.com/nednella/agentos/compare/v0.42.1...v0.43.0) (2026-10-21)
+
+
+### Features
+
+* **desktop:** refuse to start session whose agent is not installed ([9a1a659](https://github.com/nednella/agentos/commit/9a1a65964a1139d944c40df1b0645241317e9152))
+* **desktop:** say which model labels an issue's provider ignores ([2b00f48](https://github.com/nednella/agentos/commit/2b00f483ff58e499507546d42b9f34e25f38aff6))
+* **desktop:** show agy session as waiting while it asks for permission ([688306c](https://github.com/nednella/agentos/commit/688306c532477919108b38269c0817145615f8d3))
+* **desktop:** warn while default agent is not installed ([baa7a06](https://github.com/nednella/agentos/commit/baa7a0697161589dbc76bbd543483362f7107597))
+* **internal:** check that agent's command is on PATH ([3e73b64](https://github.com/nednella/agentos/commit/3e73b64abdd2ee5469c5d481784c2650d499fc95))
+* **internal:** find agy's permission prompt in its pane ([f64de29](https://github.com/nednella/agentos/commit/f64de290bbd304f373bae9879b970077fb7c02fc))
+* **internal:** let each provider list its models and efforts ([53df0af](https://github.com/nednella/agentos/commit/53df0afeb69469cad89d6209e227ec6bde832eaf))
+* **internal:** read text of session's pane ([bbbfc7d](https://github.com/nednella/agentos/commit/bbbfc7d49a2ec7b86e330fcfeeecb89295cd6ab5))
+* **ui:** show agent warnings ([15045d1](https://github.com/nednella/agentos/commit/15045d11d5f2f24c59e3a29e0abd93686e8ce12b))
+* **ui:** show ignored model labels in red on the queue row ([ec1aab1](https://github.com/nednella/agentos/commit/ec1aab185ffa0a6a5ee010b60320d14c00db6856))
+
+
+### Bug Fixes
+
+* **desktop:** call renamed Provider method when watching agy prompt ([ad3f50c](https://github.com/nednella/agentos/commit/ad3f50c2fba71f2dee188f108577fd74c6316768))
+* **desktop:** read login shell PATH when agent's command is missing ([ee5344b](https://github.com/nednella/agentos/commit/ee5344bc56eaee4c4bf5caf8711260443df67012))
+* **internal:** set up project commands for agy as well as Claude ([6e72659](https://github.com/nednella/agentos/commit/6e726599c73e1195dff6d8a4cc4ca4fdb205b7f0))
+* **ui:** show short model name in title bar ([32eac71](https://github.com/nednella/agentos/commit/32eac715634c53769e21e74031dca9557bdaff8b))
+
 ## [0.42.1](https://github.com/nednella/agentos/compare/v0.42.0...v0.42.1) (2026-10-21)
 
 
