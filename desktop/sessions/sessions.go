@@ -569,6 +569,7 @@ func (s *Sessions) take(rec session.Record) {
 	}
 	s.records[rec.Session] = rec
 	s.followBranch(rec)
+	s.watchPrompt(rec)
 	// Each hook moves the row's cost. The event log gets a turn's usage once the turn is over, and the
 	// first refresh's usage at once: it catches up on turns while the app was closed.
 	if rec.Transcript != "" {
@@ -621,6 +622,51 @@ func (s *Sessions) switched(rec session.Record, dir string) bool {
 	}
 	before, ok := s.heads[rec.Session]
 	return ok && head != before
+}
+
+// watchPrompt reads the pane a while after a tool call starts, for an agent that has no hook for its permission
+// prompt. It needs mu.
+func (s *Sessions) watchPrompt(rec session.Record) {
+	asker, ok := s.provider(rec.Agent).(agent.PaneAsker)
+	if !ok || rec.Event != "PreToolUse" {
+		return
+	}
+	time.AfterFunc(asker.PromptWait(), func() { s.readPrompt(asker, rec) })
+}
+
+// readPrompt marks the session waiting when its pane shows the permission prompt and no hook came after rec. The
+// wait is dated just after rec, as the prompt showed then, so any later hook still moves the row on.
+func (s *Sessions) readPrompt(asker agent.PaneAsker, rec session.Record) {
+	name, err := session.ParseName(rec.Session)
+	if err != nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
+	defer cancel()
+	pane, err := s.tmux.Capture(ctx, name)
+	if err != nil {
+		return
+	}
+	question, ok := asker.PermissionPrompt(pane)
+	if !ok {
+		return
+	}
+	unlock, err := bus.LockState(s.stateDir, rec.Session)
+	if err != nil {
+		return
+	}
+	cur, err := bus.ReadState(s.stateDir, rec.Session)
+	if err != nil || cur.Event != rec.Event || !cur.At.Equal(rec.At) {
+		unlock()
+		return
+	}
+	ev := session.Event{Name: "Notification", NotificationType: "permission_prompt", Message: question, Detail: question}
+	next := session.Apply(rec.Session, cur, ev, rec.At.Add(time.Millisecond))
+	err = bus.WriteState(s.stateDir, next)
+	unlock()
+	if err == nil {
+		s.observe(next)
+	}
 }
 
 // sync updates history and attention from what is known, and tells the front
