@@ -1,7 +1,9 @@
+import { shortModel } from '../model'
+
 type ModelTagProps = { agent?: string; model: string; effort: string; spend?: string; className?: string }
 
 export function ModelTag({ agent = '', model, effort, spend, className = '' }: ModelTagProps) {
-  const text = [agent, model, effort, spend].filter(Boolean).join(' · ')
+  const text = [agent, shortModel(model), effort, spend].filter(Boolean).join(' · ')
   if (!text) return null
   return (
     <span
