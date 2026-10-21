@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.42.0](https://github.com/nednella/agentos/compare/v0.41.0...v0.42.0) (2026-10-21)
+
+
+### Features
+
+* **desktop:** show the model and effort the agent runs ([039f585](https://github.com/nednella/agentos/commit/039f58539e1945f7cd8638da088858fc7824afe7)), closes [#471](https://github.com/nednella/agentos/issues/471)
+* **internal:** say what the agent used last with each usage read ([6f3d039](https://github.com/nednella/agentos/commit/6f3d039c1a8aca28fbd5337033221f1466103518))
+
+
+### Bug Fixes
+
+* **internal:** keep agy sessions to Google models ([fadbeda](https://github.com/nednella/agentos/commit/fadbedaaf28b963e5929bd10625695a08d98b99c))
+* **internal:** price only Google models in agy usage ([6410452](https://github.com/nednella/agentos/commit/6410452d08ee4442052ef047b03ebf6be955f3de))
+* **ui:** truncate session details before status ([4e2be98](https://github.com/nednella/agentos/commit/4e2be98123efeb6f1c9c6447d16b50e0817f06a8)), closes [#479](https://github.com/nednella/agentos/issues/479)
+
 ## [0.41.0](https://github.com/nednella/agentos/compare/v0.40.0...v0.41.0) (2026-10-21)
 
 
