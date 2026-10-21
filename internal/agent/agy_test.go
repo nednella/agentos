@@ -19,7 +19,9 @@ func TestAgyCommand(t *testing.T) {
 		want []string
 	}{
 		{"none", Launch{}, nil},
-		{"model and effort", Launch{Model: "gemini-4-argon-medium", Effort: "high"}, []string{"--model", "gemini-4-argon-medium", "--effort", "high"}},
+		{"the effort joins the model", Launch{Model: "gemini-4-argon", Effort: "high"}, []string{"--model", "gemini-4-argon-high"}},
+		{"an effort no id ends in", Launch{Model: "gemini-4-argon", Effort: "xhigh"}, []string{"--model", "gemini-4-argon", "--effort", "xhigh"}},
+		{"an effort alone", Launch{Effort: "low"}, []string{"--effort", "low"}},
 		{"resume", Launch{Resume: "abc"}, []string{"--conversation", "abc"}},
 		{"chat", Launch{Chat: true}, []string{"--mode", "plan"}},
 		{"start", Launch{Start: "say hi"}, []string{"-i", "say hi"}},
@@ -162,16 +164,61 @@ func TestNewAgyWritesOnlyWhereTheEnvironmentPoints(t *testing.T) {
 	}
 }
 
+func TestAgyFill(t *testing.T) {
+	models := func() []agyModel {
+		return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}}
+	}
+	settings := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(settings, []byte(`{"model": "Gemini 4 Argon (Medium)"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	unlisted := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(unlisted, []byte(`{"model": "Gemini 9"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		a    Agy
+		l    Launch
+		want Launch
+	}{
+		{"agy's default", Agy{Settings: settings, Models: models}, Launch{}, Launch{Model: "gemini-4-argon", Effort: "medium"}},
+		{"a set model keeps the default's effort", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash"}, Launch{Model: "gemini-3.8-flash", Effort: "medium"}},
+		{"a set effort stays", Agy{Settings: settings, Models: models}, Launch{Effort: "xhigh", Resume: "abc"}, Launch{Model: "gemini-4-argon", Effort: "xhigh", Resume: "abc"}},
+		{"a full id is split", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low"}, Launch{Model: "gemini-3.8-flash", Effort: "low"}},
+		{"a set effort wins over the id's", Agy{Settings: settings, Models: models}, Launch{Model: "gemini-3.8-flash-low", Effort: "high"}, Launch{Model: "gemini-3.8-flash", Effort: "high"}},
+		{"a name agy does not list", Agy{Settings: unlisted, Models: models}, Launch{}, Launch{}},
+		{"agy cannot say", Agy{Settings: settings, Models: func() []agyModel { return nil }}, Launch{}, Launch{}},
+		{"no settings", Agy{Settings: filepath.Join(t.TempDir(), "none.json"), Models: models}, Launch{}, Launch{}},
+	}
+	for _, tt := range tests {
+		if got := tt.a.Fill(t.TempDir(), tt.l); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("%s: Fill = %+v, want %+v", tt.name, got, tt.want)
+		}
+	}
+}
+
+func TestNewAgyFindsTheSettingsBesideTheConfig(t *testing.T) {
+	t.Setenv(agyConfigDirEnv, "/tmp/agy-test/config")
+	if a := NewAgy(nil); a.Settings != "/tmp/agy-test/antigravity-cli/settings.json" {
+		t.Errorf("settings = %q", a.Settings)
+	}
+}
+
 func TestAgyValidModel(t *testing.T) {
-	known := Agy{Models: func() []string { return []string{"gemini-4-argon-medium"} }}
-	unknown := Agy{Models: func() []string { return nil }}
+	known := Agy{Models: func() []agyModel { return []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}} }}
+	unknown := Agy{Models: func() []agyModel { return nil }}
 	tests := []struct {
 		name          string
 		a             Agy
 		model, effort string
 		ok            bool
 	}{
-		{"a listed model", known, "gemini-4-argon-medium", "", true},
+		{"a listed id", known, "gemini-4-argon-medium", "", true},
+		{"a listed model and its effort", known, "gemini-4-argon", "medium", true},
+		{"a model listed at another effort", known, "gemini-4-argon", "high", false},
+		{"a listed model alone", known, "gemini-4-argon", "", true},
+		{"a listed model at an effort no id ends in", known, "gemini-4-argon", "max", true},
 		{"an unlisted model", known, "gemini-9", "", false},
 		{"any model when agy cannot say", unknown, "gemini-9", "", true},
 		{"an effort agy takes", known, "", "xhigh", true},
@@ -185,14 +232,14 @@ func TestAgyValidModel(t *testing.T) {
 	}
 }
 
-func TestListAgyModelsReadsTheFirstColumn(t *testing.T) {
+func TestListAgyModelsReadsTheIdsAndNames(t *testing.T) {
 	dir := t.TempDir()
 	script := "#!/bin/sh\necho 'Fetching available models...' >&2\nprintf 'gemini-4-argon-medium\\tGemini 4 Argon (Medium)\\nclaude-opus-5-5-low\\tClaude Opus 5.5 (Low)\\n'\n"
 	if err := os.WriteFile(filepath.Join(dir, "agy"), []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", dir)
-	if got := listAgyModels(); !slices.Equal(got, []string{"gemini-4-argon-medium", "claude-opus-5-5-low"}) {
+	if got := listAgyModels(); !slices.Equal(got, []agyModel{{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"claude-opus-5-5-low", "Claude Opus 5.5 (Low)"}}) {
 		t.Errorf("models = %q", got)
 	}
 	t.Setenv("PATH", t.TempDir())

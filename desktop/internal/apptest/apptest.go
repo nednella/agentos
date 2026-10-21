@@ -811,15 +811,17 @@ func CLIPath(t *testing.T) string {
 // waits. Call it before New. It returns dir.
 func ClaudeOnPath(t *testing.T) string { return agentOnPath(t, "claude", "") }
 
-// AgyModels is what the stand-in agy answers to agy models.
-var AgyModels = []string{"gemini-4-argon-medium", "gemini-3.8-flash-low", "claude-opus-5-5-high"}
+// AgyModels is what the stand-in agy answers to agy models: each model's id and name.
+var AgyModels = [][2]string{
+	{"gemini-4-argon-medium", "Gemini 4 Argon (Medium)"}, {"gemini-3.8-flash-low", "Gemini 3.8 Flash (Low)"}, {"claude-opus-5-5-high", "Claude Opus 5.5 (High)"},
+}
 
 // AgyOnPath is ClaudeOnPath for a stand-in `agy`, which also answers `agy models` with AgyModels and writes the
 // AGENTOS_PROMPT and AGENTOS_CHAT it was started with to <dir>/<session id, "/" as "_">.env.
 func AgyOnPath(t *testing.T) string {
 	models := ""
-	for _, id := range AgyModels {
-		models += id + "\tname\n"
+	for _, m := range AgyModels {
+		models += m[0] + "\t" + m[1] + "\n"
 	}
 	return agentOnPath(t, "agy", "if [ \"$1\" = models ]; then printf '"+models+"'; exit 0; fi\nprintf 'AGENTOS_PROMPT=%s\\nAGENTOS_CHAT=%s\\n' \"$AGENTOS_PROMPT\" \"$AGENTOS_CHAT\" > \"$f.env\"\n")
 }

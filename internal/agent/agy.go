@@ -2,6 +2,7 @@ package agent
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -27,7 +28,8 @@ import (
 // files in ConfigDir, which Prepare writes with the installed agentos, Installed, as their command, so one file
 // serves every build of the app. Writes says whether this build may write them: the installed app always, any other
 // only when AGENTOS_AGY_CONFIG_DIR named ConfigDir, so a dev or test build never touches the owner's own files.
-// Models lists the ids agy accepts, nil when agy cannot say.
+// Settings is agy's own settings file, where it keeps its default model. Models lists the models agy accepts, nil
+// when agy cannot say.
 //
 // In a hook, HookPrompt and HookChat come from the session's environment: the file holding the prompt that
 // SessionStart injects, and whether the PreToolUse hook keeps the session read-only.
@@ -36,7 +38,8 @@ type Agy struct {
 	Installed  string
 	Writes     bool
 	Dirs       []string
-	Models     func() []string
+	Settings   string
+	Models     func() []agyModel
 	HookPrompt string
 	HookChat   bool
 }
@@ -54,6 +57,7 @@ func NewAgy(dirs []string) Agy {
 		a.ConfigDir = filepath.Join(home, ".gemini", "config")
 		a.Writes = runsAs(a.Installed)
 	}
+	a.Settings = filepath.Join(filepath.Dir(a.ConfigDir), "antigravity-cli", "settings.json")
 	return a
 }
 
@@ -74,16 +78,17 @@ func runsAs(path string) bool {
 func (a Agy) Name() string        { return "agy" }
 func (a Agy) Can(Capability) bool { return true }
 
-// Command is agy's command line. The model id carries its effort (gemini-4-argon-medium) and --effort is agy's own
-// override of it. A chat runs in plan mode, which only tells agy to plan: the PreToolUse hook is what keeps it from
+// Command is agy's command line. The model id carries an effort agy lists (gemini-4-argon-medium); any other effort
+// goes to --effort. A chat runs in plan mode, which only tells agy to plan: the PreToolUse hook is what keeps it from
 // changing files.
 func (a Agy) Command(l Launch) []string {
 	argv := []string{"agy"}
-	if l.Model != "" {
-		argv = append(argv, "--model", l.Model)
+	model, effort := joinModel(l.Model, l.Effort)
+	if model != "" {
+		argv = append(argv, "--model", model)
 	}
-	if l.Effort != "" {
-		argv = append(argv, "--effort", l.Effort)
+	if effort != "" {
+		argv = append(argv, "--effort", effort)
 	}
 	if l.Resume != "" {
 		argv = append(argv, "--conversation", l.Resume)
@@ -121,11 +126,60 @@ func promptFile(l Launch) string {
 	return filepath.Join(l.TmpDir, "prompt.md")
 }
 
-// Fill leaves the choice to agy: it keeps no default model agentos can read.
-func (a Agy) Fill(_ string, l Launch) Launch { return l }
+// Fill keeps the model and the effort apart, as a label or an action may give the full id, and fills what l leaves
+// empty from agy's default model. agy keeps that as the name agy models prints beside the id; a name agy does not
+// list, as when it is not signed in, leaves the choice to agy.
+func (a Agy) Fill(_ string, l Launch) Launch {
+	model, effort := splitModel(l.Model)
+	l.Model, l.Effort = model, cmp.Or(l.Effort, effort)
+	model, effort = splitModel(a.defaultModel())
+	l.Model, l.Effort = cmp.Or(l.Model, model), cmp.Or(l.Effort, effort)
+	return l
+}
 
-// ValidModel checks the model against what agy models lists; any id passes when agy cannot say, as when it is not
-// signed in.
+// defaultModel is the id of the model agy's settings name, "" when they name none that agy lists.
+func (a Agy) defaultModel() string {
+	data, err := os.ReadFile(a.Settings)
+	if err != nil || a.Models == nil {
+		return ""
+	}
+	var settings struct {
+		Model string `json:"model"`
+	}
+	if json.Unmarshal(data, &settings) != nil || settings.Model == "" {
+		return ""
+	}
+	for _, m := range a.Models() {
+		if m.Name == settings.Model {
+			return m.ID
+		}
+	}
+	return ""
+}
+
+// agyEfforts are the efforts a model id of agy ends in.
+var agyEfforts = []string{"low", "medium", "high"}
+
+// splitModel parts a model id of agy into the model and the effort it ends in, "" when it ends in none.
+func splitModel(id string) (model, effort string) {
+	for _, e := range agyEfforts {
+		if model, ok := strings.CutSuffix(id, "-"+e); ok && model != "" {
+			return model, e
+		}
+	}
+	return id, ""
+}
+
+// joinModel is splitModel turned around: the id for --model, and the effort that is left for --effort.
+func joinModel(model, effort string) (id, rest string) {
+	if model != "" && slices.Contains(agyEfforts, effort) {
+		return model + "-" + effort, ""
+	}
+	return model, effort
+}
+
+// ValidModel checks the id that model and effort join into against what agy models lists; a model alone passes when
+// agy lists it at some effort. Any id passes when agy cannot say, as when it is not signed in.
 func (a Agy) ValidModel(model, effort string) error {
 	if err := CheckModel(model, effort); err != nil {
 		return err
@@ -133,30 +187,36 @@ func (a Agy) ValidModel(model, effort string) error {
 	if model == "" || a.Models == nil {
 		return nil
 	}
-	if ids := a.Models(); len(ids) > 0 && !slices.Contains(ids, model) {
-		return fmt.Errorf("agy has no model %q: run agy models", model)
+	models := a.Models()
+	id, _ := joinModel(model, effort)
+	listed := func(m agyModel) bool { base, _ := splitModel(m.ID); return m.ID == id || base == id }
+	if len(models) > 0 && !slices.ContainsFunc(models, listed) {
+		return fmt.Errorf("agy has no model %q: run agy models", id)
 	}
 	return nil
 }
 
+// agyModel is one line of agy models: the id agy takes and the name its settings keep.
+type agyModel struct{ ID, Name string }
+
 // agyModels asks agy once per process which models it has.
 var agyModels = sync.OnceValue(listAgyModels)
 
-// listAgyModels is the first column of agy models, nil when agy is not there or cannot answer.
-func listAgyModels() []string {
+// listAgyModels reads agy models, nil when agy is not there or cannot answer.
+func listAgyModels() []agyModel {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "agy", "models").Output()
 	if err != nil {
 		return nil
 	}
-	var ids []string
+	var models []agyModel
 	for _, line := range strings.Split(string(out), "\n") {
-		if id, _, ok := strings.Cut(line, "\t"); ok && id != "" {
-			ids = append(ids, id)
+		if id, name, ok := strings.Cut(line, "\t"); ok && id != "" {
+			models = append(models, agyModel{id, strings.TrimSpace(name)})
 		}
 	}
-	return ids
+	return models
 }
 
 // Prepare writes the session's prompt file, and the global hooks and MCP entry when this build may.
