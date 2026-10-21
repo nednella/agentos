@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -97,6 +98,27 @@ var Names = []string{"claude", "agy"}
 func CheckName(name string) error {
 	if name != "" && !slices.Contains(Names, name) {
 		return fmt.Errorf("no agent %q: the agents are %s", name, strings.Join(Names, ", "))
+	}
+	return nil
+}
+
+// Program is the command p runs, "" when it runs none.
+func Program(p Provider) string {
+	argv := p.Command(Launch{})
+	if len(argv) == 0 {
+		return ""
+	}
+	return argv[0]
+}
+
+// CheckInstalled reports a provider whose command is not on PATH, naming the command.
+func CheckInstalled(p Provider) error {
+	program := Program(p)
+	if program == "" {
+		return nil
+	}
+	if _, err := exec.LookPath(program); err != nil {
+		return fmt.Errorf("%s is not installed: it is not on PATH", program)
 	}
 	return nil
 }
