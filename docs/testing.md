@@ -34,6 +34,20 @@ go test -race ./...
 
 Each `desktop/<pkg>` service has its tests beside it. They build the whole app through `desktop/internal/apptest`, which starts real tmux servers on private sockets (`aostest-<pid>`), real git repos in temp folders, and real headless Chrome for Testing on temp profiles. GitHub and `claude` are always replaced by fake runners (`apptest.FakeGH`, `FakeClaude`); commands run through `desktop/internal/run`. The browser tests skip when Chrome for Testing is not installed; CI points `AGENTOS_BROWSER` at its Google Chrome. `desktop` embeds `frontend/dist`; build it first, or run with `-tags stub`, which embeds a small page instead. The hooks in the tests run the `agentos` command built from `./desktop` with that tag: the app's binary is the command. The `cli` tests answer from a fake app on a temp control socket. The release check never reaches GitHub: the harness answers curl with `Options.Releases` and refuses every other download.
 
+## Recorded agents
+
+`internal/agent/testdata/<provider>/` holds what the real agents sent: for each scenario in `scenario_test.go` (a prompt, a tool call, a question, a permission prompt, an exit, a resume) the hook payloads and the transcript lines with usage, and in `version` the agent's version. `TestScenarios` replays them through the provider as the app reads them and checks the state, reply and usage each row must end with. A scenario a provider cannot do is marked in the table with the reason and skipped for it.
+
+After an update of `claude` or `agy`, record again with the isolation env above set:
+
+```sh
+go test ./internal/agent -run TestRecord -record claude,agy -v
+git diff internal/agent/testdata
+go test ./internal/agent -run TestScenarios
+```
+
+The diff shows what the agent changed, the test what that breaks. Recording runs each agent for real, on a cheap model, in a throwaway folder on a tmux server of its own with no agentos session around it, and spends a few requests. The agents use the owner's login; the recording keeps no line of the transcripts besides the model calls, and puts `$WORK`, `$HOME` and `$RECORDING` in place of the machine's paths.
+
 ## The real front end, in a browser
 
 `AGENTOS_HTTP` serves the embedded front end over HTTP with a shim for `window.go` and `window.runtime`: `POST /__call/<pkg>.Service/<Method>` with a JSON array of arguments and the header `X-Agentos: 1`, and server-sent events at `/__events`. The server answers only requests addressed to its own listen address (`127.0.0.1:PORT`, not `localhost`) and refuses a foreign `Origin` with 403.
