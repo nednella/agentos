@@ -145,7 +145,7 @@ const cleanupToast = (entry: Cleanup): Omit<Toast, 'key'> => {
   }
 }
 
-const WARNING_SOURCES: Record<Warning['source'], string> = { tmux: 'tmux', github: 'GitHub', 'pull requests': 'Pull requests', worktrees: 'Worktrees', config: 'Config' }
+const WARNING_SOURCES: Record<Warning['source'], string> = { tmux: 'tmux', github: 'GitHub', 'pull requests': 'Pull requests', worktrees: 'Worktrees', config: 'Config', agent: 'Agent' }
 
 const digestKey = (project: string) => `agentos.digestSeen.${project}`
 const NEWS_SEEN_KEY = 'agentos.newsSeen'
