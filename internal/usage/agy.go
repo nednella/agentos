@@ -3,11 +3,13 @@ package usage
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
 // AgyReader reads what an agy session used from its transcript: one line per step, where a PLANNER_RESPONSE line
-// is one model call. The lines name no model, so each read is priced as the model given to it.
+// is one model call. The lines name no model, so each read is priced as the model given to it, when that is a Google
+// model: an agy session runs no other.
 type AgyReader struct {
 	after time.Time
 	tail
@@ -55,7 +57,11 @@ func (a *AgyReader) Read(path, model string) ([]Part, error) {
 		}
 		a.seen[l.StepIndex] = true
 		u := apiUsage{InputTokens: l.InputTokens, OutputTokens: l.OutputTokens, CacheReadInputTokens: l.CacheReadTokens}
-		sum.Add(Tokens{Input: l.InputTokens, Output: l.OutputTokens, CacheRead: l.CacheReadTokens, Cost: cost(model, u, l.CreatedAt)})
+		var c int64
+		if strings.HasPrefix(model, "gemini-") {
+			c = cost(model, u, l.CreatedAt)
+		}
+		sum.Add(Tokens{Input: l.InputTokens, Output: l.OutputTokens, CacheRead: l.CacheReadTokens, Cost: c})
 	})
 	if err != nil {
 		return nil, err

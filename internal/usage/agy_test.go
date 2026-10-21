@@ -42,9 +42,9 @@ func TestAgyReadCountsEachStepOnce(t *testing.T) {
 		t.Errorf("a second read with nothing new = %+v", again)
 	}
 	appendTo(t, path, planner(5, t0.Add(3*time.Second), 0, 0, 7))
-	next, _ := r.Read(path, "claude-opus-5-5-low")
-	if len(next) != 1 || next[0].Output != 7 || next[0].Model != "claude-opus-5-5-low" || next[0].Cost != 140 {
-		t.Errorf("new line read = %+v, want 7 output tokens of claude-opus-5-5-low at $20", next)
+	next, _ := r.Read(path, "gemini-3.8-flash-low")
+	if len(next) != 1 || next[0].Output != 7 || next[0].Model != "gemini-3.8-flash-low" || next[0].Cost != 26 {
+		t.Errorf("new line read = %+v, want 7 output tokens of gemini-3.8-flash-low at $3.75", next)
 	}
 }
 
@@ -75,5 +75,14 @@ func TestAgyReadMissingFile(t *testing.T) {
 	parts, err := NewAgyReader(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "gemini-4-argon-medium")
 	if err != nil || len(parts) != 0 {
 		t.Errorf("Read = %+v, %v; want nothing and no error", parts, err)
+	}
+}
+
+func TestAgyReadPricesOnlyGoogleModels(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "transcript_full.jsonl")
+	appendTo(t, path, planner(1, t0.Add(time.Second), 0, 0, 7))
+	parts, _ := NewAgyReader(t0).Read(path, "claude-opus-5-5-low")
+	if len(parts) != 1 || parts[0].Output != 7 || parts[0].Cost != 0 {
+		t.Errorf("parts = %+v, want 7 output tokens at no price", parts)
 	}
 }
