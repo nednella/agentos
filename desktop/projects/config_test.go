@@ -118,3 +118,24 @@ func TestAppFollowsConfigEdits(t *testing.T) {
 		return len(w) > 0 && w[len(w)-1] == warn.Warning{Source: "config"}
 	})
 }
+
+func TestAppWarnsWhileTheAgentIsNotInstalled(t *testing.T) {
+	h := newHarness(t)
+	if _, err := h.SetAgent("absent-agent --flag"); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "a warning naming the command", func() bool {
+		return slices.ContainsFunc(h.Rec.Warnings(), func(w warn.Warning) bool {
+			return w.Source == "agent" && strings.HasPrefix(w.Message, "absent-agent ")
+		})
+	})
+	data, err := os.ReadFile(h.Conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeConfig(t, h.Conf, strings.Replace(string(data), "agent_command: absent-agent --flag", "agent_command: bash", 1))
+	eventually(t, "the warning to clear", func() bool {
+		w := h.Rec.Warnings()
+		return len(w) > 0 && w[len(w)-1] == warn.Warning{Source: "agent"}
+	})
+}
