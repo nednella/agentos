@@ -99,6 +99,8 @@ Only the `claude` and `agy` providers get `--model` and `--effort`; a plain comm
 
 A new session, or one started from a note, has no action and no labels. When nothing sets a value, no flag is passed and the agent uses its own default.
 
+The row shows that choice until the agent's first turn. From then on it shows what the agent used last: for claude, the model and effort on the newest line of its transcript, read at each Stop hook, so a `/model` change inside the session shows; for agy, the model id its hooks report, with the effort it ends in. The state file keeps them, so a restart of the app shows them without a new turn. The usage events keep the model each turn ran on.
+
 For agy the id `agy models` prints, such as `gemini-4-argon-medium`, is a model and the effort it ends in. The app keeps the two apart, as it does for claude: the row shows model `gemini-4-argon` and effort `medium`. A `model:` label or an action's `model` may be the full id, which sets the effort too unless an effort is set as well, or the model alone. The app joins the model and an effort of `low`, `medium` or `high` into `--model`; `xhigh` and `max`, which no id ends in, go to `--effort`. An agy session runs Google models only: agy also lists Claude models, which the `claude` provider runs, and `gpt-oss-120b-medium`, and the app refuses them. The app checks the joined id against `agy models`, read once per start, and a model alone when agy lists it at some effort; it takes any Google id when agy cannot answer, as when it is not signed in.
 
 ### How a session picks its agent
