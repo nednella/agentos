@@ -627,7 +627,7 @@ func (s *Sessions) switched(rec session.Record, dir string) bool {
 // watchPrompt reads the pane a while after a tool call starts, for an agent that has no hook for its permission
 // prompt. It needs mu.
 func (s *Sessions) watchPrompt(rec session.Record) {
-	asker, ok := s.provider(rec.Agent).(agent.PaneAsker)
+	asker, ok := s.Provider(rec.Agent).(agent.PaneAsker)
 	if !ok || rec.Event != "PreToolUse" {
 		return
 	}
