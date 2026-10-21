@@ -398,6 +398,55 @@ func (a Agy) ParseEvent(name string, r io.Reader) (session.Event, string, bool) 
 	return ev, reply, true
 }
 
+// PromptWait is a little longer than a tool that asks nothing takes from PreToolUse to PostToolUse: a file read
+// takes under 0.1s, a file write or a web search up to 2s (agy 1.4.4).
+func (a Agy) PromptWait() time.Duration { return 2 * time.Second }
+
+// PermissionPrompt finds agy's permission prompt below the pane's last rule, where agy draws its input box or, while
+// it asks, the question and its choices (agy 1.4.4):
+//
+//	Run this command?
+//	> 1. Yes, run command
+//	  ...
+//	  4. No, cancel
+func (a Agy) PermissionPrompt(pane string) (string, bool) {
+	lines := strings.Split(pane, "\n")
+	for i := len(lines) - 1; i >= 0; i-- {
+		if isRule(lines[i]) {
+			lines = lines[i+1:]
+			break
+		}
+	}
+	question := ""
+	for i, line := range lines {
+		if !isChoice(line, "Yes") {
+			if strings.TrimSpace(line) != "" {
+				question = strings.TrimSpace(line)
+			}
+			continue
+		}
+		if !strings.HasSuffix(question, "?") || !slices.ContainsFunc(lines[i+1:], func(l string) bool { return isChoice(l, "No") }) {
+			return "", false
+		}
+		return question, true
+	}
+	return "", false
+}
+
+// isRule says whether the line is one of the rules agy draws across the pane.
+func isRule(line string) bool {
+	line = strings.TrimSpace(line)
+	return line != "" && strings.Trim(line, "─") == ""
+}
+
+// isChoice says whether the line is a numbered choice of a prompt, maybe marked with the cursor, whose text starts
+// with text: "Yes" matches "> 1. Yes, run command".
+func isChoice(line, text string) bool {
+	line = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(line), ">"))
+	number, rest, ok := strings.Cut(line, ". ")
+	return ok && number != "" && strings.Trim(number, "0123456789") == "" && strings.HasPrefix(rest, text)
+}
+
 // startReply injects the session's prompt as a system message, which agy keeps in the conversation.
 func (a Agy) startReply() string {
 	if a.HookPrompt == "" {

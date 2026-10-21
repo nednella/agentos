@@ -68,6 +68,14 @@ type Provider interface {
 	Usage(after time.Time) usage.Reader
 }
 
+// PaneAsker is a provider whose agent has no hook for its permission prompt, so the prompt is read off the
+// session's pane. PromptWait is how long after a PreToolUse with nothing after it the pane is read;
+// PermissionPrompt gives the question the pane asks, and false when it shows no permission prompt.
+type PaneAsker interface {
+	PromptWait() time.Duration
+	PermissionPrompt(pane string) (question string, ok bool)
+}
+
 // New returns the provider for the configured agent. "claude" (or empty) gets hooks from exe and the use of dirs;
 // "agy" gets its hooks from the installed agentos; any other value runs as a plain command with no state reports.
 func New(name, exe string, dirs ...string) Provider {
