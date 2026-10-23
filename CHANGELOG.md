@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/nednella/agentos/compare/v0.43.0...v0.44.0) (2026-10-23)
+
+
+### Features
+
+* **ui:** toggle panels with ⌘A, ⌘S and ⌘D ([bd8c72f](https://github.com/nednella/agentos/commit/bd8c72fcca5c19c803cb43a3434eff2b5295eec2))
+
 ## [0.43.0](https://github.com/nednella/agentos/compare/v0.42.1...v0.43.0) (2026-10-21)
 
 
