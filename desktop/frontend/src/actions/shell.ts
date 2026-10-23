@@ -5,14 +5,14 @@ export const shellActions = ({ layout }: ActionContext): Action[] => [
     id: 'focus-shell',
     label: 'Focus the shell',
     group: 'Navigate',
-    shortcut: { key: 's' },
+    shortcut: { key: 's', shift: true },
     run: () => layout.focusPanel('shell'),
   },
   {
     id: 'toggle-shell',
     label: 'Toggle shell',
     group: 'Navigate',
-    shortcut: { key: 's', shift: true },
+    shortcut: { key: 's' },
     run: () => layout.setShellOpen(!layout.shellOpen),
   },
 ]

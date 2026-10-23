@@ -38,14 +38,14 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     id: 'toggle-sidebar',
     label: 'Toggle queue and notes panel',
     group: 'Navigate',
-    shortcut: { key: 'a', shift: true },
+    shortcut: { key: 'a', unlessTyping: true },
     run: layout.toggleSidebar,
   },
   {
     id: 'toggle-sessions',
     label: 'Toggle sessions panel',
     group: 'Navigate',
-    shortcut: { key: 'd', shift: true },
+    shortcut: { key: 'd' },
     run: layout.toggleSessions,
   },
   {
@@ -59,7 +59,7 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     id: 'panel-sidebar',
     label: 'Left panel: queue and notes',
     group: 'Navigate',
-    shortcut: { key: 'a', unlessTyping: true },
+    shortcut: { key: 'a', shift: true },
     run() {
       layout.showSidebarTab(a.sidebarTab)
       a.focus(a.sidebarTab === 'queue' ? 'queue-filter' : 'sidebar')
@@ -78,7 +78,7 @@ export const navigateActions = ({ a, layout }: ActionContext): Action[] => [
     id: 'panel-sessions',
     label: 'Right panel: sessions',
     group: 'Navigate',
-    shortcut: { key: 'd' },
+    shortcut: { key: 'd', shift: true },
     run: () => layout.focusPanel('sessions'),
   },
   {
