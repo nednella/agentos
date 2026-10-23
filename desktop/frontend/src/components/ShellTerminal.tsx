@@ -29,7 +29,7 @@ export function ShellTerminal({ visible }: ShellTerminalProps) {
         onClick={() => focus('shell')}
       >
         <span className="mono text-accent">{project?.name} ❯</span>
-        Click or press ⌘S to open a shell here
+        Click or press ⌘⇧S to open a shell here
       </button>
     )
   }

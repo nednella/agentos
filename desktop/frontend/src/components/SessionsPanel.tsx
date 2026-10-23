@@ -74,7 +74,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
         {!full && (
           <button
             className="btn btn-ghost h-8 w-8 flex-none justify-center px-0"
-            title={overlay ? 'Close (Esc)' : 'Collapse sessions (⌘⇧D)'}
+            title={overlay ? 'Close (Esc)' : 'Collapse sessions (⌘D)'}
             aria-label={overlay ? 'Close sessions' : 'Collapse sessions'}
             onClick={() => setSessionsOpen(false)}
           >
