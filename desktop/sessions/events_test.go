@@ -1,6 +1,7 @@
 package sessions_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -119,7 +120,7 @@ func TestReviewWithoutACommandIsNotRecorded(t *testing.T) {
 func TestResumedSessionIsLabelled(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
 	s := issueSession(h, t, 12)
-	h.Hook(t, s.ID, "Stop", `{"session_id":"abc"}`)
+	h.Hook(t, s.ID, "Stop", fmt.Sprintf(`{"session_id":"abc","transcript_path":%q}`, writtenTranscript(t)))
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
 	h.RefreshPRs()
 	if err := h.KillSession(s.ID); err != nil {

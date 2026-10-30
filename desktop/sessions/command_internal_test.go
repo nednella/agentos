@@ -96,9 +96,13 @@ func TestCommandResumesAConversation(t *testing.T) {
 }
 
 func TestConversationOfARunningAndAnEndedSession(t *testing.T) {
+	written := filepath.Join(t.TempDir(), "transcript.jsonl")
+	if err := os.WriteFile(written, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
 	s := &Sessions{
-		records: map[string]session.Record{"p/1": {Conversation: "live"}},
-		ended:   map[string]*endedSession{"p/2": {rec: session.Record{Conversation: "gone"}}},
+		records: map[string]session.Record{"p/1": {Conversation: "live", Transcript: written}, "p/4": {Conversation: "unwritten", Transcript: written + ".none"}},
+		ended:   map[string]*endedSession{"p/2": {rec: session.Record{Conversation: "gone", Transcript: written}}},
 	}
 	if got := s.conversationOf("p/1"); got != "live" {
 		t.Errorf("running: %q", got)
@@ -108,6 +112,9 @@ func TestConversationOfARunningAndAnEndedSession(t *testing.T) {
 	}
 	if got := s.conversationOf("p/3"); got != "" {
 		t.Errorf("unknown: %q", got)
+	}
+	if got := s.conversationOf("p/4"); got != "" {
+		t.Errorf("no transcript: %q", got)
 	}
 }
 

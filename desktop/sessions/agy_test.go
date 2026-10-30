@@ -160,7 +160,7 @@ func TestResumedAgySessionContinuesItsConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h.Hook(t, old.ID, "Stop", agyPayload(h, "", ""))
+	h.Hook(t, old.ID, "Stop", agyPayload(h, writtenTranscript(t), ""))
 	if err := h.KillSession(old.ID); err != nil {
 		t.Fatal(err)
 	}

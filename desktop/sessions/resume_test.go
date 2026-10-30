@@ -1,7 +1,9 @@
 package sessions_test
 
 import (
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -14,7 +16,7 @@ import (
 // ended is a session that had the conversation abc and has ended.
 func ended(t *testing.T, h *apptest.Harness, s sessions.Session) sessions.Session {
 	t.Helper()
-	h.Hook(t, s.ID, "Stop", `{"session_id":"abc"}`)
+	h.Hook(t, s.ID, "Stop", fmt.Sprintf(`{"session_id":"abc","transcript_path":%q}`, writtenTranscript(t)))
 	if err := h.KillSession(s.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +89,7 @@ func TestResumedSessionShowsTheEndedOnesPRAtOnce(t *testing.T) {
 // endedWhileClosed quits the app, ends the session as a computer restart would, and opens the app again a minute later.
 func endedWhileClosed(t *testing.T, h *apptest.Harness, id string) *apptest.Harness {
 	t.Helper()
-	h.Hook(t, id, "Stop", `{"session_id":"abc"}`)
+	h.Hook(t, id, "Stop", fmt.Sprintf(`{"session_id":"abc","transcript_path":%q}`, writtenTranscript(t)))
 	h.App.Stop()
 	if err := exec.Command("tmux", "-L", h.Socket, "kill-session", "-t", "="+id).Run(); err != nil {
 		t.Fatal(err)
@@ -180,6 +182,21 @@ func TestOnlyAConversationOfClaudeResumes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if err := h.KillSession(s.ID); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "the session ended", func() bool { got, _ := h.Session(s.ID); return got.State == "ended" })
+		assertNoResume(t, h, s.ID)
+	})
+	t.Run("no prompt", func(t *testing.T) {
+		apptest.ClaudeOnPath(t)
+		h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+		s, err := h.NewChat("ask")
+		if err != nil {
+			t.Fatal(err)
+		}
+		unwritten := filepath.Join(t.TempDir(), "abc.jsonl")
+		h.Hook(t, s.ID, "SessionStart", fmt.Sprintf(`{"session_id":"abc","transcript_path":%q}`, unwritten))
 		if err := h.KillSession(s.ID); err != nil {
 			t.Fatal(err)
 		}
