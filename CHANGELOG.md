@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.45.0](https://github.com/nednella/agentos/compare/v0.44.0...v0.45.0) (2026-10-30)
+
+
+### Features
+
+* **desktop:** send PR conflict state to front end ([efb371f](https://github.com/nednella/agentos/commit/efb371fb205a55031671207061aa4db5b1fed1e9))
+* **ui:** show mergeable PR badge in green ([9b61a9c](https://github.com/nednella/agentos/commit/9b61a9c1ea97b8fca31af24580e653affc5aae3f))
+
+
+### Bug Fixes
+
+* **desktop:** offer resume only once the conversation is written ([0a5dd4c](https://github.com/nednella/agentos/commit/0a5dd4c2d9a4898394e06b8b0077a644a772a3f3))
+
 ## [0.44.0](https://github.com/nednella/agentos/compare/v0.43.0...v0.44.0) (2026-10-23)
 
 
