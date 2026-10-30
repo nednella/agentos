@@ -1632,12 +1632,18 @@ func (s *Sessions) targetOf(in term.Info) (target, bool) {
 	return target{id: id, title: cmp.Or(in.Title, defaultTitle), action: in.Action, issue: issue, branches: branches, owned: owned, proj: proj, model: project.Model{Model: in.Model, Effort: in.Effort}, agent: in.Agent, created: in.Created}, true
 }
 
-// conversationOf is the agent's conversation id of a session, running or ended. It needs mu.
+// conversationOf is the agent's conversation id of a session, running or ended, "" until the agent has written its
+// transcript: Claude names the conversation at start but writes it only at the first prompt, and --resume finds none
+// before that. It needs mu.
 func (s *Sessions) conversationOf(id string) string {
+	rec := s.records[id]
 	if e, ok := s.ended[id]; ok {
-		return e.rec.Conversation
+		rec = e.rec
 	}
-	return s.records[id].Conversation
+	if _, err := os.Stat(rec.Transcript); err != nil {
+		return ""
+	}
+	return rec.Conversation
 }
 
 // projectOf needs mu.
