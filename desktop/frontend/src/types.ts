@@ -9,6 +9,7 @@ export type PR = {
   checks: 'none' | 'pending' | 'passing' | 'failing'
   comments: number
   updatedAt: number
+  conflicting: boolean
 }
 
 export type Session = {

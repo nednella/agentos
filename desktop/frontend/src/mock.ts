@@ -92,7 +92,7 @@ function seedWaits(titles: [string, number][]): Wait[] {
 }
 
 function pr(number: number, state: PR['state'], checks: PR['checks'], comments = 0): PR {
-  return { number, url: `https://github.com/acme/storefront/pull/${number}`, state, checks, comments, updatedAt: Date.now() - 3 * minute }
+  return { number, url: `https://github.com/acme/storefront/pull/${number}`, state, checks, comments, updatedAt: Date.now() - 3 * minute, conflicting: false }
 }
 
 const details: Record<State, string[]> = {

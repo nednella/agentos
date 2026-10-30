@@ -44,9 +44,10 @@ type PR struct {
 	Comments  int    `json:"comments"`
 	UpdatedAt int64  `json:"updatedAt"`
 
-	ClosedAt    int64  `json:"-"` // when the PR merged or closed; 0 while it is live
-	HeadOid     string `json:"-"` // the commit the PR's branch ended on
-	Conflicting bool   `json:"-"` // the branch does not merge cleanly into its base
+	Conflicting bool `json:"conflicting"` // the branch does not merge cleanly into its base
+
+	ClosedAt int64  `json:"-"` // when the PR merged or closed; 0 while it is live
+	HeadOid  string `json:"-"` // the commit the PR's branch ended on
 }
 
 // Cleanup is one entry of the clean-up log.
