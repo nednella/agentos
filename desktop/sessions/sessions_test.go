@@ -44,9 +44,7 @@ func TestSessionLifecycle(t *testing.T) {
 		if s[0].Detail != "Claude needs your permission" || len(s[0].History) != 2 || s[0].LastEventAt == 0 {
 			t.Errorf("waiting session = %+v", s[0])
 		}
-		if h.Rec.Count("attention") != before+1 {
-			t.Errorf("attention events = %d, want %d", h.Rec.Count("attention"), before+1)
-		}
+		eventually(t, "attention event", func() bool { return h.Rec.Count("attention") == before+1 })
 		name, payload := h.Rec.LastEvent()
 		if got, _ := json.Marshal(payload); name != "attention" || string(got) != fmt.Sprintf(`{"id":%q,"state":"waiting"}`, second.ID) {
 			t.Errorf("last event = %s %s", name, got)
@@ -63,9 +61,7 @@ func TestSessionLifecycle(t *testing.T) {
 			s := h.Rec.LastSessions()
 			return len(s) == 2 && s[1].ID == first.ID && s[1].State == "idle"
 		})
-		if h.Rec.CountAttention("replied") != repliedBefore+1 {
-			t.Error("no replied attention for a turn that ended")
-		}
+		eventually(t, "replied attention for a turn that ended", func() bool { return h.Rec.CountAttention("replied") == repliedBefore+1 })
 		h.Hook(t, second.ID, "PreToolUse", `{"tool_name":"Edit","tool_input":{"file_path":"a.tsx"}}`)
 		eventually(t, "idle then working order", func() bool {
 			s := h.Rec.LastSessions()
