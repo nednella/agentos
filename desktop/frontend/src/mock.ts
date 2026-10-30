@@ -431,6 +431,7 @@ export function createMock(params: URLSearchParams) {
     const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'storefront')!
     sessions.find((x) => x.title === 'spike: websocket retry')!.resumable = false
     byIssue(454).pr = pr(457, 'draft', 'pending')
+    byIssue(389).pr = pr(459, 'draft', 'passing')
     Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
     Object.assign(byIssue(326), { pr: pr(449, 'open', 'passing', 3), prAttention: 'comments' })
     Object.assign(byIssue(412), { pr: pr(441, 'merged', 'passing'), cleanup: 'blocked', cleanupReason: 'the worktree of issue-412 has uncommitted changes' })
