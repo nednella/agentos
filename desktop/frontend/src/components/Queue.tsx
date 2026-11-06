@@ -189,15 +189,17 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
             )
           )}
           <Collapse open={section.open}>
-            {section.issues.map((issue) => (
-              <IssueRow
-                key={issue.number}
-                issue={issue}
-                drag={drag}
-                cursor={section.open && listNav.cursorKey === `issue:${issue.number}`}
-                onOpen={() => listNav.setCursorKey(`issue:${issue.number}`)}
-              />
-            ))}
+            <div className="flex flex-col gap-1.5 py-1.5">
+              {section.issues.map((issue) => (
+                <IssueRow
+                  key={issue.number}
+                  issue={issue}
+                  drag={drag}
+                  cursor={section.open && listNav.cursorKey === `issue:${issue.number}`}
+                  onOpen={() => listNav.setCursorKey(`issue:${issue.number}`)}
+                />
+              ))}
+            </div>
           </Collapse>
         </QueueSection>
       ))}
