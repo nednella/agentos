@@ -24,12 +24,13 @@ export function isEditingText(target: EventTarget | null): boolean {
   return isTyping(target) && !(target as HTMLElement).closest('.xterm')
 }
 
-// The cursor follows the row it is on by key, so re-sorting the list does not move it.
+// The cursor follows the row it is on by key, so re-sorting the list does not move it. It is -1 until
+// a click or a key puts it on a row.
 export function useListNav(keys: string[], handlers: ListNavHandlers): ListNav {
   const [cursorKey, setCursorKey] = useState<string | null>(null)
-  const lastIndex = useRef(0)
+  const lastIndex = useRef(-1)
   const at = cursorKey === null ? -1 : keys.indexOf(cursorKey)
-  const cursor = at >= 0 ? at : Math.max(0, Math.min(lastIndex.current, keys.length - 1))
+  const cursor = cursorKey === null ? -1 : at >= 0 ? at : Math.min(lastIndex.current, keys.length - 1)
   lastIndex.current = cursor
 
   const handle = useCallback(
@@ -37,6 +38,7 @@ export function useListNav(keys: string[], handlers: ListNavHandlers): ListNav {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return false
       if (UP.has(e.key)) setCursorKey(keys[Math.max(cursor - 1, 0)] ?? null)
       else if (DOWN.has(e.key)) setCursorKey(keys[Math.max(0, Math.min(cursor + 1, keys.length - 1))] ?? null)
+      else if (cursor < 0) return false
       else if (e.key === 'Enter') {
         if (e.target !== e.currentTarget) return false
         handlers.onEnter(cursor)

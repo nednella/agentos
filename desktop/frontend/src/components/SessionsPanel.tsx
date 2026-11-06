@@ -146,7 +146,10 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
               open={group.open}
               cursor={nav.cursorKey === `group:${group.key}`}
               summary={<SessionGroupSummary sessions={group.sessions} open={group.open} />}
-              onToggle={() => toggle(group.key, !group.open)}
+              onToggle={() => {
+                nav.setCursorKey(`group:${group.key}`)
+                toggle(group.key, !group.open)
+              }}
             />
             <Collapse open={group.open}>
               <div className="flex flex-col gap-1.5 py-1.5">
