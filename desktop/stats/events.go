@@ -30,6 +30,11 @@ type Log struct {
 	dir     string
 	machine string
 
+	// appending is apart from mu so that an event never waits for a read: Load can take half a minute
+	// on files iCloud must download first, and the sessions record events under their own locks.
+	// Record writes only today's file, and compress touches only the days before yesterday.
+	appending sync.Mutex
+
 	mu    sync.Mutex
 	cache map[string]map[string]fileDays // by project key, then file path
 }
@@ -55,8 +60,8 @@ func (l *Log) Record(key string, e activity.Event) {
 		fmt.Fprintf(os.Stderr, "agentos: encoding an event: %v\n", err)
 		return
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.appending.Lock()
+	defer l.appending.Unlock()
 	name := localDay(time.Now()) + "." + l.machine + ".jsonl"
 	if err := appendLine(filepath.Join(l.folder(key), name), line); err != nil {
 		fmt.Fprintf(os.Stderr, "agentos: recording an event: %v\n", err)
