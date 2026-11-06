@@ -82,7 +82,7 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
           </button>
         )}
       </div>
-      <div ref={list} className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-1.5">
+      <div ref={list} className="flex min-h-0 flex-1 flex-col gap-1.5 overflow-y-auto pb-1.5">
         <SessionGroupHeader label="Chats" count={chats.length} />
         {chats.map((s) => (
           <SessionRow key={s.id} session={s} selected={s.id === selectedId} cursor={nav.cursorKey === s.id} compact={compact} dense={dense} />
