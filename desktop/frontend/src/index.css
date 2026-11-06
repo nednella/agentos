@@ -660,11 +660,6 @@
     transition: stroke-dashoffset 0.5s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  .splash.undrawn polyline {
-    stroke-dashoffset: 415;
-    transition: stroke-dashoffset 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
   .splash-name {
     margin-left: calc(38 * var(--u));
     white-space: pre;
@@ -687,23 +682,6 @@
 
   .splash-cursor.on {
     opacity: 1;
-  }
-
-  /* The name clears at once; the cursor glides back over the width it took. */
-  .splash.cleared .splash-cursor {
-    animation: splash-glide 0.3s cubic-bezier(0.3, 0, 0.2, 1);
-  }
-
-  .splash.closing .splash-cursor {
-    transform: scaleX(0);
-    transform-origin: left;
-    transition: transform 0.3s cubic-bezier(0.6, 0, 0.4, 1);
-  }
-
-  @keyframes splash-glide {
-    from {
-      transform: translateX(var(--glide));
-    }
   }
 
   .splash.offline {
