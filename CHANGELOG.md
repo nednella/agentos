@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.46.3](https://github.com/nednella/agentos/compare/v0.46.2...v0.46.3) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ui:** give the no-section group a full section header ([0ccb77f](https://github.com/nednella/agentos/commit/0ccb77fa79efa455ba3d766472bf02b3f625977a))
+* **ui:** line issue numbers up with section labels ([df1efa7](https://github.com/nednella/agentos/commit/df1efa71ec5053612d4c39cbd9f1c307c6cf05c8))
+
 ## [0.46.2](https://github.com/nednella/agentos/compare/v0.46.1...v0.46.2) (2026-11-06)
 
 
