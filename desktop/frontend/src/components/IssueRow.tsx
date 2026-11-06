@@ -24,7 +24,7 @@ export function IssueRow({ issue, cursor, drag, onOpen }: IssueRowProps) {
 
   return (
     <div
-      className="row row-inset group h-9 items-center gap-1 pr-1.5 pl-3"
+      className="row row-inset group h-9 items-center gap-1 pr-1.5 pl-2.5"
       data-cursor={cursor}
       data-selected={open}
       draggable={issue.moves.length > 0}
