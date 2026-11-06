@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.1](https://github.com/nednella/agentos/compare/v0.45.0...v0.45.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **desktop:** record events without waiting for the log to load ([bfc996e](https://github.com/nednella/agentos/commit/bfc996ed7c16bf3f494ab49ae81033ad3af5261c))
+
 ## [0.45.0](https://github.com/nednella/agentos/compare/v0.44.0...v0.45.0) (2026-10-30)
 
 
