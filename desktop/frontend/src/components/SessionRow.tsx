@@ -28,7 +28,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
   return (
     <div className="row row-inset row-card flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
       <button
-        className={`flex w-full flex-col gap-1 px-4 text-left ${dense ? 'py-2' : 'pt-2.5 pb-2.5'}`}
+        className={`flex w-full flex-col gap-1.5 px-[0.5625rem] text-left ${dense ? 'pt-2' : 'pt-2.5'} ${hasFooter ? 'pb-1.5' : dense ? 'pb-2' : 'pb-2.5'}`}
         aria-current={selected}
         disabled={ended}
         title={ended ? `${session.title} (ended)` : session.title}
@@ -68,7 +68,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         )}
       </button>
       {hasFooter && (
-        <div className="flex w-full flex-wrap items-center gap-2 pr-3 pb-2.5 pl-[2.625rem]">
+        <div className={`flex w-full flex-wrap items-center gap-2 pr-[0.5625rem] pl-[2.1875rem] ${dense ? 'pb-2' : 'pb-2.5'}`}>
           {ended && (
             <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
           )}
