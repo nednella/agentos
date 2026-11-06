@@ -379,7 +379,7 @@
     align-items: center;
     gap: 0.5rem;
     width: 100%;
-    height: 2rem;
+    height: 2.5rem;
     padding: 0 0.75rem 0 1rem;
     background: var(--bg-surface);
     color: var(--text-dim);
@@ -408,7 +408,7 @@
   }
 
   .section-head ~ * [data-cursor] {
-    scroll-margin-top: 2rem;
+    scroll-margin-top: 2.5rem;
   }
 
   [data-panel] {
