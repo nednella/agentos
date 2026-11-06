@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"slices"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -99,6 +100,38 @@ func TestLogCountsAnEventRecordedBeforeLoadOnce(t *testing.T) {
 	l.Record("proj", ev(activity.Prompt, time.Now()))
 	if got := l.Days("proj")[time.Now().Format(time.DateOnly)].Prompts; got != 2 {
 		t.Errorf("prompts = %d, want 2", got)
+	}
+}
+
+func TestLogRecordsWhileLoadReads(t *testing.T) {
+	dir := t.TempDir()
+	fifo := filepath.Join(dir, "proj", "events", "2026-01-01.jsonl")
+	if err := os.MkdirAll(filepath.Dir(fifo), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := syscall.Mkfifo(fifo, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	l := NewLog(dir, mine)
+	loadEnded := make(chan struct{})
+	go func() { l.Load(); close(loadEnded) }()
+	defer func() {
+		if w, err := os.OpenFile(fifo, os.O_WRONLY, 0); err == nil {
+			w.Close()
+		}
+		<-loadEnded
+	}()
+	for l.mu.TryLock() {
+		l.mu.Unlock()
+		time.Sleep(time.Millisecond)
+	}
+
+	recorded := make(chan struct{})
+	go func() { l.Record("proj", ev(activity.Prompt, time.Now())); close(recorded) }()
+	select {
+	case <-recorded:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Record waited for Load to read the files")
 	}
 }
 
