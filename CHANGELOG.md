@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.3](https://github.com/nednella/agentos/compare/v0.45.2...v0.45.3) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ui:** mark shown session with outlined card ([38b6806](https://github.com/nednella/agentos/commit/38b6806e47bffce6d2f8c9fdc0beec862a46f8d4))
+
 ## [0.45.2](https://github.com/nednella/agentos/compare/v0.45.1...v0.45.2) (2026-11-06)
 
 
