@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.45.2](https://github.com/nednella/agentos/compare/v0.45.1...v0.45.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ui:** fade out splash once its text clears ([30b0db2](https://github.com/nednella/agentos/commit/30b0db2a1052a4ffec5cc85b1a1e6333673837a4))
+
 ## [0.45.1](https://github.com/nednella/agentos/compare/v0.45.0...v0.45.1) (2026-11-06)
 
 
