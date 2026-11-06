@@ -14,9 +14,9 @@ import { IssueRow } from './IssueRow'
 import { Loading } from './Loading'
 import { Notice } from './Notice'
 import { QueueSection } from './QueueSection'
-import { QueueSectionHeader } from './QueueSectionHeader'
 import { QueueSearch } from './QueueSearch'
 import { QueueUnsortedHeader } from './QueueUnsortedHeader'
+import { SectionHeader } from './SectionHeader'
 import { SetupOffer } from './SetupOffer'
 import type { NavRef } from './Sidebar'
 
@@ -159,11 +159,11 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   if (filtering && shown.length === 0) return <Notice title="No issues match" hint="Clear the search to see all of them." centered />
 
   return (
-    <div ref={list} className="min-h-0 flex-1 overflow-y-auto pt-1.5 pb-2">
+    <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-2">
       {sections.map((section) => (
         <QueueSection key={section.name} name={section.name} drag={drag} className={sorted && !section.name ? 'mt-2 border-t border-line pt-2' : undefined}>
           {section.name ? (
-            <QueueSectionHeader
+            <SectionHeader
               name={section.name}
               count={section.issues.length}
               open={section.open}

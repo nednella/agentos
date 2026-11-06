@@ -370,6 +370,47 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
   }
 
+  .section-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    height: 2rem;
+    padding: 0 0.75rem 0 1rem;
+    background: var(--bg-surface);
+    color: var(--text-dim);
+    text-align: left;
+  }
+
+  section + section > .section-head {
+    border-top: 1px solid var(--border);
+  }
+
+  .section-head:hover:not(:disabled),
+  .section-head[data-cursor='true'] {
+    background: var(--bg-hover);
+  }
+
+  .section-head:hover:not(:disabled) :is(.label, [data-chevron]) {
+    color: var(--text);
+  }
+
+  .section-head[aria-expanded='false'] .label {
+    opacity: 0.75;
+  }
+
+  [data-panel][data-focused] .section-head[data-cursor='true'] {
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .section-head ~ * [data-cursor] {
+    scroll-margin-top: 2rem;
+  }
+
   [data-panel] {
     position: relative;
   }
