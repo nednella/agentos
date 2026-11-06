@@ -169,7 +169,10 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
               open={section.open}
               cursor={listNav.cursorKey === `section:${section.name}`}
               locked={filtering}
-              onToggle={() => toggle(section.name, isClosed(section.name))}
+              onToggle={() => {
+                listNav.setCursorKey(`section:${section.name}`)
+                toggle(section.name, isClosed(section.name))
+              }}
             />
           ) : (
             sorted && (
@@ -178,13 +181,22 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
                 open={section.open}
                 cursor={listNav.cursorKey === 'section:'}
                 locked={filtering}
-                onToggle={() => toggle('', isClosed(''))}
+                onToggle={() => {
+                  listNav.setCursorKey('section:')
+                  toggle('', isClosed(''))
+                }}
               />
             )
           )}
           <Collapse open={section.open}>
             {section.issues.map((issue) => (
-              <IssueRow key={issue.number} issue={issue} drag={drag} cursor={section.open && listNav.cursorKey === `issue:${issue.number}`} />
+              <IssueRow
+                key={issue.number}
+                issue={issue}
+                drag={drag}
+                cursor={section.open && listNav.cursorKey === `issue:${issue.number}`}
+                onOpen={() => listNav.setCursorKey(`issue:${issue.number}`)}
+              />
             ))}
           </Collapse>
         </QueueSection>

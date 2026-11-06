@@ -10,9 +10,9 @@ import { PRMark } from './PRMark'
 import { SessionMark } from './SessionMark'
 import { TypeMark } from './TypeMark'
 
-type IssueRowProps = { issue: Issue; cursor: boolean; drag: IssueDrag }
+type IssueRowProps = { issue: Issue; cursor: boolean; drag: IssueDrag; onOpen(): void }
 
-export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
+export function IssueRow({ issue, cursor, drag, onOpen }: IssueRowProps) {
   const { sessions, settings, overlay, select, startIssue, setOverlay, report } = useAgentos()
   const { mode } = useLayout()
   const session = sessions.find((s) => s.id === issue.sessionId)
@@ -38,7 +38,10 @@ export function IssueRow({ issue, cursor, drag }: IssueRowProps) {
       <button
         className="@container flex h-full min-w-0 flex-1 items-center gap-2 text-left"
         title="Read the issue"
-        onClick={() => setOverlay({ issue: issue.number })}
+        onClick={() => {
+          onOpen()
+          setOverlay({ issue: issue.number })
+        }}
       >
         <span className={`mono flex-none text-small text-dim ${dense ? 'w-8' : 'w-10'}`}>{issue.number}</span>
         <TypeMark type={issue.type} />

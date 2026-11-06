@@ -293,7 +293,7 @@
     background: var(--bg-raised);
   }
 
-  .row[data-cursor='true'] {
+  :where([data-panel][data-focused]) .row[data-cursor='true'] {
     background: var(--bg-hover);
   }
 
@@ -391,7 +391,7 @@
   }
 
   .section-head:hover:not(:disabled),
-  .section-head[data-cursor='true'] {
+  :where([data-panel][data-focused]) .section-head[data-cursor='true'] {
     background: var(--bg-hover);
   }
 
@@ -566,10 +566,6 @@
     border: 1px solid var(--border-note);
     border-radius: var(--radius-md);
     color: var(--text-note);
-  }
-
-  .note-card[data-cursor='true'] {
-    border-color: var(--border-strong);
   }
 
   [data-panel][data-focused] .note-card[data-cursor='true'] {
