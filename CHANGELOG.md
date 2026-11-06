@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.46.1](https://github.com/nednella/agentos/compare/v0.46.0...v0.46.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ui:** drop top padding under the no-section separator ([daca5ee](https://github.com/nednella/agentos/commit/daca5eef6c5899fb895e5cca1783344d445d4b60))
+* **ui:** give section headers more height ([bb6e7b7](https://github.com/nednella/agentos/commit/bb6e7b7d58c2aa39d613e26fe9ecfeff0468a984))
+* **ui:** show the list cursor only after a click or key in a focused panel ([2076eae](https://github.com/nednella/agentos/commit/2076eae2257452e6064489f9b0d7e36b20efb52c))
+* **ui:** space queue rows like session cards ([bfc8929](https://github.com/nednella/agentos/commit/bfc8929cce48721da104c42381eae272bc1008af))
+
 ## [0.46.0](https://github.com/nednella/agentos/compare/v0.45.3...v0.46.0) (2026-11-06)
 
 
