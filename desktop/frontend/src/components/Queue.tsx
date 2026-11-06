@@ -161,7 +161,7 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   return (
     <div ref={list} className="min-h-0 flex-1 overflow-y-auto pb-2">
       {sections.map((section) => (
-        <QueueSection key={section.name} name={section.name} drag={drag} className={sorted && !section.name ? 'mt-2 border-t border-line' : undefined}>
+        <QueueSection key={section.name} name={section.name} drag={drag} className={sorted && !section.name ? 'border-t border-line' : undefined}>
           {section.name ? (
             <SectionHeader
               name={section.name}
