@@ -26,7 +26,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
   const spend = session.tokens > 0 ? `~${dollars(session.cost)}` : ''
 
   return (
-    <div className="row flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
+    <div className="row row-inset row-card flex-col" data-state={session.state} data-selected={selected} data-cursor={cursor} style={{ opacity: ended ? 0.6 : 1 }}>
       <button
         className={`flex w-full flex-col gap-1 px-4 text-left ${dense ? 'py-2' : 'pt-2.5 pb-2.5'}`}
         aria-current={selected}
@@ -43,7 +43,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           <StateDot state={session.state} />
           <span className="mono w-4 flex-none text-small text-dim">{session.n}</span>
           <ActionTag action={session.action} />
-          <span className="min-w-0 flex-1 truncate text-body font-medium">{session.title}</span>
+          <span className={`min-w-0 flex-1 truncate text-body ${selected ? 'font-semibold' : 'font-medium'}`}>{session.title}</span>
           <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
         </span>
         {!compact && !dense && (

@@ -342,6 +342,34 @@
     background: var(--waiting);
   }
 
+  .row-card {
+    border: 1px solid transparent;
+  }
+
+  .row-card::before {
+    inset: 6px auto 6px -1px;
+    border-radius: 2px;
+  }
+
+  .row-card[data-selected='true']:not([data-state='waiting'])::before {
+    background: transparent;
+  }
+
+  .row-card[data-selected='true'] {
+    background: var(--bg-raised);
+    border-color: var(--accent);
+  }
+
+  [data-panel][data-focused] .row-card[data-cursor='true'] {
+    box-shadow: none;
+    border: 1px dashed color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+
+  [data-panel][data-focused] .row-card[data-cursor='true'][data-selected='true'] {
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+
   [data-panel] {
     position: relative;
   }
