@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.46.0](https://github.com/nednella/agentos/compare/v0.45.3...v0.46.0) (2026-11-06)
+
+
+### Features
+
+* **ui:** fold session groups with a state summary ([10c5829](https://github.com/nednella/agentos/commit/10c5829dd21282779c35bae25407704ac9889c73))
+
+
+### Bug Fixes
+
+* **ui:** line up the padding inside session cards ([b9dc615](https://github.com/nednella/agentos/commit/b9dc61514d345430c28d6a7636a5fa090ac38f9b))
+* **ui:** space session cards as wide as their side margin ([a453180](https://github.com/nednella/agentos/commit/a45318065fbc00e1ac64698a2415dd51131ba412))
+
 ## [0.45.3](https://github.com/nednella/agentos/compare/v0.45.2...v0.45.3) (2026-11-06)
 
 
