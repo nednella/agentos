@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useState } from 'react'
 
 const NAME = 'agentos'
-const PHASES = ['drawn', 'selected', 'cleared', 'undrawn', 'closing']
-const LEAVE_MS = 4150
+const PHASES = ['drawn', 'selected']
+const LEAVE_MS = 3400
 const FADE_MS = 600
 
 export type SplashStage = 'playing' | 'leaving' | 'done'
@@ -16,8 +16,6 @@ export function Splash({ stage, onStage }: SplashProps) {
   const [phase, setPhase] = useState(0)
   const [cursorOn, setCursorOn] = useState(false)
   const [typed, setTyped] = useState(0)
-  const [glide, setGlide] = useState(0)
-  const nameRef = useRef<HTMLSpanElement>(null)
 
   useEffect(() => {
     const timers: ReturnType<typeof setTimeout>[] = []
@@ -28,13 +26,7 @@ export function Splash({ stage, onStage }: SplashProps) {
     at(2150, () => setCursorOn(false))
     at(2550, () => setCursorOn(true))
     at(2850, () => setPhase(2))
-    at(3200, () => {
-      setGlide(nameRef.current?.getBoundingClientRect().width ?? 0)
-      setTyped(0)
-      setPhase(3)
-    })
-    at(3400, () => setPhase(4))
-    at(3900, () => setPhase(5))
+    at(3200, () => setTyped(0))
     at(LEAVE_MS, () => onStage('leaving'))
     at(LEAVE_MS + FADE_MS, () => onStage('done'))
     return () => timers.forEach(clearTimeout)
@@ -50,13 +42,10 @@ export function Splash({ stage, onStage }: SplashProps) {
         <svg viewBox="258 348 224 328" aria-hidden="true">
           <polyline points="290,380 450,512 290,644" />
         </svg>
-        <span className="splash-name" ref={nameRef}>
+        <span className="splash-name">
           <span>{NAME.slice(0, typed)}</span>
         </span>
-        <span
-          className={`splash-cursor ${cursorOn ? 'on' : ''}`}
-          style={{ '--glide': `${glide}px` } as CSSProperties}
-        />
+        <span className={`splash-cursor ${cursorOn ? 'on' : ''}`} />
       </div>
     </div>
   )
