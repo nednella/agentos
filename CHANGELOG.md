@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.46.2](https://github.com/nednella/agentos/compare/v0.46.1...v0.46.2) (2026-11-06)
+
+
+### Bug Fixes
+
+* **ui:** drop the margin above the no-section separator ([73f9487](https://github.com/nednella/agentos/commit/73f9487c3b36e7000516d3874f8a6645f5f15656))
+
 ## [0.46.1](https://github.com/nednella/agentos/compare/v0.46.0...v0.46.1) (2026-11-06)
 
 
