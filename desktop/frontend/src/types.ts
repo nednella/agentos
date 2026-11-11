@@ -10,6 +10,21 @@ export type PR = {
   comments: number
   updatedAt: number
   conflicting: boolean
+  title: string
+  review: '' | 'approved' | 'changes' | 'commented'
+  failedChecks: string[]
+  runningChecks: number
+  passedChecks: number
+  newComments: number
+}
+
+export type BranchStatus = {
+  base: string
+  unpushed: number
+  uncommitted: number
+  ahead: number
+  behind: number
+  notInMain: number
 }
 
 export type Session = {
@@ -28,6 +43,7 @@ export type Session = {
   branch: string
   worktree: string
   pr: PR | null
+  git: BranchStatus | null
   prAttention: '' | 'checks' | 'comments'
   cleanup: '' | 'pending' | 'blocked' | 'ask'
   cleanupReason: string

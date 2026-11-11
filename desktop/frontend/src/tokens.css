@@ -25,6 +25,11 @@
   --accent: #a78bfa;
   --danger: #f5586a;
 
+  --pr-open: #238636;
+  --pr-draft: #5a6270;
+  --pr-merged: #8957e5;
+  --pr-closed: #da3633;
+
   --type-feature: #6ea8ff;
   --type-bug: #f5586a;
   --type-refactor: #b794f6;
@@ -86,6 +91,11 @@
   --ended: #8b93a5;
   --accent: #7c5ce0;
   --danger: #d02a3e;
+
+  --pr-open: #238636;
+  --pr-draft: #6e7781;
+  --pr-merged: #8957e5;
+  --pr-closed: #da3633;
 
   --type-feature: #2a6fe0;
   --type-bug: #d02a3e;

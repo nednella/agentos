@@ -2,7 +2,7 @@ import { buildIssueDetail, buildIssues, movesFrom, moveIssue, sortBySection } fr
 import { clickAt, newPage, normalizeUrl, pageRects, pageTitle, renderPage, typeText } from './mockBrowser'
 import type { PageModel } from './mockBrowser'
 import * as term from './mockTerminal'
-import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Memory, News, NewsIssue, Note, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, UsageRow, Wait, WaitKind, WorkRow } from './types'
+import type { BrowserState, Cleanup, CleanupEvent, CleanupMode, Digest, DigestItem, DigestSchedule, EventMap, Evidence, HistoryEntry, Issue, Ledger, LedgerRow, Memory, News, NewsIssue, Note, BranchStatus, PR, Project, Release, Session, PromptSend, Settings, Snapshot, State, Stats, ThemeSetting, UsageRow, Wait, WaitKind, WorkRow } from './types'
 
 type Handler = (payload: never) => void
 
@@ -91,8 +91,27 @@ function seedWaits(titles: [string, number][]): Wait[] {
   return waits.sort((a, b) => b.startedAt - a.startedAt)
 }
 
-function pr(number: number, state: PR['state'], checks: PR['checks'], comments = 0): PR {
-  return { number, url: `https://github.com/acme/storefront/pull/${number}`, state, checks, comments, updatedAt: Date.now() - 3 * minute, conflicting: false }
+function pr(number: number, state: PR['state'], checks: PR['checks'], extra: Partial<PR> = {}): PR {
+  return {
+    number,
+    url: `https://github.com/acme/storefront/pull/${number}`,
+    state,
+    checks,
+    comments: 0,
+    updatedAt: Date.now() - 3 * minute,
+    conflicting: false,
+    title: `Pull request ${number}`,
+    review: '',
+    failedChecks: [],
+    runningChecks: checks === 'pending' ? 2 : 0,
+    passedChecks: checks === 'passing' || checks === 'pending' ? 4 : 0,
+    newComments: 0,
+    ...extra,
+  }
+}
+
+function git(extra: Partial<BranchStatus> = {}): BranchStatus {
+  return { base: 'main', unpushed: 0, uncommitted: 0, ahead: 1, behind: 0, notInMain: 0, ...extra }
 }
 
 const details: Record<State, string[]> = {
@@ -217,7 +236,8 @@ export function createMock(params: URLSearchParams) {
       history: s.history.map((h) => ({ ...h })),
       branch: s.branch,
       worktree: s.worktree,
-      pr: s.pr ? { ...s.pr } : null,
+      pr: s.pr ? { ...s.pr, failedChecks: [...s.pr.failedChecks] } : null,
+      git: s.git ? { ...s.git } : null,
       prAttention: s.prAttention,
       cleanup: s.cleanup,
       cleanupReason: s.cleanupReason,
@@ -385,6 +405,7 @@ export function createMock(params: URLSearchParams) {
       branch: issue ? `issue-${issue}` : '',
       worktree: issue ? `${owner.dir}/trees/issue-${issue}` : '',
       pr: null,
+      git: null,
       prAttention: '',
       cleanup: '',
       cleanupReason: '',
@@ -430,13 +451,21 @@ export function createMock(params: URLSearchParams) {
     seed('#389 webhook retries', 389, 'working', [['working', 58], ['idle', 40], ['working', 9]])
     const byIssue = (n: number) => sessions.find((x) => x.issue === n && x.project === 'storefront')!
     sessions.find((x) => x.title === 'spike: websocket retry')!.resumable = false
-    byIssue(454).pr = pr(457, 'draft', 'pending')
-    byIssue(389).pr = pr(459, 'draft', 'passing')
-    Object.assign(byIssue(444), { pr: pr(452, 'open', 'failing'), prAttention: 'checks' })
-    Object.assign(byIssue(326), { pr: pr(449, 'open', 'passing', 3), prAttention: 'comments' })
-    Object.assign(byIssue(412), { pr: pr(441, 'merged', 'passing'), cleanup: 'blocked', cleanupReason: 'the worktree of issue-412 has uncommitted changes' })
-    Object.assign(byIssue(437), { pr: pr(445, 'merged', 'passing'), cleanup: 'pending' })
-    Object.assign(byIssue(430), { pr: pr(447, 'closed', 'failing'), cleanup: 'ask' })
+    Object.assign(byIssue(454), { pr: pr(457, 'draft', 'pending', { title: 'Split the product page into sections' }), git: git({ unpushed: 2, uncommitted: 4, ahead: 3 }) })
+    Object.assign(byIssue(389), { pr: pr(459, 'draft', 'passing', { title: 'Retry webhooks with backoff', review: 'approved' }), git: git() })
+    Object.assign(byIssue(444), {
+      pr: pr(452, 'open', 'failing', { title: 'Move checkout to its own route', review: 'changes', comments: 4, newComments: 2, failedChecks: ['unit-tests', 'lint / eslint'], passedChecks: 3 }),
+      prAttention: 'checks',
+      git: git({ ahead: 4 }),
+    })
+    Object.assign(byIssue(326), {
+      pr: pr(449, 'open', 'passing', { title: 'Round cart totals half up', conflicting: true, comments: 3, review: 'commented' }),
+      git: git({ behind: 9, ahead: 2 }),
+    })
+    Object.assign(byIssue(412), { pr: pr(441, 'merged', 'passing', { title: 'Sweep unused locale keys' }), git: git({ uncommitted: 3 }), cleanup: 'blocked', cleanupReason: 'the worktree of issue-412 has uncommitted changes' })
+    Object.assign(byIssue(437), { pr: pr(445, 'merged', 'passing', { title: 'Show the coupon strip' }), git: git({ notInMain: 1, ahead: 2 }), cleanup: 'pending' })
+    Object.assign(byIssue(430), { pr: pr(447, 'closed', 'failing', { title: 'Fix the thumbnail ratio', failedChecks: ['unit-tests'] }), git: git(), cleanup: 'ask' })
+    Object.assign(sessions.find((x) => x.title === 'checkout tests scratch')!, { branch: 'scratch-checkout', git: git({ unpushed: 2, ahead: 2 }) })
     seed('#12 session memory', 12, 'waiting', [['working', 30], ['waiting', 7]], data[1])
     seed('notes sync spike', 0, 'working', [['working', 11]], data[1])
     seed('Why does checkout call the cart API twice?', 0, 'waiting', [['working', 6], ['waiting', 2]], data[0], true)
@@ -694,7 +723,7 @@ export function createMock(params: URLSearchParams) {
   const failing = sessions.find((s) => s.issue === 389)
   if (failing) {
     setTimeout(() => {
-      failing.pr = pr(455, 'open', 'failing')
+      failing.pr = pr(455, 'open', 'failing', { title: 'Retry webhooks with backoff', failedChecks: ['unit-tests'] })
       failing.prAttention = 'checks'
       publish()
       if (current.name === failing.project) emit('attention', { id: failing.id, state: 'pr' })
@@ -1132,7 +1161,9 @@ export function createMock(params: URLSearchParams) {
     Ledger: async (days: number, project: string) => delay(ledgerFor(days, project), 300),
     RefreshPRs: async () => github(undefined, 500),
     AckPR: async (id: string) => {
-      find(id).prAttention = ''
+      const s = find(id)
+      s.prAttention = ''
+      if (s.pr) s.pr.newComments = 0
       publish()
     },
     TypeInto: async (id: string, text: string) => {
