@@ -47,7 +47,7 @@ func TestPRTracking(t *testing.T) {
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 2, 1))
 	h.RefreshPRs()
 	h.RefreshPRs()
-	if got, _ = h.Session(s.ID); got.PRAttention != "comments" || got.PR.State != "open" {
+	if got, _ = h.Session(s.ID); got.PRAttention != "comments" || got.PR.State != "open" || got.PR.NewComments != 2 {
 		t.Fatalf("new comments = %+v", got)
 	}
 	if prAlerts() != 1 {
@@ -60,7 +60,7 @@ func TestPRTracking(t *testing.T) {
 	if err := h.AckPR(s.ID); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ = h.Session(s.ID); got.PRAttention != "" {
+	if got, _ = h.Session(s.ID); got.PRAttention != "" || got.PR.NewComments != 0 {
 		t.Errorf("after ack = %+v", got)
 	}
 
@@ -363,6 +363,90 @@ func TestCleanupMergedBlockedByCommitsAfterTheMergedHead(t *testing.T) {
 				t.Error("something was removed although the branch holds work the merged PR lacks")
 			}
 		})
+	}
+}
+
+// commitIn commits a new file in dir.
+func commitIn(t *testing.T, dir, file string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, file), []byte(file+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	gitIn(t, dir, "add", file)
+	gitIn(t, dir, "commit", "-m", file)
+}
+
+func gitStatus(t *testing.T, h *apptest.Harness, id string) sessions.BranchStatus {
+	t.Helper()
+	got, _ := h.Session(id)
+	if got.Git == nil {
+		t.Fatalf("no git status: %+v", got)
+	}
+	return *got.Git
+}
+
+func TestBranchStatus(t *testing.T) {
+	h := newHarness(t)
+	origin := repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	worksIn(h, t, s, wt)
+	h.RefreshPRs()
+	if got := gitStatus(t, h, s.ID); got != (sessions.BranchStatus{Base: "main", Ahead: 1}) {
+		t.Errorf("a pushed branch = %+v", got)
+	}
+
+	other := filepath.Join(t.TempDir(), "other")
+	gitIn(t, filepath.Dir(other), "clone", origin, other)
+	commitIn(t, other, "on-main.txt")
+	gitIn(t, other, "push", "origin", "main")
+	gitIn(t, h.Dir, "fetch")
+	commitIn(t, wt, "later.txt")
+	if err := os.WriteFile(filepath.Join(wt, "new.txt"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	h.RefreshPRs()
+	if got := gitStatus(t, h, s.ID); got != (sessions.BranchStatus{Base: "main", Ahead: 2, Behind: 1, Unpushed: 1, Uncommitted: 1}) {
+		t.Errorf("after main moved and the agent worked = %+v", got)
+	}
+
+	if err := os.WriteFile(filepath.Join(wt, "README"), []byte("changed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cwd, _ := json.Marshal(map[string]string{"cwd": wt}) // the same folder, so only the status is read again
+	h.Hook(t, s.ID, "PostToolUse", string(cwd))
+	eventually(t, "the tool call's change in the row", func() bool { got, _ := h.Session(s.ID); return got.Git != nil && got.Git.Uncommitted == 2 })
+}
+
+func TestBranchStatusOfABranchOriginHasNot(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	wt := filepath.Join(h.Dir, "trees", "issue-7")
+	gitIn(t, h.Dir, "worktree", "add", "-b", "issue-7", wt)
+	commitIn(t, wt, "a.txt")
+	commitIn(t, wt, "b.txt")
+	s := issueSession(h, t, 7)
+	h.RefreshPRs()
+	if got := gitStatus(t, h, s.ID); got != (sessions.BranchStatus{Base: "main", Ahead: 2, Unpushed: 2}) {
+		t.Errorf("a branch never pushed = %+v", got)
+	}
+}
+
+func TestBranchStatusAfterAMergeThatLeftACommitOut(t *testing.T) {
+	h := newHarness(t)
+	origin := repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	head := gitIn(t, wt, "rev-parse", "HEAD")
+	commitIn(t, wt, "after.txt")
+	gitIn(t, origin, "branch", "-D", "issue-7")
+	gitIn(t, h.Dir, "fetch", "--prune")
+	s := issueSession(h, t, 7)
+
+	openThenMergeAt(h, head)
+	eventually(t, "blocked", func() bool { got, _ := h.Session(s.ID); return got.Cleanup == "blocked" })
+	if got := gitStatus(t, h, s.ID); got.NotInMain != 1 || got.Unpushed != 0 {
+		t.Errorf("after the merge = %+v, want 1 commit not in main and none counted unpushed", got)
 	}
 }
 
