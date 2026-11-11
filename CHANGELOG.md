@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.47.0](https://github.com/nednella/agentos/compare/v0.46.3...v0.47.0) (2026-11-11)
+
+
+### Features
+
+* **desktop:** read branch status and PR details for session rows ([53a1528](https://github.com/nednella/agentos/commit/53a15285c495ef34759e61d6790c0bbc935963ad))
+* **ui:** replace PR badge with branch status line and hover card ([bfdf3c4](https://github.com/nednella/agentos/commit/bfdf3c470fc09af9a0449152d595b7dc6a8f1b52))
+
 ## [0.46.3](https://github.com/nednella/agentos/compare/v0.46.2...v0.46.3) (2026-11-06)
 
 
