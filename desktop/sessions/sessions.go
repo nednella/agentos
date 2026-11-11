@@ -66,12 +66,13 @@ type Session struct {
 	Evidence    int              `json:"evidence"`
 	Browser     bool             `json:"browser"`
 
-	Branch        string `json:"branch"`
-	Worktree      string `json:"worktree"`
-	PR            *PR    `json:"pr"`
-	PRAttention   string `json:"prAttention"`
-	Cleanup       string `json:"cleanup"`
-	CleanupReason string `json:"cleanupReason"`
+	Branch        string        `json:"branch"`
+	Worktree      string        `json:"worktree"`
+	PR            *PR           `json:"pr"`
+	Git           *BranchStatus `json:"git"` // nil when git cannot read the branch
+	PRAttention   string        `json:"prAttention"`
+	Cleanup       string        `json:"cleanup"`
+	CleanupReason string        `json:"cleanupReason"`
 
 	EndedAt   int64 `json:"endedAt"`   // unix ms; 0 while the session runs
 	Resumable bool  `json:"resumable"` // the session has ended and its agent can continue its conversation
@@ -586,7 +587,8 @@ func (s *Sessions) take(rec session.Record) {
 }
 
 // followBranch has the lifecycle look at the branch of a session, when the agent moved,
-// finished a turn or switched the branch of the project folder. It needs mu.
+// finished a turn or switched the branch of the project folder, and read its git status again after
+// each tool call. It needs mu.
 func (s *Sessions) followBranch(rec session.Record) {
 	if s.isChat(rec.Session) || rec.Cwd == "" {
 		return
@@ -603,6 +605,9 @@ func (s *Sessions) followBranch(rec session.Record) {
 		}
 		if switched := s.switched(rec, proj.Dir); moved || switched {
 			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop", switched)
+		}
+		if rec.Event == "PostToolUse" {
+			go s.life.restatus(s.ctx, rec.Session, proj)
 		}
 	}
 }
@@ -947,7 +952,7 @@ func (s *Sessions) list() []Session {
 			view.Resumable = s.Provider(in.Agent).Can(agent.Resume) && s.conversationOf(id) != ""
 		}
 		f := s.life.fields(id)
-		view.Branch, view.Worktree, view.PR = f.branch, f.worktree, f.pr
+		view.Branch, view.Worktree, view.PR, view.Git = f.branch, f.worktree, f.pr, f.git
 		view.PRAttention, view.Cleanup, view.CleanupReason = f.attention, f.cleanup, f.reason
 		if view.Branch == "" && issue > 0 {
 			view.Branch = s.project.BranchFor(issue)

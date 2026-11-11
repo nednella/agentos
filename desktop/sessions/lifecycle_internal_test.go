@@ -54,6 +54,51 @@ func TestParsePR(t *testing.T) {
 	}
 }
 
+func TestParsePRChecksAndTitle(t *testing.T) {
+	data := `[{"number":12,"title":"Show the status","url":"u","state":"OPEN","isDraft":false,"statusCheckRollup":[` +
+		`{"name":"lint","status":"COMPLETED","conclusion":"FAILURE"},{"context":"ci/test","state":"ERROR"},` +
+		`{"name":"build","status":"IN_PROGRESS"},{"name":"vet","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[],"updatedAt":"2026-10-01T12:00:00Z"}]`
+	pr, err := parsePR([]byte(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pr.Title != "Show the status" || pr.Checks != "failing" || !slices.Equal(pr.FailedChecks, []string{"lint", "ci/test"}) || pr.RunningChecks != 1 || pr.PassedChecks != 1 {
+		t.Errorf("pr = %+v", pr)
+	}
+	if pr, _ := parsePR([]byte(prJSON("OPEN", false, "[]", 0, 0))); pr.FailedChecks == nil {
+		t.Error("no failing checks must be an empty list, not null")
+	}
+}
+
+func TestVerdict(t *testing.T) {
+	by := func(login, state string) review {
+		r := review{State: state}
+		r.Author.Login = login
+		return r
+	}
+	tests := []struct {
+		name    string
+		reviews []review
+		want    string
+	}{
+		{"none", nil, ""},
+		{"a comment", []review{by("a", "COMMENTED")}, "commented"},
+		{"an approval", []review{by("a", "APPROVED")}, "approved"},
+		{"a comment after an approval keeps it", []review{by("a", "APPROVED"), by("a", "COMMENTED")}, "approved"},
+		{"changes by one reviewer win over another's approval", []review{by("a", "CHANGES_REQUESTED"), by("b", "APPROVED")}, "changes"},
+		{"a reviewer's later approval replaces their changes", []review{by("a", "CHANGES_REQUESTED"), by("a", "APPROVED")}, "approved"},
+		{"a dismissal undoes the approval", []review{by("a", "APPROVED"), by("a", "DISMISSED")}, ""},
+		{"a pending review is not one", []review{by("a", "PENDING")}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := verdict(tt.reviews); got != tt.want {
+				t.Errorf("verdict = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseWorktrees(t *testing.T) {
 	w := parseWorktrees("worktree /p\nHEAD abc\nbranch refs/heads/main\n\nworktree /p/trees/issue-7\nHEAD def\nbranch refs/heads/issue-7\n\nworktree /p/detached\nHEAD 123\ndetached\n")
 	if w.main != "/p" || w.byBranch["issue-7"] != "/p/trees/issue-7" || w.byBranch["main"] != "/p" || len(w.byBranch) != 2 || !slices.Equal(w.detached, []string{"/p/detached"}) {

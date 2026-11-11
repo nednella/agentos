@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,8 +47,25 @@ type PR struct {
 
 	Conflicting bool `json:"conflicting"` // the branch does not merge cleanly into its base
 
+	Title         string   `json:"title"`
+	Review        string   `json:"review"`       // the reviewers' verdict: "changes", "approved", "commented" or ""
+	FailedChecks  []string `json:"failedChecks"` // the names of the checks that fail
+	RunningChecks int      `json:"runningChecks"`
+	PassedChecks  int      `json:"passedChecks"`
+	NewComments   int      `json:"newComments"` // the comments and reviews the user has not seen
+
 	ClosedAt int64  `json:"-"` // when the PR merged or closed; 0 while it is live
 	HeadOid  string `json:"-"` // the commit the PR's branch ended on
+}
+
+// BranchStatus is where a session's branch stands against origin, as git on this Mac sees it.
+type BranchStatus struct {
+	Base        string `json:"base"`        // the branch pull requests merge into
+	Unpushed    int    `json:"unpushed"`    // commits origin's copy of the branch lacks, or the base when origin has none; after a merge NotInMain counts instead
+	Uncommitted int    `json:"uncommitted"` // changed and new files in the worktree
+	Ahead       int    `json:"ahead"`       // commits the base on origin lacks
+	Behind      int    `json:"behind"`      // commits on the base on origin that the branch lacks
+	NotInMain   int    `json:"notInMain"`   // after a merge, the commits the merged pull request did not take
 }
 
 // Cleanup is one entry of the clean-up log.
@@ -94,11 +112,14 @@ type track struct {
 	branch    string // the branch the PR was found on, or the newest one when there is none
 	worktree  string
 	pr        *PR
+	git       *BranchStatus
 	attention string
 	cleanup   string
 	reason    string
 	autoTried bool
 	opened    bool // the PR is new to the app; the user hears of it once the session is idle
+	reading   bool // a read of the git status runs
+	again     bool // another read was asked for during that one
 }
 
 // ack is how much of a PR the user has seen.
@@ -209,6 +230,7 @@ func (l *Lifecycle) stopCleanups() {
 type sessionFields struct {
 	branch, worktree, attention, cleanup, reason string
 	pr                                           *PR
+	git                                          *BranchStatus
 }
 
 func (l *Lifecycle) fields(id string) sessionFields {
@@ -224,7 +246,14 @@ func (l *Lifecycle) fields(id string) sessionFields {
 	f := sessionFields{branch: t.branch, worktree: t.worktree, attention: t.attention, cleanup: t.cleanup, reason: t.reason}
 	if t.pr != nil {
 		pr := *t.pr
+		if a, seen := l.prs(session.ProjectKey(id)).Acks[strconv.Itoa(pr.Number)]; seen {
+			pr.NewComments = max(0, pr.Comments-a.Comments)
+		}
 		f.pr = &pr
+	}
+	if t.git != nil {
+		st := *t.git
+		f.git = &st
 	}
 	return f
 }
@@ -344,9 +373,14 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		}
 		fetched = append(fetched, done{t, branch, pr})
 	}
+	var statuses map[string]*BranchStatus
+	if treeErr == nil {
+		statuses = l.statuses(ctx, proj.Dir, trees, fetched)
+	}
 	var auto []string
 	for _, f := range fetched {
 		o := l.update(f.target, f.branch, trees.byBranch[f.branch], f.pr, hearer(fetched, f.branch) == f.id)
+		l.setStatus(f.id, f.branch, statuses[f.branch])
 		if o.auto {
 			auto = append(auto, f.id)
 		}
@@ -865,32 +899,41 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
-		"number,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt,closedAt", "--limit", "1")
+		"number,title,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt,closedAt", "--limit", "1")
 	if err != nil {
 		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
 	return parsePR(out)
 }
 
+// review is one review of a pull request, as gh lists them, oldest first.
+type review struct {
+	State  string `json:"state"`
+	Author struct {
+		Login string `json:"login"`
+	} `json:"author"`
+}
+
 func parsePR(data []byte) (*PR, error) {
 	var raw []struct {
 		Number    int    `json:"number"`
+		Title     string `json:"title"`
 		URL       string `json:"url"`
 		State     string `json:"state"`
 		IsDraft   bool   `json:"isDraft"`
 		HeadOid   string `json:"headRefOid"`
 		Mergeable string `json:"mergeable"`
 		Rollup    []struct {
+			Name       string `json:"name"`    // a check run's
+			Context    string `json:"context"` // a commit status's
 			Status     string `json:"status"`
 			Conclusion string `json:"conclusion"`
 			State      string `json:"state"`
 		} `json:"statusCheckRollup"`
-		Comments []json.RawMessage `json:"comments"`
-		Reviews  []struct {
-			State string `json:"state"`
-		} `json:"reviews"`
-		UpdatedAt time.Time `json:"updatedAt"`
-		ClosedAt  time.Time `json:"closedAt"`
+		Comments  []json.RawMessage `json:"comments"`
+		Reviews   []review          `json:"reviews"`
+		UpdatedAt time.Time         `json:"updatedAt"`
+		ClosedAt  time.Time         `json:"closedAt"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("reading gh pr list: %w", err)
@@ -899,12 +942,13 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), Checks: "none", HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING"}
+	pr := &PR{Number: r.Number, Title: r.Title, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING", FailedChecks: []string{}}
 	for _, v := range r.Reviews {
 		if v.State != "APPROVED" { // an approval asks nothing of the session
 			pr.Comments++
 		}
 	}
+	pr.Review = verdict(r.Reviews)
 	switch {
 	case r.State == "MERGED":
 		pr.State = "merged"
@@ -919,14 +963,49 @@ func parsePR(data []byte) (*PR, error) {
 		switch {
 		case slices.Contains([]string{"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"}, c.Conclusion),
 			c.State == "FAILURE" || c.State == "ERROR":
-			pr.Checks = "failing"
-		case pr.Checks != "failing" && (c.State == "PENDING" || c.State == "EXPECTED" || (c.State == "" && c.Status != "" && c.Status != "COMPLETED")):
-			pr.Checks = "pending"
-		case pr.Checks == "none":
-			pr.Checks = "passing"
+			pr.FailedChecks = append(pr.FailedChecks, cmp.Or(c.Name, c.Context))
+		case c.State == "PENDING" || c.State == "EXPECTED" || (c.State == "" && c.Status != "" && c.Status != "COMPLETED"):
+			pr.RunningChecks++
+		default:
+			pr.PassedChecks++
 		}
 	}
+	switch {
+	case len(pr.FailedChecks) > 0:
+		pr.Checks = "failing"
+	case pr.RunningChecks > 0:
+		pr.Checks = "pending"
+	case pr.PassedChecks > 0:
+		pr.Checks = "passing"
+	default:
+		pr.Checks = "none"
+	}
 	return pr, nil
+}
+
+// verdict sums up the latest verdict of each reviewer: changes requested by anyone, else an approval,
+// else a comment. As on GitHub, a comment does not undo a verdict, and a dismissal does.
+func verdict(reviews []review) string {
+	latest := map[string]string{}
+	commented := false
+	for _, v := range reviews {
+		switch v.State {
+		case "APPROVED", "CHANGES_REQUESTED", "DISMISSED":
+			latest[v.Author.Login] = v.State
+		case "COMMENTED":
+			commented = true
+		}
+	}
+	verdicts := slices.Collect(maps.Values(latest))
+	switch {
+	case slices.Contains(verdicts, "CHANGES_REQUESTED"):
+		return "changes"
+	case slices.Contains(verdicts, "APPROVED"):
+		return "approved"
+	case commented:
+		return "commented"
+	}
+	return ""
 }
 
 // Cleanup removes a session's worktree, branch and temp files and ends the session.
@@ -1207,7 +1286,7 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 		return ""
 	}
 	merged := pr != nil && pr.State == "merged"
-	out, err := l.git(ctx, dir, "rev-list", "origin/"+branch+".."+branch)
+	n, err := l.commitsNotIn(ctx, dir, "origin/"+branch, branch)
 	switch {
 	case err != nil && merged:
 		// GitHub deletes the remote branch on merge, so compare with what the PR merged instead.
@@ -1215,7 +1294,7 @@ func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, br
 	case err != nil:
 		return branch + " has no copy on origin to compare with"
 	}
-	switch n := len(strings.Fields(string(out))); {
+	switch {
 	case n == 1:
 		return branch + " has a commit that is not on origin"
 	case n > 1:
@@ -1229,15 +1308,113 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 	if head == "" {
 		return "GitHub did not say which commit the merged pull request ended on"
 	}
-	_, err := l.git(ctx, dir, "merge-base", "--is-ancestor", branch, head)
-	var exit *exec.ExitError
+	n, err := l.commitsNotIn(ctx, dir, head, branch)
 	switch {
-	case err == nil:
-		return ""
-	case errors.As(err, &exit) && exit.ExitCode() == 1:
+	case err != nil:
+		return fmt.Sprintf("git could not compare %s with the merged pull request: %v", branch, err)
+	case n > 0:
 		return branch + " has commits that are not in the merged pull request"
 	}
-	return fmt.Sprintf("git could not compare %s with the merged pull request: %v", branch, err)
+	return ""
+}
+
+// commitsNotIn counts the commits on branch that ref lacks.
+func (l *Lifecycle) commitsNotIn(ctx context.Context, dir, ref, branch string) (int, error) {
+	out, err := l.git(ctx, dir, "rev-list", "--count", ref+".."+branch)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(strings.TrimSpace(string(out)))
+}
+
+// statuses reads the git status of each fetched branch once.
+func (l *Lifecycle) statuses(ctx context.Context, dir string, trees worktrees, fetched []done) map[string]*BranchStatus {
+	out := map[string]*BranchStatus{}
+	if len(fetched) == 0 {
+		return out
+	}
+	base := l.mainBranch(ctx, dir)
+	for _, f := range fetched {
+		if _, ok := out[f.branch]; !ok {
+			out[f.branch] = l.branchStatus(ctx, dir, base, f.branch, trees.byBranch[f.branch], f.pr)
+		}
+	}
+	return out
+}
+
+// branchStatus reads where branch stands against origin, or nil when git cannot compare it with the base.
+func (l *Lifecycle) branchStatus(ctx context.Context, dir, base, branch, worktree string, pr *PR) *BranchStatus {
+	out, err := l.git(ctx, dir, "rev-list", "--left-right", "--count", "origin/"+base+"..."+branch)
+	if err != nil {
+		return nil
+	}
+	st := &BranchStatus{Base: base}
+	if _, err := fmt.Sscan(string(out), &st.Behind, &st.Ahead); err != nil {
+		return nil
+	}
+	merged := pr != nil && pr.State == "merged"
+	if st.Unpushed, err = l.commitsNotIn(ctx, dir, "origin/"+branch, branch); err != nil {
+		st.Unpushed = 0
+		if !merged { // a merge copies the commits onto the base, so NotInMain says what is lost
+			st.Unpushed = st.Ahead
+		}
+	}
+	if merged && pr.HeadOid != "" {
+		st.NotInMain, _ = l.commitsNotIn(ctx, dir, pr.HeadOid, branch)
+	}
+	if worktree != "" {
+		if out, err := l.git(ctx, dir, "-C", worktree, "status", "--porcelain"); err == nil {
+			st.Uncommitted = strings.Count(string(out), "\n")
+		}
+	}
+	return st
+}
+
+// setStatus stores the git status read for the session's branch, unless the session moved on since.
+func (l *Lifecycle) setStatus(id, branch string, st *BranchStatus) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if tr := l.tracks[id]; tr != nil && tr.branch == branch {
+		tr.git = st
+	}
+}
+
+// restatus reads the git status of the session's branch again, so the row follows the agent's commits
+// and edits between fetches. Reads for one session do not overlap: one asked for during a read runs after it.
+func (l *Lifecycle) restatus(ctx context.Context, id string, proj project.Project) {
+	l.mu.Lock()
+	tr := l.tracks[id]
+	if tr == nil || tr.branch == "" {
+		l.mu.Unlock()
+		return
+	}
+	if tr.reading {
+		tr.again = true
+		l.mu.Unlock()
+		return
+	}
+	tr.reading = true
+	for {
+		tr.again = false
+		branch, worktree := tr.branch, tr.worktree
+		var pr *PR
+		if tr.pr != nil {
+			c := *tr.pr
+			pr = &c
+		}
+		l.mu.Unlock()
+		st := l.branchStatus(ctx, proj.Dir, l.mainBranch(ctx, proj.Dir), branch, worktree, pr)
+		l.mu.Lock()
+		if tr.branch == branch {
+			tr.git = st
+		}
+		if !tr.again || l.gone[id] {
+			break
+		}
+	}
+	tr.reading = false
+	l.mu.Unlock()
+	l.sessions.changed()
 }
 
 func (l *Lifecycle) runProjectCommand(ctx context.Context, proj project.Project, b branchPlan, force bool) error {
@@ -1341,7 +1518,7 @@ func (l *Lifecycle) inherit(proj project.Project, from, to string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if old := l.tracks[from]; old != nil && l.tracks[to] == nil {
-		l.tracks[to] = &track{branch: old.branch, worktree: old.worktree, pr: old.pr}
+		l.tracks[to] = &track{branch: old.branch, worktree: old.worktree, pr: old.pr, git: old.git}
 	}
 	f := l.prs(key)
 	for _, m := range []map[string][]string{f.Branches, f.Reported, f.SawOpen} {
