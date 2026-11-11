@@ -7,22 +7,24 @@ import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { ActionTag } from './ActionTag'
 import { CleanupControls } from './CleanupControls'
+import { EvidenceButton } from './EvidenceButton'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
-import { PRBadge } from './PRBadge'
 import { StateDot } from './StateDot'
+import { StatusLine } from './StatusLine'
 import { Timeline } from './Timeline'
 
 type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
 
 export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
-  const { select, focus, setSessionView, dismissSession, resumeSession, report, issues } = useAgentos()
+  const { select, focus, dismissSession, resumeSession, report, issues } = useAgentos()
   const now = useNow()
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
-  const showPR = session.pr !== null && !dense
+  const showStatus = (session.pr !== null || session.git !== null) && (!dense || ended)
   const showEvidence = session.evidence > 0 && !dense
-  const hasFooter = ended || showPR || showEvidence || session.cleanup !== ''
+  const hasActions = ended || session.cleanup !== '' || (!showStatus && showEvidence)
+  const hasFooter = showStatus || hasActions
   const spend = session.tokens > 0 ? `~${dollars(session.cost)}` : ''
 
   return (
@@ -68,46 +70,41 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
         )}
       </button>
       {hasFooter && (
-        <div className={`flex w-full flex-wrap items-center gap-2 pr-[0.5625rem] pl-[2.1875rem] ${dense ? 'pb-2' : 'pb-2.5'}`}>
-          {ended && (
-            <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
-          )}
-          {showPR && <PRBadge session={session} compact={compact} />}
-          {ended && session.pr && dense && <PRBadge session={session} compact />}
-          {showEvidence && (
-            <button
-              className="inline-flex h-6 flex-none items-center gap-1 rounded-sm border border-line-strong px-2 text-small text-soft"
-              title={`${session.evidence} evidence items`}
-              onClick={() => {
-                select(session.id)
-                setSessionView(session.id, 'evidence')
-              }}
-            >
-              <Icon name="image" size={12} />
-              <span className="mono">{session.evidence}</span>
-            </button>
-          )}
-          {session.cleanup !== '' && <CleanupControls session={session} />}
-          {ended && issue && (
-            <button
-              className="btn btn-ghost h-6 px-2"
-              title={`Open #${issue.number} on GitHub`}
-              onClick={() => report(() => api.openURL(issue.url))}
-            >
-              <Icon name="external" size={12} /> #{issue.number}
-            </button>
-          )}
-          {ended && (
-            <span className="ml-auto flex gap-2">
-              {session.resumable && (
-                <button className="btn h-6 px-2" title="Start a session that continues this conversation" onClick={() => report(() => resumeSession(session.id))}>
-                  Resume
+        <div className={`flex w-full flex-col gap-1.5 pr-[0.5625rem] pl-[2.1875rem] ${dense ? 'pb-2' : 'pb-2.5'}`}>
+          {showStatus && <StatusLine session={session}>{showEvidence && <EvidenceButton session={session} />}</StatusLine>}
+          {hasActions && (
+            <div className="flex w-full flex-wrap items-center gap-2">
+              {ended && (
+                <span className="inline-flex h-6 items-center rounded-sm border border-line-strong px-2 text-small text-soft">Ended</span>
+              )}
+              {!showStatus && showEvidence && <EvidenceButton session={session} />}
+              {session.cleanup !== '' && <CleanupControls session={session} />}
+              {ended && issue && (
+                <button
+                  className="btn btn-ghost h-6 px-2"
+                  title={`Open #${issue.number} on GitHub`}
+                  onClick={() => report(() => api.openURL(issue.url))}
+                >
+                  <Icon name="external" size={12} /> #{issue.number}
                 </button>
               )}
-              <button className="btn h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
-                Dismiss
-              </button>
-            </span>
+              {ended && (
+                <span className="ml-auto flex gap-2">
+                  {session.resumable && (
+                    <button
+                      className="btn h-6 px-2"
+                      title="Start a session that continues this conversation"
+                      onClick={() => report(() => resumeSession(session.id))}
+                    >
+                      Resume
+                    </button>
+                  )}
+                  <button className="btn h-6 px-2" onClick={() => report(() => dismissSession(session.id))}>
+                    Dismiss
+                  </button>
+                </span>
+              )}
+            </div>
           )}
         </div>
       )}
