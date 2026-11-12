@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.48.0](https://github.com/nednella/agentos/compare/v0.47.0...v0.48.0) (2026-11-12)
+
+
+### Features
+
+* **ui:** show chat and task cards after detaching a session ([817a53b](https://github.com/nednella/agentos/commit/817a53bbe5405d8e31dd9a66676bf2b99af4345d))
+
+
+### Bug Fixes
+
+* **ui:** keep closed queue sections per project ([b271a6b](https://github.com/nednella/agentos/commit/b271a6bb913529820ff4497c4bd73574b76fb3ed))
+* **ui:** keep closed session groups per project ([4084323](https://github.com/nednella/agentos/commit/40843239e109065b9454b44ca8721d0dfb806a89))
+
 ## [0.47.0](https://github.com/nednella/agentos/compare/v0.46.3...v0.47.0) (2026-11-11)
 
 
