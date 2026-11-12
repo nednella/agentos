@@ -67,7 +67,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
         if (e.key === '0') setView(FIT)
       }}
     >
-      <ZoomableImage src={item.url} alt={item.caption || 'Media image'} view={view} onView={setView} onDismiss={onClose} />
+      <ZoomableImage src={item.url} alt={item.caption || 'Image'} view={view} onView={setView} onDismiss={onClose} />
       <div className="flex max-w-3xl flex-col items-center gap-2 text-center">
         {item.caption && <p className="text-body">{item.caption}</p>}
         <p className="mono text-small text-dim">
