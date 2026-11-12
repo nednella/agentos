@@ -20,7 +20,6 @@ import { SessionRow } from './SessionRow'
 
 const COMPACT_BELOW_REM = 17
 const NEW_SESSION_KEY = 'new-session'
-const CLOSED_KEY = 'agentos.sessions.closed'
 
 type GroupKey = 'chats' | 'tasks'
 type Group = { key: GroupKey; name: string; sessions: Session[]; open: boolean }
@@ -28,17 +27,22 @@ type Item = { kind: 'group'; group: Group } | { kind: 'session'; session: Sessio
 
 const itemKey = (item: Item) => (item.kind === 'group' ? `group:${item.group.key}` : item.session.id)
 
+const closedKey = (project: string) => `agentos.sessions.closed.${project}`
+const readClosed = (project: string) => ({ project, groups: new Set(readStored<GroupKey[]>(closedKey(project), [])) })
+
 type SessionsListProps = { panel: RefObject<HTMLElement>; full: boolean; overlay: boolean; widthRem: number }
 
 function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
-  const { sessions, selectedId, select, focus, setComposing } = useAgentos()
+  const { project, sessions, selectedId, select, focus, setComposing } = useAgentos()
   const { mode, setSessionsOpen, returnToTerminal } = useLayout()
   const list = useRef<HTMLDivElement>(null)
-  const [closed, setClosed] = useState<Set<GroupKey>>(() => new Set(readStored<GroupKey[]>(CLOSED_KEY, [])))
+  const projectName = project?.name ?? ''
+  const [closed, setClosed] = useState(() => readClosed(projectName))
+  if (closed.project !== projectName) setClosed(readClosed(projectName))
 
   const groups: Group[] = [
-    { key: 'chats', name: 'Chats', sessions: sessions.filter((s) => s.chat), open: !closed.has('chats') },
-    { key: 'tasks', name: 'Tasks', sessions: sessions.filter((s) => !s.chat), open: !closed.has('tasks') },
+    { key: 'chats', name: 'Chats', sessions: sessions.filter((s) => s.chat), open: !closed.groups.has('chats') },
+    { key: 'tasks', name: 'Tasks', sessions: sessions.filter((s) => !s.chat), open: !closed.groups.has('tasks') },
   ]
   const items: Item[] = groups.flatMap((group) => [
     { kind: 'group' as const, group },
@@ -46,13 +50,11 @@ function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
   ])
 
   const toggle = (key: GroupKey, open: boolean) => {
-    setClosed((set) => {
-      const next = new Set(set)
-      if (open) next.delete(key)
-      else next.add(key)
-      writeStored(CLOSED_KEY, [...next])
-      return next
-    })
+    const groups = new Set(closed.groups)
+    if (open) groups.delete(key)
+    else groups.add(key)
+    writeStored(closedKey(projectName), [...groups])
+    setClosed({ project: projectName, groups })
   }
 
   const groupAt = (index: number) => {
