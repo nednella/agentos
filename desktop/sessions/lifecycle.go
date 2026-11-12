@@ -1125,7 +1125,7 @@ func (l *Lifecycle) release(key, id, branch string) {
 // A step that finds the context cancelled stops with closedReason.
 func (l *Lifecycle) removeAll(ctx context.Context, t target, pr *PR, prBranch string, force bool) (removed []string, reason string) {
 	removed = []string{}
-	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.runCleanupCommand, l.removeSession}
+	steps := []func(context.Context, target, *cleanupPlan) ([]string, string){l.stopShell, l.runCleanupCommand, l.removeSession}
 	plan, reason := l.plan(ctx, t, pr, prBranch, force)
 	for _, step := range steps {
 		if reason != "" {
@@ -1214,6 +1214,18 @@ func (l *Lifecycle) runCleanupCommand(ctx context.Context, t target, p *cleanupP
 		removed = append(removed, "clean-up command for "+b.branch)
 	}
 	return removed, ""
+}
+
+// stopShell stops the session's own shell, so no program in it works in the worktree the clean-up command removes.
+func (l *Lifecycle) stopShell(ctx context.Context, t target, _ *cleanupPlan) (removed []string, reason string) {
+	stopped, err := l.sessions.stopShell(ctx, t.id)
+	switch {
+	case err != nil:
+		return nil, fmt.Sprintf("stopping the shell failed: %v", err)
+	case stopped:
+		return []string{"shell"}, ""
+	}
+	return nil, ""
 }
 
 // leftBehind says whether the branch still exists or any worktree has it checked out. A failed

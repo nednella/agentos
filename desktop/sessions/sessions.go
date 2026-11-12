@@ -65,6 +65,7 @@ type Session struct {
 	History     []session.Change `json:"history"`
 	Evidence    int              `json:"evidence"`
 	Browser     bool             `json:"browser"`
+	Shell       string           `json:"shell"` // the id of the session's own shell while it runs, else ""
 
 	Branch        string        `json:"branch"`
 	Worktree      string        `json:"worktree"`
@@ -123,7 +124,7 @@ type Sessions struct {
 	awake      Awake
 	keepAwake  func(projectKey string) bool
 	info       []term.Info
-	shells     []session.Name           // every project's shell sessions
+	shells     []session.Name           // every project's shells and every session's own shell
 	known      map[string]term.Info     // the last info of every session seen, for when it ends
 	ended      map[string]*endedSession // sessions whose tmux session is gone, until dismissed
 	nums       map[string]int           // the number each session shows, for this run of the app
@@ -514,6 +515,7 @@ func (s *Sessions) drop(id string) {
 		go os.RemoveAll(s.tmpDir(name))
 		_ = os.Remove(s.handoverPath(name))
 	}
+	go s.stopShell(s.ctx, id)
 }
 
 // tmpDir is the session's own TMPDIR, and Claude's scratchpad. It sits in a folder the agent may use
@@ -944,6 +946,9 @@ func (s *Sessions) list() []Session {
 			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Agent: in.Agent, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
 			History: slices.Clone(s.history[id]),
 		}
+		if shell := ss.Name.OwnShell(); slices.Contains(s.shells, shell) {
+			view.Shell = shell.String()
+		}
 		if !ss.At.IsZero() {
 			view.LastEventAt = ss.At.UnixMilli()
 		}
@@ -1275,6 +1280,7 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	}
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
+		s.takeShell(tctx, from, name)
 	}
 	view := s.register(p, name, title, proj, issue, model, created, conversation != "", chat, action)
 	if branch := proj.BranchFor(issue); issue > 0 && branch != "" && !chat {
@@ -1723,14 +1729,15 @@ func (s *Sessions) closeBrowser(id string) {
 	s.browsers.Close(ctx, id)
 }
 
-// ShellIDs are the current project's shell sessions in tab order, empty until one is opened.
+// ShellIDs are the current project's shell sessions in tab order, empty until one is opened. A session's own
+// shell is not one of them.
 func (s *Sessions) ShellIDs() []string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	key := s.project.Key()
 	var mine []session.Name
 	for _, n := range s.shells {
-		if n.Project == key {
+		if n.Project == key && n.Token == "" {
 			mine = append(mine, n)
 		}
 	}
@@ -1751,41 +1758,85 @@ func (s *Sessions) OpenShell() (string, error) {
 	if ids := s.ShellIDs(); len(ids) > 0 {
 		return ids[0], nil
 	}
-	return s.startShell()
+	return s.newProjectShell()
 }
 
 // NewShell starts another shell in the current project, numbered after the shells it has.
 func (s *Sessions) NewShell() (string, error) {
 	s.shellMu.Lock()
 	defer s.shellMu.Unlock()
-	return s.startShell()
+	return s.newProjectShell()
 }
 
-func (s *Sessions) startShell() (string, error) {
+func (s *Sessions) newProjectShell() (string, error) {
 	s.mu.Lock()
-	ctx, proj := s.ctx, s.project
+	proj := s.project
 	var used []int
 	for _, n := range s.shells {
-		if n.Project == proj.Key() {
+		if n.Project == proj.Key() && n.Token == "" {
 			used = append(used, n.Shell)
 		}
 	}
 	s.mu.Unlock()
 	name := session.Name{Project: proj.Key(), Shell: session.NextN(used)}
-	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	if err := s.startShell(name, proj.Dir); err != nil {
+		return "", err
+	}
+	return name.String(), nil
+}
+
+// OpenSessionShell makes sure the session, running or ended, has its own shell and returns the shell's id. The shell
+// starts in the session's worktree, else in the project folder.
+func (s *Sessions) OpenSessionShell(id string) (string, error) {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return "", err
+	}
+	if name.IsShell() {
+		return "", errNotSession
+	}
+	shell := name.OwnShell()
+	s.shellMu.Lock()
+	defer s.shellMu.Unlock()
+	s.mu.Lock()
+	has := slices.Contains(s.shells, shell)
+	in, known := s.infoOf(id)
+	proj, found := s.projectOf(in)
+	s.mu.Unlock()
+	switch {
+	case has:
+		return shell.String(), nil
+	case !known:
+		return "", fmt.Errorf("no session %s", id)
+	case !found:
+		return "", fmt.Errorf("the project of session %s is gone", id)
+	}
+	if err := s.startShell(shell, cmp.Or(s.life.fields(id).worktree, proj.Dir)); err != nil {
+		return "", err
+	}
+	s.changed()
+	return shell.String(), nil
+}
+
+// startShell starts a login shell in dir. It gets the project, so the agentos command works in it, but no session:
+// the owner types in it, not an agent.
+func (s *Sessions) startShell(name session.Name, dir string) error {
+	s.createMu.Lock()
+	defer s.createMu.Unlock()
+	ctx, cancel := context.WithTimeout(s.context(), tmuxTimeout)
 	defer cancel()
 	login := cmp.Or(os.Getenv("SHELL"), "/bin/zsh")
 	env := []string{
-		"AGENTOS_PROJECT=" + proj.Key(),
+		"AGENTOS_PROJECT=" + name.Project,
 		"AGENTOS_SOCKET=" + bus.SocketPath(s.stateDir),
 	}
-	if err := s.tmux.NewSession(tctx, name, "shell", proj.Dir, env, []string{login, "-l"}, startCols, startRows); err != nil {
-		return "", err
+	if err := s.tmux.NewSession(ctx, name, "shell", dir, env, []string{login, "-l"}, startCols, startRows); err != nil {
+		return err
 	}
 	s.mu.Lock()
 	s.shells = append(s.shells, name)
 	s.mu.Unlock()
-	return name.String(), nil
+	return nil
 }
 
 // CloseShell stops one shell of the current project.
@@ -1807,6 +1858,54 @@ func (s *Sessions) CloseShell(id string) error {
 	defer s.mu.Unlock()
 	s.shells = slices.DeleteFunc(s.shells, func(n session.Name) bool { return n == name })
 	return nil
+}
+
+// stopShell stops the session's own shell and every program in it, and says whether there was one.
+func (s *Sessions) stopShell(ctx context.Context, id string) (bool, error) {
+	name, err := session.ParseName(id)
+	if err != nil {
+		return false, err
+	}
+	shell := name.OwnShell()
+	tctx, cancel := context.WithTimeout(ctx, tmuxTimeout)
+	defer cancel()
+	if !s.tmux.Has(tctx, shell) {
+		return false, nil
+	}
+	s.closeTerm(shell.String())
+	if err := s.tmux.Kill(tctx, shell); err != nil && s.tmux.Has(tctx, shell) {
+		return true, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.shells = slices.DeleteFunc(s.shells, func(n session.Name) bool { return n == shell })
+	s.sync()
+	return true, nil
+}
+
+// takeShell gives the ended session's shell, if it has one, to the session that resumes it.
+func (s *Sessions) takeShell(ctx context.Context, from string, to session.Name) {
+	old, err := session.ParseName(from)
+	if err != nil {
+		return
+	}
+	shell := old.OwnShell()
+	s.mu.Lock()
+	has := slices.Contains(s.shells, shell)
+	s.mu.Unlock()
+	if !has {
+		return
+	}
+	s.closeTerm(shell.String())
+	if err := s.tmux.Move(ctx, shell, to.OwnShell()); err != nil {
+		fmt.Fprintf(os.Stderr, "agentos: handing a shell to the resumed session: %v\n", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if i := slices.Index(s.shells, shell); i >= 0 {
+		s.shells[i] = to.OwnShell()
+	}
 }
 
 // chromeDevToolsMCPName is the package of the MCP server that gives Claude the page tools. Its version is pinned

@@ -466,6 +466,45 @@ func TestCleanupCustomCommand(t *testing.T) {
 	}
 }
 
+func TestCleanupStopsTheShellBeforeTheCommand(t *testing.T) {
+	t.Setenv("SHELL", "/bin/sh")
+	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "touch {dir}/ran; git worktree remove {force} {worktree} && git branch -D {branch}"})
+	repoFixture(t, h)
+	wt := issueWorktree(t, h)
+	s := issueSession(h, t, 7)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	eventually(t, "the worktree", func() bool { got, _ := h.Session(s.ID); return got.Worktree != "" })
+	shell, err := h.SessionShellOpen(s.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ran, saw, looping := filepath.Join(h.Dir, "ran"), filepath.Join(h.Dir, "saw"), filepath.Join(h.Dir, "looping")
+	loop := fmt.Sprintf(`trap "" HUP TERM; while :; do touch %s; [ -e %s ] && touch %s; sleep 0.1; done`, looping, ran, saw)
+	if err := exec.Command("tmux", "-L", h.Socket, "send-keys", "-t", "="+shell.ID+":", "-l", loop).Run(); err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("tmux", "-L", h.Socket, "send-keys", "-t", "="+shell.ID+":", "Enter").Run(); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the program in the shell", func() bool { return exists(looping) })
+
+	h.GH.SetPR(prJSON("MERGED", false, "[]", 0, 0))
+	h.RefreshPRs()
+	eventually(t, "the session to be cleaned up", func() bool { _, ok := h.Session(s.ID); return !ok })
+	log := h.Cleanups()
+	if want := []string{"shell", "clean-up command for issue-7", "temp files", "session"}; len(log) != 1 || !slices.Equal(log[0].Removed, want) {
+		t.Fatalf("log = %+v, want removed %q", log, want)
+	}
+	time.Sleep(300 * time.Millisecond)
+	if !exists(ran) || exists(saw) || exists(wt) {
+		t.Errorf("command ran %v, the shell's program saw it %v, worktree left %v", exists(ran), exists(saw), exists(wt))
+	}
+	if out, _ := exec.Command("tmux", "-L", h.Socket, "list-sessions").CombinedOutput(); strings.Contains(string(out), shell.ID) {
+		t.Errorf("the shell still runs: %s", out)
+	}
+}
+
 func TestCleanupCommandGetsForceOnlyWhenForced(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{CleanupCommand: "printf '[%s]' {force} > {dir}/force-{branch}; git worktree remove {force} {worktree} && git branch -D {branch}"})
 	repoFixture(t, h)

@@ -37,6 +37,12 @@ func (v *Service) ShellNew() (ShellInfo, error) {
 	return ShellInfo{ID: id}, err
 }
 
+// SessionShellOpen makes sure the session has its own shell and returns its id.
+func (v *Service) SessionShellOpen(id string) (ShellInfo, error) {
+	shell, err := v.s.OpenSessionShell(id)
+	return ShellInfo{ID: shell}, err
+}
+
 // ShellClose stops one shell of the current project.
 func (v *Service) ShellClose(id string) error { return v.s.CloseShell(id) }
 
