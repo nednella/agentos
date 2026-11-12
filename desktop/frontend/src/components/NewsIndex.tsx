@@ -72,7 +72,7 @@ export function NewsIndex() {
       aria-label="News"
       className="panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
     >
-      <header className="panel-head flex flex-none items-center gap-3 border-b border-line px-4 py-2.5">
+      <header className="panel-head flex h-10 flex-none items-center gap-3 border-b border-line px-4">
         <h2 className="text-title font-semibold">News</h2>
         <button
           className="btn btn-ghost ml-auto h-7 w-7 justify-center px-0"
