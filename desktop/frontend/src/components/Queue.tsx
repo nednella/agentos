@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
 import { filterIssues, isFiltering } from '../issueFilter'
-import { readStored, writeStored } from '../storage'
 import type { Issue } from '../types'
 import { useListNav } from '../useListNav'
 import { useMinimumLoading } from '../useMinimumLoading'
+import { useProjectStored } from '../useProjectStored'
 import { useDragEdgeScroll } from '../useDragEdgeScroll'
 import { useIssueDrag } from '../useIssueDrag'
 import { useScrollCursorIntoView } from '../useScrollCursorIntoView'
@@ -23,9 +23,6 @@ import type { NavRef } from './Sidebar'
 type Item = { kind: 'section'; name: string; count: number } | { kind: 'issue'; issue: Issue }
 
 const itemKey = (item: Item) => (item.kind === 'section' ? `section:${item.name}` : `issue:${item.issue.number}`)
-
-const CLOSED_KEY = 'agentos.queue.closed'
-const UNSORTED_OPEN_KEY = 'agentos.queue.unsortedOpen'
 
 type QueueProps = { nav: NavRef }
 
@@ -70,14 +67,14 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   const drag = useIssueDrag(coreIssues)
   const issues = drag.place(coreIssues)
   const shown = drag.place(coreShown)
-  const [closed, setClosed] = useState<Set<string>>(() => new Set(readStored<string[]>(CLOSED_KEY, [])))
-  const [unsortedOpen, setUnsortedOpen] = useState(() => readStored(UNSORTED_OPEN_KEY, false))
+  const [closed, setClosed] = useProjectStored<string[]>('queue.closed', [])
+  const [unsortedOpen, setUnsortedOpen] = useProjectStored('queue.unsortedOpen', false)
   const list = useRef<HTMLDivElement>(null)
 
   // The core lists issues section by section and the issues no section matches last, in a nameless group;
   // a project with no sections has only that group, shown as a plain list.
   const sorted = issues.some((issue) => issue.section)
-  const isClosed = useCallback((name: string) => (name ? closed.has(name) : sorted && !unsortedOpen), [closed, sorted, unsortedOpen])
+  const isClosed = useCallback((name: string) => (name ? closed.includes(name) : sorted && !unsortedOpen), [closed, sorted, unsortedOpen])
 
   const sections = useMemo(() => {
     const groups: { name: string; issues: Issue[]; open: boolean }[] = []
@@ -101,16 +98,9 @@ function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
   const toggle = (name: string, open: boolean) => {
     if (!name) {
       setUnsortedOpen(open)
-      writeStored(UNSORTED_OPEN_KEY, open)
       return
     }
-    setClosed((set) => {
-      const next = new Set(set)
-      if (open) next.delete(name)
-      else next.add(name)
-      writeStored(CLOSED_KEY, [...next])
-      return next
-    })
+    setClosed(open ? closed.filter((n) => n !== name) : [...closed, name])
   }
 
   const listNav = useListNav(items.map(itemKey), {
