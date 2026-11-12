@@ -44,11 +44,16 @@ export function ShellTabs() {
     selectShell(id)
     focusPanel('shell')
   }
+  const collapsible = mode !== 'narrow'
+  const toggle = () => setShellOpen(!shellOpen)
 
   return (
     <div
       className={`shell-tabs group/tabs flex h-10 flex-none items-stretch border-b text-small ${shellOpen ? 'border-line' : 'border-transparent'}`}
       style={{ paddingRight: 'var(--corner-pad)' }}
+      onClick={(e) => {
+        if (collapsible && e.target === e.currentTarget) toggle()
+      }}
     >
       <div role="tablist" aria-label="Shells" className="flex min-w-0 items-stretch">
         <ShellTab label={project?.name ?? ''} pinned selected={shellId === projectShell} onSelect={() => pick(projectShell)} />
@@ -91,13 +96,13 @@ export function ShellTabs() {
       >
         <Icon name="add" size={14} />
       </button>
-      {mode !== 'narrow' && (
+      {collapsible && (
         <button
           className={`${tabRowButton} ml-auto self-center`}
           title={shellOpen ? 'Collapse the shell (⌘S)' : 'Open the shell (⌘S)'}
           aria-label={shellOpen ? 'Collapse the shell' : 'Open the shell'}
           aria-expanded={shellOpen}
-          onClick={() => setShellOpen(!shellOpen)}
+          onClick={toggle}
         >
           <span className={`transition-transform duration-150 ${shellOpen ? '' : 'rotate-180'}`}>
             <Icon name="chevron-down" size={14} />
