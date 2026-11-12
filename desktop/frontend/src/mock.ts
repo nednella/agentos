@@ -242,6 +242,7 @@ export function createMock(params: URLSearchParams) {
       cleanup: s.cleanup,
       cleanupReason: s.cleanupReason,
       browser: s.browser,
+      shell: s.shell,
       evidence: s.evidence,
       chat: s.chat,
       action: s.action,
@@ -296,7 +297,8 @@ export function createMock(params: URLSearchParams) {
     }))
   }
 
-  type Shell = { id: string; project: string; buffer: string; line: string; opened: boolean }
+  // A session's own shell names its session; the drawer's shells name none.
+  type Shell = { id: string; project: string; dir: string; session: string; buffer: string; line: string; opened: boolean }
   const shells: Shell[] = []
   const shellName = (project: string, n: number) => (n === 1 ? `shell-${project}` : `shell-${project}-${n}`)
 
@@ -316,26 +318,45 @@ export function createMock(params: URLSearchParams) {
       shellWrite(shell, `\r\n\x1b[2mok: agentos ${args.join(' ')}\x1b[0m`)
       return
     }
+    if (name === 'exit') {
+      removeShell(shell.id)
+      emit('term:exit', { id: shell.id })
+      return
+    }
     if (name === 'ls') shellWrite(shell, '\r\napp-frontend  api  e2e  locales  CLAUDE.md  package.json')
-    else if (name === 'pwd') shellWrite(shell, `\r\n${current.dir}`)
+    else if (name === 'pwd') shellWrite(shell, `\r\n${shell.dir}`)
     else if (name === 'clear') shellWrite(shell, '\x1bc')
     else shellWrite(shell, `\r\nzsh: command not found: ${name}`)
   }
 
-  const shellsOf = (project: string) => shells.filter((x) => x.project === project)
+  const shellsOf = (project: string) => shells.filter((x) => x.project === project && !x.session)
   const findShell = (id: string) => shells.find((x) => x.id === id)
+
+  function addShell(id: string, dir: string, session = ''): Shell {
+    const shell: Shell = { id, project: current.name, dir, session, buffer: `\x1b[2m${dir}\x1b[0m\r\n${prompt(current.name)}`, line: '', opened: false }
+    shells.push(shell)
+    return shell
+  }
 
   function startShell(): Shell {
     const taken = shellsOf(current.name).map((x) => x.id)
     let n = 1
     while (taken.includes(shellName(current.name, n))) n++
-    const shell: Shell = { id: shellName(current.name, n), project: current.name, buffer: `\x1b[2m${current.dir}\x1b[0m\r\n${prompt(current.name)}`, line: '', opened: false }
-    shells.push(shell)
-    return shell
+    return addShell(shellName(current.name, n), current.dir)
+  }
+
+  function removeShell(id: string) {
+    const at = shells.findIndex((x) => x.id === id)
+    if (at < 0) return
+    const owner = sessions.find((s) => s.id === shells[at].session)
+    shells.splice(at, 1)
+    if (!owner) return
+    owner.shell = ''
+    publish()
   }
 
   function isShell(id: string) {
-    return id.startsWith('shell-')
+    return id.startsWith('shell-') || id.endsWith('-shell')
   }
 
   function snapshot(): Snapshot {
@@ -410,6 +431,7 @@ export function createMock(params: URLSearchParams) {
       cleanup: '',
       cleanupReason: '',
       browser: false,
+      shell: '',
       evidence: 0,
       chat,
       action: issue ? 'Work' : '',
@@ -907,6 +929,7 @@ export function createMock(params: URLSearchParams) {
       const s = find(id)
       if (s.state !== 'ended') throw 'Only an ended session can be dismissed'
       sessions.splice(sessions.indexOf(s), 1)
+      removeShell(s.shell)
       publish()
       emit('issues', { project: current.name, items: currentIssues() })
     },
@@ -921,6 +944,12 @@ export function createMock(params: URLSearchParams) {
       s.effort = old.effort
       s.agent = old.agent
       s.buffer = old.buffer + term.promptLine('')
+      const shell = findShell(old.shell)
+      if (shell) {
+        shell.id = `${s.id}-shell`
+        shell.session = s.id
+        s.shell = shell.id
+      }
       sessions.splice(sessions.indexOf(old), 1)
       publish()
       emit('issues', { project: current.name, items: currentIssues() })
@@ -1109,9 +1138,12 @@ export function createMock(params: URLSearchParams) {
       return { id: (shellsOf(current.name)[0] ?? startShell()).id }
     },
     ShellNew: async () => ({ id: startShell().id }),
-    ShellClose: async (id: string) => {
-      const at = shells.findIndex((x) => x.id === id)
-      if (at >= 0) shells.splice(at, 1)
+    ShellClose: async (id: string) => removeShell(id),
+    SessionShellOpen: async (id: string) => {
+      const s = find(id)
+      if (!findShell(s.shell)) s.shell = addShell(`${s.id}-shell`, s.worktree || current.dir, s.id).id
+      publish()
+      return { id: s.shell }
     },
     TermOpen: async (id: string) => {
       if (isShell(id)) {

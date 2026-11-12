@@ -37,6 +37,7 @@ func newAppCmds() []*cobra.Command {
 		appCmd("notes", "Show the notes", groupViews, cobra.NoArgs),
 		appCmd("evidence", "Show the evidence of the session on screen", groupViews, cobra.NoArgs),
 		appCmd("agent", "Show the agent of the session on screen", groupViews, cobra.NoArgs),
+		appCmd("shell", "Show the shell of the session on screen", groupViews, cobra.NoArgs),
 		appCmd("news", "Show the news", groupViews, cobra.NoArgs),
 		appCmd("filter [query]", "Filter the queue, for example: filter @me type:bug", groupViews, nil),
 		newProjectCmd(),

@@ -58,6 +58,7 @@ func TestViewCommands(t *testing.T) {
 		{ctl.Request{Cmd: "notes"}, control.UICommand{Name: "notes", Args: []string{}}},
 		{ctl.Request{Cmd: "evidence"}, control.UICommand{Name: "evidence", Args: []string{}}},
 		{ctl.Request{Cmd: "agent"}, control.UICommand{Name: "agent", Args: []string{}}},
+		{ctl.Request{Cmd: "shell"}, control.UICommand{Name: "shell", Args: []string{}}},
 		{ctl.Request{Cmd: "next"}, control.UICommand{Name: "next", Args: []string{}}},
 		{ctl.Request{Cmd: "filter", Args: []string{"@me", "type:bug"}}, control.UICommand{Name: "filter", Args: []string{"@me", "type:bug"}}},
 	}

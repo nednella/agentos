@@ -15,12 +15,12 @@ export type Toast = {
   action?: { label: string; run(): void }
 }
 
-export type SessionView = 'terminal' | 'browser' | 'evidence'
-export const SESSION_VIEWS: SessionView[] = ['terminal', 'browser', 'evidence']
+export type SessionView = 'terminal' | 'shell' | 'browser' | 'evidence'
+export const SESSION_VIEWS: SessionView[] = ['terminal', 'shell', 'browser', 'evidence']
 
 export type Overlay = 'palette' | 'projects' | 'shortcuts' | 'settings' | 'patch-notes' | 'changelog' | { issue: number } | null
 export type SidebarTab = 'queue' | 'notes'
-export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
+export type FocusTarget = 'terminal' | 'shell' | 'session-shell' | 'sidebar' | 'sessions' | 'queue-filter' | 'note-input'
 export type Composing = 'session' | 'chat' | null
 export type PendingImage = { base64: string; mime: string }
 
@@ -64,6 +64,7 @@ export type Agentos = {
   newShell(): Promise<void>
   closeShell(id: string): Promise<void>
   selectShell(id: string): void
+  openSessionShell(id: string): Promise<void>
   applyUpdate(): Promise<void>
   select(id: string): void
   detach(): void
@@ -193,6 +194,8 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [focusRequest, setFocusRequest] = useState<Agentos['focusRequest']>({ target: 'terminal', n: 0 })
 
   const sessionsRef = useRef(sessions)
+  // Session shells that exited here, until the backend stops listing them: its next poll can come after a sessions event.
+  const exitedShells = useRef(new Set<string>())
   const selectedRef = useRef(selectedId)
   const projectRef = useRef(project)
   const lastSelected = useRef(new Map<string, string>())
@@ -223,6 +226,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   }, [selectId])
 
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
+
+  const focusView = useCallback(
+    (view: SessionView) => {
+      if (view === 'terminal') focus('terminal')
+      if (view === 'shell') focus('session-shell')
+    },
+    [focus],
+  )
 
   const dismissToast = useCallback((key: number) => {
     clearTimeout(toastTimers.current.get(key))
@@ -259,7 +270,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   )
 
   const applySessions = useCallback(
-    (list: Session[]) => {
+    (incoming: Session[]) => {
+      const exited = exitedShells.current
+      for (const id of exited) if (!incoming.some((s) => s.shell === id)) exited.delete(id)
+      const list = incoming.map((s) => (exited.has(s.shell) ? { ...s, shell: '' } : s))
       setSessions(list)
       setOpenedIds((ids) => ids.filter((id) => list.some((s) => s.id === id)))
       const current = selectedRef.current
@@ -389,7 +403,16 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     }
 
   useEffect(() => on('sessions', ifCurrent(applySessions)), [applySessions])
-  useEffect(() => on('term:exit', ({ id }) => setShellIds((ids) => ids.filter((x) => x !== id))), [])
+  useEffect(
+    () =>
+      on('term:exit', ({ id }) => {
+        setShellIds((ids) => ids.filter((x) => x !== id))
+        if (!sessionsRef.current.some((s) => s.shell === id)) return
+        exitedShells.current.add(id)
+        setSessions((list) => list.map((s) => (s.shell === id ? { ...s, shell: '' } : s)))
+      }),
+    [],
+  )
   useEffect(() => on('notes', ifCurrent(setNotes)), [])
   useEffect(() => on('awake', setAwake), [])
   useEffect(() => on('memory', setMemory), [])
@@ -587,6 +610,12 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         setShellIds((ids) => ids.filter((x) => x !== id))
       },
       selectShell: setPickedShell,
+      async openSessionShell(id) {
+        const shell = await api.sessionShellOpen(id)
+        exitedShells.current.delete(shell.id)
+        setSessions((list) => list.map((s) => (s.id === id ? { ...s, shell: shell.id } : s)))
+        focus('session-shell')
+      },
       select(id) {
         selectId(id)
         focus('terminal')
@@ -673,7 +702,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       loadBrowserState,
       setSessionView(id, view) {
         setViews((map) => ({ ...map, [id]: view }))
-        if (view === 'terminal') focus('terminal')
+        focusView(view)
       },
       cycleSessionView(delta) {
         const id = selectedRef.current
@@ -681,7 +710,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         const at = SESSION_VIEWS.indexOf(views[id] ?? 'terminal')
         const next = SESSION_VIEWS[(at + delta + SESSION_VIEWS.length) % SESSION_VIEWS.length]
         setViews((map) => ({ ...map, [id]: next }))
-        if (next === 'terminal') focus('terminal')
+        focusView(next)
       },
       async openBrowser(id, url) {
         setViews((map) => ({ ...map, [id]: 'browser' }))
@@ -811,7 +840,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, focusView, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>

@@ -9,7 +9,7 @@ import { decodeBase64 } from '../base64'
 import { useLayout } from '../LayoutContext'
 import { terminalFont, terminalThemes } from '../terminalTheme'
 
-type TerminalProps = { id: string; active: boolean; kind?: 'session' | 'shell'; onLeave?(): void }
+type TerminalProps = { id: string; active: boolean; kind?: 'session' | 'shell' | 'session-shell'; onLeave?(): void }
 
 const DOUBLE_ESC_MS = 500
 const RESIZE_SETTLE_MS = 120
@@ -30,7 +30,7 @@ let focusedRequest = -1
 const DEVICE_REPORT = /^(\x1b\[[?>]?[\d;]*c|\x1bP[^\x1b]*\x1b\\|\x1b\]\d+;[^\x07\x1b]*(\x07|\x1b\\))+$/
 
 export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProps) {
-  const focusTarget = kind === 'shell' ? 'shell' : 'terminal'
+  const focusTarget = kind === 'session' ? 'terminal' : kind
   const leave = useRef(onLeave)
   leave.current = onLeave
   const lastEsc = useRef(0)
@@ -115,7 +115,7 @@ export function Terminal({ id, active, kind = 'session', onLeave }: TerminalProp
     }
 
     term.attachCustomKeyEventHandler((event) => {
-      if (kind === 'shell' && event.key === 'Escape' && event.type === 'keydown') {
+      if (kind !== 'session' && event.key === 'Escape' && event.type === 'keydown') {
         const now = performance.now()
         if (now - lastEsc.current < DOUBLE_ESC_MS) {
           lastEsc.current = 0
