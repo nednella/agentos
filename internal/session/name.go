@@ -11,8 +11,9 @@ import (
 // never reused, so a session shares nothing with an earlier one; a session an older build
 // numbered keeps its number as its token. The title shown to the user lives in a tmux
 // option, so renaming never changes the name the agent's hooks report under. A name with
-// Shell set is one of the project's shells, "<project key>/shell" for the first and
-// "<project key>/shell-<k>" for the rest; a shell is not an agent and never reports.
+// Shell set and no Token is one of the project's shells, "<project key>/shell" for the first
+// and "<project key>/shell-<k>" for the rest. A name with both set is the shell of the session
+// with that token, "<project key>/<token>-shell". A shell is not an agent and never reports.
 type Name struct {
 	Project string
 	Token   string
@@ -30,6 +31,8 @@ func NewToken() string { return strings.ToLower(rand.Text()[:tokenLen]) }
 
 func (n Name) String() string {
 	switch {
+	case n.Shell > 0 && n.Token != "":
+		return n.Project + "/" + n.Token + "-" + shellSuffix
 	case n.Shell == 1:
 		return n.Project + "/" + shellSuffix
 	case n.Shell > 1:
@@ -38,8 +41,11 @@ func (n Name) String() string {
 	return n.Project + "/" + n.Token
 }
 
-// IsShell says whether the name is one of a project's shells rather than an agent.
+// IsShell says whether the name is a shell, the project's or a session's, rather than an agent.
 func (n Name) IsShell() bool { return n.Shell > 0 }
+
+// OwnShell is the name of the session's own shell.
+func (n Name) OwnShell() Name { return Name{Project: n.Project, Token: n.Token, Shell: 1} }
 
 // ParseName decodes a tmux session name. It fails for sessions agentos did not create.
 func ParseName(s string) (Name, error) {
@@ -57,9 +63,12 @@ func ParseName(s string) (Name, error) {
 		}
 		return Name{Project: s[:i], Shell: k}, nil
 	}
-	token := s[i+1:]
+	token, own := strings.CutSuffix(s[i+1:], "-"+shellSuffix)
 	if token == "" || strings.Trim(token, tokenChars) != "" {
 		return Name{}, fmt.Errorf("session name %q has no valid token", s)
+	}
+	if own {
+		return Name{Project: s[:i], Token: token, Shell: 1}, nil
 	}
 	return Name{Project: s[:i], Token: token}, nil
 }

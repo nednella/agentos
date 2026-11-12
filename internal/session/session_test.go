@@ -171,6 +171,12 @@ func TestParseName(t *testing.T) {
 		{"api/shell-x", Name{}, true},
 		{"a/b/shell", Name{}, true},
 		{"/shell", Name{}, true},
+		{"api/k3x9q0ab-shell", Name{Project: "api", Token: "k3x9q0ab", Shell: 1}, false},
+		{"api/12-shell", Name{Project: "api", Token: "12", Shell: 1}, false},
+		{"api/-shell", Name{}, true},
+		{"api/X-shell", Name{}, true},
+		{"api/a-b-shell", Name{}, true},
+		{"api/shell-shell", Name{}, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.in, func(t *testing.T) {
@@ -181,10 +187,24 @@ func TestParseName(t *testing.T) {
 			if err == nil && got.String() != tt.in {
 				t.Errorf("round trip = %q, want %q", got.String(), tt.in)
 			}
-			if err == nil && got.IsShell() != (strings.Contains(tt.in, "/shell") && got.Token == "") {
+			if err == nil && got.IsShell() != (strings.Contains(tt.in, "shell") && tt.in != "api/shells") {
 				t.Errorf("IsShell = %v for %q", got.IsShell(), tt.in)
 			}
 		})
+	}
+}
+
+func TestOwnShell(t *testing.T) {
+	agent := Name{Project: "api", Token: "k3x9q0ab"}
+	shell := agent.OwnShell()
+	if shell.String() != "api/k3x9q0ab-shell" || !shell.IsShell() {
+		t.Errorf("OwnShell = %q, shell %v", shell, shell.IsShell())
+	}
+	if other := (Name{Project: "api", Token: "k3x9q0ac"}).OwnShell(); other == shell {
+		t.Error("two sessions share a shell name")
+	}
+	if project := (Name{Project: "api", Shell: 1}); project == shell {
+		t.Error("the session's shell is the project's shell")
 	}
 }
 

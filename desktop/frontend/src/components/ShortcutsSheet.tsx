@@ -14,12 +14,12 @@ const GROUPS: Group[] = [
   { title: 'Navigate', ids: ['panel-sidebar', 'focus-shell', 'panel-sessions', 'toggle-sidebar', 'toggle-sessions', 'toggle-shell', 'toggle-panels', 'switch-project', 'open-repo', 'palette', 'shortcuts'] },
   { title: 'Queue', ids: ['show-queue', 'filter-queue', 'refresh-issues'], extra: [{ id: 'alt-click', label: 'Start without leaving the queue', keys: '⌥ click' }] },
   { title: 'Notes', ids: ['show-notes', 'note'] },
-  { title: 'Views', ids: ['stats', 'digest', 'news', 'show-terminal', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
+  { title: 'Views', ids: ['stats', 'digest', 'news', 'show-terminal', 'show-shell', 'show-browser', 'show-evidence', 'view-previous', 'view-next', 'zoom-in', 'zoom-out', 'zoom-reset'] },
   {
     title: 'Shell',
     ids: [],
     extra: [
-      { id: 'shell-keys', label: 'Back to the terminal', keys: 'Esc Esc' },
+      { id: 'shell-keys', label: 'Back to the agent', keys: 'Esc Esc' },
       { id: 'shell-ex-1', label: 'agentos issue 394 393', mono: true },
       { id: 'shell-ex-2', label: 'agentos open 2', mono: true },
       { id: 'shell-ex-3', label: 'agentos filter @nednella type:bug', mono: true },

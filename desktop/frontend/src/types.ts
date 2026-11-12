@@ -48,6 +48,7 @@ export type Session = {
   cleanup: '' | 'pending' | 'blocked' | 'ask'
   cleanupReason: string
   browser: boolean
+  shell: string
   evidence: number
   chat: boolean
   action: string

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -224,5 +225,39 @@ func assertNoResume(t *testing.T, h *apptest.Harness, id string) {
 	}
 	if _, ok := h.Session(id); !ok {
 		t.Error("the ended row went")
+	}
+}
+
+func TestResumedSessionTakesOverTheShell(t *testing.T) {
+	apptest.ClaudeOnPath(t)
+	t.Setenv("SHELL", "/bin/sh")
+	h := apptest.NewWith(t, apptest.Options{Agent: "claude"})
+	old, err := h.Sessions().Create("#12 work", "", false, 12, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	shell, err := h.SessionShellOpen(old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := exec.Command("tmux", "-L", h.Socket, "send-keys", "-t", "="+shell.ID+":", "-l", "kept").Run(); err != nil {
+		t.Fatal(err)
+	}
+	ended(t, h, old)
+	fresh, err := h.ResumeSession(old.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := fresh.ID + "-shell"
+	if got, _ := h.Session(fresh.ID); got.Shell != want {
+		t.Fatalf("resumed row shell = %q, want %q", got.Shell, want)
+	}
+	time.Sleep(300 * time.Millisecond)
+	out, err := exec.Command("tmux", "-L", h.Socket, "capture-pane", "-p", "-t", "="+want+":").Output()
+	if err != nil || !strings.Contains(string(out), "kept") {
+		t.Errorf("the resumed session's shell is not the old one: %q, %v", out, err)
+	}
+	if exec.Command("tmux", "-L", h.Socket, "has-session", "-t", "="+shell.ID).Run() == nil {
+		t.Error("the old shell name stayed")
 	}
 }

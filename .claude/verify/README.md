@@ -6,3 +6,4 @@ Start the real app in a browser with the isolation env from `docs/testing.md`: `
 - [Collapsed groups](collapsed-groups.md): the Chats and Tasks groups of the sessions panel and the sections of the queue, and which of them each project keeps closed.
 - [Empty session panel](empty-session-panel.md): what the centre panel shows when no session is selected, with or without sessions in the project.
 - [Shell tabs](shell-tabs.md): the tab row of the shell drawer, open and collapsed, and the same row in the narrow layout.
+- [Session views](session-views.md): the Agent, Shell, Browser and Media views of the session panel, and the session's own shell.

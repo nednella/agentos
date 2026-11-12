@@ -7,9 +7,10 @@ type ViewTabsProps = { session: Session; view: SessionView }
 export function ViewTabs({ session, view }: ViewTabsProps) {
   const { setSessionView, browserStates } = useAgentos()
   const browserOpen = browserStates[session.id]?.open ?? session.browser
-  const tabs: { id: SessionView; label: string; count?: number; live?: boolean }[] = [
-    { id: 'terminal', label: 'Terminal' },
-    { id: 'browser', label: 'Browser', live: browserOpen },
+  const tabs: { id: SessionView; label: string; count?: number; live?: string }[] = [
+    { id: 'terminal', label: 'Agent' },
+    { id: 'shell', label: 'Shell', live: session.shell ? 'Shell running' : undefined },
+    { id: 'browser', label: 'Browser', live: browserOpen ? 'Browser open' : undefined },
     { id: 'evidence', label: 'Media', count: session.evidence },
   ]
 
@@ -27,7 +28,7 @@ export function ViewTabs({ session, view }: ViewTabsProps) {
             onClick={() => setSessionView(session.id, tab.id)}
           >
             {tab.label}
-            {tab.live && <span className="dot" data-state="working" title="Browser open" />}
+            {tab.live && <span className="dot" data-state="working" title={tab.live} />}
             {tab.count !== undefined && tab.count > 0 && <span className="mono text-small text-dim">({tab.count})</span>}
           </button>
         )

@@ -906,6 +906,9 @@ func (h *Harness) Cleanups() []sessions.Cleanup           { return h.sessions.Cl
 func (h *Harness) ResumeSession(id string) (sessions.Session, error) {
 	return h.sessions.ResumeSession(id)
 }
+func (h *Harness) SessionShellOpen(id string) (sessions.ShellInfo, error) {
+	return h.sessions.SessionShellOpen(id)
+}
 
 func (h *Harness) TermOpen(id string, cols, rows int) error {
 	return h.terminal.TermOpen(id, cols, rows)

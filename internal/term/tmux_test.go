@@ -93,6 +93,15 @@ func TestSessionLifecycle(t *testing.T) {
 		t.Errorf("rename did not show: %v", infos)
 	}
 
+	moved := session.Name{Project: "demo", Token: "c3"}
+	if err := tmux.Move(ctx, name, moved); err != nil {
+		t.Fatal(err)
+	}
+	if tmux.Has(ctx, name) || !tmux.Has(ctx, moved) {
+		t.Errorf("after move: old there %v, new there %v", tmux.Has(ctx, name), tmux.Has(ctx, moved))
+	}
+	name = moved
+
 	if err := tmux.Kill(ctx, name); err != nil {
 		t.Fatal(err)
 	}

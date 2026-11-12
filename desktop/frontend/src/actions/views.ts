@@ -39,13 +39,24 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'show-terminal',
-    label: 'Show terminal',
+    label: 'Show agent',
     group: 'Sessions',
-    uiCommand: 'term',
+    uiCommand: 'agent',
     run() {
       if (!current) throw 'No session selected'
       layout.closeCentre()
       a.setSessionView(current.id, 'terminal')
+    },
+  },
+  {
+    id: 'show-shell',
+    label: 'Show shell',
+    group: 'Sessions',
+    uiCommand: 'shell',
+    run() {
+      if (!current) throw 'No session selected'
+      layout.closeCentre()
+      a.setSessionView(current.id, 'shell')
     },
   },
   {
@@ -77,7 +88,7 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'view-previous',
-    label: 'Previous view (terminal, browser, media)',
+    label: 'Previous view (agent, shell, browser, media)',
     group: 'Navigate',
     shortcut: { key: '[', code: 'BracketLeft', shift: true, label: '[' },
     palette: false,
@@ -85,7 +96,7 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'view-next',
-    label: 'Next view (terminal, browser, media)',
+    label: 'Next view (agent, shell, browser, media)',
     group: 'Navigate',
     shortcut: { key: ']', code: 'BracketRight', shift: true, label: ']' },
     palette: false,

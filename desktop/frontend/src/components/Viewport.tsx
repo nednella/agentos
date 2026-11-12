@@ -4,6 +4,7 @@ import { useFocusRequest } from '../useFocusRequest'
 import { BrowserTab } from './BrowserTab'
 import { EmptyState } from './EmptyState'
 import { EvidenceTab } from './EvidenceTab'
+import { SessionShell } from './SessionShell'
 import { Terminal } from './Terminal'
 import { ViewTabs } from './ViewTabs'
 import { ViewportActions } from './ViewportActions'
@@ -44,6 +45,7 @@ export function Viewport() {
               <Terminal key={id} id={id} active={id === selectedId} />
             ))}
         </div>
+        {view === 'shell' && <SessionShell key={selected.id} session={selected} />}
         {view === 'browser' && <BrowserTab key={selected.id} session={selected} />}
         {view === 'evidence' && <EvidenceTab key={selected.id} session={selected} />}
       </div>

@@ -34,6 +34,7 @@ type Backend = {
   ShellOpen(): Promise<{ id: string }>
   ShellNew(): Promise<{ id: string }>
   ShellClose(id: string): Promise<void>
+  SessionShellOpen(id: string): Promise<{ id: string }>
   TermOpen(id: string, cols: number, rows: number): Promise<void>
   TermWrite(id: string, data: string): Promise<void>
   TermResize(id: string, cols: number, rows: number): Promise<void>
@@ -96,7 +97,7 @@ declare global {
 // The Go side binds one service per package; window.go.<namespace>.Service.<Method>.
 const namespaces = {
   projects: ['Snapshot', 'SwitchProject', 'AddProject', 'AddProjectDir', 'NewProject', 'CreateRepo', 'RemoveProject', 'SetUpProject', 'DismissSetup'],
-  sessions: ['NewSession', 'NewChat', 'KillSession', 'DismissSession', 'ResumeSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose', 'Memory'],
+  sessions: ['NewSession', 'NewChat', 'KillSession', 'DismissSession', 'ResumeSession', 'RenameSession', 'TypeInto', 'RefreshPRs', 'AckPR', 'Cleanup', 'Cleanups', 'ShellOpen', 'ShellNew', 'ShellClose', 'SessionShellOpen', 'Memory'],
   terminal: ['TermOpen', 'TermWrite', 'TermResize', 'TermClose'],
   issues: ['Issues', 'StartIssue', 'MoveIssue', 'UndoMove', 'IssueDetail'],
   notes: ['AddNote', 'UpdateNote', 'SetNotePinned', 'SetNoteArchived', 'AddNoteImage', 'RemoveNoteImage', 'DeleteNote', 'NoteToIssue', 'NoteToSession'],
@@ -164,6 +165,7 @@ export const api = {
   shellOpen: () => backend.ShellOpen(),
   shellNew: () => backend.ShellNew(),
   shellClose: (id: string) => backend.ShellClose(id),
+  sessionShellOpen: (id: string) => backend.SessionShellOpen(id),
   termOpen: (id: string, cols: number, rows: number) => backend.TermOpen(id, cols, rows),
   // A terminal can close (project switch, session end) while keys or a resize
   // are still in flight; that is not an error worth surfacing.
