@@ -25,7 +25,7 @@ function TabButton({ tab, label, count, tight }: TabButtonProps) {
     <button
       role="tab"
       aria-selected={active}
-      className={`flex h-10 items-center gap-2 border-b-2 text-body font-medium ${tight ? 'px-2' : 'px-3'}`}
+      className={`flex h-full items-center gap-2 border-b-2 text-body font-medium ${tight ? 'px-2' : 'px-3'}`}
       title={`${label} (${count})`}
       style={{ borderColor: active ? 'var(--accent)' : 'transparent', color: active ? 'var(--text)' : 'var(--text-soft)' }}
       onClick={() => showSidebarTab(tab)}
@@ -76,7 +76,7 @@ function SidebarPanel({ panel, nav, overlay, full, widthRem }: SidebarPanelProps
       }}
       onKeyDown={onKeyDown}
     >
-      <div role="tablist" className="panel-head flex flex-none items-center border-b border-line">
+      <div role="tablist" className="panel-head flex h-10 flex-none items-center border-b border-line">
         {!full && (
           <button
             className="btn btn-ghost my-1 mr-1 ml-[0.3125rem] h-8 w-8 flex-none justify-center px-0"
