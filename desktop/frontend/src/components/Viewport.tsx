@@ -2,7 +2,6 @@ import { useRef } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { useFocusRequest } from '../useFocusRequest'
 import { BrowserTab } from './BrowserTab'
-import { DetachedState } from './DetachedState'
 import { EmptyState } from './EmptyState'
 import { EvidenceTab } from './EvidenceTab'
 import { Terminal } from './Terminal'
@@ -21,7 +20,7 @@ export function Viewport() {
   if (!selected) {
     return (
       <section ref={panel} data-panel="terminal" tabIndex={-1} className="panel h-full min-h-0 min-w-0">
-        {sessions.length > 0 ? <DetachedState /> : <EmptyState />}
+        <EmptyState />
       </section>
     )
   }
