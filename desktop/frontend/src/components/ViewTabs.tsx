@@ -8,7 +8,7 @@ export function ViewTabs({ session, view }: ViewTabsProps) {
   const { setSessionView, browserStates } = useAgentos()
   const browserOpen = browserStates[session.id]?.open ?? session.browser
   const tabs: { id: SessionView; label: string; count?: number; live?: boolean }[] = [
-    { id: 'terminal', label: 'Terminal' },
+    { id: 'terminal', label: 'Agent' },
     { id: 'browser', label: 'Browser', live: browserOpen },
     { id: 'evidence', label: 'Media', count: session.evidence },
   ]

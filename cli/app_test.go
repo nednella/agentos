@@ -34,7 +34,7 @@ func TestAppCommandsSendTheirWords(t *testing.T) {
 		{[]string{"queue"}, "queue", nil, nil},
 		{[]string{"notes"}, "notes", nil, nil},
 		{[]string{"evidence"}, "evidence", nil, nil},
-		{[]string{"term"}, "term", nil, nil},
+		{[]string{"agent"}, "agent", nil, nil},
 		{[]string{"refresh"}, "refresh", nil, nil},
 		{[]string{"pr"}, "pr", nil, nil},
 		{[]string{"pr", "2"}, "pr", []string{"2"}, nil},

@@ -19,7 +19,7 @@ const GROUPS: Group[] = [
     title: 'Shell',
     ids: [],
     extra: [
-      { id: 'shell-keys', label: 'Back to the terminal', keys: 'Esc Esc' },
+      { id: 'shell-keys', label: 'Back to the agent', keys: 'Esc Esc' },
       { id: 'shell-ex-1', label: 'agentos issue 394 393', mono: true },
       { id: 'shell-ex-2', label: 'agentos open 2', mono: true },
       { id: 'shell-ex-3', label: 'agentos filter @nednella type:bug', mono: true },
