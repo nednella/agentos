@@ -221,6 +221,14 @@ func (t *Tmux) Rename(ctx context.Context, name session.Name, title string) erro
 	return nil
 }
 
+// Move gives a session a new name. Rename changes only the title the user sees.
+func (t *Tmux) Move(ctx context.Context, from, to session.Name) error {
+	if _, err := t.run(ctx, "rename-session", "-t", target(from), to.String()); err != nil {
+		return fmt.Errorf("moving session %s to %s: %w", from, to, err)
+	}
+	return nil
+}
+
 // SetIssue records which GitHub issue a session was started for.
 func (t *Tmux) SetIssue(ctx context.Context, name session.Name, issue int) error {
 	if _, err := t.run(ctx, "set-option", "-t", target(name), issueOption, strconv.Itoa(issue)); err != nil {
