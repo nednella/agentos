@@ -23,7 +23,7 @@ export function NewsHeader({
 
   return (
     <>
-      <header className="panel-head flex flex-none items-center gap-2 border-b border-line px-4 py-2.5">
+      <header className="panel-head flex h-10 flex-none items-center gap-2 border-b border-line px-4">
         <nav
           aria-label="Breadcrumb"
           className="flex min-w-0 items-center gap-2 text-body"
