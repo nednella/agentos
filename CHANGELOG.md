@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.51.0](https://github.com/nednella/agentos/compare/v0.50.0...v0.51.0) (2026-11-12)
+
+
+### Features
+
+* **ui:** rename evidence view to media ([798c74b](https://github.com/nednella/agentos/commit/798c74ba4724e0999a627f0703de84ee5bcb513b))
+
+
+### Bug Fixes
+
+* **ui:** end queue tab row level with other panel heads ([6fd5d1d](https://github.com/nednella/agentos/commit/6fd5d1d420dec03376fbede4a1272fe6e91b4757))
+* **ui:** label uncaptioned media images as image ([81093e2](https://github.com/nednella/agentos/commit/81093e2437cd3c914b16bdc9cfea1c9442e6020c))
+* **ui:** match session view tabs to header height ([982cde4](https://github.com/nednella/agentos/commit/982cde4495a609fbd9fe275685c2289dd78ad062))
+* **ui:** match stats and news headers to header height ([3ce3484](https://github.com/nednella/agentos/commit/3ce348432ae01739ec3d3934561182d69b7be4af))
+
 ## [0.50.0](https://github.com/nednella/agentos/compare/v0.49.0...v0.50.0) (2026-11-12)
 
 
