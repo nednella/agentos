@@ -26,7 +26,7 @@ export function EvidenceCard({ item, selectable, selected, onOpen, onToggle }: E
           aria-pressed={selectable ? selected : undefined}
           onClick={selectable ? onToggle : onOpen}
         >
-          <img src={item.url} alt={item.caption || 'Evidence image'} className="h-full w-full object-cover" />
+          <img src={item.url} alt={item.caption || 'Media image'} className="h-full w-full object-cover" />
           {selectable && (
             <span
               className="absolute top-2 right-2 grid h-5 w-5 place-items-center rounded-sm border"

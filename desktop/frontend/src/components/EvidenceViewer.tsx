@@ -53,7 +53,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
       ref={root}
       tabIndex={-1}
       role="dialog"
-      aria-label="Evidence"
+      aria-label="Media"
       className="fade-in fixed inset-0 flex flex-col items-center justify-center gap-3 p-4 outline-none"
       style={{ zIndex: 'var(--z-overlay)', background: 'var(--bg-overlay-strong)' }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
@@ -67,7 +67,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
         if (e.key === '0') setView(FIT)
       }}
     >
-      <ZoomableImage src={item.url} alt={item.caption || 'Evidence image'} view={view} onView={setView} onDismiss={onClose} />
+      <ZoomableImage src={item.url} alt={item.caption || 'Media image'} view={view} onView={setView} onDismiss={onClose} />
       <div className="flex max-w-3xl flex-col items-center gap-2 text-center">
         {item.caption && <p className="text-body">{item.caption}</p>}
         <p className="mono text-small text-dim">

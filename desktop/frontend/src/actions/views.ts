@@ -66,7 +66,7 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'show-evidence',
-    label: 'Show evidence',
+    label: 'Show media',
     group: 'Sessions',
     uiCommand: 'evidence',
     run() {
@@ -77,7 +77,7 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'view-previous',
-    label: 'Previous view (terminal, browser, evidence)',
+    label: 'Previous view (terminal, browser, media)',
     group: 'Navigate',
     shortcut: { key: '[', code: 'BracketLeft', shift: true, label: '[' },
     palette: false,
@@ -85,7 +85,7 @@ export const viewActions = ({ a, layout, current }: ActionContext): Action[] => 
   },
   {
     id: 'view-next',
-    label: 'Next view (terminal, browser, evidence)',
+    label: 'Next view (terminal, browser, media)',
     group: 'Navigate',
     shortcut: { key: ']', code: 'BracketRight', shift: true, label: ']' },
     palette: false,

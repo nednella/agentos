@@ -23,7 +23,7 @@ export function BrowserRecentCaptures({ session }: BrowserRecentCapturesProps) {
             <li key={item.id} className="min-w-0">
               <button
                 className="block aspect-[16/10] w-full overflow-hidden rounded-md border border-line bg-term"
-                title={item.caption || 'Open in Evidence'}
+                title={item.caption || 'Open in Media'}
                 onClick={() => setSessionView(session.id, 'evidence')}
               >
                 <img src={item.url} alt={item.caption || 'Capture'} className="h-full w-full object-cover" />
