@@ -10,7 +10,7 @@ export function ViewTabs({ session, view }: ViewTabsProps) {
   const tabs: { id: SessionView; label: string; count?: number; live?: boolean }[] = [
     { id: 'terminal', label: 'Terminal' },
     { id: 'browser', label: 'Browser', live: browserOpen },
-    { id: 'evidence', label: 'Evidence', count: session.evidence },
+    { id: 'evidence', label: 'Media', count: session.evidence },
   ]
 
   return (

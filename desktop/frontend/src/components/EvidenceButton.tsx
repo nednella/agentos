@@ -9,7 +9,7 @@ export function EvidenceButton({ session }: EvidenceButtonProps) {
   return (
     <button
       className="ml-auto inline-flex h-6 flex-none items-center gap-1 rounded-sm border border-line-strong px-2 text-small text-soft"
-      title={`${session.evidence} evidence items`}
+      title={`${session.evidence} media items`}
       onClick={() => {
         select(session.id)
         setSessionView(session.id, 'evidence')

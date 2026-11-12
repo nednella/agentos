@@ -91,7 +91,7 @@ export function SettingsPanel() {
           <SettingRow label="Send the first prompt" hint="Auto sends what a new task starts with at once. Manual types it and waits for Enter.">
             <SegmentedControl label="Send the first prompt" options={MODES} value={settings.promptSend} onChange={(value) => report(() => setPromptSend(value))} />
           </SettingRow>
-          <SettingRow label="Browser enabled" hint="Tells new tasks about the browser and evidence commands.">
+          <SettingRow label="Browser enabled" hint="Tells new tasks about the browser and media commands.">
             <SegmentedControl label="Browser enabled" options={SWITCH} value={settings.browserEnabled ? 'on' : 'off'} onChange={(value) => report(() => setBrowserEnabled(value === 'on'))} />
           </SettingRow>
           <SettingRow label="Digest schedule" hint="Weekly runs the digest by itself. Off leaves it to you.">
