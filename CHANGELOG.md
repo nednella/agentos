@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.49.0](https://github.com/nednella/agentos/compare/v0.48.0...v0.49.0) (2026-11-12)
+
+
+### Features
+
+* **ui:** show shells as row of tabs ([aa0f6f0](https://github.com/nednella/agentos/commit/aa0f6f0e9daff618dc18b235c091bf219c3e5538))
+
 ## [0.48.0](https://github.com/nednella/agentos/compare/v0.47.0...v0.48.0) (2026-11-12)
 
 
