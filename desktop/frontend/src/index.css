@@ -430,6 +430,41 @@
     background: color-mix(in srgb, var(--accent) 8%, transparent);
   }
 
+  /* The row covers the shell panel's top, so it draws the focus line and tint itself, above its tabs. */
+  .shell-tabs {
+    position: relative;
+    background: var(--bg-surface);
+  }
+
+  [data-panel][data-focused] .shell-tabs {
+    background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+  }
+
+  [data-panel][data-focused] .shell-tabs::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    z-index: 1;
+    height: 2px;
+    background: var(--accent);
+    pointer-events: none;
+  }
+
+  .shell-tabs-scroll {
+    --fade-left: 0px;
+    --fade-right: 0px;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, transparent, #000 var(--fade-left), #000 calc(100% - var(--fade-right)), transparent);
+  }
+
+  .shell-tabs-scroll[data-hidden-left='true'] {
+    --fade-left: 1.5rem;
+  }
+
+  .shell-tabs-scroll[data-hidden-right='true'] {
+    --fade-right: 1.5rem;
+  }
+
   .link {
     color: var(--accent);
     text-decoration: underline;

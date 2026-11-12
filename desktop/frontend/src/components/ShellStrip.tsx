@@ -1,23 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { KeyboardEvent, PointerEvent } from 'react'
-import { useAgentos } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
-import { Icon } from './Icon'
-import { ShellList } from './ShellList'
+import { ShellTabs } from './ShellTabs'
 import { ShellTerminal } from './ShellTerminal'
 
-const HEADER_REM = 1.75
 const KEY_STEP_REM = 1
 // The strip sits on the window's rounded bottom corners; the terminal pads itself 0.75rem, so this margin
-// puts its text in line with the header and clear of the curve.
-const cornerPad = { paddingLeft: 'var(--corner-pad)', paddingRight: 'var(--corner-pad)' }
+// keeps its text clear of the curve.
 const terminalInset = { marginLeft: 'calc(var(--corner-pad) - 0.75rem)', marginRight: 'calc(var(--corner-pad) - 0.75rem)', marginBottom: '0.375rem' }
 
 export function ShellStrip() {
-  const { project, shellIds, shellId, focus } = useAgentos()
-  const { shellOpen, shellRem, setShellOpen, setShellHeight, resetShellHeight } = useLayout()
-  const [listOpen, setListOpen] = useState(false)
-  const listRoot = useRef<HTMLDivElement>(null)
+  const { shellOpen, shellRem, setShellHeight, resetShellHeight } = useLayout()
   const drag = useRef<{ y: number; rem: number; root: number } | null>(null)
 
   const root = () => parseFloat(getComputedStyle(document.documentElement).fontSize)
@@ -48,89 +41,29 @@ export function ShellStrip() {
     setShellHeight(Math.min(shellRem + step, (0.6 * window.innerHeight) / root()), true)
   }
 
-  useEffect(() => {
-    if (!listOpen) return
-    const close = (e: MouseEvent) => {
-      if (!listRoot.current?.contains(e.target as Node)) setListOpen(false)
-    }
-    const escape = (e: globalThis.KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      e.stopPropagation()
-      setListOpen(false)
-    }
-    window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', escape, true)
-    return () => {
-      window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', escape, true)
-    }
-  }, [listOpen])
-
-  if (!shellOpen) {
-    return (
-      <div data-panel="shell" className="flex-none border-t border-line bg-surface">
-        <button
-          className="flex h-9 w-full items-center gap-2 text-left"
-          style={cornerPad}
-          aria-label="Open the shell"
-          onClick={() => {
-            setShellOpen(true)
-            if (shellId) focus('shell')
-          }}
-        >
-          <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
-          <span className="text-small text-dim">Shell</span>
-        </button>
-      </div>
-    )
-  }
-
   return (
-    <div data-panel="shell" tabIndex={-1} className="relative flex-none border-t border-line bg-term">
-      <div
-        className="divider"
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label="Resize shell"
-        tabIndex={0}
-        title="Drag to resize, double-click to reset"
-        onKeyDown={onKeyDown}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onDoubleClick={resetShellHeight}
-      />
-      <div className="panel-head flex items-center border-b border-line" style={{ ...cornerPad, height: `${HEADER_REM}rem` }}>
-        <button className="flex h-full flex-1 items-center gap-2 text-left" aria-label="Collapse the shell" onClick={() => setShellOpen(false)}>
-          <span className="mono text-small text-accent">{project?.name ?? ''} ❯</span>
-          <span className="text-small text-dim">Shell{shellIds.length > 1 ? ` ${shellIds.indexOf(shellId) + 1}` : ''}</span>
-        </button>
-        {shellIds.length > 0 && (
-          <div ref={listRoot} className="relative h-full">
-            <button
-              className="flex h-full items-center text-dim hover:text-ink"
-              title={listOpen ? 'Hide the shell list' : 'Show the shell list'}
-              aria-label={listOpen ? 'Hide the shell list' : 'Show the shell list'}
-              aria-expanded={listOpen}
-              onClick={() => setListOpen(!listOpen)}
-            >
-              <span className={`transition-transform duration-150 ${listOpen ? 'rotate-180' : ''}`}>
-                <Icon name="chevron" size={15} />
-              </span>
-            </button>
-            {listOpen && (
-              <ShellList
-                className="fade-in absolute top-full right-0 mt-1 overflow-hidden rounded-md border border-line-strong bg-raised shadow-2xl"
-                style={{ maxHeight: `calc(${shellRem}rem - 0.25rem)`, zIndex: 'var(--z-popup)' }}
-                onPick={() => setListOpen(false)}
-              />
-            )}
-          </div>
-        )}
-      </div>
-      <div className="relative" style={{ ...terminalInset, height: `${shellRem}rem` }}>
-        <ShellTerminal visible />
-      </div>
+    <div data-panel="shell" tabIndex={-1} className={`relative flex-none border-t border-line ${shellOpen ? 'bg-term' : 'bg-surface'}`}>
+      {shellOpen && (
+        <div
+          className="divider"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize shell"
+          tabIndex={0}
+          title="Drag to resize, double-click to reset"
+          onKeyDown={onKeyDown}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onDoubleClick={resetShellHeight}
+        />
+      )}
+      <ShellTabs />
+      {shellOpen && (
+        <div className="relative" style={{ ...terminalInset, height: `${shellRem}rem` }}>
+          <ShellTerminal visible />
+        </div>
+      )}
     </div>
   )
 }
