@@ -22,7 +22,7 @@ export function ViewTabs({ session, view }: ViewTabsProps) {
             key={tab.id}
             role="tab"
             aria-selected={active}
-            className="flex h-9 items-center gap-1.5 border-b-2 px-2.5 short:h-8 text-body font-medium"
+            className="flex h-10 items-center gap-1.5 border-b-2 px-2.5 text-body font-medium"
             style={{ borderColor: active ? 'var(--accent)' : 'transparent', color: active ? 'var(--text)' : 'var(--text-soft)' }}
             onClick={() => setSessionView(session.id, tab.id)}
           >
