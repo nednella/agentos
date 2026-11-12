@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.50.0](https://github.com/nednella/agentos/compare/v0.49.0...v0.50.0) (2026-11-12)
+
+
+### Features
+
+* **ui:** toggle shell by clicking empty space in its tab row ([a40e103](https://github.com/nednella/agentos/commit/a40e10367f61be9be41732000a95358cf23bca04))
+
+
+### Bug Fixes
+
+* **ui:** centre project shell tab title ([9a25cb9](https://github.com/nednella/agentos/commit/9a25cb97faa681dd709a9520d93961e458c14d11))
+
 ## [0.49.0](https://github.com/nednella/agentos/compare/v0.48.0...v0.49.0) (2026-11-12)
 
 
