@@ -20,7 +20,7 @@ export function ShellTab({ label, selected, pinned = false, onSelect, onClose }:
       <button
         role="tab"
         aria-selected={selected}
-        className={`flex h-full items-center gap-2 whitespace-nowrap ${pinned ? 'pl-6' : 'pl-[1.125rem]'} ${onClose ? 'pr-1' : 'pr-[1.125rem]'}`}
+        className={`flex h-full items-center gap-2 whitespace-nowrap pl-[1.125rem] ${onClose ? 'pr-1' : 'pr-[1.125rem]'}`}
         onClick={onSelect}
       >
         {pinned && <Icon name="folder" size={12} />}
