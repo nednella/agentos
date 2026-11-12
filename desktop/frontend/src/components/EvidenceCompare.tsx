@@ -23,7 +23,7 @@ export function EvidenceCompare({ left, right, onClose }: EvidenceCompareProps) 
         {[left, right].map((item, i) => (
           <figure key={item.id} className="flex min-w-0 flex-col gap-2">
             <figcaption className="label">{i === 0 ? 'Left' : 'Right'}</figcaption>
-            <img src={item.url} alt={item.caption || 'Media image'} className="block max-h-[62vh] w-full rounded-md border border-line-strong object-contain" />
+            <img src={item.url} alt={item.caption || 'Image'} className="block max-h-[62vh] w-full rounded-md border border-line-strong object-contain" />
             <p className="text-small text-soft">{item.caption || 'No caption'}</p>
           </figure>
         ))}
