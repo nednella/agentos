@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.52.0](https://github.com/nednella/agentos/compare/v0.51.0...v0.52.0) (2026-11-14)
+
+
+### Features
+
+* **desktop:** drive session pages with agent-browser ([6d3523b](https://github.com/nednella/agentos/commit/6d3523ba77525313eb68c1f623ef7b4d52326611))
+* **desktop:** remove agentos browser tab ([80d44b9](https://github.com/nednella/agentos/commit/80d44b9090cadc06f6157238cf820ee35538c353))
+
+
+### Bug Fixes
+
+* **internal:** give a new tmux pane its session's PATH ([fa411e9](https://github.com/nednella/agentos/commit/fa411e99f41cca8163d471eb07eca2ff16b7ec78))
+
 ## [0.51.0](https://github.com/nednella/agentos/compare/v0.50.0...v0.51.0) (2026-11-12)
 
 
