@@ -25,7 +25,7 @@ func TestAgyCommand(t *testing.T) {
 		{"resume", Launch{Resume: "abc"}, []string{"--conversation", "abc"}},
 		{"chat", Launch{Chat: true}, []string{"--mode", "plan"}},
 		{"start", Launch{Start: "say hi"}, []string{"-i", "say hi"}},
-		{"the prompt and the browser go through the global files", Launch{Prompt: "p", MCP: MCPServer{Command: "npx"}}, nil},
+		{"the prompt goes through the start hook, the browser through the env", Launch{Prompt: "p", Browser: true}, nil},
 		{"all, in order", Launch{Model: "m", Resume: "abc", Chat: true, Start: "s"}, []string{"--model", "m", "--conversation", "abc", "--mode", "plan", "-i", "s"}},
 	}
 	for _, tt := range tests {
@@ -82,14 +82,11 @@ func readJSON(t *testing.T, path string) map[string]any {
 	return v
 }
 
-func TestAgyPrepareWritesTheGlobalHooksAndMCPEntry(t *testing.T) {
+func TestAgyPrepareWritesTheGlobalHooks(t *testing.T) {
 	dir := t.TempDir()
-	hooks, servers := filepath.Join(dir, "hooks.json"), filepath.Join(dir, "mcp_config.json")
-	// The owner's own entries, and an empty MCP file like a fresh agy leaves, stay as they are.
+	hooks := filepath.Join(dir, "hooks.json")
+	// The owner's own entries stay as they are.
 	if err := os.WriteFile(hooks, []byte(`{"lint":{"PostToolUse":[{"matcher":"run_command","hooks":[{"command":"./lint.sh"}]}]}}`), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(servers, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	a := Agy{ConfigDir: dir, Installed: "/Users/me/.local/bin/agentos", Writes: true}
@@ -118,10 +115,8 @@ func TestAgyPrepareWritesTheGlobalHooksAndMCPEntry(t *testing.T) {
 			t.Errorf("%s handler = %v", ev, h)
 		}
 	}
-	mcp := readJSON(t, servers)["mcpServers"].(map[string]any)["browser"].(map[string]any)
-	want := map[string]any{"command": "/Users/me/.local/bin/agentos", "args": []any{"mcp-browser"}, "disabledTools": []any{"new_page", "close_page"}}
-	if !reflect.DeepEqual(mcp, want) {
-		t.Errorf("browser server = %v, want %v", mcp, want)
+	if _, err := os.Stat(filepath.Join(dir, "mcp_config.json")); err == nil {
+		t.Error("Prepare made an mcp_config.json")
 	}
 
 	// A second start leaves the files alone; an entry that differs is written again.
@@ -138,6 +133,43 @@ func TestAgyPrepareWritesTheGlobalHooksAndMCPEntry(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(hooks); !strings.Contains(string(data), "'/opt/agentos' hook Stop") || strings.Contains(string(data), "/Users/me") {
 		t.Errorf("hooks.json after the command moved = %s", data)
+	}
+}
+
+func TestAgyPrepareRemovesTheOldBrowserServer(t *testing.T) {
+	tests := []struct {
+		name, before, after string
+	}{
+		{"the server agentos wrote goes", `{"mcpServers":{"browser":{"command":"/Users/me/.local/bin/agentos","args":["mcp-browser"],"disabledTools":["new_page"]},"github":{"command":"gh-mcp"}},"other":1}`,
+			`{"mcpServers":{"github":{"command":"gh-mcp"}},"other":1}`},
+		{"the owner's own browser server stays", `{"mcpServers":{"browser":{"command":"npx","args":["chrome-devtools-mcp"]}}}`, `{"mcpServers":{"browser":{"command":"npx","args":["chrome-devtools-mcp"]}}}`},
+		{"an empty file stays", ``, ``},
+		{"a file that is not JSON stays", `{`, `{`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			servers := filepath.Join(dir, "mcp_config.json")
+			if err := os.WriteFile(servers, []byte(tt.before), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := (Agy{ConfigDir: dir, Installed: "/x", Writes: true}).Prepare(Launch{}); err != nil {
+				t.Fatal(err)
+			}
+			data, _ := os.ReadFile(servers)
+			if tt.after == tt.before {
+				if string(data) != tt.before {
+					t.Errorf("mcp_config.json = %s, want it untouched", data)
+				}
+				return
+			}
+			var got, want any
+			_ = json.Unmarshal(data, &got)
+			_ = json.Unmarshal([]byte(tt.after), &want)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("mcp_config.json = %s, want %s", data, tt.after)
+			}
+		})
 	}
 }
 
@@ -354,6 +386,7 @@ func TestAgyChatHookKeepsTheChatReadOnly(t *testing.T) {
 		{"run_command", "agentos issue 12 --prompt -", "allow"},
 		{"run_command", "gh issue comment 12 --body-file -", "allow"},
 		{"run_command", "agentos browser open http://x", "allow"},
+		{"run_command", "agent-browser snapshot -i -c", "allow"},
 		{"run_command", "agentos issues", "ask"},
 		{"run_command", "git commit -m x", "ask"},
 		{"run_command", "gh pr create", "ask"},

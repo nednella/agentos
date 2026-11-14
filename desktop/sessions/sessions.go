@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"slices"
@@ -22,7 +23,6 @@ import (
 	"github.com/nednella/agentos/internal/agent"
 	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/bus"
-	"github.com/nednella/agentos/internal/mcp"
 	"github.com/nednella/agentos/internal/project"
 	"github.com/nednella/agentos/internal/prompts"
 	"github.com/nednella/agentos/internal/session"
@@ -179,10 +179,11 @@ type Evidence interface {
 
 // Browsers is what the sessions need of the browsers.
 type Browsers interface {
-	Available() bool
+	AgentReady() bool
+	AgentEnv(id, tmpDir string) ([]string, error)
 	Has(id string) bool
 	Close(ctx context.Context, id string)
-	Port(projectKey string) int
+	Forget(ctx context.Context, id string)
 	PIDs() []int
 }
 
@@ -509,7 +510,7 @@ func (s *Sessions) drop(id string) {
 	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
 	go s.evidence.Purge(id)
-	go s.browsers.Close(s.ctx, id)
+	go s.browsers.Forget(s.ctx, id)
 	if name, err := session.ParseName(id); err == nil {
 		go os.RemoveAll(s.tmpDir(name))
 		_ = os.Remove(s.handoverPath(name))
@@ -1335,7 +1336,16 @@ func (s *Sessions) launch(ctx context.Context, p agent.Provider, name session.Na
 			return fmt.Errorf("saving the handover: %w", err)
 		}
 	}
-	l := s.launchFor(p, name, proj, model, conversation, brief, handover, start, chat)
+	browser := s.hasBrowser(p, proj, brief)
+	if browser {
+		agentEnv, err := s.browsers.AgentEnv(name.String(), tmp)
+		if err != nil {
+			log.Printf("agentos: session %s starts without its browser: %v", name, err)
+			browser = false
+		}
+		env = append(env, agentEnv...)
+	}
+	l := launchFor(model, conversation, brief, handover, start, chat, browser)
 	l.TmpDir = tmp
 	if err := p.Prepare(l); err != nil {
 		return err
@@ -1809,65 +1819,16 @@ func (s *Sessions) CloseShell(id string) error {
 	return nil
 }
 
-// chromeDevToolsMCPName is the package of the MCP server that gives Claude the page tools. Its version is pinned
-// so a new release cannot change the tools under a running install, and it is the version agentos stands in for.
-const chromeDevToolsMCPName = "chrome-devtools-mcp"
-
-var chromeDevToolsMCPVersion = mcp.Browser.ServerInfo.Version
-
-// npmCacheDir is npm's cache folder: where $npm_config_cache points, else ~/.npm.
-func npmCacheDir() string {
-	if dir := os.Getenv("npm_config_cache"); dir != "" {
-		return dir
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, ".npm")
-}
-
-// cachedMCPBin is the command file of the pinned MCP server when npx has it in its cache under npmCache, else "".
-// Running it directly saves the `npm exec` process npx keeps beside the server.
-func cachedMCPBin(npmCache string) string {
-	if npmCache == "" {
-		return ""
-	}
-	packages, _ := filepath.Glob(filepath.Join(npmCache, "_npx", "*", "node_modules", chromeDevToolsMCPName, "package.json"))
-	for _, manifest := range packages {
-		data, err := os.ReadFile(manifest)
-		var pkg struct {
-			Version string `json:"version"`
-		}
-		if err != nil || json.Unmarshal(data, &pkg) != nil || pkg.Version != chromeDevToolsMCPVersion {
-			continue
-		}
-		bin := filepath.Join(filepath.Dir(manifest), "..", ".bin", chromeDevToolsMCPName)
-		if _, err := os.Stat(bin); err == nil {
-			return filepath.Clean(bin)
-		}
-	}
-	return ""
-}
-
-// browserMCP is the MCP server of the page tools, attached to the project's browser on port. workspace is the
-// folder the tools may read upload files from. The server runs from npmCache when the pinned version is there;
-// otherwise npx runs it, which also fills the cache for the next session.
-func browserMCP(port int, workspace, npmCache string) agent.MCPServer {
-	args := []string{"--browser-url=http://127.0.0.1:" + strconv.Itoa(port), "--no-usage-statistics", "--no-performance-crux", "--workspace=" + workspace}
-	command := cachedMCPBin(npmCache)
-	if command == "" {
-		command = "npx"
-		args = append([]string{"-y", "--prefer-offline", chromeDevToolsMCPName + "@" + chromeDevToolsMCPVersion}, args...)
-	}
-	return agent.MCPServer{Command: command, Args: args, Env: map[string]string{"CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1"}, Denied: agent.BrowserToolsDenied}
+// hasBrowser says whether the session's agent gets a tab of the project's browser: when it can drive one, the project
+// allows it, the browser and agent-browser are there, and the session has no brief.
+func (s *Sessions) hasBrowser(p agent.Provider, proj project.Project, brief string) bool {
+	return brief == "" && proj.BrowserOn() && p.Can(agent.Browser) && s.browsers.AgentReady()
 }
 
 // launchFor is what the session's agent starts with. The agent learns where it runs and the commands that reach the
-// app, and about the browser when it can use one, the project allows it and one exists; a session with a brief
-// learns only the brief. A task started by another session gets that session's handover last. An agent that takes
-// its first prompt on its command line gets start.
-func (s *Sessions) launchFor(p agent.Provider, name session.Name, proj project.Project, model project.Model, conversation, brief, handover, start string, chat bool) agent.Launch {
+// app, and about the browser when it has one; a session with a brief learns only the brief. A task started by another
+// session gets that session's handover last. An agent that takes its first prompt on its command line gets start.
+func launchFor(model project.Model, conversation, brief, handover, start string, chat, browser bool) agent.Launch {
 	l := agent.Launch{Model: model.Model, Effort: model.Effort, Resume: conversation, Chat: chat, Start: start}
 	if brief != "" {
 		l.Prompt = brief
@@ -1877,41 +1838,12 @@ func (s *Sessions) launchFor(p agent.Provider, name session.Name, proj project.P
 	if chat {
 		l.Prompt = prompts.Session() + "\n\n" + prompts.Chat()
 	}
-	if m, ok := s.browserMCPFor(proj); ok && p.Can(agent.Browser) {
-		l.MCP = m
+	if browser {
+		l.Browser = true
 		l.Prompt += "\n\n" + prompts.Browser()
 	}
 	if handover != "" {
 		l.Prompt += "\n\n" + prompts.Handover(handover)
 	}
 	return l
-}
-
-// browserMCPFor is the server of the page tools for the project's browser, when the project allows one and one exists.
-func (s *Sessions) browserMCPFor(proj project.Project) (agent.MCPServer, bool) {
-	if !proj.BrowserOn() || !s.browsers.Available() {
-		return agent.MCPServer{}, false
-	}
-	port := s.browsers.Port(proj.Key())
-	if port == 0 {
-		return agent.MCPServer{}, false
-	}
-	return browserMCP(port, proj.Dir, npmCacheDir()), true
-}
-
-// BrowserMCP is the server of the page tools for the session's project, zero when the session has no browser. An
-// agent whose MCP servers are global, like agy, asks for it through agentos mcp-browser.
-func (s *Sessions) BrowserMCP(id string) (agent.MCPServer, error) {
-	s.mu.Lock()
-	in, ok := s.infoOf(id)
-	s.mu.Unlock()
-	if !ok {
-		return agent.MCPServer{}, fmt.Errorf("session %s is not running", id)
-	}
-	proj, ok := s.projectOf(in)
-	if !ok {
-		return agent.MCPServer{}, fmt.Errorf("session %s has no project", id)
-	}
-	m, _ := s.browserMCPFor(proj)
-	return m, nil
 }

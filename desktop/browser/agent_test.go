@@ -130,7 +130,7 @@ func TestBrowserAgentCLI(t *testing.T) {
 		if out, err := browserCmd(t, h, "", "open", srv.URL); err == nil || !strings.Contains(err.Error(), "AGENTOS_SESSION") {
 			t.Errorf("without a session: %q, %v", out, err)
 		}
-		if out := mustBrowser(t, h, "", "help"); !strings.Contains(out, "list_pages") || strings.Contains(out, "snapshot") {
+		if out := mustBrowser(t, h, "", "help"); !strings.Contains(out, "agent-browser") || strings.Contains(out, "list_pages") {
 			t.Errorf("help = %q", out)
 		}
 	})
@@ -180,7 +180,7 @@ func TestBrowserTabs(t *testing.T) {
 
 	t.Run("tab opens an owned page and prints it", func(t *testing.T) {
 		out := mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
-		if want := "opened tab Second - " + srv.URL + "/second\npage: [main · 1 web] - find it in list_pages by this title prefix"; out != want {
+		if want := "opened tab Second - " + srv.URL + "/second"; out != want {
 			t.Errorf("tab printed %q, want %q", out, want)
 		}
 		st := h.BrowserState(s.ID)

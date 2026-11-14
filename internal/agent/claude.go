@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -14,11 +15,14 @@ import (
 )
 
 // chatTools are the commands a chat may run in plan mode: the ones that hand work to the owner's queue, plan
-// an issue in it, or drive the session's own browser window.
+// an issue in it, or open the session's own browser window.
 var chatTools = []string{
 	"Bash(agentos issue:*)", "Bash(agentos new:*)", "Bash(agentos note:*)", "Bash(agentos refresh:*)", "Bash(agentos browser:*)",
 	"Bash(gh issue create:*)", "Bash(gh issue comment:*)", "Bash(gh issue edit:*)",
 }
+
+// browserTool drives the session's browser tab. A session with a browser may run it without asking, a chat too.
+const browserTool = "Bash(agent-browser:*)"
 
 var claudeEvents = []string{
 	"SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse",
@@ -44,10 +48,6 @@ type hookGroup struct {
 	Hooks   []hookCommand `json:"hooks"`
 }
 
-// allowTool is a PermissionRequest hook command that answers the prompt with yes. Plan mode asks before a page
-// tool that changes the page, and neither an allow rule nor a PreToolUse hook's allow stops that.
-const allowTool = `printf '%s' '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'`
-
 func (c Claude) Name() string        { return "claude" }
 func (c Claude) Can(Capability) bool { return true }
 
@@ -57,10 +57,6 @@ func (c Claude) Command(l Launch) []string {
 	hooks := make(map[string][]hookGroup, len(claudeEvents))
 	for _, ev := range claudeEvents {
 		hooks[ev] = []hookGroup{{Hooks: []hookCommand{{Type: "command", Command: util.ShellQuote(c.Exe) + " hook " + ev}}}}
-	}
-	browser := l.MCP.Command != ""
-	if l.Chat && browser {
-		hooks["PermissionRequest"] = []hookGroup{{Matcher: "mcp__browser__.*", Hooks: []hookCommand{{Type: "command", Command: allowTool}}}}
 	}
 	type permissions struct {
 		AdditionalDirectories []string `json:"additionalDirectories,omitempty"`
@@ -79,11 +75,16 @@ func (c Claude) Command(l Launch) []string {
 	if l.Resume != "" {
 		argv = append(argv, "--resume", l.Resume)
 	}
+	var allowed []string
 	if l.Chat {
-		argv = append(argv, "--permission-mode", "plan", "--allowedTools", strings.Join(chatTools, ","))
+		argv = append(argv, "--permission-mode", "plan")
+		allowed = chatTools
 	}
-	if browser {
-		argv = append(argv, "--mcp-config", c.mcpConfig(l.MCP), "--disallowedTools", deniedTools(l.MCP))
+	if l.Browser {
+		allowed = append(slices.Clip(allowed), browserTool)
+	}
+	if len(allowed) > 0 {
+		argv = append(argv, "--allowedTools", strings.Join(allowed, ","))
 	}
 	if l.Prompt != "" {
 		argv = append(argv, "--append-system-prompt", l.Prompt)
@@ -92,29 +93,6 @@ func (c Claude) Command(l Launch) []string {
 		argv = append(argv, "--", l.Start)
 	}
 	return argv
-}
-
-// mcpConfig is the --mcp-config JSON that adds m as the MCP server "browser". agentos, at c.Exe, stands in for the
-// server and starts it at the first tool call, so a session that never uses the browser never runs it.
-func (c Claude) mcpConfig(m MCPServer) string {
-	type server struct {
-		Command string            `json:"command"`
-		Args    []string          `json:"args"`
-		Env     map[string]string `json:"env"`
-	}
-	config, _ := json.Marshal(map[string]map[string]server{"mcpServers": {"browser": {
-		Command: c.Exe, Args: append([]string{"mcp-browser", "--", m.Command}, m.Args...), Env: m.Env,
-	}}})
-	return string(config)
-}
-
-// deniedTools is the --disallowedTools value for the denied tools of m, in claude's name for an MCP tool.
-func deniedTools(m MCPServer) string {
-	names := make([]string, len(m.Denied))
-	for i, tool := range m.Denied {
-		names[i] = "mcp__browser__" + tool
-	}
-	return strings.Join(names, " ")
 }
 
 // Env sets claude's temp folder to the session's own.
