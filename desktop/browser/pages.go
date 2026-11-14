@@ -13,10 +13,7 @@ import (
 	"github.com/nednella/agentos/internal/util"
 )
 
-const (
-	pageProbeLimit = 3 * time.Second
-	newPageLimit   = 10 * time.Second
-)
+const pageProbeLimit = 3 * time.Second
 
 // page is one browser page a session owns: its first, the tabs and popups it opens, and any tab the owner opens in
 // the session's window. Its fields are guarded by the mutex of its session's tab.
@@ -109,16 +106,6 @@ func (t *tab) activePage() (*page, error) {
 	defer t.mu.Unlock()
 	if pg := t.activeLocked(); pg != nil {
 		return pg, nil
-	}
-	return nil, errNoPage
-}
-
-// newest is the session's most recently opened page.
-func (t *tab) newest() (*page, error) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	if n := len(t.pages); n > 0 {
-		return t.pages[n-1], nil
 	}
 	return nil, errNoPage
 }
@@ -317,12 +304,7 @@ func windowOf(ctx context.Context, p *browserProc, targetID string) (int, error)
 
 // eval runs JavaScript in the page and returns its JSON result.
 func (pg *page) eval(ctx context.Context, expression string) (json.RawMessage, error) {
-	return pg.evaluate(ctx, expression, false)
-}
-
-// evaluate is eval; userGesture runs the script as if the user had just clicked, so the browser allows a popup.
-func (pg *page) evaluate(ctx context.Context, expression string, userGesture bool) (json.RawMessage, error) {
-	raw, err := pg.call(ctx, "Runtime.evaluate", map[string]any{"expression": expression, "returnByValue": true, "awaitPromise": true, "userGesture": userGesture})
+	raw, err := pg.call(ctx, "Runtime.evaluate", map[string]any{"expression": expression, "returnByValue": true, "awaitPromise": true})
 	if err != nil {
 		return nil, err
 	}

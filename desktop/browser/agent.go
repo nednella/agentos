@@ -2,10 +2,7 @@ package browser
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"slices"
-	"strings"
 	"time"
 )
 
@@ -78,94 +75,4 @@ func (b *Browsers) AgentOpen(ctx context.Context, id, address string, front bool
 		}
 	}
 	return "opened " + pg.line(ctx), nil
-}
-
-// AgentTab is agentos browser tab: it opens the address in a new tab of the session's window. The newest page opens
-// it with window.open, run as if the user had clicked so the popup blocker lets it through and the browser puts the
-// tab in the opener's window; the new page joins the session as the opener's child.
-func (b *Browsers) AgentTab(ctx context.Context, id, address string) (string, error) {
-	address, err := webAddress(address)
-	if err != nil {
-		return "", err
-	}
-	t, err := b.tabFor(ctx, id)
-	if err != nil {
-		return "", err
-	}
-	opener, err := t.newest()
-	if err != nil {
-		return "", err
-	}
-	known := t.targets()
-	quoted, _ := json.Marshal(address)
-	opened, err := opener.evaluate(ctx, "window.open("+string(quoted)+", '_blank') !== null", true)
-	if err != nil {
-		return "", err
-	}
-	if string(opened) != "true" {
-		return "", errors.New("the browser blocked the new tab")
-	}
-	pg, err := t.waitNewPage(ctx, known)
-	if err != nil {
-		return "", err
-	}
-	if err := pg.waitSettled(ctx, address); err != nil {
-		return "", err
-	}
-	t.refreshAll(ctx)
-	return "opened tab " + pg.line(ctx), nil
-}
-
-// targets are the targets of the session's pages.
-func (t *tab) targets() []string {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-	ids := make([]string, len(t.pages))
-	for i, pg := range t.pages {
-		ids[i] = pg.targetID
-	}
-	return ids
-}
-
-// waitNewPage waits for the session to take in a page that is not among known.
-func (t *tab) waitNewPage(ctx context.Context, known []string) (*page, error) {
-	ctx, cancel := context.WithTimeout(ctx, newPageLimit)
-	defer cancel()
-	for {
-		t.mu.Lock()
-		for _, pg := range t.pages {
-			if !slices.Contains(known, pg.targetID) && pg.sessionID != "" {
-				t.mu.Unlock()
-				return pg, nil
-			}
-		}
-		t.mu.Unlock()
-		select {
-		case <-ctx.Done():
-			return nil, errors.New("the new tab did not open")
-		case <-time.After(50 * time.Millisecond):
-		}
-	}
-}
-
-// waitSettled waits until a page opened by a script has left its first empty document and finished loading. The
-// load events of a popup can pass before agentos listens, so it reads the document instead.
-func (pg *page) waitSettled(ctx context.Context, address string) error {
-	ctx, cancel := context.WithTimeout(ctx, loadLimit)
-	defer cancel()
-	for {
-		raw, err := pg.eval(ctx, `location.href + "\n" + document.readyState`)
-		var both string
-		if err == nil && json.Unmarshal(raw, &both) == nil {
-			addr, state, _ := strings.Cut(both, "\n")
-			if state == "complete" && (addr != "about:blank" || strings.HasPrefix(address, "about:")) {
-				return nil
-			}
-		}
-		select {
-		case <-ctx.Done():
-			return errors.New("the page did not finish loading")
-		case <-time.After(100 * time.Millisecond):
-		}
-	}
 }

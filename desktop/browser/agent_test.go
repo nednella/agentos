@@ -3,7 +3,6 @@ package browser_test
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"image/png"
 	"net/http"
 	"net/http/httptest"
@@ -178,21 +177,15 @@ func TestBrowserTabs(t *testing.T) {
 		t.Fatalf("state after open = %+v", st)
 	}
 
-	t.Run("tab opens an owned page and prints it", func(t *testing.T) {
-		out := mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
-		if want := "opened tab Second - " + srv.URL + "/second"; out != want {
-			t.Errorf("tab printed %q, want %q", out, want)
+	t.Run("a tab the page opens is the session's", func(t *testing.T) {
+		if err := b.OpenTab(t.Context(), s.ID, srv.URL+"/second"); err != nil {
+			t.Fatal(err)
 		}
-		st := h.BrowserState(s.ID)
-		if st.Pages != 2 || st.Title != "Second" || st.URL != srv.URL+"/second" {
-			t.Errorf("state follows the new page: %+v", st)
-		}
-		if _, err := browserCmd(t, h, s.ID, "tab"); err == nil {
-			t.Error("tab without an address succeeded")
-		}
-		if _, err := browserCmd(t, h, s.ID, "tab", "javascript:alert(1)"); err == nil || pages() != 2 {
-			t.Errorf("tab with a javascript address: %v, %d pages", err, pages())
-		}
+		eventually(t, "the second page", func() bool { return pages() == 2 })
+		eventually(t, "the state to follow it", func() bool {
+			st := h.BrowserState(s.ID)
+			return st.Title == "Second" && st.URL == srv.URL+"/second"
+		})
 	})
 
 	t.Run("console from the new page reaches the session", func(t *testing.T) {
@@ -207,25 +200,18 @@ func TestBrowserTabs(t *testing.T) {
 		eventually(t, "the page to go on", func() bool { return eval("window.answer") == "false" })
 	})
 
-	t.Run("a tab opened from a page the session owns is owned too", func(t *testing.T) {
-		mustBrowser(t, h, s.ID, "open", srv.URL)
-		mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
-		eventually(t, "the third page", func() bool { return pages() == 3 })
-		eventually(t, "the state to follow it", func() bool { return h.BrowserState(s.ID).URL == srv.URL+"/second" })
-	})
-
 	t.Run("a page that closes leaves the session open", func(t *testing.T) {
-		for want := 2; want >= 1; want-- {
-			_, _ = b.Eval(t.Context(), s.ID, "window.close()")
-			eventually(t, fmt.Sprintf("%d pages", want), func() bool { return pages() == want })
-			if st := h.BrowserState(s.ID); !st.Open || st.Title != "Demo" && want == 1 {
-				t.Errorf("state = %+v", st)
-			}
+		_, _ = b.Eval(t.Context(), s.ID, "window.close()")
+		eventually(t, "1 page", func() bool { return pages() == 1 })
+		if st := h.BrowserState(s.ID); !st.Open || st.Title != "Demo" {
+			t.Errorf("state = %+v", st)
 		}
 	})
 
 	t.Run("close closes the window with every tab", func(t *testing.T) {
-		mustBrowser(t, h, s.ID, "tab", srv.URL+"/second")
+		if err := b.OpenTab(t.Context(), s.ID, srv.URL+"/second"); err != nil {
+			t.Fatal(err)
+		}
 		eventually(t, "two pages", func() bool { return pages() == 2 })
 		if out := mustBrowser(t, h, s.ID, "close"); out != "closed your window" {
 			t.Errorf("close printed %q", out)
