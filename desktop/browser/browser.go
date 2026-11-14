@@ -80,18 +80,19 @@ func findBrowser() string {
 }
 
 // Browsers runs one browser per project and one window per session. AGENTOS_BROWSER_HEADLESS=1 starts the
-// browser without windows, for tests.
+// browser without windows, for tests. agentBrowser is the command the sessions' agents drive their tab with.
 type Browsers struct {
-	dataDir    string
-	binary     string
-	headless   bool
-	emit       func(event string, payload any)
-	dialogWait time.Duration
-	urlFor     func(sessionID string) string // the page a new tab opens first
-	labelFor   func(sessionID string) string // names the session in its window's title
-	onTabs     func()                        // a tab opened or closed
-	launchMu   sync.Mutex
-	portMu     sync.Mutex
+	dataDir      string
+	binary       string
+	agentBrowser string
+	headless     bool
+	emit         func(event string, payload any)
+	dialogWait   time.Duration
+	urlFor       func(sessionID string) string // the page a new tab opens first
+	labelFor     func(sessionID string) string // names the session in its window's title
+	onTabs       func()                        // a tab opened or closed
+	launchMu     sync.Mutex
+	portMu       sync.Mutex
 
 	mu      sync.Mutex
 	procs   map[string]*browserProc // by project key
@@ -102,7 +103,8 @@ type Browsers struct {
 // New runs the browsers with their profiles under dataDir.
 func New(dataDir string, emit func(string, any)) *Browsers {
 	return &Browsers{
-		dataDir: dataDir, binary: findBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1", emit: emit, dialogWait: dialogWait,
+		dataDir: dataDir, binary: findBrowser(), agentBrowser: findAgentBrowser(), headless: os.Getenv("AGENTOS_BROWSER_HEADLESS") == "1",
+		emit: emit, dialogWait: dialogWait,
 		urlFor: func(string) string { return "" }, labelFor: func(string) string { return "" }, onTabs: func() {},
 		procs: map[string]*browserProc{}, tabs: map[string]*tab{}, opening: map[string]*sync.Mutex{},
 	}
@@ -618,6 +620,9 @@ func (b *Browsers) Open(ctx context.Context, id, url string) (BrowserState, erro
 			return BrowserState{}, err
 		}
 	}
+	if err := b.bindAgent(ctx, id, targets[0]); err != nil {
+		log.Printf("agentos: %v", err)
+	}
 	go t.watch()
 	if url == "" {
 		url = b.urlFor(id)
@@ -766,8 +771,12 @@ func (b *Browsers) Show(ctx context.Context, id string) error {
 	return pg.activate(ctx)
 }
 
-// Close closes all the session's pages, and stops the project's browser when no other session has a window in it.
+// Close closes all the session's pages, and stops the project's browser when no other session has a window in it. The
+// session's agent-browser is left bound to no tab.
 func (b *Browsers) Close(ctx context.Context, id string) {
+	if err := b.bindAgent(ctx, id, ""); err != nil {
+		log.Printf("agentos: %v", err)
+	}
 	b.mu.Lock()
 	t := b.tabs[id]
 	delete(b.tabs, id)

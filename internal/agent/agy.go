@@ -24,9 +24,9 @@ import (
 	"github.com/nednella/agentos/internal/util"
 )
 
-// Agy runs the Antigravity CLI. agy takes no hooks or MCP servers on its command line: they come from the global
-// files in ConfigDir, which Prepare writes with the installed agentos, Installed, as their command, so one file
-// serves every build of the app. Writes says whether this build may write them: the installed app always, any other
+// Agy runs the Antigravity CLI. agy takes no hooks on its command line: they come from the global files in
+// ConfigDir, which Prepare writes with the installed agentos, Installed, as their command, so one file serves every
+// build of the app. Writes says whether this build may write them: the installed app always, any other
 // only when AGENTOS_AGY_CONFIG_DIR named ConfigDir, so a dev or test build never touches the owner's own files.
 // Settings is agy's own settings file, where it keeps its default model. ListModels reads agy models, nil when agy
 // cannot say.
@@ -260,7 +260,7 @@ func listAgyModels() []agyModel {
 	return models
 }
 
-// Prepare writes the session's prompt file, and the global hooks and MCP entry when this build may.
+// Prepare writes the session's prompt file, and the global hooks when this build may.
 func (a Agy) Prepare(l Launch) error {
 	if file := promptFile(l); file != "" {
 		if err := os.WriteFile(file, []byte(l.Prompt), 0o600); err != nil {
@@ -273,7 +273,7 @@ func (a Agy) Prepare(l Launch) error {
 	if err := a.installHooks(); err != nil {
 		return fmt.Errorf("writing agy's hooks: %w", err)
 	}
-	if err := a.installMCP(); err != nil {
+	if err := a.removeBrowserMCP(); err != nil {
 		return fmt.Errorf("writing agy's MCP servers: %w", err)
 	}
 	return nil
@@ -296,16 +296,30 @@ func (a Agy) installHooks() error {
 	return a.setEntry(filepath.Join(a.ConfigDir, "hooks.json"), nil, "agentos", hook)
 }
 
-// installMCP keeps the server browser in mcp_config.json up to date: agentos stands in for the page tools and finds the
-// session's browser itself, and agy withholds the tools the session must not have.
-func (a Agy) installMCP() error {
-	server := map[string]any{"command": a.Installed, "args": []string{"mcp-browser"}, "disabledTools": BrowserToolsDenied}
-	return a.setEntry(filepath.Join(a.ConfigDir, "mcp_config.json"), []string{"mcpServers"}, "browser", server)
+// removeBrowserMCP takes out of mcp_config.json the server browser that agentos wrote when sessions had MCP page
+// tools: it runs agentos mcp-browser, which agentos no longer has. A server browser of the owner's own stays.
+func (a Agy) removeBrowserMCP() error {
+	path := filepath.Join(a.ConfigDir, "mcp_config.json")
+	data, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var top, servers map[string]json.RawMessage
+	var browser struct {
+		Args []string `json:"args"`
+	}
+	if json.Unmarshal(data, &top) != nil || json.Unmarshal(top["mcpServers"], &servers) != nil ||
+		json.Unmarshal(servers["browser"], &browser) != nil || !slices.Equal(browser.Args, []string{"mcp-browser"}) {
+		return nil
+	}
+	delete(servers, "browser")
+	top["mcpServers"], _ = json.Marshal(servers)
+	out, _ := json.MarshalIndent(top, "", "  ")
+	return atomicfile.Write(path, append(out, '\n'), 0o600)
 }
-
-// BrowserToolsDenied are the page tools a session must not have: new_page and close_page would open and close pages
-// outside the session's own, in a window of another session.
-var BrowserToolsDenied = []string{"new_page", "close_page"}
 
 // setEntry sets key to value in the JSON object at path, under the objects named by keys, and writes the file only
 // when that changes it. A missing or empty file is an empty object.
@@ -513,7 +527,7 @@ func chatDecision(tool, command string) string {
 		if isChatCommand(command) {
 			return decision("allow", "")
 		}
-		return decision("ask", "a chat runs only the agentos and gh issue commands that hand work on")
+		return decision("ask", "a chat runs only the agentos and gh issue commands that hand work on, and agent-browser")
 	}
 	return ""
 }
@@ -523,10 +537,11 @@ func decision(what, reason string) string {
 	return string(reply)
 }
 
-// isChatCommand says whether the command line is one of chatTools, which claude allows a chat as Bash(<words>:*).
+// isChatCommand says whether the command line is one of chatTools or browserTool, which claude allows a chat as
+// Bash(<words>:*).
 func isChatCommand(command string) bool {
 	command = strings.TrimSpace(command)
-	for _, tool := range chatTools {
+	for _, tool := range append(slices.Clip(chatTools), browserTool) {
 		words := strings.TrimSuffix(strings.TrimPrefix(tool, "Bash("), ":*)")
 		if command == words || strings.HasPrefix(command, words+" ") {
 			return true

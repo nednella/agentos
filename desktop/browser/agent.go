@@ -55,15 +55,7 @@ func (b *Browsers) tabFor(ctx context.Context, id string) (*tab, error) {
 	return b.need(id)
 }
 
-// pageHelp is the last line of what the agent commands print for a page.
-func (t *tab) pageHelp() string {
-	if t.prefix == "" {
-		return ""
-	}
-	return "\npage: " + t.prefix + " - find it in list_pages by this title prefix"
-}
-
-// AgentOpen is agentos browser open: it loads the page in the session's window and says how to find it.
+// AgentOpen is agentos browser open: it loads the page in the session's window and prints it.
 func (b *Browsers) AgentOpen(ctx context.Context, id, address string, front bool) (string, error) {
 	t, err := b.tabFor(ctx, id)
 	if err != nil {
@@ -85,7 +77,7 @@ func (b *Browsers) AgentOpen(ctx context.Context, id, address string, front bool
 			return "", err
 		}
 	}
-	return "opened " + pg.line(ctx) + t.pageHelp(), nil
+	return "opened " + pg.line(ctx), nil
 }
 
 // AgentTab is agentos browser tab: it opens the address in a new tab of the session's window. The newest page opens
@@ -121,7 +113,7 @@ func (b *Browsers) AgentTab(ctx context.Context, id, address string) (string, er
 		return "", err
 	}
 	t.refreshAll(ctx)
-	return "opened tab " + pg.line(ctx) + t.pageHelp(), nil
+	return "opened tab " + pg.line(ctx), nil
 }
 
 // targets are the targets of the session's pages.

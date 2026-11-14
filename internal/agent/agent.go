@@ -19,23 +19,13 @@ import (
 // Resume is a conversation to continue, which an agent that cannot resume ignores.
 // Chat starts the agent read-only, able to run only the commands that hand work off; an agent that cannot ignores it.
 // Prompt is the text agentos adds to the agent's system prompt. Start is the first prompt, for an agent that takes
-// it on its command line. MCP is the server of the page tools, zero when the session has no browser. TmpDir is the
-// session's own temp folder.
+// it on its command line. Browser says the session drives its browser tab with agent-browser. TmpDir is the session's
+// own temp folder.
 type Launch struct {
 	Model, Effort, Resume string
-	Chat                  bool
+	Chat, Browser         bool
 	Prompt, Start         string
-	MCP                   MCPServer
 	TmpDir                string
-}
-
-// MCPServer is an MCP server the agent runs on stdio, under the name "browser". Denied are the names of its
-// tools the agent must not have.
-type MCPServer struct {
-	Command string
-	Args    []string
-	Env     map[string]string
-	Denied  []string
 }
 
 // Capability is something a provider can do with a Launch.
@@ -45,7 +35,7 @@ const (
 	Resume      Capability = iota // continue a conversation
 	StartArg                      // take the first prompt on its command line and submit it once ready
 	ModelEffort                   // take a model and an effort
-	Browser                       // use the page tools of an MCP server
+	Browser                       // drive the session's browser tab with agent-browser
 )
 
 // Provider is one agent CLI as agentos runs it: the command and environment a session starts with, and the way its

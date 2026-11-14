@@ -492,16 +492,15 @@ func TestBrowserListensOnItsSavedPort(t *testing.T) {
 	}
 }
 
-func TestAgentOpenNamesThePage(t *testing.T) {
+func TestAgentOpenPrintsThePageWithoutTheLabel(t *testing.T) {
 	b, ctx := newTestBrowsers(t)
+	b.Hook(func(string) string { return "" }, func(string) string { return "demo · 2 fix login" }, func() {})
 	if _, err := b.Open(ctx, "p/1", "about:blank"); err != nil {
 		t.Fatal(err)
 	}
-	b.tab("p/1").prefix = "[demo · 2 fix login]"
 	out, err := b.AgentOpen(ctx, "p/1", "data:text/html,<title>Hi</title>", false)
-	want := "page: [demo · 2 fix login] - find it in list_pages by this title prefix"
-	if err != nil || !strings.HasSuffix(out, "\n"+want) {
-		t.Errorf("AgentOpen = %q, %v; want the last line %q", out, err, want)
+	if want := "opened Hi - data:text/html,<title>Hi</title>"; err != nil || out != want {
+		t.Errorf("AgentOpen = %q, %v; want %q", out, err, want)
 	}
 }
 
