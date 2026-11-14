@@ -331,3 +331,28 @@ func TestCleanEnvDropsInheritedSession(t *testing.T) {
 		t.Error("an unrelated variable was dropped")
 	}
 }
+
+func TestNewSessionGivesThePaneItsPath(t *testing.T) {
+	tmux := newTestTmux(t)
+	ctx := context.Background()
+	// The server is up first, so the pane cannot get the PATH from the server's start.
+	if err := tmux.NewSession(ctx, session.Name{Project: "demo", Token: "a1"}, "first", t.TempDir(), nil, []string{"sleep", "60"}, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	out := filepath.Join(dir, "path")
+	path := "PATH=" + dir + string(os.PathListSeparator) + os.Getenv("PATH")
+	if err := tmux.NewSession(ctx, session.Name{Project: "demo", Token: "a2"}, "second", dir, []string{path}, []string{"sh", "-c", `echo "$PATH" > path; sleep 60`}, 100, 30); err != nil {
+		t.Fatal(err)
+	}
+	var got []byte
+	for range 50 {
+		if got, _ = os.ReadFile(out); len(got) > 0 {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	if want := strings.TrimPrefix(path, "PATH="); strings.TrimSpace(string(got)) != want {
+		t.Errorf("the pane's PATH = %q, want %q", got, want)
+	}
+}

@@ -82,9 +82,14 @@ func (t *Tmux) argv(args ...string) []string {
 }
 
 func (t *Tmux) run(ctx context.Context, args ...string) (string, error) {
+	return t.runWith(ctx, cleanEnv(), args...)
+}
+
+// runWith is run with env as the environment of the tmux client.
+func (t *Tmux) runWith(ctx context.Context, env []string, args ...string) (string, error) {
 	argv := t.argv(args...)
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
-	cmd.Env = cleanEnv()
+	cmd.Env = env
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	if err := cmd.Run(); err != nil {
@@ -185,13 +190,18 @@ func (t *Tmux) NewSession(ctx context.Context, name session.Name, title, dir str
 		"new-session", "-d", "-s", name.String(), "-c", dir,
 		"-x", strconv.Itoa(cols), "-y", strconv.Itoa(rows),
 	}
+	client := cleanEnv()
 	for _, kv := range env {
 		args = append(args, "-e", kv)
+		// tmux gives a new pane the PATH of the client that starts it, whatever -e says.
+		if strings.HasPrefix(kv, "PATH=") {
+			client = append(client, kv)
+		}
 	}
 	args = append(args, "--")
 	args = append(args, argv...)
 	args = append(args, ";", "set-option", "-t", target(name), titleOption, arg(oneLine(title)))
-	if _, err := t.run(ctx, args...); err != nil {
+	if _, err := t.runWith(ctx, client, args...); err != nil {
 		return fmt.Errorf("starting session %s: %w", name, err)
 	}
 	return nil
