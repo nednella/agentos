@@ -74,9 +74,10 @@ func TestStartReclaimsARunningBrowserAndItsWindows(t *testing.T) {
 	if _, err := first.Open(ctx, "p/1", srv.URL); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := first.AgentTab(ctx, "p/1", srv.URL+"/two"); err != nil {
+	if err := first.OpenTab(ctx, "p/1", srv.URL+"/two"); err != nil {
 		t.Fatal(err)
 	}
+	waitPages(t, first, "p/1", 2)
 	if _, err := first.Open(ctx, "p/2", "about:blank"); err != nil {
 		t.Fatal(err)
 	}
@@ -634,7 +635,7 @@ func TestSessionClosesWithItsLastPage(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-closed // the open
-	if _, err := b.AgentTab(ctx, "p/1", srv.URL+"/two"); err != nil {
+	if err := b.OpenTab(ctx, "p/1", srv.URL+"/two"); err != nil {
 		t.Fatal(err)
 	}
 	waitPages(t, b, "p/1", 2)
