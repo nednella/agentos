@@ -74,7 +74,7 @@ export function EvidenceTab({ session }: EvidenceTabProps) {
           {newestFirst ? 'Newest first' : 'Oldest first'}
         </button>
       </div>
-      <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] content-start gap-3 overflow-y-auto p-3">
+      <div className="grid min-h-0 flex-1 auto-rows-max grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] content-start gap-3 overflow-y-auto p-3">
         {items.map((item) => (
           <EvidenceCard
             key={item.id}
