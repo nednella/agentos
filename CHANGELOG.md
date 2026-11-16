@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.52.1](https://github.com/nednella/agentos/compare/v0.52.0...v0.52.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **ui:** keep media cards full height so the tab scrolls ([daa39fa](https://github.com/nednella/agentos/commit/daa39fa45055a543e29c91548d6e28f8fb1474f0))
+
 ## [0.52.0](https://github.com/nednella/agentos/compare/v0.51.0...v0.52.0) (2026-11-14)
 
 
