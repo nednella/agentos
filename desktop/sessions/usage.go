@@ -27,7 +27,8 @@ type reader struct {
 // what it used last. model is the one the agent reports, for a transcript that names none. With record, it also
 // records all that is not in the event log yet, one event for each model. The first count of a run of the app starts
 // after the latest usage the event log holds for the session, so a restart reads again what was not recorded, and
-// counts nothing twice.
+// counts nothing twice. The row of a session that continues a conversation also shows what the sessions before it in
+// that conversation used; the event log keeps each session's own.
 func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	s.mu.Lock()
 	in, ok := s.infoOf(id)
@@ -50,16 +51,22 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	defer r.mu.Unlock()
 	var before usage.Tokens
 	if r.cursor == nil {
-		after := in.Created
+		after, from := in.Created, ""
 		s.activity.Since(session.ProjectKey(id), in.Created.In(time.Local).Format(time.DateOnly), func(e activity.Event) {
-			if e.Kind != kind || e.Session != id {
-				return
-			}
-			before.Add(e.Tokens)
-			if at := time.UnixMilli(e.At); at.After(after) {
-				after = at
+			switch {
+			case e.Session != id:
+			case e.Kind == activity.SessionStart || e.Kind == activity.ChatStart:
+				from = e.From
+			case e.Kind == kind:
+				before.Add(e.Tokens)
+				if at := time.UnixMilli(e.At); at.After(after) {
+					after = at
+				}
 			}
 		})
+		if from != "" {
+			before.Add(s.usedBefore(session.ProjectKey(id), from, kind))
+		}
 		r.cursor = s.Provider(in.Agent).Usage(after)
 	}
 	parts, cur, err := r.cursor.Read(transcript, model)
@@ -98,6 +105,28 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 		s.spent[id] = total
 		s.sync()
 	}
+}
+
+// usedBefore is what the session from and each session it continues used, as the event log of the project holds it.
+func (s *Sessions) usedBefore(projectKey, from, kind string) usage.Tokens {
+	used := map[string]usage.Tokens{}
+	continues := map[string]string{}
+	s.activity.Since(projectKey, "", func(e activity.Event) {
+		switch e.Kind {
+		case activity.SessionStart, activity.ChatStart:
+			continues[e.Session] = e.From
+		case kind:
+			t := used[e.Session]
+			t.Add(e.Tokens)
+			used[e.Session] = t
+		}
+	})
+	var total usage.Tokens
+	for seen := map[string]bool{}; from != "" && !seen[from]; from = continues[from] {
+		seen[from] = true
+		total.Add(used[from])
+	}
+	return total
 }
 
 // ran shows on the row the model and effort the agent used last, and keeps them where the start choice is kept, the
