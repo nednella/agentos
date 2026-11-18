@@ -143,7 +143,7 @@ type Sessions struct {
 	repoOf     func(dir string) string
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
-	resumed    map[string]bool          // new sessions that continue a conversation, until sync counts them
+	resumed    map[string]string        // the session each new session continues the conversation of, until sync counts it
 	wakes      map[string][]string      // prompts for sessions that were waiting on the user when their PR needed them, oldest first
 	prefillFor time.Duration
 	readers    map[string]*reader      // each session's transcript reader
@@ -247,7 +247,7 @@ func newSessions(o Options) *Sessions {
 		seen:       map[string]session.State{},
 		history:    map[string][]session.Change{},
 		ready:      map[string]chan struct{}{},
-		resumed:    map[string]bool{},
+		resumed:    map[string]string{},
 		wakes:      map[string][]string{},
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
@@ -694,11 +694,11 @@ func (s *Sessions) sync() {
 		if !known {
 			switch {
 			case s.synced && in.Chat:
-				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.ChatStart})
+				s.record(id, activity.Event{At: time.Now().UnixMilli(), Kind: activity.ChatStart, From: s.resumed[id]})
 			case s.synced:
 				issue, _ := strconv.Atoi(in.Issue)
-				e := activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionStart, Issue: issue, Model: in.Model, Effort: in.Effort}
-				if s.resumed[id] {
+				e := activity.Event{At: time.Now().UnixMilli(), Kind: activity.SessionStart, Issue: issue, Model: in.Model, Effort: in.Effort, From: s.resumed[id]}
+				if e.From != "" {
 					e.Label = activity.Resumed
 				}
 				s.record(id, e)
@@ -1277,7 +1277,11 @@ func (s *Sessions) createIn(proj project.Project, title, text string, send bool,
 	if from != "" {
 		s.life.inherit(proj, from, name.String())
 	}
-	view := s.register(p, name, title, proj, issue, model, created, conversation != "", chat, action)
+	continues := ""
+	if conversation != "" {
+		continues = from
+	}
+	view := s.register(p, name, title, proj, issue, model, created, continues, chat, action)
 	if branch := proj.BranchFor(issue); issue > 0 && branch != "" && !chat {
 		s.life.claim(proj, name.String(), branch)
 	}
@@ -1357,12 +1361,13 @@ func (s *Sessions) launch(ctx context.Context, p agent.Provider, name session.Na
 	return s.start(ctx, name, title, proj.Dir, env, p.Command(l), issue, model, chat, action, p.Name())
 }
 
-// register adds the new session to the list and returns its row. It takes mu.
-func (s *Sessions) register(p agent.Provider, name session.Name, title string, proj project.Project, issue int, model project.Model, created time.Time, resumed, chat bool, action string) Session {
+// register adds the new session to the list and returns its row. continues is the session whose conversation it
+// continues, if any. It takes mu.
+func (s *Sessions) register(p agent.Provider, name session.Name, title string, proj project.Project, issue int, model project.Model, created time.Time, continues string, chat bool, action string) Session {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if resumed {
-		s.resumed[name.String()] = true
+	if continues != "" {
+		s.resumed[name.String()] = continues
 	}
 	in := term.Info{Name: name, Title: title, Path: proj.Dir, Chat: chat, Action: action, Agent: p.Name(), Created: created}
 	if p.Can(agent.ModelEffort) {
