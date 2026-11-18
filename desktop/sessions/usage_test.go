@@ -7,6 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/nednella/agentos/desktop/internal/apptest"
+	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/bus"
 )
 
@@ -154,4 +157,59 @@ func TestUsageIsCountedAtEachHookAndRecordedAtTheEndOfATurn(t *testing.T) {
 		row, _ := second.Session(s.ID)
 		return row.Tokens == 1221
 	})
+}
+
+func TestResumedSessionShowsTheWholeConversationsUsage(t *testing.T) {
+	h := newClaudeHarness(t)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// turn ends a turn of the session that used input and output tokens, and ends the session.
+	turn := func(h *apptest.Harness, id string, input, output int64) {
+		t.Helper()
+		transcript := filepath.Join(t.TempDir(), "conv.jsonl")
+		appendLines(t, transcript, assistantLine("msg_"+id, time.Now().Add(100*time.Millisecond), input, output))
+		h.Hook(t, id, "Stop", fmt.Sprintf(`{"session_id":"abc","transcript_path":%q}`, transcript))
+		recorded := len(h.Events(t, activity.Usage)) + 1
+		eventually(t, "the turn's usage in the event log", func() bool { return len(h.Events(t, activity.Usage)) == recorded })
+		if err := h.KillSession(id); err != nil {
+			t.Fatal(err)
+		}
+		eventually(t, "the session ended", func() bool { row, _ := h.Session(id); return row.State == "ended" })
+	}
+	resume := func(h *apptest.Harness, id string) sessions.Session {
+		t.Helper()
+		fresh, err := h.ResumeSession(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return fresh
+	}
+	tokens := func(h *apptest.Harness, id string, want int64) {
+		t.Helper()
+		eventually(t, fmt.Sprintf("%d tokens on the row", want), func() bool { row, _ := h.Session(id); return row.Tokens == want })
+	}
+
+	turn(h, s.ID, 1000, 100)
+	second := resume(h, s.ID)
+	turn(h, second.ID, 10, 1)
+	tokens(h, second.ID, 1111)
+	third := resume(h, second.ID)
+	h.Hook(t, third.ID, "SessionStart", fmt.Sprintf(`{"transcript_path":%q}`, writtenTranscript(t)))
+	tokens(h, third.ID, 1111)
+
+	starts := h.Events(t, activity.SessionStart)
+	if len(starts) != 3 || starts[0].From != "" || starts[1].From != s.ID || starts[2].From != second.ID {
+		t.Errorf("session_start = %+v, want each resumed one to name the session it continues", starts)
+	}
+	restarted := h.Restart(t)
+	tokens(restarted, third.ID, 1111)
+	led, err := restarted.Ledger(30, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if led.Usage.Totals.Tokens != 1111 {
+		t.Errorf("usage = %+v: the stats count a session's usage again in the one that continues it", led.Usage.Totals)
+	}
 }
