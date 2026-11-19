@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.53.0](https://github.com/nednella/agentos/compare/v0.52.1...v0.53.0) (2026-11-19)
+
+
+### Features
+
+* **desktop:** record session a resumed one continues ([ccda64b](https://github.com/nednella/agentos/commit/ccda64b94acde7a05871ce034aaf8cd98dd9eb47))
+* **desktop:** show whole conversation's usage on resumed row ([477ac54](https://github.com/nednella/agentos/commit/477ac54aa43e426e5faf70c76cc2380daeae7cf8))
+
 ## [0.52.1](https://github.com/nednella/agentos/compare/v0.52.0...v0.52.1) (2026-11-16)
 
 
