@@ -28,6 +28,7 @@ func TestParsePR(t *testing.T) {
 		{"draft", prJSON("OPEN", true, "[]", 0, 0), "draft", "none", 0},
 		{"open", prJSON("OPEN", false, "[]", 1, 2), "open", "none", 3},
 		{"approval is not a review to address", strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `[{"id":"x"},{"id":"x"}]`, `[{"state":"APPROVED"},{"state":"CHANGES_REQUESTED"}]`, 1), "open", "none", 2},
+		{"the gh user's own comments and replies are not news", strings.Replace(strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `[{"id":"x"},{"id":"x"}]`, `[{"author":{"login":"bot"},"state":"CHANGES_REQUESTED"},{"author":{"login":"me"},"state":"COMMENTED"}]`, 1), `[{"id":"x"}]`, `[{"author":{"login":"me"}}]`, 1), "open", "none", 1},
 		{"merged", prJSON("MERGED", false, "[]", 0, 0), "merged", "none", 0},
 		{"closed", prJSON("CLOSED", false, "[]", 0, 0), "closed", "none", 0},
 		{"passing", prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"},{"state":"SUCCESS"}]`, 0, 0), "open", "passing", 0},
@@ -37,7 +38,7 @@ func TestParsePR(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			pr, err := parsePR([]byte(tt.data))
+			pr, err := parsePR([]byte(tt.data), "me")
 			if err != nil || pr == nil {
 				t.Fatalf("parsePR = %v, %v", pr, err)
 			}
@@ -46,10 +47,10 @@ func TestParsePR(t *testing.T) {
 			}
 		})
 	}
-	if pr, err := parsePR([]byte("[]")); pr != nil || err != nil {
+	if pr, err := parsePR([]byte("[]"), "me"); pr != nil || err != nil {
 		t.Errorf("no PR gave %v, %v", pr, err)
 	}
-	if _, err := parsePR([]byte("nope")); err == nil {
+	if _, err := parsePR([]byte("nope"), "me"); err == nil {
 		t.Error("bad json accepted")
 	}
 }
@@ -58,14 +59,14 @@ func TestParsePRChecksAndTitle(t *testing.T) {
 	data := `[{"number":12,"title":"Show the status","url":"u","state":"OPEN","isDraft":false,"statusCheckRollup":[` +
 		`{"name":"lint","status":"COMPLETED","conclusion":"FAILURE"},{"context":"ci/test","state":"ERROR"},` +
 		`{"name":"build","status":"IN_PROGRESS"},{"name":"vet","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[],"updatedAt":"2026-10-01T12:00:00Z"}]`
-	pr, err := parsePR([]byte(data))
+	pr, err := parsePR([]byte(data), "me")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if pr.Title != "Show the status" || pr.Checks != "failing" || !slices.Equal(pr.FailedChecks, []string{"lint", "ci/test"}) || pr.RunningChecks != 1 || pr.PassedChecks != 1 {
 		t.Errorf("pr = %+v", pr)
 	}
-	if pr, _ := parsePR([]byte(prJSON("OPEN", false, "[]", 0, 0))); pr.FailedChecks == nil {
+	if pr, _ := parsePR([]byte(prJSON("OPEN", false, "[]", 0, 0)), "me"); pr.FailedChecks == nil {
 		t.Error("no failing checks must be an empty list, not null")
 	}
 }
@@ -207,5 +208,19 @@ func TestInheritPutsTheEndedSessionsBranchesFirst(t *testing.T) {
 	}
 	if got := f.SawOpen["p/new"]; !slices.Equal(got, []string{"issue-7"}) {
 		t.Errorf("saw open = %v", got)
+	}
+}
+
+func TestReviewAfterACommentIsDeletedWakesTheSession(t *testing.T) {
+	l := newLifecycle(nil, nil, t.TempDir(), t.TempDir(), nil, noActivity{}, func(string, any) {})
+	proj := project.Project{Name: "p", OnReview: "/address-review {n}"}
+	tg := target{id: "p/a", proj: proj, branches: []string{"x"}}
+	for i, tt := range []struct {
+		comments int
+		want     string
+	}{{3, ""}, {2, ""}, {3, "/address-review 7"}, {3, ""}} {
+		if o := l.update(tg, "x", "", &PR{Number: 7, State: "open", Comments: tt.comments}, true); o.wake != tt.want {
+			t.Errorf("fetch %d with %d comments woke with %q, want %q", i, tt.comments, o.wake, tt.want)
+		}
 	}
 }
