@@ -123,8 +123,8 @@ export function Sidebar() {
         data-animating={animating}
         style={{ width: sidebarOpen ? `${widths.sidebar}rem` : 'var(--edge-strip-w)' }}
       >
-        <SidebarPanel panel={shellPanel} nav={shellNav} overlay={false} full={false} widthRem={widths.sidebar} />
-        <EdgeStrip side="left" inShell />
+        {(sidebarOpen || animating) && <SidebarPanel panel={shellPanel} nav={shellNav} overlay={false} full={false} widthRem={widths.sidebar} />}
+        {(!sidebarOpen || animating) && <EdgeStrip side="left" inShell />}
       </div>
       {sidebarPeek && (
         <>
