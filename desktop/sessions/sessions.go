@@ -150,6 +150,7 @@ type Sessions struct {
 	spent      map[string]usage.Tokens // what each session's agent used
 	held       map[string]int64        // the memory each live session held at the last sample
 	memory     Memory
+	serverPID  int // the tmux server's, as tmux gave it; asked again once ps no longer lists it
 }
 
 // ProjectList is the configured projects.
