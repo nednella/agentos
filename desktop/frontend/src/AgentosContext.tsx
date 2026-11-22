@@ -29,7 +29,6 @@ export type Agentos = {
   projects: Project[]
   sessions: Session[]
   selectedId: string | null
-  openedIds: string[]
   issues: Issue[]
   issuesLoading: boolean
   issuesDisabled: boolean
@@ -160,7 +159,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [openedIds, setOpenedIds] = useState<string[]>([])
   const [rawIssues, setRawIssues] = useState<Issue[]>([])
   const [issuesLoading, setIssuesLoading] = useState(true)
   const [issuesDisabled, setIssuesDisabled] = useState(false)
@@ -211,7 +209,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     setSelectedId(id)
     if (!id) return
     detached.current = false
-    setOpenedIds((ids) => (ids.includes(id) ? ids : [...ids, id]))
   }, [])
 
   const detach = useCallback(() => {
@@ -219,7 +216,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     if (!id) return
     detached.current = true
     selectId(null)
-    setOpenedIds((ids) => ids.filter((opened) => opened !== id))
   }, [selectId])
 
   const focus = useCallback((target: FocusTarget) => setFocusRequest((r) => ({ target, n: r.n + 1 })), [])
@@ -261,7 +257,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const applySessions = useCallback(
     (list: Session[]) => {
       setSessions(list)
-      setOpenedIds((ids) => ids.filter((id) => list.some((s) => s.id === id)))
       const current = selectedRef.current
       if (detached.current || (current && list.some((s) => s.id === current))) return
       const remembered = list.find((s) => s.id === lastSelected.current.get(projectRef.current?.name ?? ''))
@@ -532,7 +527,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       projects,
       sessions,
       selectedId,
-      openedIds,
       issues,
       issuesLoading,
       issuesDisabled,
@@ -811,7 +805,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, openedIds, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [project, projects, sessions, selectedId, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
   )
 
   return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
