@@ -31,11 +31,13 @@ type watcher struct {
 	config string // the pr_watch and pr_poll it was started with
 }
 
-// ensureWatchers keeps a watcher running for every project with a session on a branch, and stops the rest.
+// ensureWatchers keeps a watcher running for every project with a live session on a branch, and stops the rest.
 func (l *Lifecycle) ensureWatchers(ctx context.Context) {
 	want := map[string]project.Project{}
-	for _, g := range groups(l.sessions.workTargets()) {
-		want[g.proj.Key()] = g.proj
+	for _, t := range l.sessions.workTargets() {
+		if !t.ended {
+			want[t.proj.Key()] = t.proj
+		}
 	}
 	l.mu.Lock()
 	defer l.mu.Unlock()

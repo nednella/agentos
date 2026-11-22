@@ -333,7 +333,7 @@ func groups(targets []target) []group {
 	return out
 }
 
-// Poll looks up the worktree and pull request of every session on a branch, live or ended.
+// Poll looks up the worktree and pull request of every session on a branch that it follows.
 func (l *Lifecycle) Poll(ctx context.Context) {
 	l.pollMu.Lock()
 	defer l.pollMu.Unlock()
@@ -341,7 +341,7 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 	l.round++
 	l.mu.Unlock()
 	var treeFailure, prFailure string
-	for _, g := range groups(l.sessions.workTargets()) {
+	for _, g := range groups(l.followed(l.sessions.workTargets())) {
 		treeErr, prErr := l.refresh(ctx, g.proj, g.targets, nil)
 		if treeErr != nil && treeFailure == "" {
 			treeFailure = util.FirstLine(treeErr.Error())
@@ -355,6 +355,17 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 		l.report("pull requests", prFailure)
 	}
 	l.ensureWatchers(ctx)
+}
+
+// followed are the sessions the one-minute check looks up: each live one, and an ended one until its first
+// fetch and while its PR is open, since that PR merging cleans it up and a review on it resumes it.
+func (l *Lifecycle) followed(targets []target) []target {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return slices.DeleteFunc(targets, func(t target) bool {
+		tr := l.tracks[t.id]
+		return t.ended && tr != nil && (tr.pr == nil || tr.pr.State != "draft" && tr.pr.State != "open")
+	})
 }
 
 // refresh fetches the pull requests of the project's sessions, all of them or only those on
