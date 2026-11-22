@@ -1633,13 +1633,14 @@ func (s *Sessions) workTargets() []target {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var out []target
+	projs := s.projects()
 	for _, in := range s.info {
-		if t, ok := s.targetOf(in); ok {
+		if t, ok := s.targetOf(in, projs); ok {
 			out = append(out, t)
 		}
 	}
 	for _, e := range s.ended {
-		if t, ok := s.targetOf(e.info); ok {
+		if t, ok := s.targetOf(e.info, projs); ok {
 			t.ended = true
 			out = append(out, t)
 		}
@@ -1663,7 +1664,7 @@ func (s *Sessions) target(id string) (target, error) {
 
 // targetOrErr needs mu.
 func (s *Sessions) targetOrErr(in term.Info, ended bool) (target, error) {
-	t, ok := s.targetOf(in)
+	t, ok := s.targetOf(in, s.projects())
 	if !ok {
 		return target{}, fmt.Errorf("session %s has no issue or branch to clean up after", in.Name)
 	}
@@ -1671,9 +1672,9 @@ func (s *Sessions) targetOrErr(in term.Info, ended bool) (target, error) {
 	return t, nil
 }
 
-// targetOf needs mu.
-func (s *Sessions) targetOf(in term.Info) (target, bool) {
-	proj, ok := s.projectOf(in)
+// targetOf finds the session's project in projs. It needs mu.
+func (s *Sessions) targetOf(in term.Info, projs []project.Project) (target, bool) {
+	proj, ok := projectIn(projs, in)
 	if !ok || in.Chat {
 		return target{}, false
 	}
@@ -1708,7 +1709,11 @@ func (s *Sessions) conversationOf(id string) string {
 
 // projectOf needs mu.
 func (s *Sessions) projectOf(in term.Info) (project.Project, bool) {
-	for _, p := range s.projects() {
+	return projectIn(s.projects(), in)
+}
+
+func projectIn(projs []project.Project, in term.Info) (project.Project, bool) {
+	for _, p := range projs {
 		if p.Key() == in.Name.Project {
 			return p, true
 		}
