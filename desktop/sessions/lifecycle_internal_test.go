@@ -10,12 +10,18 @@ import (
 	"github.com/nednella/agentos/internal/project"
 )
 
+// prJSON is GitHub's answer to the pull request query with one pull request.
 func prJSON(state string, draft bool, rollup string, comments, reviews int) string {
 	repeat := func(n int) string {
-		return "[" + strings.TrimSuffix(strings.Repeat(`{"id":"x"},`, n), ",") + "]"
+		return "[" + strings.TrimSuffix(strings.Repeat(`{"author":{"login":"amy"}},`, n), ",") + "]"
 	}
-	return fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"statusCheckRollup":%s,"comments":%s,"reviews":%s,"updatedAt":"2026-10-01T12:00:00Z"}]`,
-		state, draft, rollup, repeat(comments), repeat(reviews))
+	return found(fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":%s}}}}]},"comments":{"nodes":%s},"reviews":{"nodes":%s},"updatedAt":"2026-10-01T12:00:00Z"}]`,
+		state, draft, rollup, repeat(comments), repeat(reviews)))
+}
+
+// found is GitHub's answer to the pull request query with the nodes given.
+func found(nodes string) string {
+	return `{"data":{"repository":{"pullRequests":{"nodes":` + nodes + `}}}}`
 }
 
 func TestParsePR(t *testing.T) {
@@ -27,14 +33,15 @@ func TestParsePR(t *testing.T) {
 	}{
 		{"draft", prJSON("OPEN", true, "[]", 0, 0), "draft", "none", 0},
 		{"open", prJSON("OPEN", false, "[]", 1, 2), "open", "none", 3},
-		{"approval is not a review to address", strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `[{"id":"x"},{"id":"x"}]`, `[{"state":"APPROVED"},{"state":"CHANGES_REQUESTED"}]`, 1), "open", "none", 2},
-		{"the gh user's own comments and replies are not news", strings.Replace(strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `[{"id":"x"},{"id":"x"}]`, `[{"author":{"login":"bot"},"state":"CHANGES_REQUESTED"},{"author":{"login":"me"},"state":"COMMENTED"}]`, 1), `[{"id":"x"}]`, `[{"author":{"login":"me"}}]`, 1), "open", "none", 1},
+		{"approval is not a review to address", strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `"reviews":{"nodes":[{"author":{"login":"amy"}},{"author":{"login":"amy"}}]}`, `"reviews":{"nodes":[{"state":"APPROVED"},{"state":"CHANGES_REQUESTED"}]}`, 1), "open", "none", 2},
+		{"the gh user's own comments and replies are not news", strings.Replace(strings.Replace(prJSON("OPEN", false, "[]", 1, 2), `"reviews":{"nodes":[{"author":{"login":"amy"}},{"author":{"login":"amy"}}]}`, `"reviews":{"nodes":[{"author":{"login":"bot"},"state":"CHANGES_REQUESTED"},{"author":{"login":"me"},"state":"COMMENTED"}]}`, 1), `"comments":{"nodes":[{"author":{"login":"amy"}}]}`, `"comments":{"nodes":[{"author":{"login":"me"}}]}`, 1), "open", "none", 1},
 		{"merged", prJSON("MERGED", false, "[]", 0, 0), "merged", "none", 0},
 		{"closed", prJSON("CLOSED", false, "[]", 0, 0), "closed", "none", 0},
 		{"passing", prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"},{"state":"SUCCESS"}]`, 0, 0), "open", "passing", 0},
 		{"pending", prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"SUCCESS"},{"status":"IN_PROGRESS","conclusion":""}]`, 0, 0), "open", "pending", 0},
 		{"failing wins", prJSON("OPEN", false, `[{"status":"IN_PROGRESS"},{"status":"COMPLETED","conclusion":"FAILURE"},{"status":"COMPLETED","conclusion":"SUCCESS"}]`, 0, 0), "open", "failing", 0},
 		{"status context error", prJSON("OPEN", false, `[{"state":"ERROR"}]`, 0, 0), "open", "failing", 0},
+		{"no checks at all", found(`[{"number":12,"state":"OPEN","commits":{"nodes":[{"commit":{"statusCheckRollup":null}}]},"comments":{"nodes":[]},"reviews":{"nodes":[]},"updatedAt":"2026-10-01T12:00:00Z","closedAt":null}]`), "open", "none", 0},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -42,12 +49,12 @@ func TestParsePR(t *testing.T) {
 			if err != nil || pr == nil {
 				t.Fatalf("parsePR = %v, %v", pr, err)
 			}
-			if pr.State != tt.state || pr.Checks != tt.check || pr.Comments != tt.comments || pr.Number != 12 || pr.UpdatedAt == 0 {
+			if pr.State != tt.state || pr.Checks != tt.check || pr.Comments != tt.comments || pr.Number != 12 || pr.UpdatedAt == 0 || pr.ClosedAt != 0 {
 				t.Errorf("pr = %+v", pr)
 			}
 		})
 	}
-	if pr, err := parsePR([]byte("[]"), "me"); pr != nil || err != nil {
+	if pr, err := parsePR([]byte(found("[]")), "me"); pr != nil || err != nil {
 		t.Errorf("no PR gave %v, %v", pr, err)
 	}
 	if _, err := parsePR([]byte("nope"), "me"); err == nil {
@@ -55,16 +62,21 @@ func TestParsePR(t *testing.T) {
 	}
 }
 
-func TestParsePRChecksAndTitle(t *testing.T) {
-	data := `[{"number":12,"title":"Show the status","url":"u","state":"OPEN","isDraft":false,"statusCheckRollup":[` +
+func TestParsePRChecksTitleAndVerdict(t *testing.T) {
+	data := found(`[{"number":12,"title":"Show the status","url":"u","state":"OPEN","isDraft":false,"commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":[` +
 		`{"name":"lint","status":"COMPLETED","conclusion":"FAILURE"},{"context":"ci/test","state":"ERROR"},` +
-		`{"name":"build","status":"IN_PROGRESS"},{"name":"vet","status":"COMPLETED","conclusion":"SUCCESS"}],"comments":[],"reviews":[],"updatedAt":"2026-10-01T12:00:00Z"}]`
+		`{"name":"build","status":"IN_PROGRESS"},{"name":"vet","status":"COMPLETED","conclusion":"SUCCESS"}]}}}}]},` +
+		`"comments":{"nodes":[]},"reviews":{"nodes":[{"state":"APPROVED","author":{"login":"a"}},{"state":"CHANGES_REQUESTED","author":{"login":"b"}}]},` +
+		`"updatedAt":"2026-10-01T12:00:00Z","closedAt":"2026-10-02T12:00:00Z"}]`)
 	pr, err := parsePR([]byte(data), "me")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if pr.Title != "Show the status" || pr.Checks != "failing" || !slices.Equal(pr.FailedChecks, []string{"lint", "ci/test"}) || pr.RunningChecks != 1 || pr.PassedChecks != 1 {
 		t.Errorf("pr = %+v", pr)
+	}
+	if pr.Review != "changes" || pr.Comments != 1 || pr.ClosedAt == 0 {
+		t.Errorf("review %q, comments %d, closed at %d", pr.Review, pr.Comments, pr.ClosedAt)
 	}
 	if pr, _ := parsePR([]byte(prJSON("OPEN", false, "[]", 0, 0)), "me"); pr.FailedChecks == nil {
 		t.Error("no failing checks must be an empty list, not null")

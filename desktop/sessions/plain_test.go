@@ -82,15 +82,15 @@ func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
 	s := plainSession(h, t)
 	madeBranch(h, t, s)
 	worksIn(h, t, s, h.Dir)
-	eventually(t, "the lookup of the turn", func() bool { return h.GH.Calls("pr list") > 0 })
+	eventually(t, "the lookup of the turn", func() bool { return h.GH.Calls("api graphql") > 0 })
 	time.Sleep(300 * time.Millisecond)
 
-	before := h.GH.Calls("pr list")
+	before := h.GH.Calls("api graphql")
 	for range 3 {
 		h.Sessions().Refresh()
 	}
 	time.Sleep(300 * time.Millisecond)
-	if got := h.GH.Calls("pr list"); got != before {
+	if got := h.GH.Calls("api graphql"); got != before {
 		t.Errorf("pr lookups after refreshes of an idle session = %d, want %d", got, before)
 	}
 }

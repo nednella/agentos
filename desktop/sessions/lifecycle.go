@@ -168,7 +168,7 @@ type Lifecycle struct {
 	gone       map[string]bool        // forgotten ids: a poll that was waiting on gh must not write for them
 	files      map[string]*prsFile    // by project key
 	lists      map[string]*pullList   // by project key: the last pull request list
-	lookups    map[string]lookup      // by project key and branch: what gh pr list --head said last
+	lookups    map[string]lookup      // by project key and branch: what the PR lookup said last
 	round      int                    // the reconciles so far
 	refreshing map[string]*sync.Mutex // by project key: one refresh at a time
 	watchers   map[string]*watcher    // by project key
@@ -545,7 +545,7 @@ func (l *Lifecycle) cachedPR(ctx context.Context, proj project.Project, branch s
 	return pr, nil
 }
 
-// lookup is what gh pr list --head said of a branch, with what the repo's PR list said of it then.
+// lookup is what the PR lookup said of a branch, with what the repo's PR list said of it then.
 type lookup struct {
 	pr    *PR
 	seen  listed // zero when the list held no PR of the branch
@@ -1005,6 +1005,24 @@ func samePath(a, b string) bool {
 	return real(a) == real(b)
 }
 
+// prQuery asks for the newest pull request of a branch, as gh pr list --head does, but for the authors of
+// its comments and the authors and states of its reviews rather than their bodies.
+const prQuery = `query($owner: String!, $repo: String!, $head: String!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequests(headRefName: $head, states: [OPEN, CLOSED, MERGED], first: 1, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes {
+        number title url state isDraft headRefOid mergeable updatedAt closedAt
+        comments(last: 100) { nodes { author { login } } }
+        reviews(last: 100) { nodes { state author { login } } }
+        commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 100) { nodes {
+          ... on CheckRun { name status conclusion }
+          ... on StatusContext { context state }
+        } } } } } }
+      }
+    }
+  }
+}`
+
 func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error) {
 	me, err := l.login(ctx, dir)
 	if err != nil {
@@ -1012,8 +1030,7 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
-	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
-		"number,title,url,state,isDraft,headRefOid,mergeable,statusCheckRollup,comments,reviews,updatedAt,closedAt", "--limit", "1")
+	out, err := l.run(ctx, dir, "gh", "api", "graphql", "-f", "query="+prQuery, "-F", "owner={owner}", "-F", "repo={repo}", "-f", "head="+branch)
 	if err != nil {
 		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
@@ -1045,57 +1062,77 @@ type author struct {
 	Login string `json:"login"`
 }
 
-// review is one review of a pull request, as gh lists them, oldest first. Each reply in a review
+// review is one review of a pull request, as GitHub lists them, oldest first. Each reply in a review
 // thread is a review of its own.
 type review struct {
 	State  string `json:"state"`
 	Author author `json:"author"`
 }
 
-// parsePR reads what gh pr list printed. me is the gh user, whose own comments and reviews ask
+type nodes[T any] struct {
+	Nodes []T `json:"nodes"`
+}
+
+// check is a check run or a commit status of the PR's last commit.
+type check struct {
+	Name       string `json:"name"`    // a check run's
+	Context    string `json:"context"` // a commit status's
+	Status     string `json:"status"`
+	Conclusion string `json:"conclusion"`
+	State      string `json:"state"`
+}
+
+// parsePR reads GitHub's answer to prQuery. me is the gh user, whose own comments and reviews ask
 // nothing of the session.
 func parsePR(data []byte, me string) (*PR, error) {
-	var raw []struct {
-		Number    int    `json:"number"`
-		Title     string `json:"title"`
-		URL       string `json:"url"`
-		State     string `json:"state"`
-		IsDraft   bool   `json:"isDraft"`
-		HeadOid   string `json:"headRefOid"`
-		Mergeable string `json:"mergeable"`
-		Rollup    []struct {
-			Name       string `json:"name"`    // a check run's
-			Context    string `json:"context"` // a commit status's
-			Status     string `json:"status"`
-			Conclusion string `json:"conclusion"`
-			State      string `json:"state"`
-		} `json:"statusCheckRollup"`
-		Comments []struct {
-			Author author `json:"author"`
-		} `json:"comments"`
-		Reviews   []review  `json:"reviews"`
-		UpdatedAt time.Time `json:"updatedAt"`
-		ClosedAt  time.Time `json:"closedAt"`
+	var resp struct {
+		Data struct {
+			Repository struct {
+				PullRequests nodes[struct {
+					Number    int    `json:"number"`
+					Title     string `json:"title"`
+					URL       string `json:"url"`
+					State     string `json:"state"`
+					IsDraft   bool   `json:"isDraft"`
+					HeadOid   string `json:"headRefOid"`
+					Mergeable string `json:"mergeable"`
+					Comments  nodes[struct {
+						Author author `json:"author"`
+					}] `json:"comments"`
+					Reviews nodes[review] `json:"reviews"`
+					Commits nodes[struct {
+						Commit struct {
+							Rollup struct {
+								Contexts nodes[check] `json:"contexts"`
+							} `json:"statusCheckRollup"`
+						} `json:"commit"`
+					}] `json:"commits"`
+					UpdatedAt time.Time `json:"updatedAt"`
+					ClosedAt  time.Time `json:"closedAt"`
+				}] `json:"pullRequests"`
+			} `json:"repository"`
+		} `json:"data"`
 	}
-	if err := json.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("reading gh pr list: %w", err)
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return nil, fmt.Errorf("reading the pull request: %w", err)
 	}
-	if len(raw) == 0 {
+	found := resp.Data.Repository.PullRequests.Nodes
+	if len(found) == 0 {
 		return nil, nil
 	}
-	r := raw[0]
+	r := found[0]
 	pr := &PR{Number: r.Number, Title: r.Title, URL: r.URL, UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING", FailedChecks: []string{}}
-	for _, c := range r.Comments {
+	for _, c := range r.Comments.Nodes {
 		if c.Author.Login != me {
 			pr.Comments++
 		}
 	}
-	for _, v := range r.Reviews {
+	for _, v := range r.Reviews.Nodes {
 		if v.Author.Login != me && v.State != "APPROVED" { // an approval asks nothing of the session
 			pr.Comments++
 		}
 	}
-	pr.Review = verdict(r.Reviews)
+	pr.Review = verdict(r.Reviews.Nodes)
 	switch {
 	case r.State == "MERGED":
 		pr.State = "merged"
@@ -1106,7 +1143,11 @@ func parsePR(data []byte, me string) (*PR, error) {
 	default:
 		pr.State = "open"
 	}
-	for _, c := range r.Rollup {
+	var checks []check
+	for _, n := range r.Commits.Nodes {
+		checks = append(checks, n.Commit.Rollup.Contexts.Nodes...)
+	}
+	for _, c := range checks {
 		switch {
 		case slices.Contains([]string{"FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"}, c.Conclusion),
 			c.State == "FAILURE" || c.State == "ERROR":
