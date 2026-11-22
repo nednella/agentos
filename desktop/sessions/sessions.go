@@ -144,7 +144,7 @@ type Sessions struct {
 	onIssues   func()
 	ready      map[string]chan struct{} // closed when the agent's SessionStart arrives
 	resumed    map[string]string        // the session each new session continues the conversation of, until sync counts it
-	wakes      map[string][]string      // prompts for sessions that were waiting on the user when their PR needed them, oldest first
+	wakes      map[string][]string      // prompts for sessions that were working or waiting on the user when their PR needed them, oldest first, each once
 	prefillFor time.Duration
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
@@ -1467,8 +1467,9 @@ func (s *Sessions) send(ctx context.Context, name session.Name, text string, sub
 	_ = s.tmux.Submit(tctx, name)
 }
 
-// wake sends the prompt to the session, once it is not waiting on the user: typed into a
-// permission prompt, the text could answer it. A session that has ended gets a new one for
+// wake sends the prompt to the session once its turn is over and it is not waiting on the user:
+// typed into a permission prompt, the text could answer it. A prompt already held for the session
+// is not held again. A session that has ended gets a new one for
 // its issue when the issue has no live session: it gets the prompt, sent unless the
 // project sends by hand, the new one takes over the old's branches and handover, and the old
 // row goes. The new one continues the old's conversation when the agent can.
@@ -1492,8 +1493,10 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 		return
 	}
 	s.mu.Lock()
-	if rec := s.records[t.id]; rec.State == session.Waiting {
-		s.wakes[t.id] = append(s.wakes[t.id], prompt)
+	if holdsPrompts(s.records[t.id].State) {
+		if !slices.Contains(s.wakes[t.id], prompt) {
+			s.wakes[t.id] = append(s.wakes[t.id], prompt)
+		}
 		s.mu.Unlock()
 		return
 	}
@@ -1501,15 +1504,19 @@ func (s *Sessions) wake(ctx context.Context, t target, prompt string) {
 	s.send(ctx, name, prompt, true)
 }
 
-// deliverWakes sends the prompts held back while their sessions waited on the user, in order. A session
-// that ended meanwhile was ended by the user, or cleaned up: its prompts go with it. It needs mu.
+func holdsPrompts(state session.State) bool {
+	return state == session.Working || state == session.Waiting
+}
+
+// deliverWakes sends the prompts held back while their sessions worked or waited on the user, in order.
+// A session that ended meanwhile was ended by the user, or cleaned up: its prompts go with it. It needs mu.
 func (s *Sessions) deliverWakes() {
 	for id, prompts := range s.wakes {
 		_, live := s.seen[id]
 		switch {
 		case !live:
 			delete(s.wakes, id)
-		case s.records[id].State != session.Waiting:
+		case !holdsPrompts(s.records[id].State):
 			delete(s.wakes, id)
 			ctx, name := s.ctx, s.known[id].Name
 			go func() {
