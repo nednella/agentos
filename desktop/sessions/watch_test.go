@@ -197,7 +197,7 @@ func TestConflictWakesOncePerCommit(t *testing.T) {
 	})
 }
 
-func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
+func TestWakeWaitsUntilTheTurnEnds(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := issueSession(h, t, 12)
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
@@ -212,7 +212,56 @@ func TestWakeWaitsUntilTheSessionIsNotWaiting(t *testing.T) {
 		t.Fatal("the prompt was typed into a session waiting on the user")
 	}
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"yes"}`)
-	eventually(t, "the held prompt once the session works again", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+	eventually(t, "working", func() bool { return stateOf(h, s.ID) == "working" })
+	time.Sleep(500 * time.Millisecond)
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
+		t.Fatal("the prompt was typed into a session in the middle of its turn")
+	}
+	h.Hook(t, s.ID, "Stop", `{}`)
+	eventually(t, "the held prompt once the turn ends", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+}
+
+// withReviews puts the reviews in place of the none PRJSON printed.
+func withReviews(prJSON string, reviews ...string) string {
+	return strings.Replace(prJSON, `"reviews":[]`, `"reviews":[`+strings.Join(reviews, ",")+`]`, 1)
+}
+
+func reviewBy(login, state string) string {
+	return fmt.Sprintf(`{"author":{"login":%q},"state":%q}`, login, state)
+}
+
+func TestOneReviewAndItsRepliesWakeTheSessionOnce(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n"})
+	s := issueSession(h, t, 12)
+	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
+	h.RefreshPRs()
+	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"go"}`)
+	eventually(t, "working", func() bool { return stateOf(h, s.ID) == "working" })
+
+	review := reviewBy("bot", "CHANGES_REQUESTED")
+	mine := reviewBy(apptest.GHUser, "COMMENTED")
+	answer := reviewBy("bot", "COMMENTED")
+	for _, reviews := range [][]string{{review}, {review, mine, mine}, {review, mine, mine, answer}, {review, mine, mine, answer, answer}} {
+		h.GH.SetPR(withReviews(prJSON("OPEN", false, "[]", 0, 0), reviews...))
+		h.RefreshPRs()
+	}
+	time.Sleep(500 * time.Millisecond)
+	if strings.Contains(h.Pane(t, s.ID), "/address-review") {
+		t.Fatal("the prompt was typed into a session in the middle of its turn")
+	}
+	h.Hook(t, s.ID, "Stop", `{}`)
+	eventually(t, "the review prompt once the turn ends", func() bool { return strings.Contains(h.Pane(t, s.ID), "/address-review 12") })
+	time.Sleep(500 * time.Millisecond)
+	if n := strings.Count(h.Pane(t, s.ID), "/address-review 12"); n != 1 {
+		t.Errorf("the prompt appears %d times, want once", n)
+	}
+
+	h.GH.SetPR(withReviews(prJSON("OPEN", false, "[]", 0, 0), review, mine, mine, answer, answer, mine))
+	h.RefreshPRs()
+	time.Sleep(500 * time.Millisecond)
+	if n := strings.Count(h.Pane(t, s.ID), "/address-review 12"); n != 1 {
+		t.Errorf("a reply by the gh user woke the idle session: the prompt appears %d times, want once", n)
+	}
 }
 
 // waitingWithHeldReview is a session of issue 12 waiting on the user, with a review prompt held for it.
@@ -228,7 +277,7 @@ func waitingWithHeldReview(t *testing.T, h *apptest.Harness) sessions.Session {
 	return s
 }
 
-func TestEveryPromptHeldWhileWaitingIsSent(t *testing.T) {
+func TestEveryHeldPromptIsSent(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_review_command: \"/address-review {n}\"\n    pr_checks_command: \"/fix-checks {n}\"\n"})
 	s := waitingWithHeldReview(t, h)
 	h.GH.SetPR(prJSON("OPEN", false, `[{"status":"COMPLETED","conclusion":"FAILURE"}]`, 1, 0))
@@ -238,6 +287,7 @@ func TestEveryPromptHeldWhileWaitingIsSent(t *testing.T) {
 		t.Fatal("a prompt was typed into a session waiting on the user")
 	}
 	h.Hook(t, s.ID, "UserPromptSubmit", `{"prompt":"yes"}`)
+	h.Hook(t, s.ID, "Stop", `{}`)
 	eventually(t, "both held prompts", func() bool {
 		pane := h.Pane(t, s.ID)
 		return strings.Contains(pane, "/address-review 12") && strings.Contains(pane, "/fix-checks 12")
