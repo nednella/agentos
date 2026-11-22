@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/usage"
@@ -126,7 +125,7 @@ func (c Claude) ValidModel(model, effort string) error {
 
 func (c Claude) Prepare(Launch) error { return nil }
 
-func (c Claude) Usage(after time.Time) usage.Reader { return usage.NewCursor(after) }
+func (c Claude) Usage(from usage.Mark) usage.Reader { return usage.NewCursor(from) }
 
 type payload struct {
 	NotificationType     string         `json:"notification_type"`

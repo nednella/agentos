@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 )
@@ -39,7 +40,7 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 	appendTo(t, path, `{"type":"user","timestamp":"2026-10-11T12:00:00Z","message":{"role":"user"}}`+"\n", m1, m1,
 		assistant("msg_2", "claude-opus-5-5", t0.Add(2*time.Second), 1, 1, 1, 0))
 
-	c := NewCursor(t0)
+	c := NewCursor(Mark{After: t0})
 	parts, _, err := c.Read(path, "")
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +72,7 @@ func TestReadCountsEachMessageOnce(t *testing.T) {
 func TestReadSaysWhatTheAgentUsedLast(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conv.jsonl")
 	appendTo(t, path, assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 1, 1, 0, 0))
-	c := NewCursor(t0)
+	c := NewCursor(Mark{After: t0})
 	if _, cur, _ := c.Read(path, ""); cur != (Current{}) {
 		t.Errorf("current from a line before the start = %+v, want none", cur)
 	}
@@ -100,7 +101,7 @@ func TestReadSkipsWhatCameBefore(t *testing.T) {
 	appendTo(t, path,
 		assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 500, 500, 0, 0),
 		assistant("msg_new", "claude-opus-5-5", t0.Add(time.Minute), 1, 2, 0, 0))
-	parts, _, _ := NewCursor(t0).Read(path, "")
+	parts, _, _ := NewCursor(Mark{After: t0}).Read(path, "")
 	if len(parts) != 1 || parts[0].Input != 1 || parts[0].Output != 2 {
 		t.Errorf("parts = %+v, want only the message after the start", parts)
 	}
@@ -110,7 +111,7 @@ func TestReadLeavesAPartLine(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "conv.jsonl")
 	full := assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 2, 0, 0)
 	appendTo(t, path, full[:40])
-	c := NewCursor(t0)
+	c := NewCursor(Mark{After: t0})
 	if parts, _, _ := c.Read(path, ""); len(parts) != 0 {
 		t.Fatalf("a part line was counted: %+v", parts)
 	}
@@ -126,7 +127,7 @@ func TestReadAddsSubagents(t *testing.T) {
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
 	appendTo(t, filepath.Join(dir, "abc", "subagents", "agent-x.jsonl"),
 		assistant("msg_2", "claude-haiku-5-5", t0.Add(2*time.Second), 3, 3, 0, 0))
-	parts, _, err := NewCursor(t0).Read(path, "")
+	parts, _, err := NewCursor(Mark{After: t0}).Read(path, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +137,7 @@ func TestReadAddsSubagents(t *testing.T) {
 }
 
 func TestReadMissingFile(t *testing.T) {
-	parts, _, err := NewCursor(t0).Read(filepath.Join(t.TempDir(), "none.jsonl"), "")
+	parts, _, err := NewCursor(Mark{After: t0}).Read(filepath.Join(t.TempDir(), "none.jsonl"), "")
 	if err != nil || len(parts) != 0 {
 		t.Errorf("Read = %+v, %v; want nothing and no error", parts, err)
 	}
@@ -172,7 +173,7 @@ func TestReadAfterARestartSkipsTheLatestCounted(t *testing.T) {
 	at := t0.Add(1234567 * time.Microsecond)
 	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", at, 1, 1, 0, 0))
 	// The event log keeps the time of the latest message counted in milliseconds.
-	if parts, _, _ := NewCursor(time.UnixMilli(at.UnixMilli())).Read(path, ""); len(parts) != 0 {
+	if parts, _, _ := NewCursor(Mark{After: time.UnixMilli(at.UnixMilli())}).Read(path, ""); len(parts) != 0 {
 		t.Errorf("the message counted before the restart was counted again: %+v", parts)
 	}
 }
@@ -192,5 +193,82 @@ func TestCostOfAgyModels(t *testing.T) {
 	// A claude id from agy ends in its effort and still prices as that claude model.
 	if got := cost("claude-opus-5-5-low", apiUsage{InputTokens: 1_000_000}, t0); got != 4_000_000 {
 		t.Errorf("claude through agy cost = %d, want 4000000", got)
+	}
+}
+
+func TestReadFromAMarkReadsOnlyWhatCameAfterItsOffsets(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "abc.jsonl")
+	sub := filepath.Join(dir, "abc", "subagents", "agent-x.jsonl")
+	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
+	appendTo(t, sub, assistant("msg_2", "claude-haiku-5-5", t0.Add(2*time.Second), 3, 3, 0, 0))
+	first := NewCursor(Mark{After: t0})
+	if _, _, err := first.Read(path, ""); err != nil {
+		t.Fatal(err)
+	}
+	mark := first.Mark()
+	appendTo(t, path, assistant("msg_3", "claude-opus-5-5", t0.Add(3*time.Second), 5, 5, 0, 0))
+	appendTo(t, sub, assistant("msg_4", "claude-haiku-5-5", t0.Add(4*time.Second), 7, 7, 0, 0))
+
+	tests := []struct {
+		name string
+		from Mark
+		want []int64 // input of each part
+	}{
+		{"saved offsets", mark, []int64{5, 7}},
+		{"the same time and no offsets", Mark{After: mark.After}, []int64{5, 7}},
+		{"offsets with an earlier time still count by time", Mark{After: t0.Add(3500 * time.Millisecond), Offsets: mark.Offsets}, []int64{7}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parts, _, err := NewCursor(tt.from).Read(path, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+			var got []int64
+			for _, p := range parts {
+				got = append(got, p.Input)
+			}
+			if !slices.Equal(got, tt.want) {
+				t.Errorf("inputs = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestReadFromAMarkFiltersTheLinesAfterItsOffsetByTime(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
+	first := NewCursor(Mark{After: t0})
+	first.Read(path, "")
+	mark := first.Mark()
+	appendTo(t, path, assistant("msg_old", "claude-opus-5-5", t0.Add(-time.Hour), 9, 9, 0, 0))
+	if parts, _, _ := NewCursor(mark).Read(path, ""); len(parts) != 0 {
+		t.Errorf("parts = %+v, want none: the line is before the mark's time", parts)
+	}
+}
+
+func TestReadFromAMarkStartsOverInAShorterFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
+	mark := Mark{After: t0, Offsets: map[string]int64{path: 1 << 20}}
+	parts, _, err := NewCursor(mark).Read(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 1 || parts[0].Input != 1 {
+		t.Errorf("parts = %+v, want the replaced file read from its start", parts)
+	}
+}
+
+func TestMarkIsACopy(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendTo(t, path, assistant("msg_1", "claude-opus-5-5", t0.Add(time.Second), 1, 1, 0, 0))
+	c := NewCursor(Mark{After: t0})
+	c.Read(path, "")
+	m := c.Mark()
+	m.Offsets[path] = 0
+	if got := c.Mark().Offsets[path]; got == 0 {
+		t.Errorf("offset = %d, want the cursor's own", got)
 	}
 }

@@ -373,7 +373,7 @@ func setIn(obj *map[string]json.RawMessage, keys []string, value json.RawMessage
 	return true, nil
 }
 
-func (a Agy) Usage(after time.Time) usage.Reader { return agyUsage{usage.NewAgyReader(after)} }
+func (a Agy) Usage(from usage.Mark) usage.Reader { return agyUsage{usage.NewAgyReader(from)} }
 
 // agyUsage says with each read what the agent used last: the id its hooks report, parted into model and effort.
 type agyUsage struct{ *usage.AgyReader }

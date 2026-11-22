@@ -16,13 +16,16 @@ type AgyReader struct {
 	seen map[int64]bool
 }
 
-// NewAgyReader counts only the steps written after the time given, like NewCursor.
-func NewAgyReader(after time.Time) *AgyReader {
-	return &AgyReader{after: after, tail: newTail(), seen: map[int64]bool{}}
+// NewAgyReader counts only the steps written after the mark's time, like NewCursor.
+func NewAgyReader(m Mark) *AgyReader {
+	return &AgyReader{after: m.After, tail: newTail(m.Offsets), seen: map[int64]bool{}}
 }
 
 // After is the time of the latest step read.
 func (a *AgyReader) After() time.Time { return a.after }
+
+// Mark is where the reader stands.
+func (a *AgyReader) Mark() Mark { return a.tail.mark(a.after) }
 
 // agyLine is the part of an agy transcript line that tells what a model call used.
 type agyLine struct {

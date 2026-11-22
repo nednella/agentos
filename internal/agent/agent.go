@@ -57,8 +57,8 @@ type Provider interface {
 	// ParseEvent reads the agent's hook payload for its event name into the canonical event, and gives the reply the
 	// hook prints on stdout, "" for an agent that reads none. It reports false for a hook agentos does not record.
 	ParseEvent(name string, r io.Reader) (ev session.Event, reply string, ok bool)
-	// Usage reads what the agent's transcripts say it used after the time given.
-	Usage(after time.Time) usage.Reader
+	// Usage reads what the agent's transcripts say it used after the mark's time, from the mark's offsets.
+	Usage(from usage.Mark) usage.Reader
 }
 
 // PaneAsker is a provider whose agent has no hook for its permission prompt, so the prompt is read off the
@@ -184,15 +184,16 @@ func (p Plain) Prepare(Launch) error            { return nil }
 func (p Plain) ParseEvent(string, io.Reader) (session.Event, string, bool) {
 	return session.Event{}, "", false
 }
-func (p Plain) Usage(after time.Time) usage.Reader { return noUsage{after} }
+func (p Plain) Usage(from usage.Mark) usage.Reader { return noUsage{from} }
 
 // noUsage reads nothing: a plain agent has no transcript agentos knows.
-type noUsage struct{ after time.Time }
+type noUsage struct{ mark usage.Mark }
 
 func (n noUsage) Read(string, string) ([]usage.Part, usage.Current, error) {
 	return nil, usage.Current{}, nil
 }
-func (n noUsage) After() time.Time { return n.after }
+func (n noUsage) After() time.Time { return n.mark.After }
+func (n noUsage) Mark() usage.Mark { return n.mark }
 
 // claudeConfigDir is where claude keeps the user's settings, "" when there is no home.
 func claudeConfigDir() string {

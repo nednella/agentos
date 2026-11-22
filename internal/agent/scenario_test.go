@@ -86,7 +86,7 @@ func replay(t *testing.T, p Provider, dir string) row {
 	abs, _ := filepath.Abs(dir)
 	data = bytes.ReplaceAll(data, []byte(recordingDir), []byte(abs))
 	r := row{conversations: map[string]bool{}}
-	reader := p.Usage(time.Time{})
+	reader := p.Usage(usage.Mark{})
 	at := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	lines := bufio.NewScanner(bytes.NewReader(data))
 	lines.Buffer(nil, 1<<20)

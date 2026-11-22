@@ -67,7 +67,7 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 		if from != "" {
 			before.Add(s.usedBefore(session.ProjectKey(id), from, kind))
 		}
-		r.cursor = s.Provider(in.Agent).Usage(after)
+		r.cursor = s.Provider(in.Agent).Usage(usage.Mark{After: after})
 	}
 	parts, cur, err := r.cursor.Read(transcript, model)
 	if err != nil {
