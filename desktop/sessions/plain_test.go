@@ -95,6 +95,30 @@ func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
 	}
 }
 
+func TestProjectsGitValuesAreReadOnce(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	s := plainSession(h, t)
+	madeBranch(h, t, s)
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the branch", func() bool { got, _ := h.Session(s.ID); return got.Branch == "my-fix" })
+	time.Sleep(300 * time.Millisecond)
+
+	base, dirs := h.GH.GitCalls("symbolic-ref"), h.GH.GitCalls("rev-parse --path-format=absolute --git-dir --git-common-dir")
+	looked := h.GH.GitCalls("branch --show-current")
+	for range 3 {
+		worksIn(h, t, s, h.Dir)
+	}
+	eventually(t, "the turns' looks at the branch", func() bool { return h.GH.GitCalls("branch --show-current") >= looked+3 })
+	h.RefreshPRs()
+	if got := h.GH.GitCalls("symbolic-ref"); got != base {
+		t.Errorf("the default branch was read %d more times", got-base)
+	}
+	if got := h.GH.GitCalls("rev-parse --path-format=absolute --git-dir --git-common-dir"); got != dirs {
+		t.Errorf("the git folders were read %d more times", got-dirs)
+	}
+}
+
 func TestPlainSessionFindsItsPR(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)

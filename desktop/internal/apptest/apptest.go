@@ -279,11 +279,12 @@ func Eventually(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// FakeGH answers the gh calls with canned output; any other command runs for real.
+// FakeGH answers the gh calls with canned output; any other command runs for real, and git's are counted.
 
 type FakeGH struct {
 	mu            sync.Mutex
 	calls         []string
+	gits          []string // the git calls, which run for real
 	Repo          error
 	CreateRepoErr error             // what gh repo create fails with, if set
 	ExistingRepos []string          // the names gh repo view <name> finds; any other name is not found
@@ -306,6 +307,11 @@ type FakeGH struct {
 func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]byte, error) {
 	if name == "curl" {
 		return f.curl(args)
+	}
+	if name == "git" {
+		f.mu.Lock()
+		f.gits = append(f.gits, strings.Join(args, " "))
+		f.mu.Unlock()
 	}
 	if name != "gh" {
 		return run.Exec(ctx, dir, name, args...)
@@ -514,6 +520,19 @@ func (f *FakeGH) SetPRFor(branch, out string) {
 		f.prByHead = map[string]string{}
 	}
 	f.prByHead[branch] = out
+}
+
+// GitCalls counts the git calls that start with prefix.
+func (f *FakeGH) GitCalls(prefix string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.gits {
+		if strings.HasPrefix(c, prefix) {
+			n++
+		}
+	}
+	return n
 }
 
 func (f *FakeGH) CallLog() []string {

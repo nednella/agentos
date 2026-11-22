@@ -174,6 +174,8 @@ type Lifecycle struct {
 	watchers   map[string]*watcher    // by project key
 	finished   map[string]bool        // session id and branch: an older branch whose clean-up a poll started
 	logins     map[string]string      // by project folder: the gh user's login
+	bases      map[string]string      // by folder: the branch origin calls its default
+	gitDirs    map[string]gitDirs     // by folder
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -186,7 +188,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, lists: map[string]*pullList{}, lookups: map[string]lookup{}, refreshing: map[string]*sync.Mutex{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, lists: map[string]*pullList{}, lookups: map[string]lookup{}, refreshing: map[string]*sync.Mutex{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{}, bases: map[string]string{}, gitDirs: map[string]gitDirs{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -1816,24 +1818,51 @@ func (l *Lifecycle) workBranch(ctx context.Context, proj project.Project, cwd st
 	if err != nil || branch == "" || branch == l.mainBranch(ctx, proj.Dir) {
 		return "", false, false
 	}
-	gitDirs := func(dir string) (gitDir, common string) {
-		out, err := l.git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
-		if err != nil {
-			return "", ""
-		}
-		gitDir, common, _ = strings.Cut(strings.TrimSpace(string(out)), "\n")
-		return gitDir, common
-	}
-	gitDir, here := gitDirs(cwd)
-	_, project := gitDirs(proj.Dir)
-	return branch, samePath(gitDir, here), here != "" && samePath(here, project)
+	here, project := l.gitDirsOf(ctx, cwd), l.gitDirsOf(ctx, proj.Dir)
+	return branch, samePath(here.own, here.common), here.common != "" && samePath(here.common, project.common)
 }
 
-// mainBranch is the branch origin calls its default, or main when origin does not say.
-func (l *Lifecycle) mainBranch(ctx context.Context, dir string) string {
-	out, err := l.git(ctx, dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+// gitDirs are the git folder of a worktree and the one its repo's worktrees share.
+type gitDirs struct{ own, common string }
+
+// gitDirsOf are the git folders of the worktree dir is in, empty when it is in none. Those git finds are kept.
+func (l *Lifecycle) gitDirsOf(ctx context.Context, dir string) gitDirs {
+	l.mu.Lock()
+	d, ok := l.gitDirs[dir]
+	l.mu.Unlock()
+	if ok {
+		return d
+	}
+	out, err := l.git(ctx, dir, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir")
 	if err != nil {
+		return gitDirs{}
+	}
+	d.own, d.common, _ = strings.Cut(strings.TrimSpace(string(out)), "\n")
+	l.mu.Lock()
+	l.gitDirs[dir] = d
+	l.mu.Unlock()
+	return d
+}
+
+// mainBranch is the branch origin calls its default, or main when origin does not say. What git answers is kept.
+func (l *Lifecycle) mainBranch(ctx context.Context, dir string) string {
+	l.mu.Lock()
+	base, ok := l.bases[dir]
+	l.mu.Unlock()
+	if ok {
+		return base
+	}
+	out, err := l.git(ctx, dir, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+	var exit *exec.ExitError
+	if err != nil && !errors.As(err, &exit) {
 		return "main"
 	}
-	return cmp.Or(strings.TrimPrefix(strings.TrimSpace(string(out)), "origin/"), "main")
+	base = "main"
+	if err == nil {
+		base = cmp.Or(strings.TrimPrefix(strings.TrimSpace(string(out)), "origin/"), "main")
+	}
+	l.mu.Lock()
+	l.bases[dir] = base
+	l.mu.Unlock()
+	return base
 }
