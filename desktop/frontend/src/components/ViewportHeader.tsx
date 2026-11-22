@@ -14,7 +14,7 @@ import { Timeline } from './Timeline'
 type ViewportHeaderProps = { session: Session }
 
 export function ViewportHeader({ session }: ViewportHeaderProps) {
-  const { renameSession, report, focus, killSession } = useAgentos()
+  const { renameSession, report, focus, killSession } = useAgentos('renameSession', 'report', 'focus', 'killSession')
   const [renaming, setRenaming] = useState(false)
   const kill = useArmedConfirm()
 

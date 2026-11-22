@@ -6,7 +6,7 @@ import { Keycap } from './Keycap'
 type NewSessionRowProps = { cursor: boolean; compact: boolean }
 
 export function NewSessionRow({ cursor, compact }: NewSessionRowProps) {
-  const { composing, setComposing, newSession, newChat, report } = useAgentos()
+  const { composing, setComposing, newSession, newChat, report } = useAgentos('composing', 'setComposing', 'newSession', 'newChat', 'report')
 
   if (composing) {
     const chat = composing === 'chat'

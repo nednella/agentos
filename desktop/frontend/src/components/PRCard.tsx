@@ -28,7 +28,7 @@ const PILL: Record<
 }
 
 export function PRCard({ session, anchor, hover }: PRCardProps) {
-  const { openPR, report } = useAgentos()
+  const { openPR, report } = useAgentos('openPR', 'report')
   const card = useRef<HTMLDivElement>(null)
   const [top, setTop] = useState(anchor.bottom + 4)
   const { pr, git } = session

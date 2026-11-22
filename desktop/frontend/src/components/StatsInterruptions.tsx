@@ -11,7 +11,7 @@ import { StatsRecent } from './StatsRecent'
 type StatsInterruptionsProps = { days: number; project: string }
 
 export function StatsInterruptions({ days, project }: StatsInterruptionsProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const [stats, setStats] = useState<StatsData | null>(null)
 
   useEffect(() => {

@@ -6,7 +6,7 @@ type IssueBodyProps = { html: string }
 
 // GitHub renders and sanitizes this HTML for its own pages; the app shows it as it is.
 export function IssueBody({ html }: IssueBodyProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
 
   const onClick = (e: MouseEvent<HTMLDivElement>) => {
     const link = (e.target as HTMLElement).closest('a')

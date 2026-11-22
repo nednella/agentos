@@ -12,7 +12,7 @@ const SECTION_TYPE: Record<string, IssueType> = { Features: 'feature', 'Bug Fixe
 const shortDate = (date: string) => (date ? new Date(`${date}T12:00:00`).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '')
 
 export function PatchNotes() {
-  const { overlay, setOverlay, patchNotes } = useAgentos()
+  const { overlay, setOverlay, patchNotes } = useAgentos('overlay', 'setOverlay', 'patchNotes')
   const close = () => setOverlay(null)
   if (overlay === 'changelog') return <Changelog onClose={close} />
   if (overlay !== 'patch-notes' || patchNotes.length === 0) return null
@@ -20,7 +20,7 @@ export function PatchNotes() {
 }
 
 function Changelog({ onClose }: { onClose(): void }) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const [releases, setReleases] = useState<Release[]>([])
   useEffect(() => report(async () => setReleases(await api.changelog())), [report])
   if (releases.length === 0) return null
@@ -30,7 +30,7 @@ function Changelog({ onClose }: { onClose(): void }) {
 type PatchNotesSheetProps = { releases: Release[]; sinceLastRun?: boolean; onClose(): void }
 
 function PatchNotesSheet({ releases, sinceLastRun, onClose }: PatchNotesSheetProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const [index, setIndex] = useState(0)
   const release = releases[index]
   const several = releases.length > 1

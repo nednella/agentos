@@ -10,7 +10,7 @@ const PR_ACTION = {
 }
 
 export function ViewportActions({ session }: ViewportActionsProps) {
-  const { report, focus, typeInto, ackPR } = useAgentos()
+  const { report, focus, typeInto, ackPR } = useAgentos('report', 'focus', 'typeInto', 'ackPR')
   if (!session.pr && !session.git) return null
   const pr = session.pr
   const action = pr && session.prAttention ? PR_ACTION[session.prAttention] : null

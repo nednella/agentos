@@ -13,7 +13,7 @@ import type { NavRef } from './Sidebar'
 type NotesProps = { nav: NavRef }
 
 export function Notes({ nav }: NotesProps) {
-  const a = useAgentos()
+  const a = useAgentos('notes', 'focus', 'report', 'setNotePinned', 'setNoteArchived')
   const [query, setQuery] = useState('')
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)

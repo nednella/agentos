@@ -5,7 +5,7 @@ import { Icon } from './Icon'
 type EvidenceButtonProps = { session: Session }
 
 export function EvidenceButton({ session }: EvidenceButtonProps) {
-  const { select, setSessionView } = useAgentos()
+  const { select, setSessionView } = useAgentos('select', 'setSessionView')
   return (
     <button
       className="ml-auto inline-flex h-6 flex-none items-center gap-1 rounded-sm border border-line-strong px-2 text-small text-soft"

@@ -1,4 +1,5 @@
-import { useAgentos } from '../AgentosContext'
+import { memo } from 'react'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { api } from '../api'
 import { gigabytes, memoryNote } from '../memory'
 import { dollars } from '../spend'
@@ -16,10 +17,10 @@ import { Timeline } from './Timeline'
 
 type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; compact: boolean; dense: boolean }
 
-export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
-  const { select, focus, dismissSession, resumeSession, report, issues } = useAgentos()
+function SessionRowView({ session, selected, cursor, compact, dense }: SessionRowProps) {
+  const { select, focus, dismissSession, resumeSession, report } = useAgentos('select', 'focus', 'dismissSession', 'resumeSession', 'report')
+  const issue = useAgentosSelector((a) => a.issues.find((i) => i.number === session.issue))
   const ended = session.state === 'ended'
-  const issue = issues.find((i) => i.number === session.issue)
   const showStatus = (session.pr !== null || session.git !== null) && (!dense || ended)
   const showEvidence = session.evidence > 0 && !dense
   const hasActions = ended || session.cleanup !== '' || (!showStatus && showEvidence)
@@ -110,3 +111,5 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
     </div>
   )
 }
+
+export const SessionRow = memo(SessionRowView)

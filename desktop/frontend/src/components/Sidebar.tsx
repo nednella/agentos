@@ -18,7 +18,7 @@ export type NavRef = MutableRefObject<NavHandler | null>
 type TabButtonProps = { tab: SidebarTab; label: string; count: number; tight: boolean }
 
 function TabButton({ tab, label, count, tight }: TabButtonProps) {
-  const { sidebarTab } = useAgentos()
+  const { sidebarTab } = useAgentos('sidebarTab')
   const { showSidebarTab } = useLayout()
   const active = sidebarTab === tab
   return (
@@ -41,7 +41,7 @@ const TABS: SidebarTab[] = ['queue', 'notes']
 type SidebarPanelProps = { panel: RefObject<HTMLElement>; nav: NavRef; overlay: boolean; full: boolean; widthRem: number }
 
 function SidebarPanel({ panel, nav, overlay, full, widthRem }: SidebarPanelProps) {
-  const { sidebarTab, issues, notes } = useAgentos()
+  const { sidebarTab, issues, notes } = useAgentos('sidebarTab', 'issues', 'notes')
   const tight = widthRem < 15
   const { setSidebarOpen, showSidebarTab, returnToTerminal } = useLayout()
 

@@ -37,7 +37,7 @@ const hours = (ms: number) => {
 }
 
 export function LedgerView({ days, project }: LedgerViewProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const [ledger, setLedger] = useState<Ledger | null>(null)
   const [active, setActive] = useState(SECTIONS[0].id)
   const [full, setFull] = useState<Table | null>(null)

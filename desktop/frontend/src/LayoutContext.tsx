@@ -137,7 +137,7 @@ function useSystemTheme(): Theme {
 }
 
 export function LayoutProvider({ children }: LayoutProviderProps) {
-  const { selectedId, settings, setTextScale, sidebarTab, setSidebarTab, focus, report, pushToast, dismissToast } = useAgentos()
+  const { selectedId, settings, setTextScale, sidebarTab, setSidebarTab, focus, report, pushToast, dismissToast } = useAgentos('selectedId', 'settings', 'setTextScale', 'sidebarTab', 'setSidebarTab', 'focus', 'report', 'pushToast', 'dismissToast')
   const { w: width, h: height } = useWindowSize()
   const mode = modeFor(width)
   const band: Band = mode === 'narrow' ? 'compact' : mode

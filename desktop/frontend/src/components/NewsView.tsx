@@ -24,7 +24,15 @@ export function NewsView() {
     markNewsSeen,
     report,
     focusRequest,
-  } = useAgentos();
+  } = useAgentos(
+    "news",
+    "newsSeen",
+    "newsUnread",
+    "refreshNews",
+    "markNewsSeen",
+    "report",
+    "focusRequest",
+  );
   const lastFetch = useClock((now) =>
     news && news.lastFetchAt > 0 ? ago(news.lastFetchAt, now) : "never fetched",
   );

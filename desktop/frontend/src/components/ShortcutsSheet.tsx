@@ -51,7 +51,13 @@ function RowView({ row }: RowViewProps) {
 }
 
 export function ShortcutsSheet() {
-  const { overlay, setOverlay } = useAgentos()
+  const { overlay } = useAgentos('overlay')
+  if (overlay !== 'shortcuts') return null
+  return <ShortcutsSheetDialog />
+}
+
+function ShortcutsSheetDialog() {
+  const { setOverlay } = useAgentos('setOverlay')
   const actions = useActions()
   const [query, setQuery] = useState('')
 
@@ -70,8 +76,6 @@ export function ShortcutsSheet() {
     if (leftovers.length > 0) all.push({ title: 'More', rows: needle ? leftovers.filter((r) => matches(r, needle)) : leftovers })
     return all.filter((g) => g.rows.length > 0)
   }, [actions, query])
-
-  if (overlay !== 'shortcuts') return null
 
   const column = (titles: string[]) => groups.filter((g) => titles.includes(g.title) || (titles === RIGHT && g.title === 'More'))
   const blocks = (list: typeof groups) =>

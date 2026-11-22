@@ -7,7 +7,7 @@ import { InlineInput } from './InlineInput'
 type CaptureButtonProps = { id: string }
 
 export function CaptureButton({ id }: CaptureButtonProps) {
-  const { report, pushToast } = useAgentos()
+  const { report, pushToast } = useAgentos('report', 'pushToast')
   const [capturing, setCapturing] = useState(false)
 
   if (capturing) {

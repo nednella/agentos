@@ -1,4 +1,4 @@
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { useFocusRequest } from '../useFocusRequest'
 import { Terminal } from './Terminal'
@@ -9,7 +9,8 @@ let openedFor = -1
 type ShellTerminalProps = { visible: boolean }
 
 export function ShellTerminal({ visible }: ShellTerminalProps) {
-  const { shellId, openShell, report, focus, focusRequest, project } = useAgentos()
+  const { shellId, openShell, report, focus, focusRequest } = useAgentos('shellId', 'openShell', 'report', 'focus', 'focusRequest')
+  const projectName = useAgentosSelector((a) => a.project?.name)
   const { returnToTerminal } = useLayout()
 
   useFocusRequest(
@@ -28,7 +29,7 @@ export function ShellTerminal({ visible }: ShellTerminalProps) {
         className="absolute inset-0 flex items-center gap-2 px-3 text-left text-small text-dim"
         onClick={() => focus('shell')}
       >
-        <span className="mono text-accent">{project?.name} ❯</span>
+        <span className="mono text-accent">{projectName} ❯</span>
         Click or press ⌘⇧S to open a shell here
       </button>
     )

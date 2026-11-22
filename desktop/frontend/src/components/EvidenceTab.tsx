@@ -12,7 +12,7 @@ type EvidenceTabProps = { session: Session }
 const ORDER_KEY = 'agentos.evidenceNewest'
 
 export function EvidenceTab({ session }: EvidenceTabProps) {
-  const { evidence } = useAgentos()
+  const { evidence } = useAgentos('evidence')
   const [newestFirst, setNewestFirst] = useState(() => readStored(ORDER_KEY, false))
   const [comparing, setComparing] = useState(false)
   const [picked, setPicked] = useState<string[]>([])

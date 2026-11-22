@@ -44,7 +44,7 @@ function SettingRow({ label, hint, children }: SettingRowProps) {
 }
 
 export function SettingsPanel() {
-  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setAgent, setCleanup, setPromptSend, setBrowserEnabled, setDigestSchedule, report } = useAgentos()
+  const { overlay, setOverlay, project, settings, setTheme, setKeepAwake, setAgent, setCleanup, setPromptSend, setBrowserEnabled, setDigestSchedule, report } = useAgentos('overlay', 'setOverlay', 'project', 'settings', 'setTheme', 'setKeepAwake', 'setAgent', 'setCleanup', 'setPromptSend', 'setBrowserEnabled', 'setDigestSchedule', 'report')
   const { scale, zoom } = useLayout()
   if (overlay !== 'settings') return null
 

@@ -4,7 +4,7 @@ import { Ago } from './Ago'
 import { Icon } from './Icon'
 
 export function CleanupsMenu() {
-  const { cleanups } = useAgentos()
+  const { cleanups } = useAgentos('cleanups')
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState({ top: 0, right: 0 })

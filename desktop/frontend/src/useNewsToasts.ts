@@ -4,7 +4,7 @@ import { useLayout } from './LayoutContext'
 import type { NewsPage } from './LayoutContext'
 
 export function useNewsToasts() {
-  const { news, digest, pushToast, dismissToast } = useAgentos()
+  const { news, digest, pushToast, dismissToast } = useAgentos('news', 'digest', 'pushToast', 'dismissToast')
   const { newsOpen, newsPage, openNews } = useLayout()
   const latest = useRef({ newsOpen, newsPage, pushToast, dismissToast, openNews })
   latest.current = { newsOpen, newsPage, pushToast, dismissToast, openNews }

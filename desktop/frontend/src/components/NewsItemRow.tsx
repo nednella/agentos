@@ -5,7 +5,7 @@ import type { NewsItem } from '../types'
 type NewsItemRowProps = { item: NewsItem; unread: boolean }
 
 export function NewsItemRow({ item, unread }: NewsItemRowProps) {
-  const { report, markNewsRead } = useAgentos()
+  const { report, markNewsRead } = useAgentos('report', 'markNewsRead')
 
   return (
     <li className="relative flex flex-col gap-1.5 px-6 py-3">

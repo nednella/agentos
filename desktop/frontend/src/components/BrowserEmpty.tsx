@@ -5,7 +5,7 @@ import type { Session } from '../types'
 type BrowserEmptyProps = { session: Session; error: string }
 
 export function BrowserEmpty({ session, error }: BrowserEmptyProps) {
-  const { openBrowser, report } = useAgentos()
+  const { openBrowser, report } = useAgentos('openBrowser', 'report')
   const [url, setUrl] = useState('')
 
   return (

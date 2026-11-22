@@ -9,7 +9,7 @@ import { Overlay } from './Overlay'
 import { PaletteRow } from './PaletteRow'
 
 export function PaletteDialog() {
-  const { setOverlay, report } = useAgentos()
+  const { setOverlay, report } = useAgentos('setOverlay', 'report')
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(0)
   const confirm = useArmedConfirm<string>()
