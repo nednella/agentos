@@ -42,7 +42,7 @@ type PR struct {
 	URL       string `json:"url"`
 	State     string `json:"state"`
 	Checks    string `json:"checks"`
-	Comments  int    `json:"comments"`
+	Comments  int    `json:"comments"` // the comments and reviews by others than the gh user that are not approvals
 	UpdatedAt int64  `json:"updatedAt"`
 
 	Conflicting bool `json:"conflicting"` // the branch does not merge cleanly into its base
@@ -169,6 +169,7 @@ type Lifecycle struct {
 	etags    map[string]string   // by project key: the ETag of the last pull request list
 	watchers map[string]*watcher // by project key
 	finished map[string]bool     // session id and branch: an older branch whose clean-up a poll started
+	logins   map[string]string   // by project folder: the gh user's login
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -181,7 +182,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{}, finished: map[string]bool{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -746,8 +747,9 @@ func (l *Lifecycle) attentionFor(key string, pr *PR, hears bool) string {
 		acks[n] = a
 		l.savePRs(key)
 	}
-	if pr.Checks != "failing" && a.Checks {
-		a.Checks = false
+	if (pr.Checks != "failing" && a.Checks) || pr.Comments < a.Comments {
+		a.Checks = a.Checks && pr.Checks == "failing"
+		a.Comments = min(a.Comments, pr.Comments)
 		acks[n] = a
 		l.savePRs(key)
 	}
@@ -775,7 +777,8 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string)
 		seen = nudge{Comments: pr.Comments}
 	}
 	draftComments := pr.State == "draft" && !proj.ReviewDrafts && pr.Comments > seen.Comments
-	if draftComments {
+	fewer := pr.Comments < seen.Comments // a deleted comment must not hide the next one
+	if draftComments || fewer {
 		seen.Comments = pr.Comments
 	}
 	head := cmp.Or(pr.HeadOid, "unknown")
@@ -790,7 +793,7 @@ func (l *Lifecycle) nudgeFor(proj project.Project, pr *PR) (prompt, kind string)
 		seen.Conflict = head
 		prompt, kind = proj.ConflictCommand(pr.Number), activity.Conflict
 	}
-	if !known || draftComments || prompt != "" {
+	if !known || draftComments || fewer || prompt != "" {
 		nudged[n] = seen
 		l.savePRs(key)
 	}
@@ -896,6 +899,10 @@ func samePath(a, b string) bool {
 }
 
 func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error) {
+	me, err := l.login(ctx, dir)
+	if err != nil {
+		return nil, fmt.Errorf("finding the gh user: %w", err)
+	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, dir, "gh", "pr", "list", "--head", branch, "--state", "all", "--json",
@@ -903,18 +910,44 @@ func (l *Lifecycle) findPR(ctx context.Context, dir, branch string) (*PR, error)
 	if err != nil {
 		return nil, fmt.Errorf("finding a pull request: %w", err)
 	}
-	return parsePR(out)
+	return parsePR(out, me)
 }
 
-// review is one review of a pull request, as gh lists them, oldest first.
+// login is the gh user's login, as the session's own comments and replies carry it.
+func (l *Lifecycle) login(ctx context.Context, dir string) (string, error) {
+	l.mu.Lock()
+	me, ok := l.logins[dir]
+	l.mu.Unlock()
+	if ok {
+		return me, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
+	defer cancel()
+	out, err := l.run(ctx, dir, "gh", "api", "user", "--jq", ".login")
+	if err != nil {
+		return "", err
+	}
+	me = strings.TrimSpace(string(out))
+	l.mu.Lock()
+	l.logins[dir] = me
+	l.mu.Unlock()
+	return me, nil
+}
+
+type author struct {
+	Login string `json:"login"`
+}
+
+// review is one review of a pull request, as gh lists them, oldest first. Each reply in a review
+// thread is a review of its own.
 type review struct {
 	State  string `json:"state"`
-	Author struct {
-		Login string `json:"login"`
-	} `json:"author"`
+	Author author `json:"author"`
 }
 
-func parsePR(data []byte) (*PR, error) {
+// parsePR reads what gh pr list printed. me is the gh user, whose own comments and reviews ask
+// nothing of the session.
+func parsePR(data []byte, me string) (*PR, error) {
 	var raw []struct {
 		Number    int    `json:"number"`
 		Title     string `json:"title"`
@@ -930,10 +963,12 @@ func parsePR(data []byte) (*PR, error) {
 			Conclusion string `json:"conclusion"`
 			State      string `json:"state"`
 		} `json:"statusCheckRollup"`
-		Comments  []json.RawMessage `json:"comments"`
-		Reviews   []review          `json:"reviews"`
-		UpdatedAt time.Time         `json:"updatedAt"`
-		ClosedAt  time.Time         `json:"closedAt"`
+		Comments []struct {
+			Author author `json:"author"`
+		} `json:"comments"`
+		Reviews   []review  `json:"reviews"`
+		UpdatedAt time.Time `json:"updatedAt"`
+		ClosedAt  time.Time `json:"closedAt"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("reading gh pr list: %w", err)
@@ -942,9 +977,14 @@ func parsePR(data []byte) (*PR, error) {
 		return nil, nil
 	}
 	r := raw[0]
-	pr := &PR{Number: r.Number, Title: r.Title, URL: r.URL, Comments: len(r.Comments), UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING", FailedChecks: []string{}}
+	pr := &PR{Number: r.Number, Title: r.Title, URL: r.URL, UpdatedAt: util.Millis(r.UpdatedAt), ClosedAt: util.Millis(r.ClosedAt), HeadOid: r.HeadOid, Conflicting: r.Mergeable == "CONFLICTING", FailedChecks: []string{}}
+	for _, c := range r.Comments {
+		if c.Author.Login != me {
+			pr.Comments++
+		}
+	}
 	for _, v := range r.Reviews {
-		if v.State != "APPROVED" { // an approval asks nothing of the session
+		if v.Author.Login != me && v.State != "APPROVED" { // an approval asks nothing of the session
 			pr.Comments++
 		}
 	}

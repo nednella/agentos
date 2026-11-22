@@ -350,6 +350,8 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			return nil, f.Repo
 		}
 		return []byte(`{"nameWithOwner":"acme/widgets"}`), nil
+	case args[0] == "api" && args[1] == "user":
+		return []byte(GHUser + "\n"), nil
 	case args[0] == "api" && strings.HasSuffix(args[1], "/comments?per_page=100"):
 		if !strings.Contains(args[1], "/issues/7/") {
 			return []byte("[]"), nil
@@ -1022,6 +1024,9 @@ func (h *Harness) Events(t *testing.T, kind string) []activity.Event {
 	}
 	return out
 }
+
+// GHUser is the login gh api user prints.
+const GHUser = "me"
 
 // PRJSON is what gh pr list prints for one pull request.
 func PRJSON(state string, draft bool, rollup string, comments, reviews int) string {
