@@ -378,10 +378,7 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	lock.Lock()
 	defer lock.Unlock()
 	trees, treeErr := l.worktrees(ctx, proj.Dir)
-	var list *pullList
-	if repo := l.repos.Repo(ctx, proj.Dir); repo != "" {
-		list, _ = l.pulls(ctx, proj, repo) // without the list each branch is looked up, and that lookup reports what fails
-	}
+	list := l.repoPulls(ctx, proj)
 	prs := map[string]*PR{} // by branch: two sessions of one issue share its PR
 	var fetched []done
 	var older []done
@@ -453,6 +450,17 @@ func (l *Lifecycle) refreshLock(key string) *sync.Mutex {
 		l.refreshing[key] = m
 	}
 	return m
+}
+
+// repoPulls is the repo's PR list, or nil when it cannot be read: then each branch is looked up, and
+// that lookup reports what fails.
+func (l *Lifecycle) repoPulls(ctx context.Context, proj project.Project) *pullList {
+	repo := l.repos.Repo(ctx, proj.Dir)
+	if repo == "" {
+		return nil
+	}
+	list, _ := l.pulls(ctx, proj, repo)
+	return list
 }
 
 // abandoned are the branches of the sessions that have no PR and that no worktree has checked out any
@@ -1799,7 +1807,7 @@ func (l *Lifecycle) hasBranch(proj project.Project, id, branch string) bool {
 }
 
 // track notes branch as the newest one the session works on and looks up its pull request.
-// A branch it already knows is looked up again only when the turn ended: the agent may just have opened the PR.
+// A branch it already knows is looked for a new PR only when the turn ended: the agent may just have opened one.
 // Unless the agent reported the branch, one that another session works on now or owns stays that
 // session's: the agent only looked in its worktree.
 func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, branch string, turnEnded, reported bool) {
@@ -1821,8 +1829,7 @@ func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, 
 	if len(known) > 0 && known[len(known)-1] == branch {
 		l.mu.Unlock()
 		if turnEnded {
-			l.expire(proj, []string{branch})
-			l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
+			l.lookForPR(ctx, id, proj, branch)
 		}
 		return
 	}
@@ -1831,6 +1838,34 @@ func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, 
 	l.mu.Unlock()
 	l.ensureWatchers(ctx)
 	l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
+}
+
+// lookForPR refreshes the session's branch when its PR is not the one the session knows. An open PR
+// known on the branch is left to the watcher.
+func (l *Lifecycle) lookForPR(ctx context.Context, id string, proj project.Project, branch string) {
+	l.mu.Lock()
+	var known *PR
+	if tr := l.tracks[id]; tr != nil && tr.branch == branch {
+		known = tr.pr
+	}
+	l.mu.Unlock()
+	if isLive(known) {
+		return
+	}
+	pr, err := l.branchPR(ctx, proj, branch)
+	if err == nil && (pr == nil || known != nil && pr.Number == known.Number && pr.State == known.State) {
+		return
+	}
+	l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
+}
+
+// branchPR is the PR of the branch, from the repo's PR list where it can be. The refresh that may follow
+// then finds the lookup it made.
+func (l *Lifecycle) branchPR(ctx context.Context, proj project.Project, branch string) (*PR, error) {
+	lock := l.refreshLock(proj.Key())
+	lock.Lock()
+	defer lock.Unlock()
+	return l.cachedPR(ctx, proj, branch, l.repoPulls(ctx, proj), map[string]*PR{})
 }
 
 // workBranch is the branch checked out in cwd, unless cwd is detached, on the main branch or in another repo.
