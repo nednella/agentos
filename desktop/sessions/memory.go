@@ -3,6 +3,7 @@ package sessions
 import (
 	"bytes"
 	"context"
+	"maps"
 	"os"
 	"strconv"
 	"strings"
@@ -45,19 +46,26 @@ func (s *Sessions) SampleMemory() {
 		s.warn.Report("memory", util.FirstLine(err.Error()))
 		return
 	}
-	server, err := s.tmux.ServerPID(ctx)
-	if err != nil {
-		s.warn.Report("memory", util.FirstLine(err.Error()))
-		return
+	procs := readProcesses(out, footprint)
+	s.mu.Lock()
+	server, machine := s.serverPID, s.memory.Machine
+	running := len(s.info) > 0 || len(s.shells) > 0 // tmux ends its server when its last session goes
+	s.mu.Unlock()
+	if !procs.has(server) {
+		server = 0
+		if running {
+			if server, err = s.tmux.ServerPID(ctx); err != nil {
+				s.warn.Report("memory", util.FirstLine(err.Error()))
+				return
+			}
+		}
 	}
 	s.warn.Clear("memory")
-	machine := s.Memory().Machine
 	if machine == 0 {
 		if out, err := s.run(ctx, "", "sysctl", "-n", "hw.memsize"); err == nil {
 			machine, _ = strconv.ParseInt(strings.TrimSpace(string(out)), 10, 64)
 		}
 	}
-	procs := readProcesses(out, footprint)
 	var browsers int64
 	for _, pid := range s.browsers.PIDs() {
 		browsers += procs.held(pid)
@@ -65,10 +73,11 @@ func (s *Sessions) SampleMemory() {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	clear(s.held)
+	s.serverPID = server
+	held := map[string]int64{}
 	for _, in := range s.info {
 		if in.PID > 0 {
-			s.held[in.Name.String()] = roundUp(procs.held(in.PID))
+			held[in.Name.String()] = roundUp(procs.held(in.PID))
 		}
 	}
 	m := Memory{
@@ -82,18 +91,22 @@ func (s *Sessions) SampleMemory() {
 		s.memory = m
 		s.emit("memory", m)
 	}
-	s.sync()
+	if !maps.Equal(held, s.held) {
+		s.held = held
+		s.sync()
+	}
 }
 
 // processes is the process tree ps reported, and how much memory a process uses.
 type processes struct {
+	pids     map[int]bool
 	children map[int][]int
 	size     func(pid int) int64
 }
 
 // readProcesses reads lines of `ps -axo pid=,ppid=`.
 func readProcesses(out []byte, size func(pid int) int64) processes {
-	p := processes{children: map[int][]int{}, size: size}
+	p := processes{pids: map[int]bool{}, children: map[int][]int{}, size: size}
 	for line := range bytes.Lines(out) {
 		f := strings.Fields(string(line))
 		if len(f) != 2 {
@@ -104,12 +117,16 @@ func readProcesses(out []byte, size func(pid int) int64) processes {
 		if err1 != nil || err2 != nil {
 			continue
 		}
+		p.pids[pid] = true
 		if pid != ppid {
 			p.children[ppid] = append(p.children[ppid], pid)
 		}
 	}
 	return p
 }
+
+// has says whether pid is running.
+func (p processes) has(pid int) bool { return p.pids[pid] }
 
 // held is what pid and every process under it use; 0 when pid is gone.
 func (p processes) held(pid int) int64 {
