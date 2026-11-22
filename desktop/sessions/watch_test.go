@@ -463,6 +463,27 @@ func TestPollWatcherFetchesOnlyWhatMoved(t *testing.T) {
 	}
 }
 
+func TestEndedSessionWithoutAnOpenPRIsNotWatchedOrFetched(t *testing.T) {
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
+	h.GH.SetPulls(`W/"one"`, pulls("other", "2026-10-01T12:00:00Z"))
+	s := issueSession(h, t, 12)
+	eventually(t, "the poll to run", func() bool { return h.GH.Calls("api -i") >= 1 })
+	h.RefreshPRs()
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	h.RefreshPRs()
+	polled, fetched := h.GH.Calls("api -i"), h.GH.Calls("api graphql")
+	time.Sleep(2500 * time.Millisecond)
+	h.RefreshPRs()
+	if got := h.GH.Calls("api -i"); got != polled {
+		t.Errorf("the watcher polled %d more times for an ended session", got-polled)
+	}
+	if got := h.GH.Calls("api graphql"); got != fetched {
+		t.Errorf("the one-minute check fetched %d more times for an ended session with no PR", got-fetched)
+	}
+}
+
 func TestStoppingTheAppStopsItsWatchers(t *testing.T) {
 	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: poll\n    pr_poll_interval: 1s\n"})
 	h.GH.SetPulls(`W/"one"`, pulls("issue-12", "2026-10-01T12:00:00Z"))
