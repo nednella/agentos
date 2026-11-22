@@ -1,5 +1,5 @@
-import { ago, useNow } from '../time'
 import type { Evidence } from '../types'
+import { Ago } from './Ago'
 import { Icon } from './Icon'
 
 type EvidenceCardProps = {
@@ -11,7 +11,6 @@ type EvidenceCardProps = {
 }
 
 export function EvidenceCard({ item, selectable, selected, onOpen, onToggle }: EvidenceCardProps) {
-  const now = useNow()
   const image = item.kind === 'image'
 
   return (
@@ -48,7 +47,7 @@ export function EvidenceCard({ item, selectable, selected, onOpen, onToggle }: E
           >
             {item.source === 'agent' ? 'agent' : 'you'}
           </span>
-          <span className="mono">{ago(item.at, now)}</span>
+          <span className="mono"><Ago at={item.at} /></span>
         </p>
       </div>
     </article>

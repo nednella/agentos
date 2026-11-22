@@ -1,5 +1,5 @@
 import { STATE_LABEL } from '../stateMeta'
-import { duration, useNow } from '../time'
+import { duration, shownNow, useClock } from '../time'
 import type { Session, State } from '../types'
 
 type TimelineProps = { session: Session; size: 'mini' | 'full' }
@@ -24,8 +24,18 @@ function segmentsOf(session: Session, now: number): Segment[] {
   return segments
 }
 
+function summaryOf(segments: Segment[]): string {
+  const total = (state: State) => segments.filter((s) => s.state === state).reduce((sum, s) => sum + (s.to - s.from), 0)
+  return SUMMARY.map(({ state, word }) => ({ word, ms: total(state) }))
+    .filter((part) => part.ms >= 1000)
+    .map((part) => `${duration(part.ms)} ${part.word}`)
+    .join(' · ')
+}
+
 export function Timeline({ session, size }: TimelineProps) {
-  const now = useNow()
+  const openSince = session.history.at(-1)?.at ?? session.createdAt
+  const now = useClock((current) => shownNow(current, openSince))
+  const summary = useClock((current) => (size === 'full' ? summaryOf(segmentsOf(session, current)) : ''))
   const segments = segmentsOf(session, now)
   const bar = (
     <div className="timeline h-[2px]">
@@ -40,13 +50,6 @@ export function Timeline({ session, size }: TimelineProps) {
     </div>
   )
   if (size === 'mini') return bar
-
-  const total = (state: State) =>
-    segments.filter((s) => s.state === state).reduce((sum, s) => sum + (s.to - s.from), 0)
-  const summary = SUMMARY.map(({ state, word }) => ({ word, ms: total(state) }))
-    .filter((part) => part.ms >= 1000)
-    .map((part) => `${duration(part.ms)} ${part.word}`)
-    .join(' · ')
 
   return (
     <div className="short:hidden flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pb-2">

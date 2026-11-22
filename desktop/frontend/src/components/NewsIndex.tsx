@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAgentos } from "../AgentosContext";
 import { useLayout } from "../LayoutContext";
-import { ago, useNow } from "../time";
+import { ago, useClock } from "../time";
 import { Icon } from "./Icon";
 import { NewsSourceRow } from "./NewsSourceRow";
 
@@ -28,7 +28,11 @@ export function NewsIndex() {
     focusRequest,
   } = useAgentos();
   const { closeCentre, openNews } = useLayout();
-  const now = useNow();
+  const lastRun = useClock((now) =>
+    digest && digest.lastRunAt > 0
+      ? `last run ${ago(digest.lastRunAt, now)}`
+      : "never run",
+  );
   const panel = useRef<HTMLElement>(null);
 
   useEffect(() => panel.current?.focus(), []);
@@ -58,7 +62,7 @@ export function NewsIndex() {
       unseen: !item.noteId && item.at > digestSeen,
     }));
   const digestSub = [
-    `From the dependencies in ${project?.name ?? "this project"}'s source code · ${digest && digest.lastRunAt > 0 ? `last run ${ago(digest.lastRunAt, now)}` : "never run"}`,
+    `From the dependencies in ${project?.name ?? "this project"}'s source code · ${lastRun}`,
     digest?.running && "running…",
   ]
     .filter(Boolean)

@@ -3,9 +3,9 @@ import { api } from '../api'
 import { gigabytes, memoryNote } from '../memory'
 import { dollars } from '../spend'
 import { stateLabel } from '../stateMeta'
-import { ago, useNow } from '../time'
 import type { Session } from '../types'
 import { ActionTag } from './ActionTag'
+import { Ago } from './Ago'
 import { CleanupControls } from './CleanupControls'
 import { EvidenceButton } from './EvidenceButton'
 import { Icon } from './Icon'
@@ -18,7 +18,6 @@ type SessionRowProps = { session: Session; selected: boolean; cursor: boolean; c
 
 export function SessionRow({ session, selected, cursor, compact, dense }: SessionRowProps) {
   const { select, focus, dismissSession, resumeSession, report, issues } = useAgentos()
-  const now = useNow()
   const ended = session.state === 'ended'
   const issue = issues.find((i) => i.number === session.issue)
   const showStatus = (session.pr !== null || session.git !== null) && (!dense || ended)
@@ -46,7 +45,7 @@ export function SessionRow({ session, selected, cursor, compact, dense }: Sessio
           <span className="mono w-4 flex-none text-small text-dim">{session.n}</span>
           <ActionTag action={session.action} />
           <span className={`min-w-0 flex-1 truncate text-body ${selected ? 'font-semibold' : 'font-medium'}`}>{session.title}</span>
-          <span className="mono flex-none text-label text-dim">{ago(session.lastEventAt, now)}</span>
+          <span className="mono flex-none text-label text-dim"><Ago at={session.lastEventAt} /></span>
         </span>
         {!compact && !dense && (
           <span className="flex w-full items-center gap-2 pl-[1.625rem]">
