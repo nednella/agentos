@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useAgentos } from "../AgentosContext";
-import { ago, useNow } from "../time";
+import { ago, useClock } from "../time";
 import { useMinimumLoading } from "../useMinimumLoading";
 import { Loading } from "./Loading";
 import { NewsHeader } from "./NewsHeader";
@@ -25,7 +25,9 @@ export function NewsView() {
     report,
     focusRequest,
   } = useAgentos();
-  const now = useNow();
+  const lastFetch = useClock((now) =>
+    news && news.lastFetchAt > 0 ? ago(news.lastFetchAt, now) : "never fetched",
+  );
   const loading = useMinimumLoading(!news);
   const panel = useRef<HTMLElement>(null);
   const issues = news?.issues ?? [];
@@ -54,11 +56,7 @@ export function NewsView() {
     >
       <NewsHeader
         source="TLDR Dev"
-        updated={
-          news && news.lastFetchAt > 0
-            ? ago(news.lastFetchAt, now)
-            : "never fetched"
-        }
+        updated={lastFetch}
         action="Refresh"
         running={!news || news.running}
         onRun={() => report(refreshNews)}

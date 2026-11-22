@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
-import { ago, useNow } from '../time'
+import { Ago } from './Ago'
 import { Icon } from './Icon'
 
 export function CleanupsMenu() {
   const { cleanups } = useAgentos()
-  const now = useNow()
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState({ top: 0, right: 0 })
@@ -58,7 +57,7 @@ export function CleanupsMenu() {
               <div className="flex items-baseline gap-2">
                 <span className="min-w-0 flex-1 truncate text-body font-medium">{c.sessionTitle}</span>
                 {c.pr > 0 && <span className="mono text-small text-dim">PR #{c.pr}</span>}
-                <span className="mono text-label text-dim">{ago(c.at, now)}</span>
+                <span className="mono text-label text-dim"><Ago at={c.at} /></span>
               </div>
               {c.status === 'blocked' ? (
                 <p className="text-small text-danger">Blocked: {c.reason}</p>

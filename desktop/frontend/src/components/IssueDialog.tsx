@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { api, errorMessage } from '../api'
 import { useAgentos } from '../AgentosContext'
 import { useMinimumLoading } from '../useMinimumLoading'
-import { ago, useNow } from '../time'
 import type { IssueDetail } from '../types'
+import { Ago } from './Ago'
 import { Icon } from './Icon'
 import { IssueBody } from './IssueBody'
 import { Loading } from './Loading'
@@ -23,7 +23,6 @@ type IssueDialogContentProps = { number: number }
 
 function IssueDialogContent({ number }: IssueDialogContentProps) {
   const { issues, sessions, startIssue, select, setOverlay, report } = useAgentos()
-  const now = useNow()
   const body = useRef<HTMLDivElement>(null)
   const [detail, setDetail] = useState<IssueDetail | null>(null)
   const [error, setError] = useState('')
@@ -102,7 +101,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-small text-dim">
             <TypeMark type={issue.type} />
             <span title={dateOf(issue.createdAt)}>
-              {issue.author ? `${issue.author} opened this` : 'Opened'} {ago(issue.createdAt, now)}
+              {issue.author ? `${issue.author} opened this` : 'Opened'} <Ago at={issue.createdAt} />
             </span>
             {issue.labels.map((label) => (
               <span key={label} className="mono rounded-sm border border-line-strong px-1.5 text-label text-soft">
@@ -127,7 +126,7 @@ function IssueDialogContent({ number }: IssueDialogContentProps) {
                     <div className="flex items-baseline gap-2 text-small">
                       <span className="font-medium">{comment.author}</span>
                       <span className="text-dim" title={dateOf(comment.createdAt)}>
-                        {ago(comment.createdAt, now)}
+                        <Ago at={comment.createdAt} />
                       </span>
                     </div>
                     <IssueBody html={comment.bodyHTML} />

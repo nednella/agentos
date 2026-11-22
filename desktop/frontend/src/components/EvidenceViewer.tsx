@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { api } from '../api'
-import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Evidence } from '../types'
+import { Ago } from './Ago'
 import { ConfirmRow } from './ConfirmRow'
 import { Icon } from './Icon'
 import { FIT, ZOOM_STEP, ZoomableImage, zoomTo, type ImageView } from './ZoomableImage'
@@ -17,7 +17,6 @@ type EvidenceViewerProps = {
 
 export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceViewerProps) {
   const { report } = useAgentos()
-  const now = useNow()
   const root = useRef<HTMLDivElement>(null)
   const [id, setId] = useState(startId)
   const confirm = useArmedConfirm()
@@ -71,7 +70,7 @@ export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceV
       <div className="flex max-w-3xl flex-col items-center gap-2 text-center">
         {item.caption && <p className="text-body">{item.caption}</p>}
         <p className="mono text-small text-dim">
-          {at + 1} of {items.length} · {item.source === 'agent' ? 'agent' : 'you'} · {ago(item.at, now)} · {Math.round(view.scale * 100)}%
+          {at + 1} of {items.length} · {item.source === 'agent' ? 'agent' : 'you'} · <Ago at={item.at} /> · {Math.round(view.scale * 100)}%
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2">
           <button className="btn" onClick={() => step(-1)} aria-label="Previous image" disabled={items.length < 2}>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useAgentos } from "../AgentosContext";
-import { ago, until, useNow } from "../time";
+import { ago, until, useClock } from "../time";
 import type { DigestItem } from "../types";
 import { DigestItemRow } from "./DigestItemRow";
 import { useMinimumLoading } from "../useMinimumLoading";
@@ -30,7 +30,14 @@ function groupByDay(
 export function DigestView() {
   const { digest, runDigest, markDigestSeen, report, focusRequest, project } =
     useAgentos();
-  const now = useNow();
+  const lastRun = useClock((now) =>
+    digest && digest.lastRunAt > 0 ? ago(digest.lastRunAt, now) : "never run",
+  );
+  const nextRun = useClock((now) =>
+    digest && digest.nextRunAt > 0
+      ? `next run ${until(digest.nextRunAt, now)}`
+      : "automatic runs off",
+  );
   const loading = useMinimumLoading(!digest);
   const panel = useRef<HTMLElement>(null);
   const groups = useMemo(
@@ -54,21 +61,14 @@ export function DigestView() {
     >
       <NewsHeader
         source="Weekly digest"
-        updated={
-          digest && digest.lastRunAt > 0
-            ? ago(digest.lastRunAt, now)
-            : "never run"
-        }
+        updated={lastRun}
         action="Run now"
         running={!digest || digest.running}
         onRun={() => report(runDigest)}
       >
         From the dependencies in{" "}
         <span className="text-soft">{project?.name ?? "this project"}</span>'s
-        source code ·{" "}
-        {digest && digest.nextRunAt > 0
-          ? `next run ${until(digest.nextRunAt, now)}`
-          : "automatic runs off"}
+        source code · {nextRun}
       </NewsHeader>
       {digest?.error && (
         <p className="flex-none border-b border-line px-4 py-2 text-small text-danger">

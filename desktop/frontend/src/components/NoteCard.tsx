@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { imageFiles, readImage } from '../images'
-import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Note } from '../types'
+import { Ago } from './Ago'
 import { AutoTextarea } from './AutoTextarea'
 import { ConfirmRow } from './ConfirmRow'
 import { Icon } from './Icon'
@@ -26,7 +26,6 @@ const AUTOSAVE_MS = 700
 
 export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenImage }: NoteCardProps) {
   const a = useAgentos()
-  const now = useNow()
   const confirm = useArmedConfirm<Confirm>()
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
@@ -109,7 +108,7 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
     <article className="note-card group p-3" data-cursor={cursor} style={{ opacity: note.archived ? 0.6 : 1 }}>
       <div className="mb-1 flex min-h-6 items-center gap-2">
         <span className="mono text-label" style={{ color: 'var(--text-note-dim)' }}>
-          {ago(note.createdAt, now)}
+          <Ago at={note.createdAt} />
         </span>
         <span className="ml-auto flex items-center">
           <span className="reveal">

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 import { dollars, tokenCount } from '../spend'
-import { ago, useNow } from '../time'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Session } from '../types'
 import { ActionTag } from './ActionTag'
+import { Ago } from './Ago'
 import { InlineInput } from './InlineInput'
 import { ChatTag } from './ChatTag'
 import { ModelTag } from './ModelTag'
@@ -15,7 +15,6 @@ type ViewportHeaderProps = { session: Session }
 
 export function ViewportHeader({ session }: ViewportHeaderProps) {
   const { renameSession, report, focus, killSession } = useAgentos()
-  const now = useNow()
   const [renaming, setRenaming] = useState(false)
   const kill = useArmedConfirm()
 
@@ -50,7 +49,7 @@ export function ViewportHeader({ session }: ViewportHeaderProps) {
             </h2>
           )}
         </div>
-        <span className="mono ml-auto flex-none text-small whitespace-nowrap text-dim">{ago(session.lastEventAt, now)}</span>
+        <span className="mono ml-auto flex-none text-small whitespace-nowrap text-dim"><Ago at={session.lastEventAt} /></span>
         {session.state === 'ended' ? null : kill.armed ? (
           <span
             className="contents"
