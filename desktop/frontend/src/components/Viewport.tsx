@@ -10,7 +10,7 @@ import { ViewportActions } from './ViewportActions'
 import { ViewportHeader } from './ViewportHeader'
 
 export function Viewport() {
-  const { sessions, selectedId, openedIds, viewOf } = useAgentos()
+  const { sessions, selectedId, viewOf } = useAgentos()
   const panel = useRef<HTMLElement>(null)
   const selected = sessions.find((s) => s.id === selectedId)
   const view = viewOf(selectedId)
@@ -38,11 +38,7 @@ export function Viewport() {
       <ViewTabs session={selected} view={view} />
       <div className="relative min-h-0 flex-1 border-t border-line bg-term">
         <div className={view === 'terminal' ? 'absolute inset-0' : 'hidden'}>
-          {openedIds
-            .filter((id) => sessions.some((s) => s.id === id))
-            .map((id) => (
-              <Terminal key={id} id={id} active={id === selectedId} />
-            ))}
+          <Terminal key={selected.id} id={selected.id} active />
         </div>
         {view === 'browser' && <BrowserTab key={selected.id} session={selected} />}
         {view === 'evidence' && <EvidenceTab key={selected.id} session={selected} />}
