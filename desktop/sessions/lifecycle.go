@@ -165,17 +165,18 @@ type Lifecycle struct {
 
 	mu         sync.Mutex
 	tracks     map[string]*track
-	gone       map[string]bool        // forgotten ids: a poll that was waiting on gh must not write for them
-	files      map[string]*prsFile    // by project key
-	lists      map[string]*pullList   // by project key: the last pull request list
-	lookups    map[string]lookup      // by project key and branch: what the PR lookup said last
-	round      int                    // the reconciles so far
-	refreshing map[string]*sync.Mutex // by project key: one refresh at a time
-	watchers   map[string]*watcher    // by project key
-	finished   map[string]bool        // session id and branch: an older branch whose clean-up a poll started
-	logins     map[string]string      // by project folder: the gh user's login
-	bases      map[string]string      // by folder: the branch origin calls its default
-	gitDirs    map[string]gitDirs     // by folder
+	gone       map[string]bool          // forgotten ids: a poll that was waiting on gh must not write for them
+	files      map[string]*prsFile      // by project key
+	lists      map[string]*pullList     // by project key: the last pull request list
+	lookups    map[string]lookup        // by project key and branch: what the PR lookup said last
+	round      int                      // the reconciles so far
+	refreshing map[string]*sync.Mutex   // by project key: one refresh at a time
+	watchers   map[string]*watcher      // by project key
+	finished   map[string]bool          // session id and branch: an older branch whose clean-up a poll started
+	logins     map[string]string        // by project folder: the gh user's login
+	bases      map[string]string        // by folder: the branch origin calls its default
+	gitDirs    map[string]gitDirs       // by folder
+	learning   map[string]chan struct{} // by session id: closed when the last look at its branch that was asked for is done
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -188,7 +189,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, lists: map[string]*pullList{}, lookups: map[string]lookup{}, refreshing: map[string]*sync.Mutex{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{}, bases: map[string]string{}, gitDirs: map[string]gitDirs{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, lists: map[string]*pullList{}, lookups: map[string]lookup{}, refreshing: map[string]*sync.Mutex{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{}, bases: map[string]string{}, gitDirs: map[string]gitDirs{}, learning: map[string]chan struct{}{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -1756,6 +1757,28 @@ func (l *Lifecycle) claim(proj project.Project, id, branch string) {
 		}
 	}
 	l.savePRs(key)
+}
+
+// learnInOrder runs learn in the background, after the looks asked for before it for the session, so the branch
+// of the latest hook is the newest one.
+func (l *Lifecycle) learnInOrder(ctx context.Context, id string, proj project.Project, cwd string, turnEnded, switched bool) {
+	l.mu.Lock()
+	before := l.learning[id]
+	done := make(chan struct{})
+	l.learning[id] = done
+	l.mu.Unlock()
+	go func() {
+		if before != nil {
+			<-before
+		}
+		l.learn(ctx, id, proj, cwd, turnEnded, switched)
+		close(done)
+		l.mu.Lock()
+		if l.learning[id] == done {
+			delete(l.learning, id)
+		}
+		l.mu.Unlock()
+	}()
 }
 
 // learn tracks the branch checked out in cwd, when cwd is in the project's repo and the branch is
