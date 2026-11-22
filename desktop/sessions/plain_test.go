@@ -95,6 +95,38 @@ func TestIdleSessionLooksUpItsPROncePerTurn(t *testing.T) {
 	}
 }
 
+func TestTurnOnTheSameBranchOnlyLooksForANewPR(t *testing.T) {
+	h := newHarness(t)
+	repoFixture(t, h)
+	h.GH.SetPulls(`W/"one"`, pulls("other", "2026-10-01T12:00:00Z"))
+	s := plainSession(h, t)
+	madeBranch(h, t, s)
+	worksIn(h, t, s, h.Dir)
+	eventually(t, "the branch", func() bool { got, _ := h.Session(s.ID); return got.Branch == "my-fix" })
+	time.Sleep(300 * time.Millisecond)
+
+	turn := func() (gits, lookups int) {
+		t.Helper()
+		gits, lookups, looked := h.GH.GitCalls(""), h.GH.Calls("api graphql"), h.GH.GitCalls("branch --show-current")
+		worksIn(h, t, s, h.Dir)
+		eventually(t, "the look at the branch", func() bool { return h.GH.GitCalls("branch --show-current") > looked })
+		time.Sleep(300 * time.Millisecond)
+		return h.GH.GitCalls("") - gits, h.GH.Calls("api graphql") - lookups
+	}
+	if gits, lookups := turn(); gits != 1 || lookups != 0 {
+		t.Errorf("a turn with no PR ran %d git calls and %d PR lookups, want 1 and 0", gits, lookups)
+	}
+	h.GH.SetPulls(`W/"two"`, pulls("my-fix", "2026-10-02T12:00:00Z"))
+	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
+	if _, lookups := turn(); lookups != 1 {
+		t.Errorf("the turn that opened the PR looked it up %d times, want once", lookups)
+	}
+	eventually(t, "the PR the agent opened", hasPR(h, s.ID))
+	if gits, lookups := turn(); gits != 1 || lookups != 0 {
+		t.Errorf("a turn with an open PR ran %d git calls and %d PR lookups, want 1 and 0", gits, lookups)
+	}
+}
+
 func TestProjectsGitValuesAreReadOnce(t *testing.T) {
 	h := newHarness(t)
 	repoFixture(t, h)
