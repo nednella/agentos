@@ -3,14 +3,17 @@ package sessions
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/nednella/agentos/internal/activity"
+	"github.com/nednella/agentos/internal/atomicfile"
 	"github.com/nednella/agentos/internal/session"
 	"github.com/nednella/agentos/internal/term"
 	"github.com/nednella/agentos/internal/usage"
@@ -50,6 +53,7 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var before usage.Tokens
+	name, nameErr := session.ParseName(id)
 	if r.cursor == nil {
 		after, from := in.Created, ""
 		s.activity.Since(session.ProjectKey(id), in.Created.In(time.Local).Format(time.DateOnly), func(e activity.Event) {
@@ -67,7 +71,11 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 		if from != "" {
 			before.Add(s.usedBefore(session.ProjectKey(id), from, kind))
 		}
-		r.cursor = s.Provider(in.Agent).Usage(usage.Mark{After: after})
+		mark := usage.Mark{After: after}
+		if nameErr == nil {
+			mark = s.loadUsageMark(name, after)
+		}
+		r.cursor = s.Provider(in.Agent).Usage(mark)
 	}
 	parts, cur, err := r.cursor.Read(transcript, model)
 	if err != nil {
@@ -104,6 +112,38 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	if _, kept := s.readers[id]; kept { // a dismissed session has no row to show it
 		s.spent[id] = total
 		s.sync()
+		if record && nameErr == nil {
+			s.saveUsageMark(name, r.cursor.Mark())
+		}
+	}
+}
+
+// usageMarkPath is where the session's reader keeps how far it read its transcripts.
+func (s *Sessions) usageMarkPath(name session.Name) string {
+	return filepath.Join(s.localDir, name.Project, "usage", name.Token+".json")
+}
+
+// loadUsageMark is the mark a reader of the session starts from: the saved one when it stands at or before after,
+// the time the event log holds, since offsets from a later time could skip lines the log never got. Else only after.
+func (s *Sessions) loadUsageMark(name session.Name, after time.Time) usage.Mark {
+	var m usage.Mark
+	data, err := os.ReadFile(s.usageMarkPath(name))
+	if err != nil || json.Unmarshal(data, &m) != nil || m.After.Truncate(time.Millisecond).After(after) {
+		return usage.Mark{After: after}
+	}
+	m.After = after
+	return m
+}
+
+// saveUsageMark keeps the mark of a reader whose reads are all in the event log. A failure costs only a longer read
+// after the next restart.
+func (s *Sessions) saveUsageMark(name session.Name, m usage.Mark) {
+	data, err := json.Marshal(m)
+	if err == nil {
+		err = atomicfile.Write(s.usageMarkPath(name), data, 0o600)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "agentos: saving the usage mark of %s: %v\n", name, err)
 	}
 }
 
