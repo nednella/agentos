@@ -95,7 +95,7 @@ func TestKillStopsOnlyThisProject(t *testing.T) {
 	if got := names(t, tmux); got != "other/a1" {
 		t.Errorf("sessions left: %q", got)
 	}
-	if left := bus.ReadAll(state); len(left) != 1 || left["other/a1"].Session == "" {
+	if left := bus.ReadAll(state, nil); len(left) != 1 || left["other/a1"].Session == "" {
 		t.Errorf("state files left: %v", left)
 	}
 	if out := runKill(t); !strings.Contains(out, "no agents to stop") {
@@ -109,7 +109,7 @@ func TestKillAllStopsEveryProject(t *testing.T) {
 	if got := names(t, tmux); got != "" {
 		t.Errorf("sessions left: %q", got)
 	}
-	if left := bus.ReadAll(state); len(left) != 0 {
+	if left := bus.ReadAll(state, nil); len(left) != 0 {
 		t.Errorf("state files left: %v", left)
 	}
 }

@@ -3,6 +3,7 @@ package bus
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -45,9 +46,13 @@ func TestStateFiles(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "sessions", "junk.json"), []byte("not json"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	all := ReadAll(dir)
+	all := ReadAll(dir, nil)
 	if len(all) != 2 || !reflect.DeepEqual(all["p/1"], rec) || !reflect.DeepEqual(all["q/2"], other) {
 		t.Errorf("ReadAll = %+v", all)
+	}
+	skipQ := func(name string, info fs.FileInfo) bool { return name == "q/2" && info.Size() > 0 }
+	if got := ReadAll(dir, skipQ); len(got) != 1 || !reflect.DeepEqual(got["p/1"], rec) {
+		t.Errorf("ReadAll skipping q/2 = %+v", got)
 	}
 
 	if err := RemoveState(dir, "p/1"); err != nil {
@@ -56,7 +61,7 @@ func TestStateFiles(t *testing.T) {
 	if err := RemoveState(dir, "p/1"); err != nil {
 		t.Errorf("removing a missing file failed: %v", err)
 	}
-	if got := ReadAll(dir); len(got) != 1 {
+	if got := ReadAll(dir, nil); len(got) != 1 {
 		t.Errorf("after remove: %+v", got)
 	}
 }
