@@ -100,7 +100,7 @@ func TestHookIgnoresWhatIsNotASession(t *testing.T) {
 	t.Setenv("AGENTOS_SOCKET", "")
 	reportHook("Stop", strings.NewReader(`{}`), io.Discard)
 	time.Sleep(100 * time.Millisecond)
-	if len(bus.ReadAll(dir)) != 0 || len(received()) != 0 {
+	if len(bus.ReadAll(dir, nil)) != 0 || len(received()) != 0 {
 		t.Error("the hook reported for something that is not a session")
 	}
 }

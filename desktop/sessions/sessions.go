@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -107,9 +108,10 @@ type Sessions struct {
 	emit     func(event string, payload any)
 	warn     *warn.Warnings
 
-	createMu sync.Mutex // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
-	shellMu  sync.Mutex // one shell check-and-create at a time: two callers at once would both find no shell and start two
-	issueMu  sync.Mutex // one issue check-and-create at a time: two starts at once would both find no session and start two
+	createMu  sync.Mutex           // one creation, or one refresh of the list from tmux, at a time: a list read before a creation must not be applied after it
+	stateRead map[string]fileStamp // each state file as the last refresh read it, under createMu
+	shellMu   sync.Mutex           // one shell check-and-create at a time: two callers at once would both find no shell and start two
+	issueMu   sync.Mutex           // one issue check-and-create at a time: two starts at once would both find no session and start two
 
 	mu         sync.Mutex
 	ctx        context.Context
@@ -253,6 +255,7 @@ func newSessions(o Options) *Sessions {
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
 		held:       map[string]int64{},
+		stateRead:  map[string]fileStamp{},
 		prefillFor: prefillWait,
 		ctx:        context.Background(),
 	}
@@ -311,7 +314,11 @@ func (s *Sessions) Refresh() {
 		return
 	}
 	s.warn.Clear("tmux")
-	records := bus.ReadAll(s.stateDir)
+	stamps := map[string]fileStamp{}
+	records := bus.ReadAll(s.stateDir, func(name string, info fs.FileInfo) bool {
+		stamps[name] = stampOf(info)
+		return s.stateRead[name] == stamps[name]
+	})
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.info = infos
@@ -330,10 +337,37 @@ func (s *Sessions) Refresh() {
 		}
 	}
 	s.expireEnded(time.Now())
+	s.markRead(records, stamps, infos)
 	s.number()
 	s.loaded = true
 	s.sync()
 	s.synced = true
+}
+
+// fileStamp tells whether a file changed since it was read.
+type fileStamp struct {
+	mod  time.Time
+	size int64
+}
+
+func stampOf(info fs.FileInfo) fileStamp { return fileStamp{info.ModTime(), info.Size()} }
+
+// markRead keeps the stamps the state files had when they were read, so the next refresh reads a file again only once
+// it changes. A file of a session that is neither live nor ended yet, such as one still settling, is read each time.
+// It needs createMu and mu.
+func (s *Sessions) markRead(records map[string]session.Record, stamps map[string]fileStamp, infos []term.Info) {
+	for name := range records {
+		if s.ended[name] != nil || slices.ContainsFunc(infos, func(i term.Info) bool { return i.Name.String() == name }) {
+			s.stateRead[name] = stamps[name]
+		} else {
+			delete(s.stateRead, name)
+		}
+	}
+	for name := range s.stateRead {
+		if _, ok := stamps[name]; !ok {
+			delete(s.stateRead, name)
+		}
+	}
 }
 
 // revive takes back a session that tmux lists although it was marked ended. The saved

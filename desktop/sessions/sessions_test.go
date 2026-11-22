@@ -3,6 +3,7 @@ package sessions_test
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,8 @@ import (
 
 	"github.com/nednella/agentos/desktop/internal/apptest"
 	"github.com/nednella/agentos/desktop/sessions"
+	"github.com/nednella/agentos/internal/bus"
+	"github.com/nednella/agentos/internal/session"
 )
 
 func TestSessionLifecycle(t *testing.T) {
@@ -320,4 +323,47 @@ func TestProjectCountsFollowTheSessions(t *testing.T) {
 	})
 	h.Hook(t, a.ID, "SessionEnd", `{}`)
 	eventually(t, "an ended session to leave the counts", func() bool { return counts().Sessions == 1 })
+}
+
+func TestRefreshReadsAStateFileAgainOnlyOnceItChanges(t *testing.T) {
+	h := newHarness(t)
+	s, err := h.NewSession("work", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.Sessions().Refresh()
+	path := filepath.Join(h.State, "sessions", s.ID+".json")
+	at := time.Now().Truncate(time.Second)
+	write := func(detail string, at time.Time) {
+		t.Helper()
+		if err := bus.WriteState(h.State, session.Record{Session: s.ID, State: session.Working, Event: "PreToolUse", At: at, Detail: detail}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	detail := func() string { row, _ := h.Session(s.ID); return row.Detail }
+
+	write("first", at.Add(time.Second))
+	h.Sessions().Refresh()
+	if got := detail(); got != "first" {
+		t.Fatalf("detail after a changed file = %q, want first", got)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write("other", at.Add(2*time.Second)) // as long as the first, so only the time tells them apart
+	if err := os.Chtimes(path, info.ModTime(), info.ModTime()); err != nil {
+		t.Fatal(err)
+	}
+	h.Sessions().Refresh()
+	if got := detail(); got != "first" {
+		t.Errorf("detail after an unchanged file = %q: the file was read again", got)
+	}
+	if err := os.Chtimes(path, time.Now(), time.Now()); err != nil {
+		t.Fatal(err)
+	}
+	h.Sessions().Refresh()
+	if got := detail(); got != "other" {
+		t.Errorf("detail after the file changed = %q, want other", got)
+	}
 }

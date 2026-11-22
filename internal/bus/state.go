@@ -90,13 +90,21 @@ func RemoveState(dir, name string) error {
 	return nil
 }
 
-// ReadAll returns every saved record by session name. Unreadable files are skipped.
-func ReadAll(dir string) map[string]session.Record {
+// ReadAll returns every saved record by session name, but those skip says to leave unread. skip may be nil.
+// Unreadable files are skipped.
+func ReadAll(dir string, skip func(name string, info fs.FileInfo) bool) map[string]session.Record {
 	out := map[string]session.Record{}
 	root := filepath.Join(dir, "sessions")
 	_ = filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() || !strings.HasSuffix(path, ".json") {
 			return nil
+		}
+		if skip != nil {
+			rel, _ := filepath.Rel(root, path)
+			info, err := d.Info()
+			if err == nil && skip(strings.TrimSuffix(rel, ".json"), info) {
+				return nil
+			}
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
