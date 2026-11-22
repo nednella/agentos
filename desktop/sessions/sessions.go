@@ -4,12 +4,12 @@ package sessions
 import (
 	"cmp"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -136,8 +136,8 @@ type Sessions struct {
 	history    map[string][]session.Change
 	loaded     bool // the first refresh is in, so later changes may raise attention
 	synced     bool // the first refresh is synced, so a session seen from now on is a new one
-	lastSent   string
-	lastProjs  string
+	lastSent   []Session
+	lastProjs  []Project
 	lastIssues string
 	life       *Lifecycle
 	repoOf     func(dir string) string
@@ -770,13 +770,12 @@ func (s *Sessions) sync() {
 	s.holdAwake()
 
 	s.announceProjects()
-	s.announceIssues()
 	list := s.list()
-	b, err := json.Marshal(list)
-	if err != nil || string(b) == s.lastSent {
+	s.announceIssues(list)
+	if reflect.DeepEqual(list, s.lastSent) {
 		return
 	}
-	s.lastSent = string(b)
+	s.lastSent = list
 	s.emit("sessions", scoped.Of(key, list))
 	for _, a := range attention {
 		s.emit("attention", map[string]string{"id": a[0], "state": a[1]})
@@ -856,19 +855,18 @@ func (s *Sessions) holdAwake() {
 // announceProjects tells the front end when a project appears, goes, or its counts move. It needs mu.
 func (s *Sessions) announceProjects() {
 	views := s.projectViews()
-	b, err := json.Marshal(views)
-	if err != nil || string(b) == s.lastProjs {
+	if reflect.DeepEqual(views, s.lastProjs) {
 		return
 	}
-	s.lastProjs = string(b)
+	s.lastProjs = views
 	s.emit("projects", views)
 }
 
 // announceIssues asks for a fresh issues event when the sessions tied to issues change. It needs mu.
-func (s *Sessions) announceIssues() {
+func (s *Sessions) announceIssues(list []Session) {
 	var sig strings.Builder
 	sig.WriteString(s.project.Key())
-	for _, v := range s.list() {
+	for _, v := range list {
 		if v.Issue > 0 && v.State != session.Ended && !v.Chat {
 			fmt.Fprintf(&sig, " %d=%s", v.Issue, v.ID)
 		}
@@ -943,7 +941,7 @@ func (s *Sessions) list() []Session {
 			ID: id, N: ss.N, Title: cmp.Or(in.Title, defaultTitle),
 			State: ss.State, Detail: ss.Detail,
 			CreatedAt: in.Created.UnixMilli(), Issue: issue, Chat: in.Chat, Action: in.Action, Model: in.Model, Effort: in.Effort, Agent: in.Agent, Evidence: s.evidence.Count(id), Browser: s.browsers.Has(id),
-			History: slices.Clone(s.history[id]),
+			History: s.history[id], // shared, not copied: a change in a history is never written over
 		}
 		if !ss.At.IsZero() {
 			view.LastEventAt = ss.At.UnixMilli()
