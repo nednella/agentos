@@ -645,7 +645,7 @@ func (s *Sessions) followBranch(rec session.Record) {
 			continue
 		}
 		if switched := s.switched(rec, proj.Dir); moved || switched {
-			go s.life.learn(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop", switched)
+			s.life.learnInOrder(s.ctx, rec.Session, proj, rec.Cwd, rec.Event == "Stop", switched)
 		}
 		if rec.Event == "PostToolUse" {
 			go s.life.restatus(s.ctx, rec.Session, proj)
