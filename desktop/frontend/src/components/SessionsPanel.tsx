@@ -182,8 +182,8 @@ export function SessionsPanel() {
         data-animating={animating}
         style={{ width: sessionsOpen ? `${widths.sessions}rem` : 'var(--edge-strip-w)' }}
       >
-        <SessionsList panel={shellPanel} full={false} overlay={false} widthRem={widths.sessions} />
-        <EdgeStrip side="right" inShell />
+        {(sessionsOpen || animating) && <SessionsList panel={shellPanel} full={false} overlay={false} widthRem={widths.sessions} />}
+        {(!sessionsOpen || animating) && <EdgeStrip side="right" inShell />}
       </div>
       {sessionsPeek && (
         <>
