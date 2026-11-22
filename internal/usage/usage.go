@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -61,6 +62,16 @@ type Reader interface {
 	Read(path, model string) ([]Part, Current, error)
 	// After is the time of the latest message read.
 	After() time.Time
+	// Mark is where the reader stands, to start another reader from there.
+	Mark() Mark
+}
+
+// Mark is where a reader stands in a session's transcripts: the time of the latest message read, and how far each
+// file was read. A reader started from a mark counts what one started after the same time counts, and only skips
+// reading what lies before the offsets.
+type Mark struct {
+	After   time.Time        `json:"after"`
+	Offsets map[string]int64 `json:"offsets,omitempty"`
 }
 
 // Cursor reads a session's transcripts a little at a time. Claude Code writes each API response
@@ -73,14 +84,17 @@ type Cursor struct {
 	currentAt time.Time
 }
 
-// NewCursor counts only the messages written after the time given: the ones before were counted
+// NewCursor counts only the messages written after the mark's time: the ones before were counted
 // by an earlier run of the app or belong to an earlier session of a resumed conversation.
-func NewCursor(after time.Time) *Cursor {
-	return &Cursor{after: after, tail: newTail(), seen: map[string]bool{}}
+func NewCursor(m Mark) *Cursor {
+	return &Cursor{after: m.After, tail: newTail(m.Offsets), seen: map[string]bool{}}
 }
 
 // After is the time of the latest message read.
 func (c *Cursor) After() time.Time { return c.after }
+
+// Mark is where the cursor stands.
+func (c *Cursor) Mark() Mark { return c.tail.mark(c.after) }
 
 // Read counts what was written since the last read to the transcript at path and to the transcripts
 // of its subagents, which Claude Code keeps in <session id>/subagents beside it. It returns one part
@@ -156,13 +170,35 @@ type apiUsage struct {
 }
 
 // tail reads a set of files a little at a time: each read gives the whole lines added since the last one.
-type tail struct{ offsets map[string]int64 }
+type tail struct {
+	offsets map[string]int64
+	read    map[string]bool // the files read by this tail, not only started from an offset
+}
 
-func newTail() tail { return tail{offsets: map[string]int64{}} }
+// newTail starts each file at its offset in offsets, which it copies.
+func newTail(offsets map[string]int64) tail {
+	t := tail{offsets: map[string]int64{}, read: map[string]bool{}}
+	maps.Copy(t.offsets, offsets)
+	return t
+}
 
-// lines gives each whole line added to file since the last read, and whether the file was read before. A
-// line still being written is left for the next read. A file that is not there yet has nothing to give.
+func (t tail) mark(after time.Time) Mark { return Mark{After: after, Offsets: maps.Clone(t.offsets)} }
+
+// lines gives each whole line added to file since the last read, and whether the file was read before. A file
+// started from an offset was not: its lines are still counted by their time. A line still being written is left
+// for the next read. A file that is not there yet has nothing to give.
 func (t tail) lines(file string, each func(b []byte, known bool)) error {
+	start := t.offsets[file]
+	info, err := os.Stat(file)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if info.Size() == start {
+		return nil
+	}
 	f, err := os.Open(file)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil
@@ -171,8 +207,8 @@ func (t tail) lines(file string, each func(b []byte, known bool)) error {
 		return err
 	}
 	defer f.Close()
-	start, known := t.offsets[file]
-	if info, err := f.Stat(); err == nil && info.Size() < start {
+	known := t.read[file]
+	if info.Size() < start {
 		start = 0 // the file was replaced
 	}
 	if _, err := f.Seek(start, io.SeekStart); err != nil {
@@ -188,6 +224,7 @@ func (t tail) lines(file string, each func(b []byte, known bool)) error {
 		each(b, known)
 	}
 	t.offsets[file] = start
+	t.read[file] = true
 	return nil
 }
 
