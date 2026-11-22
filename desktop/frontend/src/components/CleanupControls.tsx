@@ -14,7 +14,7 @@ function tail(path: string): string {
 }
 
 export function CleanupControls({ session }: CleanupControlsProps) {
-  const { cleanupSession, report } = useAgentos()
+  const { cleanupSession, report } = useAgentos('cleanupSession', 'report')
   const remove = useArmedConfirm()
   const [kept, setKept] = useState(() => readStored<string[]>(KEPT_KEY, []).includes(session.id))
   const { cleanup, cleanupReason, worktree, branch } = session

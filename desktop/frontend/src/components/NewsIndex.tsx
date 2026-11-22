@@ -26,7 +26,16 @@ export function NewsIndex() {
     digestUnseenCount,
     project,
     focusRequest,
-  } = useAgentos();
+  } = useAgentos(
+    "news",
+    "newsSeen",
+    "newsUnseen",
+    "digest",
+    "digestSeen",
+    "digestUnseenCount",
+    "project",
+    "focusRequest",
+  );
   const { closeCentre, openNews } = useLayout();
   const lastRun = useClock((now) =>
     digest && digest.lastRunAt > 0

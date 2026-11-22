@@ -19,7 +19,7 @@ type OverlayProps = {
 }
 
 export function Overlay({ label, align, size = 'default', onClose, children }: OverlayProps) {
-  const { focus } = useAgentos()
+  const { focus } = useAgentos('focus')
   const previous = useRef(document.activeElement)
   const dialog = useRef<HTMLDivElement>(null)
 

@@ -16,7 +16,7 @@ type EvidenceViewerProps = {
 }
 
 export function EvidenceViewer({ sessionId, items, startId, onClose }: EvidenceViewerProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const root = useRef<HTMLDivElement>(null)
   const [id, setId] = useState(startId)
   const confirm = useArmedConfirm()

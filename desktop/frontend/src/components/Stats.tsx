@@ -22,7 +22,7 @@ const WORK_RANGE_KEY = 'agentos.statsWorkDays'
 const PROJECT_KEY = 'agentos.statsProject'
 
 export function Stats() {
-  const { focusRequest, projects } = useAgentos()
+  const { focusRequest, projects } = useAgentos('focusRequest', 'projects')
   const { closeCentre } = useLayout()
   const [tab, setTab] = useState<Tab>(() => readStored(TAB_KEY, 'work'))
   const [days, setDays] = useState(() => readStored(RANGE_KEY, 7))

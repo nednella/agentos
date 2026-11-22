@@ -9,7 +9,7 @@ type DataDirRowProps = { dir: string; fixed: boolean }
 type Busy = '' | 'copying' | 'relaunching'
 
 export function DataDirRow({ dir, fixed }: DataDirRowProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const [choice, setChoice] = useState<DataDirChoice | null>(null)
   const [busy, setBusy] = useState<Busy>('')
   const [target, setTarget] = useState('')

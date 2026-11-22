@@ -5,7 +5,7 @@ import type { DigestItem } from '../types'
 type DigestItemRowProps = { item: DigestItem }
 
 export function DigestItemRow({ item }: DigestItemRowProps) {
-  const { digestToNote, dismissDigestItem, report } = useAgentos()
+  const { digestToNote, dismissDigestItem, report } = useAgentos('digestToNote', 'dismissDigestItem', 'report')
   const saved = item.noteId !== ''
 
   return (

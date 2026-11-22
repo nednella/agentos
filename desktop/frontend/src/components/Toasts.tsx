@@ -17,7 +17,7 @@ const EDGE: Record<Toast['tone'], string> = {
 const ACTION_LABEL: Partial<Record<string, string>> = { replied: 'Open', opened: 'Open', evidence: 'View' }
 
 export function Toasts() {
-  const { toasts, select, dismissToast, setSessionView } = useAgentos()
+  const { toasts, select, dismissToast, setSessionView } = useAgentos('toasts', 'select', 'dismissToast', 'setSessionView')
   return (
     <div
       className="pointer-events-none fixed inset-x-0 bottom-12 flex flex-col items-center gap-2"

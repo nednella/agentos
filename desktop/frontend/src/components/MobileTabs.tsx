@@ -25,7 +25,7 @@ function Tab({ panel, label, badge, urgent }: TabProps) {
 }
 
 export function MobileTabs() {
-  const { sessions, selectedId, issues, notes } = useAgentos()
+  const { sessions, selectedId, issues, notes } = useAgentos('sessions', 'selectedId', 'issues', 'notes')
   const selected = sessions.find((s) => s.id === selectedId)
   const needsYou = sessions.some((s) => s.state === 'waiting')
   return (

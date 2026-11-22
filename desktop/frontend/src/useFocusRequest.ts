@@ -6,7 +6,7 @@ import type { FocusTarget } from './AgentosContext'
 // Acts once on each focus request for `target`, while `ready`. A request made before the
 // component mounted still counts, so a panel that opens because of it can take the focus.
 export function useFocusRequest(target: FocusTarget, focusOn: RefObject<HTMLElement> | (() => void), ready = true) {
-  const { focusRequest } = useAgentos()
+  const { focusRequest } = useAgentos('focusRequest')
   const handled = useRef(-1)
 
   useEffect(() => {

@@ -5,7 +5,7 @@ import { useMinimumLoading } from './useMinimumLoading'
 
 // The app says it is offline when its GitHub and git calls get no answer, and online at the next answer.
 export function useNetwork() {
-  const { refreshIssues, refreshPRs } = useAgentos()
+  const { refreshIssues, refreshPRs } = useAgentos('refreshIssues', 'refreshPRs')
   const [online, setOnline] = useState(navigator.onLine)
   const [retrying, setRetrying] = useState(false)
 

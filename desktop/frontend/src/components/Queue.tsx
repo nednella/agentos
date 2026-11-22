@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { api } from '../api'
 import { filterIssues, isFiltering } from '../issueFilter'
 import type { Issue } from '../types'
@@ -27,27 +27,29 @@ const itemKey = (item: Item) => (item.kind === 'section' ? `section:${item.name}
 type QueueProps = { nav: NavRef }
 
 export function Queue({ nav }: QueueProps) {
-  const { project } = useAgentos()
+  const offersSetup = useAgentosSelector((a) => Boolean(a.project?.needsSetup && !a.project.setupDismissed))
   return (
     <>
-      {project?.needsSetup && !project.setupDismissed && <SetupOffer />}
+      {offersSetup && <SetupOffer />}
       <QueueBody nav={nav} />
     </>
   )
 }
 
 function QueueBody({ nav }: QueueProps) {
-  const { project, issues, issuesDisabled, issueFilter, report } = useAgentos()
-  if (project && !project.repo) {
-    return <Notice title="No repo linked" hint={`${project.name} has no GitHub repo, so it has no queue.`} centered />
+  const { issues, issuesDisabled, issueFilter, report } = useAgentos('issues', 'issuesDisabled', 'issueFilter', 'report')
+  const projectName = useAgentosSelector((a) => a.project?.name)
+  const repo = useAgentosSelector((a) => a.project?.repo ?? '')
+  if (projectName !== undefined && !repo) {
+    return <Notice title="No repo linked" hint={`${projectName} has no GitHub repo, so it has no queue.`} centered />
   }
-  if (project && issuesDisabled) {
-    const repo = (
-      <button className="link" onClick={() => report(() => api.openURL(`https://github.com/${project.repo}`))}>
-        {project.repo}
+  if (projectName !== undefined && issuesDisabled) {
+    const link = (
+      <button className="link" onClick={() => report(() => api.openURL(`https://github.com/${repo}`))}>
+        {repo}
       </button>
     )
-    return <Notice title="Issues are disabled" hint={<>{repo} has issues disabled, enable them to use the queue feature</>} centered />
+    return <Notice title="Issues are disabled" hint={<>{link} has issues disabled, enable them to use the queue feature</>} centered />
   }
   const filtering = isFiltering(issueFilter)
   const shown = filtering ? filterIssues(issues, issueFilter) : issues
@@ -63,7 +65,7 @@ function QueueBody({ nav }: QueueProps) {
 type QueueListProps = { nav: NavRef; shown: Issue[]; filtering: boolean }
 
 function QueueList({ nav, shown: coreShown, filtering }: QueueListProps) {
-  const { issues: coreIssues, issuesLoading, setOverlay } = useAgentos()
+  const { issues: coreIssues, issuesLoading, setOverlay } = useAgentos('issues', 'issuesLoading', 'setOverlay')
   const drag = useIssueDrag(coreIssues)
   const issues = drag.place(coreIssues)
   const shown = drag.place(coreShown)

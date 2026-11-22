@@ -7,7 +7,7 @@ import { BrowserStatus } from './BrowserStatus'
 type BrowserTabProps = { session: Session }
 
 export function BrowserTab({ session }: BrowserTabProps) {
-  const { browserStates, loadBrowserState } = useAgentos()
+  const { browserStates, loadBrowserState } = useAgentos('browserStates', 'loadBrowserState')
   const state = browserStates[session.id]
   const known = Boolean(state)
 

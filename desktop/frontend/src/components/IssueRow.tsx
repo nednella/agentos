@@ -1,4 +1,4 @@
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { api } from '../api'
 import type { Issue } from '../types'
@@ -13,10 +13,10 @@ import { TypeMark } from './TypeMark'
 type IssueRowProps = { issue: Issue; cursor: boolean; drag: IssueDrag; onOpen(): void }
 
 export function IssueRow({ issue, cursor, drag, onOpen }: IssueRowProps) {
-  const { sessions, settings, overlay, select, startIssue, setOverlay, report } = useAgentos()
+  const { settings, overlay, select, startIssue, setOverlay, report } = useAgentos('settings', 'overlay', 'select', 'startIssue', 'setOverlay', 'report')
   const { mode } = useLayout()
-  const session = sessions.find((s) => s.id === issue.sessionId)
-  const chat = sessions.find((s) => s.chat && s.issue === issue.number)
+  const session = useAgentosSelector((a) => a.sessions.find((s) => s.id === issue.sessionId))
+  const chat = useAgentosSelector((a) => a.sessions.find((s) => s.chat && s.issue === issue.number))
   const dense = mode === 'compact'
   const labelled = (key: string) => issue.labels.find((l) => l.startsWith(`${key}:`))?.slice(key.length + 1) ?? ''
   const agent = labelled('agent')

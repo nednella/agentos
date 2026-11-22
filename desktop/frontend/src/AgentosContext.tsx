@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { ISSUES_DISABLED, api, devFlags, errorMessage, on } from './api'
 import { readStored, writeStored } from './storage'
@@ -24,7 +24,7 @@ export type FocusTarget = 'terminal' | 'shell' | 'sidebar' | 'sessions' | 'queue
 export type Composing = 'session' | 'chat' | null
 export type PendingImage = { base64: string; mime: string }
 
-export type Agentos = {
+type AgentosState = {
   project: Project | null
   projects: Project[]
   sessions: Session[]
@@ -59,6 +59,11 @@ export type Agentos = {
   update: string
   updating: boolean
   patchNotes: Release[]
+  viewOf(id: string | null): SessionView
+}
+
+// The actions keep their identity for the app's whole life, so picking one never renders a component again.
+type AgentosActions = {
   openShell(): Promise<void>
   newShell(): Promise<void>
   closeShell(id: string): Promise<void>
@@ -89,7 +94,6 @@ export type Agentos = {
   removeNoteImage(id: string, url: string): Promise<void>
   deleteNote(id: string): Promise<void>
   refreshPRs(): Promise<void>
-  viewOf(id: string | null): SessionView
   loadBrowserState(id: string): Promise<void>
   setSessionView(id: string, view: SessionView): void
   cycleSessionView(delta: -1 | 1): void
@@ -127,12 +131,60 @@ export type Agentos = {
   dismissToast(key: number): void
 }
 
-const AgentosContext = createContext<Agentos | null>(null)
+export type Agentos = AgentosState & AgentosActions
 
-export function useAgentos(): Agentos {
-  const value = useContext(AgentosContext)
-  if (!value) throw new Error('useAgentos must be used inside AgentosProvider')
-  return value
+type Store = { get(): Agentos; set(value: Agentos): void; subscribe(listener: () => void): () => void }
+
+function createStore(initial: Agentos): Store {
+  let value = initial
+  const listeners = new Set<() => void>()
+  return {
+    get: () => value,
+    set(next) {
+      if (next === value) return
+      value = next
+      listeners.forEach((listener) => listener())
+    },
+    subscribe(listener) {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+}
+
+const AgentosContext = createContext<Store | null>(null)
+
+function useStore(): Store {
+  const store = useContext(AgentosContext)
+  if (!store) throw new Error('useAgentos must be used inside AgentosProvider')
+  return store
+}
+
+// A component renders again only when one of the keys it names changes; naming none takes them all.
+export function useAgentos(): Agentos
+export function useAgentos<K extends keyof Agentos>(...keys: K[]): Pick<Agentos, K>
+export function useAgentos<K extends keyof Agentos>(...keys: K[]): Agentos | Pick<Agentos, K> {
+  const store = useStore()
+  const picked = useRef<Pick<Agentos, K> | null>(null)
+  return useSyncExternalStore(store.subscribe, () => {
+    const value = store.get()
+    if (keys.length === 0) return value
+    const last = picked.current
+    if (last && keys.every((key) => Object.is(last[key], value[key]))) return last
+    picked.current = Object.fromEntries(keys.map((key) => [key, value[key]])) as Pick<Agentos, K>
+    return picked.current
+  })
+}
+
+// `select` must return a value the state holds, or a primitive: a new object on each call renders forever.
+export function useAgentosSelector<T>(select: (a: Agentos) => T): T {
+  const store = useStore()
+  return useSyncExternalStore(store.subscribe, () => select(store.get()))
+}
+
+// For handlers that need the state at the moment they run, without rendering on each change.
+export function useLatestAgentos(): () => Agentos {
+  return useStore().get
 }
 
 const cleanupToast = (entry: Cleanup): Omit<Toast, 'key'> => {
@@ -151,6 +203,19 @@ const NEWS_SEEN_KEY = 'agentos.newsSeen'
 const NEWS_UNREAD_KEY = 'agentos.newsUnread'
 
 const filterKey = (project: string) => `agentos.filter.${project}`
+
+const sameJSON = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+
+// Keeps each item of prev that next holds unchanged, and prev itself when nothing changed, so the rows
+// and memos built on an item render again only when that item changed.
+function keepUnchanged<T>(prev: T[], next: T[], keyOf: (item: T) => string | number): T[] {
+  const byKey = new Map(prev.map((item) => [keyOf(item), item]))
+  const kept = next.map((item) => {
+    const old = byKey.get(keyOf(item))
+    return old !== undefined && sameJSON(old, item) ? old : item
+  })
+  return kept.length === prev.length && kept.every((item, i) => item === prev[i]) ? prev : kept
+}
 
 type AgentosProviderProps = { children: ReactNode }
 
@@ -201,8 +266,17 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   const warningToasts = useRef(new Map<Warning['source'], { message: string; key: number }>())
   const failedBrowserIds = useRef(new Set<string>())
   const detached = useRef(false)
+  const shellIdsRef = useRef(shellIds)
+  const notesRef = useRef(notes)
+  const browserStatesRef = useRef(browserStates)
+  const viewsRef = useRef(views)
+  const issuesRef = useRef<Issue[]>([])
   sessionsRef.current = sessions
   projectRef.current = project
+  shellIdsRef.current = shellIds
+  notesRef.current = notes
+  browserStatesRef.current = browserStates
+  viewsRef.current = views
 
   const selectId = useCallback((id: string | null) => {
     selectedRef.current = id
@@ -256,7 +330,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
 
   const applySessions = useCallback(
     (list: Session[]) => {
-      setSessions(list)
+      setSessions((prev) => keepUnchanged(prev, list, (s) => s.id))
       const current = selectedRef.current
       if (detached.current || (current && list.some((s) => s.id === current))) return
       const remembered = list.find((s) => s.id === lastSelected.current.get(projectRef.current?.name ?? ''))
@@ -433,8 +507,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
   useEffect(
     () =>
       on('projects', (list) => {
-        setProjects(list)
-        setProject((p) => list.find((x) => x.name === p?.name) ?? p)
+        setProjects((prev) => keepUnchanged(prev, list, (p) => p.name))
+        setProject((p) => {
+          const next = list.find((x) => x.name === p?.name)
+          return next && !sameJSON(next, p) ? next : p
+        })
       }),
     [],
   )
@@ -504,10 +581,11 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
 
   useEffect(() => writeStored(NEWS_UNREAD_KEY, newsUnread), [newsUnread])
 
-  const issues = useMemo(
-    () => rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => !s.chat && s.issue === issue.number)?.id ?? '' })),
-    [rawIssues, sessions],
-  )
+  const issues = useMemo(() => {
+    const next = rawIssues.map((issue) => ({ ...issue, sessionId: sessions.find((s) => !s.chat && s.issue === issue.number)?.id ?? '' }))
+    issuesRef.current = keepUnchanged(issuesRef.current, next, (issue) => issue.number)
+    return issuesRef.current
+  }, [rawIssues, sessions])
 
   const addSession = useCallback(
     (created: Session, background = false) => {
@@ -521,42 +599,10 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
     [selectId, focus],
   )
 
-  const value = useMemo<Agentos>(
+  const viewOf = useCallback((id: string | null) => (id && views[id]) || 'terminal', [views])
+
+  const actions = useMemo<AgentosActions>(
     () => ({
-      project,
-      projects,
-      sessions,
-      selectedId,
-      issues,
-      issuesLoading,
-      issuesDisabled,
-      issueFilter,
-      notes,
-      cleanups,
-      evidence,
-      browserStates,
-      digest,
-      digestSeen,
-      digestUnseenCount,
-      news,
-      newsSeen,
-      newsUnseen,
-      newsUnread,
-      awake,
-      memory,
-      settings,
-      toasts,
-      overlay,
-      sidebarTab,
-      noteDraft,
-      composing,
-      focusRequest,
-      shellIds,
-      shellId,
-      version,
-      update,
-      updating,
-      patchNotes,
       async applyUpdate() {
         setUpdating(true)
         try {
@@ -567,7 +613,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         }
       },
       async openShell() {
-        if (shellIds.length) return
+        if (shellIdsRef.current.length) return
         const shell = await api.shellOpen()
         setShellIds([shell.id])
       },
@@ -663,7 +709,6 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
         setProjects(snap.projects)
       },
       refreshIssues: () => loadIssues(true),
-      viewOf: (id) => (id && views[id]) || 'terminal',
       loadBrowserState,
       setSessionView(id, view) {
         setViews((map) => ({ ...map, [id]: view }))
@@ -672,14 +717,14 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       cycleSessionView(delta) {
         const id = selectedRef.current
         if (!id) return
-        const at = SESSION_VIEWS.indexOf(views[id] ?? 'terminal')
+        const at = SESSION_VIEWS.indexOf(viewsRef.current[id] ?? 'terminal')
         const next = SESSION_VIEWS[(at + delta + SESSION_VIEWS.length) % SESSION_VIEWS.length]
         setViews((map) => ({ ...map, [id]: next }))
         if (next === 'terminal') focus('terminal')
       },
       async openBrowser(id, url) {
         setViews((map) => ({ ...map, [id]: 'browser' }))
-        const state = browserStates[id] ?? (await api.browserState(id))
+        const state = browserStatesRef.current[id] ?? (await api.browserState(id))
         if (!state.open) {
           const opened = await api.browserOpen(id, url ?? '')
           setBrowserStates((map) => ({ ...map, [id]: opened }))
@@ -712,7 +757,7 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       },
       async updateNote(id, text) {
         const trimmed = text.trim()
-        if (!trimmed && !notes.find((n) => n.id === id)?.images.length) throw 'A note cannot be empty'
+        if (!trimmed && !notesRef.current.find((n) => n.id === id)?.images.length) throw 'A note cannot be empty'
         const note = await api.updateNote(id, trimmed)
         setNotes((list) => list.map((n) => (n.id === id ? note : n)))
       },
@@ -805,8 +850,53 @@ export function AgentosProvider({ children }: AgentosProviderProps) {
       pushToast,
       dismissToast,
     }),
-    [project, projects, sessions, selectedId, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, markDigestSeen, markNewsSeen, markNewsRead, awake, memory, settings, views, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, focus, report, pushToast, dismissToast],
+    [selectId, detach, addSession, applySessions, enterProject, enterFrom, createRepo, loadIssues, loadBrowserState, markDigestSeen, markNewsSeen, markNewsRead, focus, report, pushToast, dismissToast],
   )
 
-  return <AgentosContext.Provider value={value}>{children}</AgentosContext.Provider>
+  const value = useMemo<Agentos>(
+    () => ({
+      project,
+      projects,
+      sessions,
+      selectedId,
+      issues,
+      issuesLoading,
+      issuesDisabled,
+      issueFilter,
+      notes,
+      cleanups,
+      evidence,
+      browserStates,
+      digest,
+      digestSeen,
+      digestUnseenCount,
+      news,
+      newsSeen,
+      newsUnseen,
+      newsUnread,
+      awake,
+      memory,
+      settings,
+      toasts,
+      overlay,
+      sidebarTab,
+      noteDraft,
+      composing,
+      focusRequest,
+      shellIds,
+      shellId,
+      version,
+      update,
+      updating,
+      patchNotes,
+      viewOf,
+      ...actions,
+    }),
+    [project, projects, sessions, selectedId, issues, issuesLoading, issuesDisabled, issueFilter, notes, cleanups, evidence, browserStates, digest, digestSeen, digestUnseenCount, news, newsSeen, newsUnseen, newsUnread, awake, memory, settings, toasts, overlay, sidebarTab, noteDraft, composing, focusRequest, shellIds, shellId, version, update, updating, patchNotes, viewOf, actions],
+  )
+
+  const [store] = useState(() => createStore(value))
+  useLayoutEffect(() => store.set(value), [store, value])
+
+  return <AgentosContext.Provider value={store}>{children}</AgentosContext.Provider>
 }

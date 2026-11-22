@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 type BrowserStatusHeaderProps = { id: string; state: BrowserState }
 
 export function BrowserStatusHeader({ id, state }: BrowserStatusHeaderProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
 
   return (
     <header className="flex flex-none flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface px-4 py-3">

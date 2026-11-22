@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 type QueueSearchProps = { shown: number | null }
 
 export function QueueSearch({ shown }: QueueSearchProps) {
-  const { issues, issuesLoading, issueFilter, setIssueFilter, focusRequest, refreshIssues, report } = useAgentos()
+  const { issues, issuesLoading, issueFilter, setIssueFilter, focusRequest, refreshIssues, report } = useAgentos('issues', 'issuesLoading', 'issueFilter', 'setIssueFilter', 'focusRequest', 'refreshIssues', 'report')
   const { returnToTerminal } = useLayout()
   const input = useRef<HTMLInputElement>(null)
   const [cursor, setCursor] = useState(0)

@@ -29,7 +29,14 @@ function groupByDay(
 
 export function DigestView() {
   const { digest, runDigest, markDigestSeen, report, focusRequest, project } =
-    useAgentos();
+    useAgentos(
+      "digest",
+      "runDigest",
+      "markDigestSeen",
+      "report",
+      "focusRequest",
+      "project",
+    );
   const lastRun = useClock((now) =>
     digest && digest.lastRunAt > 0 ? ago(digest.lastRunAt, now) : "never run",
   );

@@ -6,7 +6,7 @@ type BrowserRecentCapturesProps = { session: Session }
 const SHOWN = 3
 
 export function BrowserRecentCaptures({ session }: BrowserRecentCapturesProps) {
-  const { evidence, setSessionView } = useAgentos()
+  const { evidence, setSessionView } = useAgentos('evidence', 'setSessionView')
   const recent = (evidence[session.id] ?? [])
     .filter((item) => item.kind === 'image')
     .sort((a, b) => b.at - a.at)

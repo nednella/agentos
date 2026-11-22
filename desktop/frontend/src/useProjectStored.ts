@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { useAgentos } from './AgentosContext'
+import { useAgentosSelector } from './AgentosContext'
 import { readStored, writeStored } from './storage'
 
 export function useProjectStored<T>(name: string, fallback: T): [T, (value: T) => void] {
-  const { project } = useAgentos()
-  const key = `agentos.${name}.${project?.name ?? ''}`
+  const projectName = useAgentosSelector((a) => a.project?.name ?? '')
+  const key = `agentos.${name}.${projectName}`
   const [stored, setStored] = useState(() => ({ key, value: readStored(key, fallback) }))
 
   let current = stored

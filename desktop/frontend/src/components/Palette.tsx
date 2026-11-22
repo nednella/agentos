@@ -2,7 +2,7 @@ import { useAgentos } from '../AgentosContext'
 import { PaletteDialog } from './PaletteDialog'
 
 export function Palette() {
-  const { overlay } = useAgentos()
+  const { overlay } = useAgentos('overlay')
   if (overlay !== 'palette') return null
   return <PaletteDialog />
 }

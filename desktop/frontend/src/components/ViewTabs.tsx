@@ -5,7 +5,7 @@ import type { Session } from '../types'
 type ViewTabsProps = { session: Session; view: SessionView }
 
 export function ViewTabs({ session, view }: ViewTabsProps) {
-  const { setSessionView, browserStates } = useAgentos()
+  const { setSessionView, browserStates } = useAgentos('setSessionView', 'browserStates')
   const browserOpen = browserStates[session.id]?.open ?? session.browser
   const tabs: { id: SessionView; label: string; count?: number; live?: boolean }[] = [
     { id: 'terminal', label: 'Terminal' },

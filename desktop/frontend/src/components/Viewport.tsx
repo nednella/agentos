@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { useFocusRequest } from '../useFocusRequest'
 import { BrowserTab } from './BrowserTab'
 import { EmptyState } from './EmptyState'
@@ -10,9 +10,9 @@ import { ViewportActions } from './ViewportActions'
 import { ViewportHeader } from './ViewportHeader'
 
 export function Viewport() {
-  const { sessions, selectedId, viewOf } = useAgentos()
+  const { selectedId, viewOf } = useAgentos('selectedId', 'viewOf')
+  const selected = useAgentosSelector((a) => a.sessions.find((s) => s.id === a.selectedId))
   const panel = useRef<HTMLElement>(null)
-  const selected = sessions.find((s) => s.id === selectedId)
   const view = viewOf(selectedId)
 
   useFocusRequest('terminal', panel, !selected || view !== 'terminal')

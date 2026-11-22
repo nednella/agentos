@@ -6,7 +6,7 @@ type NoteTextProps = { text: string }
 const INLINE = /(`[^`\n]+`)|(https?:\/\/[^\s)]+)/g
 
 export function NoteText({ text }: NoteTextProps) {
-  const { report } = useAgentos()
+  const { report } = useAgentos('report')
   const parts: React.ReactNode[] = []
   let last = 0
   for (const match of text.matchAll(INLINE)) {

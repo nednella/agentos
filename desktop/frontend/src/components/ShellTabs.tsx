@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { useLayout } from '../LayoutContext'
 import { Icon } from './Icon'
 import { ShellTab, tabRowButton } from './ShellTab'
 
 export function ShellTabs() {
-  const { project, shellIds, shellId, selectShell, newShell, closeShell, report } = useAgentos()
+  const { shellIds, shellId, selectShell, newShell, closeShell, report } = useAgentos('shellIds', 'shellId', 'selectShell', 'newShell', 'closeShell', 'report')
+  const projectName = useAgentosSelector((a) => a.project?.name ?? '')
   const { mode, shellOpen, setShellOpen, focusPanel } = useLayout()
   const scroller = useRef<HTMLDivElement>(null)
   const [view, setView] = useState({ start: 0, end: 1 })
@@ -56,7 +57,7 @@ export function ShellTabs() {
       }}
     >
       <div role="tablist" aria-label="Shells" className="flex min-w-0 items-stretch">
-        <ShellTab label={project?.name ?? ''} pinned selected={shellId === projectShell} onSelect={() => pick(projectShell)} />
+        <ShellTab label={projectName} pinned selected={shellId === projectShell} onSelect={() => pick(projectShell)} />
         <div className="relative flex min-w-0">
           <div
             ref={scroller}

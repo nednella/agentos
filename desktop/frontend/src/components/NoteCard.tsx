@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useAgentos } from '../AgentosContext'
+import { useAgentos, useAgentosSelector } from '../AgentosContext'
 import { imageFiles, readImage } from '../images'
 import { useArmedConfirm } from '../useArmedConfirm'
 import type { Note } from '../types'
@@ -25,7 +25,7 @@ const FOLD_LINES = 10
 const AUTOSAVE_MS = 700
 
 export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenImage }: NoteCardProps) {
-  const a = useAgentos()
+  const a = useAgentos('report', 'updateNote', 'setNotePinned', 'setNoteArchived', 'addNoteImage', 'removeNoteImage', 'deleteNote', 'noteToIssue', 'noteToSession')
   const confirm = useArmedConfirm<Confirm>()
   const [expanded, setExpanded] = useState(false)
   const [overflowing, setOverflowing] = useState(false)
@@ -34,7 +34,8 @@ export function NoteCard({ note, cursor, editing, onEdit, onStopEditing, onOpenI
   const cancelled = useRef(false)
   const finishing = useRef(false)
   const title = note.text.split('\n')[0]
-  const canFile = Boolean(a.project?.repo) && note.text.trim() !== ''
+  const hasRepo = useAgentosSelector((state) => Boolean(state.project?.repo))
+  const canFile = hasRepo && note.text.trim() !== ''
 
   useLayoutEffect(() => {
     const el = body.current

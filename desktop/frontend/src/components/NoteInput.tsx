@@ -8,7 +8,7 @@ import { Keycap } from './Keycap'
 import { NoteImages } from './NoteImages'
 
 export function NoteInput() {
-  const { addNote, report, focusRequest, noteDraft, setNoteDraft } = useAgentos()
+  const { addNote, report, focusRequest, noteDraft, setNoteDraft } = useAgentos('addNote', 'report', 'focusRequest', 'noteDraft', 'setNoteDraft')
   const { returnToTerminal } = useLayout()
   const input = useRef<HTMLTextAreaElement>(null)
   const [images, setImages] = useState<PreviewImage[]>([])

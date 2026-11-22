@@ -8,13 +8,13 @@ import { Keycap } from './Keycap'
 import { Overlay } from './Overlay'
 
 export function ProjectPanel() {
-  const { overlay } = useAgentos()
+  const { overlay } = useAgentos('overlay')
   if (overlay !== 'projects') return null
   return <ProjectPanelContent />
 }
 
 function ProjectPanelContent() {
-  const { project, projects, switchProject, addProject, newProject, removeProject, setOverlay, report } = useAgentos()
+  const { project, projects, switchProject, addProject, newProject, removeProject, setOverlay, report } = useAgentos('project', 'projects', 'switchProject', 'addProject', 'newProject', 'removeProject', 'setOverlay', 'report')
   const [query, setQuery] = useState('')
   const [cursor, setCursor] = useState(Math.max(0, projects.findIndex((p) => p.name === project?.name)))
   const [naming, setNaming] = useState(false)

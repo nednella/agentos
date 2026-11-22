@@ -7,7 +7,7 @@ import { Masthead } from './Masthead'
 const card = 'flex flex-1 flex-col items-start gap-2 rounded-md border border-line bg-raised p-4 text-left hover:bg-hover'
 
 export function EmptyState() {
-  const { report, newSession, newChat, issues } = useAgentos()
+  const { report, newSession, newChat, issues } = useAgentos('report', 'newSession', 'newChat', 'issues')
   const { showSidebarTab } = useLayout()
   return (
     <div className="grid h-full place-items-center px-6">

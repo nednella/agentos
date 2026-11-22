@@ -6,7 +6,7 @@ import { StateDot } from './StateDot'
 type EdgeStripProps = { side: 'left' | 'right'; inShell?: boolean }
 
 export function EdgeStrip({ side, inShell = false }: EdgeStripProps) {
-  const { sessions, selectedId, select, issues, notes } = useAgentos()
+  const { sessions, selectedId, select, issues, notes } = useAgentos('sessions', 'selectedId', 'select', 'issues', 'notes')
   const { setSidebarOpen, setSessionsOpen, showSidebarTab } = useLayout()
   const left = side === 'left'
 

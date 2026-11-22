@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react'
-import { useAgentos } from '../AgentosContext'
-import { useActions, formatShortcut } from '../actions'
+import { useAgentos, useLatestAgentos } from '../AgentosContext'
+import { actionsFor, formatShortcut } from '../actions'
 import { useLayout } from '../LayoutContext'
 import type { State } from '../types'
 import { useFullscreen } from '../useFullscreen'
@@ -29,15 +29,16 @@ function Count({ state, count, label }: CountProps) {
 }
 
 export function TopBar() {
-  const { project, projects, sessions, setOverlay, digestUnseenCount, newsUnseen, report, update, updating, applyUpdate } = useAgentos()
-  const { width, statsOpen, newsOpen } = useLayout()
-  const actions = useActions()
+  const { project, projects, sessions, setOverlay, digestUnseenCount, newsUnseen, report, update, updating, applyUpdate } = useAgentos('project', 'projects', 'sessions', 'setOverlay', 'digestUnseenCount', 'newsUnseen', 'report', 'update', 'updating', 'applyUpdate')
+  const layout = useLayout()
+  const { width, statsOpen, newsOpen } = layout
+  const latestAgentos = useLatestAgentos()
   const fullscreen = useFullscreen()
   const count = (state: State) => sessions.filter((s) => s.state === state).length
   const waiting = count('waiting')
   const idle = count('idle')
   const othersNeedYou = projects.some((p) => p.name !== project?.name && p.needsYou > 0)
-  const find = (id: string) => actions.find((a) => a.id === id)!
+  const find = (id: string) => actionsFor(latestAgentos(), layout).find((a) => a.id === id)!
   const keys = (id: string) => formatShortcut(find(id).shortcut!)
   const iconButton = 'btn btn-ghost h-[32px] w-[32px] justify-center px-0'
   const badge = width < DOTS_MIN

@@ -24,7 +24,7 @@ const PR_TONE: Record<PR['state'], ChipTone> = {
 }
 
 export function StatusLine({ session, children }: StatusLineProps) {
-  const { openPR, report } = useAgentos()
+  const { openPR, report } = useAgentos('openPR', 'report')
   const { anchor, hover } = useHoverCard()
   const { pr, git } = session
   if (!pr && !git) return null

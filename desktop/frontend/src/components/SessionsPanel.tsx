@@ -30,7 +30,7 @@ const itemKey = (item: Item) => (item.kind === 'group' ? `group:${item.group.key
 type SessionsListProps = { panel: RefObject<HTMLElement>; full: boolean; overlay: boolean; widthRem: number }
 
 function SessionsList({ panel, full, overlay, widthRem }: SessionsListProps) {
-  const { sessions, selectedId, select, focus, setComposing } = useAgentos()
+  const { sessions, selectedId, select, focus, setComposing } = useAgentos('sessions', 'selectedId', 'select', 'focus', 'setComposing')
   const { mode, setSessionsOpen, returnToTerminal } = useLayout()
   const list = useRef<HTMLDivElement>(null)
   const [closed, setClosed] = useProjectStored<GroupKey[]>('sessions.closed', [])

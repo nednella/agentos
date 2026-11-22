@@ -1,7 +1,7 @@
 import { useAgentos } from '../AgentosContext'
 
 export function Masthead() {
-  const { version, setOverlay } = useAgentos()
+  const { version, setOverlay } = useAgentos('version', 'setOverlay')
   return (
     <>
       <h1 className="text-title font-semibold">

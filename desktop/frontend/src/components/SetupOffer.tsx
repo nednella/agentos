@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAgentos } from '../AgentosContext'
 
 export function SetupOffer() {
-  const { setUpProject, dismissSetup, report } = useAgentos()
+  const { setUpProject, dismissSetup, report } = useAgentos('setUpProject', 'dismissSetup', 'report')
   const [pending, setPending] = useState(false)
   const run = (action: () => Promise<void>) =>
     report(async () => {
