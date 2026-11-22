@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.53.1](https://github.com/nednella/agentos/compare/v0.53.0...v0.53.1) (2026-11-22)
+
+
+### Bug Fixes
+
+* **desktop:** hold PR commands until turn ends, once each ([f6324b3](https://github.com/nednella/agentos/commit/f6324b33c6386cfb23e85222bafea87356669aa3))
+* **desktop:** leave gh user's own comments out of PR review count ([9b1e372](https://github.com/nednella/agentos/commit/9b1e372a251cd6effbc724803e17107e863b05b6))
+
+
+### Performance Improvements
+
+* **desktop:** ask tmux for its server pid only when it changes ([405ac5a](https://github.com/nednella/agentos/commit/405ac5a95abb4b94608acc3ec12fc189514ebcf9))
+* **desktop:** build session list once per sync ([bf3e85f](https://github.com/nednella/agentos/commit/bf3e85f259e8c3085e674275a50e8c0202c3a6bf))
+* **desktop:** keep usage read offsets across restarts ([40f9f90](https://github.com/nednella/agentos/commit/40f9f9059217fb76c9d2bff115b96088866de072))
+* **desktop:** read only changed state files at refresh ([af8db3c](https://github.com/nednella/agentos/commit/af8db3c758cc5482e6ff6e9226a20e4356ff11ba))
+* **desktop:** read project list once per work target scan ([b2b3b84](https://github.com/nednella/agentos/commit/b2b3b842f8c0eeb3f1baac42098aeb65c1e10960))
+* **internal:** let usage readers start from saved offsets ([2f61648](https://github.com/nednella/agentos/commit/2f61648aa261f833dabd3427853cd501eaa5aa0d))
+* **ui:** mount only the selected session's terminal ([dc88b1a](https://github.com/nednella/agentos/commit/dc88b1aaeb0e21398ffb4fb667eb9d467c56eedb))
+* **ui:** render clock text only when it changes ([9ae6b74](https://github.com/nednella/agentos/commit/9ae6b74ff3222bcc0820c3246e780f772b4543e7))
+* **ui:** render only the components whose state changed ([38a9c95](https://github.com/nednella/agentos/commit/38a9c954abf8e2dba8bf79137ed4a526b62957ff))
+* **ui:** unmount side panels while collapsed ([180385c](https://github.com/nednella/agentos/commit/180385cecd690c1fe5a95c66fdd605d26bd2548f))
+
 ## [0.53.0](https://github.com/nednella/agentos/compare/v0.52.1...v0.53.0) (2026-11-19)
 
 
