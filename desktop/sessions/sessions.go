@@ -549,6 +549,7 @@ func (s *Sessions) drop(id string) {
 	if name, err := session.ParseName(id); err == nil {
 		go os.RemoveAll(s.tmpDir(name))
 		_ = os.Remove(s.handoverPath(name))
+		_ = os.Remove(s.usageMarkPath(name))
 	}
 }
 

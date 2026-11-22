@@ -1,9 +1,11 @@
 package sessions_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/nednella/agentos/desktop/sessions"
 	"github.com/nednella/agentos/internal/activity"
 	"github.com/nednella/agentos/internal/bus"
+	"github.com/nednella/agentos/internal/usage"
 )
 
 func assistantLine(id string, at time.Time, input, output int64) string {
@@ -212,4 +215,41 @@ func TestResumedSessionShowsTheWholeConversationsUsage(t *testing.T) {
 	if led.Usage.Totals.Tokens != 1111 {
 		t.Errorf("usage = %+v: the stats count a session's usage again in the one that continues it", led.Usage.Totals)
 	}
+}
+
+func TestRecordedUsageSavesHowFarTheTranscriptWasRead(t *testing.T) {
+	h := newClaudeHarness(t)
+	s, err := h.Sessions().Create("#4 work", "", false, 4, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	transcript := filepath.Join(t.TempDir(), "conv.jsonl")
+	appendLines(t, transcript, assistantLine("msg_1", time.Now().Add(100*time.Millisecond), 1000, 100))
+	h.Hook(t, s.ID, "Stop", fmt.Sprintf(`{"transcript_path":%q}`, transcript))
+
+	project, token, _ := strings.Cut(s.ID, "/")
+	path := filepath.Join(h.State, "data", project, "usage", token+".json")
+	info, err := os.Stat(transcript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the mark saved after the turn was recorded", func() bool {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		var m usage.Mark
+		return json.Unmarshal(data, &m) == nil && m.Offsets[transcript] == info.Size()
+	})
+
+	if err := h.KillSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.DismissSession(s.ID); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the mark removed with the row", func() bool {
+		_, err := os.Stat(path)
+		return os.IsNotExist(err)
+	})
 }
