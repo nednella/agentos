@@ -292,9 +292,9 @@ type FakeGH struct {
 	CreateErr     error             // what gh issue create fails with, if set; it still prints Create
 	Delay         time.Duration     // how long gh issue create takes
 	Releases      string            // the latest release's tag; "" fails the check
-	pr            string            // what gh pr list prints
-	prByHead      map[string]string // what gh pr list --head <branch> prints instead, by branch
-	PRErr         error             // what gh pr list fails with, if set
+	pr            string            // the pull requests GitHub finds for a branch, as a JSON list of GraphQL nodes
+	prByHead      map[string]string // the pull requests it finds instead for one branch, by branch
+	PRErr         error             // what the pull request lookup fails with, if set
 	IssuesErr     error             // what gh issue list fails with, if set
 	issues        string            // what gh issue list prints instead of the usual six issues, if set
 	pulls         string            // the body gh api prints for the repo's pull request list
@@ -322,19 +322,17 @@ func (f *FakeGH) Run(ctx context.Context, dir, name string, args ...string) ([]b
 			return nil, fmt.Errorf("gh api: exit status 1: gh: HTTP 304")
 		}
 		return []byte("HTTP/2.0 200 OK\r\nEtag: " + f.etag + "\r\nX-Ratelimit-Remaining: 4999\r\n\r\n" + f.pulls), nil
-	case args[0] == "pr":
+	case args[0] == "api" && args[1] == "graphql":
 		if f.PRErr != nil {
 			return nil, f.PRErr
 		}
-		if i := slices.Index(args, "--head"); i >= 0 {
-			if out, ok := f.prByHead[args[i+1]]; ok {
-				return []byte(out), nil
+		found := cmp.Or(f.pr, "[]")
+		if i := slices.IndexFunc(args, func(a string) bool { return strings.HasPrefix(a, "head=") }); i >= 0 {
+			if out, ok := f.prByHead[strings.TrimPrefix(args[i], "head=")]; ok {
+				found = out
 			}
 		}
-		if f.pr == "" {
-			return []byte("[]"), nil
-		}
-		return []byte(f.pr), nil
+		return []byte(`{"data":{"repository":{"pullRequests":{"nodes":` + found + `}}}}`), nil
 	case args[0] == "repo" && args[1] == "create":
 		return nil, f.CreateRepoErr
 	case args[0] == "repo" && args[1] == "view" && len(args) == 3:
@@ -420,6 +418,19 @@ func (f *FakeGH) Calls(prefix string) int {
 	return n
 }
 
+// Lookups counts the pull request lookups for branch.
+func (f *FakeGH) Lookups(branch string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	n := 0
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, "api graphql ") && strings.HasSuffix(c, " head="+branch) {
+			n++
+		}
+	}
+	return n
+}
+
 // SetIssues sets what gh issue list prints.
 func (f *FakeGH) SetIssues(list string) {
 	f.mu.Lock()
@@ -488,14 +499,14 @@ func (f *FakeGH) Forwards() int {
 	return n
 }
 
-// SetPR sets what gh pr list prints.
+// SetPR sets the pull requests GitHub finds for a branch, as PRJSON prints them.
 func (f *FakeGH) SetPR(out string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.pr = out
 }
 
-// SetPRFor sets what gh pr list prints for the PR of one branch.
+// SetPRFor sets the pull requests GitHub finds for one branch.
 func (f *FakeGH) SetPRFor(branch, out string) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -1028,12 +1039,13 @@ func (h *Harness) Events(t *testing.T, kind string) []activity.Event {
 // GHUser is the login gh api user prints.
 const GHUser = "me"
 
-// PRJSON is what gh pr list prints for one pull request.
+// PRJSON is the list GitHub finds for a branch with one pull request: its checks are the rollup's
+// contexts, and its comments and reviews are by amy, the reviews in no state.
 func PRJSON(state string, draft bool, rollup string, comments, reviews int) string {
 	repeat := func(n int) string {
-		return "[" + strings.TrimSuffix(strings.Repeat(`{"id":"x"},`, n), ",") + "]"
+		return "[" + strings.TrimSuffix(strings.Repeat(`{"author":{"login":"amy"}},`, n), ",") + "]"
 	}
-	return fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"statusCheckRollup":%s,"comments":%s,"reviews":%s,"updatedAt":"2026-10-01T12:00:00Z"}]`,
+	return fmt.Sprintf(`[{"number":12,"url":"https://github.com/acme/widgets/pull/12","state":%q,"isDraft":%v,"commits":{"nodes":[{"commit":{"statusCheckRollup":{"contexts":{"nodes":%s}}}}]},"comments":{"nodes":%s},"reviews":{"nodes":%s},"updatedAt":"2026-10-01T12:00:00Z"}]`,
 		state, draft, rollup, repeat(comments), repeat(reviews))
 }
 

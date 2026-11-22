@@ -228,7 +228,7 @@ func TestWakeWaitsUntilTheTurnEnds(t *testing.T) {
 
 // withReviews puts the reviews in place of the none PRJSON printed.
 func withReviews(prJSON string, reviews ...string) string {
-	return strings.Replace(prJSON, `"reviews":[]`, `"reviews":[`+strings.Join(reviews, ",")+`]`, 1)
+	return strings.Replace(prJSON, `"reviews":{"nodes":[]}`, `"reviews":{"nodes":[`+strings.Join(reviews, ",")+`]}`, 1)
 }
 
 func reviewBy(login, state string) string {
@@ -449,10 +449,10 @@ func TestPollWatcherFetchesOnlyWhatMoved(t *testing.T) {
 	h.GH.SetPR(prJSON("OPEN", true, "[]", 0, 0))
 	s := issueSession(h, t, 12)
 	eventually(t, "the PR found by the poll", func() bool { got, _ := h.Session(s.ID); return got.PR != nil })
-	fetched := h.GH.Calls("pr list")
+	fetched := h.GH.Calls("api graphql")
 	eventually(t, "a conditional request", func() bool { return h.GH.Calls("api -i") >= 3 })
-	if h.GH.Calls("pr list") != fetched {
-		t.Errorf("an unchanged list (304) still fetched the PR: %d pr list calls, had %d", h.GH.Calls("pr list"), fetched)
+	if h.GH.Calls("api graphql") != fetched {
+		t.Errorf("an unchanged list (304) still fetched the PR: %d PR lookups, had %d", h.GH.Calls("api graphql"), fetched)
 	}
 
 	h.GH.SetPR(prJSON("OPEN", false, "[]", 0, 0))
@@ -559,11 +559,6 @@ func TestNoWakeWithoutACommand(t *testing.T) {
 	}
 }
 
-// lookups counts the gh pr list calls for the PR of branch.
-func lookups(h *apptest.Harness, branch string) int {
-	return h.GH.Calls("pr list --head " + branch + " ")
-}
-
 // branchTrees adds a worktree on each of br-1 to br-n.
 func branchTrees(t *testing.T, h *apptest.Harness, n int) []string {
 	t.Helper()
@@ -588,8 +583,8 @@ func TestBranchesTheListHoldsNoPROfAreNotLookedUp(t *testing.T) {
 		}
 	}
 	h.RefreshPRs()
-	if n := h.GH.Calls("pr list"); n != 0 {
-		t.Errorf("%d gh pr list calls for branches with no PR of ours, want none", n)
+	if n := h.GH.Calls("api graphql"); n != 0 {
+		t.Errorf("%d PR lookups for branches with no PR of ours, want none", n)
 	}
 
 	h.GH.SetPulls(`W/"two"`, "["+pull(20, "br-5", "acme", "2026-10-02T12:00:00Z")+","+pull(21, "br-4", "stranger", "2026-10-01T12:00:00Z")+"]")
@@ -599,7 +594,7 @@ func TestBranchesTheListHoldsNoPROfAreNotLookedUp(t *testing.T) {
 	if got, _ := h.Session(s.ID); got.PR == nil || got.PR.Number != 20 {
 		t.Errorf("session = %+v, want the PR of br-5 and not the stranger's", got)
 	}
-	if n, other := lookups(h, "br-5"), h.GH.Calls("pr list")-lookups(h, "br-5"); n != 2 || other != 0 {
+	if n, other := h.GH.Lookups("br-5"), h.GH.Calls("api graphql")-h.GH.Lookups("br-5"); n != 2 || other != 0 {
 		t.Errorf("br-5 looked up %d times in two reconciles, want 2; other branches %d times, want none", n, other)
 	}
 }
@@ -619,7 +614,7 @@ func TestBranchMissingFromAFullListIsLookedUpOnce(t *testing.T) {
 	}
 	h.RefreshPRs()
 	h.RefreshPRs()
-	if a, b := lookups(h, "br-1"), lookups(h, "br-2"); a != 1 || b != 1 {
+	if a, b := h.GH.Lookups("br-1"), h.GH.Lookups("br-2"); a != 1 || b != 1 {
 		t.Errorf("br-1 looked up %d times, br-2 %d times, want once each", a, b)
 	}
 }
@@ -634,12 +629,12 @@ func TestBranchWithNoPRIsDroppedOnceItsWorktreeIsGone(t *testing.T) {
 	}
 	gitIn(t, h.Dir, "worktree", "remove", trees[0])
 	h.RefreshPRs()
-	gone, kept := lookups(h, "br-1"), lookups(h, "br-2")
+	gone, kept := h.GH.Lookups("br-1"), h.GH.Lookups("br-2")
 	h.RefreshPRs()
-	if lookups(h, "br-1") != gone {
+	if h.GH.Lookups("br-1") != gone {
 		t.Error("a branch with no PR and no worktree is still looked up")
 	}
-	if lookups(h, "br-2") == kept {
+	if h.GH.Lookups("br-2") == kept {
 		t.Error("the branch that still has its worktree is no longer looked up")
 	}
 }
