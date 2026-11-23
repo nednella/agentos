@@ -210,12 +210,42 @@ func TestAgentBrowserDrivesOnlyTheSessionsTab(t *testing.T) {
 		t.Errorf("the session's state = %+v, want the page agent-browser opened", st)
 	}
 
+	closed := b.tab(ids[0]).pagesCopy()
 	b.Close(ctx, ids[0])
+	waitClosed(t, ctx, b.tab(ids[1]).proc, closed)
 	if out, err := run(ids[0], "get", "url"); err == nil || !strings.Contains(out, "tab_gone") {
 		t.Errorf("after its window closed: %q, %v; want tab_gone", out, err)
 	}
 	name, _ := session.ParseName(ids[1])
 	if _, err := os.Stat(filepath.Join(b.agentDir(), name.Token+".sock")); err != nil {
 		t.Errorf("the other session's daemon has no socket: %v", err)
+	}
+}
+
+// waitClosed waits until the browser no longer lists the pages. Chrome answers Target.closeTarget before the page is
+// gone, and agent-browser fails to connect when a page it attaches to closes meanwhile.
+func waitClosed(t *testing.T, ctx context.Context, p *browserProc, pages []*page) {
+	t.Helper()
+	listed := func() bool {
+		raw, err := p.conn().call(ctx, "", "Target.getTargets", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var res struct {
+			TargetInfos []targetInfo `json:"targetInfos"`
+		}
+		if err := json.Unmarshal(raw, &res); err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(res.TargetInfos, func(info targetInfo) bool {
+			return slices.ContainsFunc(pages, func(pg *page) bool { return pg.targetID == info.TargetID })
+		})
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for listed() {
+		if time.Now().After(deadline) {
+			t.Fatal("the closed pages are still listed")
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 }
