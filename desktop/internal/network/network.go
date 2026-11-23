@@ -118,7 +118,8 @@ func remote(args []string) bool {
 	return false
 }
 
-// Transport reports each request: one with no answer as a failure, any answer as online.
+// Transport reports each request: one with no answer as a failure, any answer as online. A request
+// whose own context ended, cancelled or past its timeout, reports nothing: a slow server is not a lost network.
 func (w *Watch) Transport(rt http.RoundTripper) http.RoundTripper {
 	return transport{rt: rt, w: w}
 }
@@ -133,7 +134,7 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	switch {
 	case err == nil:
 		t.w.answered()
-	case !errors.Is(err, context.Canceled):
+	case req.Context().Err() == nil:
 		t.w.failed()
 	}
 	return resp, err
