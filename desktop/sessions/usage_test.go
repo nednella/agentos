@@ -206,8 +206,19 @@ func TestResumedSessionShowsTheWholeConversationsUsage(t *testing.T) {
 	if len(starts) != 3 || starts[0].From != "" || starts[1].From != s.ID || starts[2].From != second.ID {
 		t.Errorf("session_start = %+v, want each resumed one to name the session it continues", starts)
 	}
+	began := func(h *apptest.Harness) {
+		t.Helper()
+		if row, _ := h.Session(s.ID); row.BeganAt != row.CreatedAt {
+			t.Errorf("first row began at %d, want its own start %d", row.BeganAt, row.CreatedAt)
+		}
+		if row, _ := h.Session(third.ID); row.BeganAt != starts[0].At {
+			t.Errorf("third row began at %d, want the first session's start %d", row.BeganAt, starts[0].At)
+		}
+	}
+	began(h)
 	restarted := h.Restart(t)
 	tokens(restarted, third.ID, 1111)
+	began(restarted)
 	led, err := restarted.Ledger(30, "")
 	if err != nil {
 		t.Fatal(err)
