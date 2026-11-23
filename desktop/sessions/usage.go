@@ -53,6 +53,7 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	var before usage.Tokens
+	var began time.Time
 	name, nameErr := session.ParseName(id)
 	if r.cursor == nil {
 		after, from := in.Created, ""
@@ -69,7 +70,9 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 			}
 		})
 		if from != "" {
-			before.Add(s.usedBefore(session.ProjectKey(id), from, kind))
+			var used usage.Tokens
+			used, began = s.usedBefore(session.ProjectKey(id), from, kind)
+			before.Add(used)
 		}
 		mark := usage.Mark{After: after}
 		if nameErr == nil {
@@ -111,6 +114,9 @@ func (s *Sessions) countUsage(id, transcript, model string, record bool) {
 	}
 	if _, kept := s.readers[id]; kept { // a dismissed session has no row to show it
 		s.spent[id] = total
+		if !began.IsZero() {
+			s.began[id] = began
+		}
 		s.sync()
 		if record && nameErr == nil {
 			s.saveUsageMark(name, r.cursor.Mark())
@@ -147,14 +153,17 @@ func (s *Sessions) saveUsageMark(name session.Name, m usage.Mark) {
 	}
 }
 
-// usedBefore is what the session from and each session it continues used, as the event log of the project holds it.
-func (s *Sessions) usedBefore(projectKey, from, kind string) usage.Tokens {
+// usedBefore is what the session from and each session it continues used, as the event log of the project holds it,
+// and when the first of them started.
+func (s *Sessions) usedBefore(projectKey, from, kind string) (usage.Tokens, time.Time) {
 	used := map[string]usage.Tokens{}
 	continues := map[string]string{}
+	started := map[string]int64{}
 	s.activity.Since(projectKey, "", func(e activity.Event) {
 		switch e.Kind {
 		case activity.SessionStart, activity.ChatStart:
 			continues[e.Session] = e.From
+			started[e.Session] = e.At
 		case kind:
 			t := used[e.Session]
 			t.Add(e.Tokens)
@@ -162,11 +171,15 @@ func (s *Sessions) usedBefore(projectKey, from, kind string) usage.Tokens {
 		}
 	})
 	var total usage.Tokens
+	var began time.Time
 	for seen := map[string]bool{}; from != "" && !seen[from]; from = continues[from] {
 		seen[from] = true
 		total.Add(used[from])
+		if at, ok := started[from]; ok {
+			began = time.UnixMilli(at)
+		}
 	}
-	return total
+	return total, began
 }
 
 // ran shows on the row the model and effort the agent used last, and keeps them where the start choice is kept, the

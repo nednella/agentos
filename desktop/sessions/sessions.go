@@ -57,6 +57,7 @@ type Session struct {
 	Detail      string           `json:"detail"`
 	LastEventAt int64            `json:"lastEventAt"`
 	CreatedAt   int64            `json:"createdAt"`
+	BeganAt     int64            `json:"beganAt"` // when the conversation began: the start of the first session it continues, else CreatedAt
 	Issue       int              `json:"issue"`
 	Chat        bool             `json:"chat"`
 	Action      string           `json:"action"` // the queue action the session was started with, "" when none
@@ -150,6 +151,7 @@ type Sessions struct {
 	prefillFor time.Duration
 	readers    map[string]*reader      // each session's transcript reader
 	spent      map[string]usage.Tokens // what each session's agent used
+	began      map[string]time.Time    // when the conversation of each session that continues one began
 	held       map[string]int64        // the memory each live session held at the last sample
 	memory     Memory
 	serverPID  int // the tmux server's, as tmux gave it; asked again once ps no longer lists it
@@ -254,6 +256,7 @@ func newSessions(o Options) *Sessions {
 		wakes:      map[string][]string{},
 		readers:    map[string]*reader{},
 		spent:      map[string]usage.Tokens{},
+		began:      map[string]time.Time{},
 		held:       map[string]int64{},
 		stateRead:  map[string]fileStamp{},
 		prefillFor: prefillWait,
@@ -541,6 +544,7 @@ func (s *Sessions) drop(id string) {
 	delete(s.nums, id)
 	delete(s.readers, id)
 	delete(s.spent, id)
+	delete(s.began, id)
 	s.dismissed[id] = true
 	s.life.forget(id)
 	_ = bus.RemoveState(s.stateDir, id)
@@ -994,6 +998,10 @@ func (s *Sessions) list() []Session {
 		}
 		if spent, ok := s.spent[id]; ok {
 			view.Tokens, view.Cost = spent.Total(), spent.Dollars()
+		}
+		view.BeganAt = view.CreatedAt
+		if began, ok := s.began[id]; ok {
+			view.BeganAt = began.UnixMilli()
 		}
 		view.Memory = s.held[id]
 		if view.History == nil {
