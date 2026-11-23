@@ -8,6 +8,7 @@ import type { Session } from '../types'
 import { ActionTag } from './ActionTag'
 import { Ago } from './Ago'
 import { CleanupControls } from './CleanupControls'
+import { Elapsed } from './Elapsed'
 import { EvidenceButton } from './EvidenceButton'
 import { Icon } from './Icon'
 import { ModelTag } from './ModelTag'
@@ -46,7 +47,10 @@ function SessionRowView({ session, selected, cursor, compact, dense }: SessionRo
           <span className="mono w-4 flex-none text-small text-dim">{session.n}</span>
           <ActionTag action={session.action} />
           <span className={`min-w-0 flex-1 truncate text-body ${selected ? 'font-semibold' : 'font-medium'}`}>{session.title}</span>
-          <span className="mono flex-none text-label text-dim"><Ago at={session.lastEventAt} /></span>
+          <span className="mono flex-none text-label text-dim">
+            <Ago at={session.lastEventAt} />
+            {session.memory > 0 && !compact && !dense && <span title={`The agent and every process under it. ${memoryNote}`}> · {gigabytes(session.memory)}</span>}
+          </span>
         </span>
         {!compact && !dense && (
           <span className="flex w-full items-center gap-2 pl-[1.625rem]">
@@ -54,12 +58,11 @@ function SessionRowView({ session, selected, cursor, compact, dense }: SessionRo
               {stateLabel(session.state, session.chat)}
             </span>
             <span className="min-w-0 flex-1 truncate text-right">
-              <ModelTag agent={session.agent} model={session.model} effort={session.effort} spend={spend} />
-              {session.memory > 0 && (
-                <span className="mono text-small whitespace-nowrap text-dim" title={`The agent and every process under it. ${memoryNote}`}>
-                  {session.agent || session.model || session.effort || spend ? ` · ${gigabytes(session.memory)}` : gigabytes(session.memory)}
-                </span>
-              )}
+              <ModelTag model={session.model} effort={session.effort} spend={spend} />
+              <span className="mono text-small whitespace-nowrap text-dim" title="Time since the conversation began">
+                {session.model || session.effort || spend ? ' · ' : ''}
+                <Elapsed since={session.beganAt} />
+              </span>
             </span>
           </span>
         )}

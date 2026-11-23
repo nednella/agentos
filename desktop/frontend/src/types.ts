@@ -35,6 +35,7 @@ export type Session = {
   detail: string
   lastEventAt: number
   createdAt: number
+  beganAt: number
   issue: number
   model: string
   effort: string
