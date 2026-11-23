@@ -84,6 +84,7 @@ func TestStartReclaimsARunningBrowserAndItsWindows(t *testing.T) {
 	old := first.tab("p/1").proc
 	// The app forgot the browser while it ran on: the next start takes it back with the windows in it.
 	first.exited(old)
+	waitLabelled(t, ctx, first, old, "p/1", 2)
 	second := New(dir, func(string, any) {})
 	second.Hook(func(string) string { return "" }, label, func() {})
 	defer second.CloseAll()
@@ -617,6 +618,20 @@ func waitPages(t *testing.T, b *Browsers, id string, want int) {
 	for b.State(id).Pages != want {
 		if time.Now().After(deadline) {
 			t.Fatalf("%d pages, want %d", b.State(id).Pages, want)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// waitLabelled waits until the browser lists want pages with the session's label in their title. A session counts a
+// page as soon as it claims it, before the page has the label.
+func waitLabelled(t *testing.T, ctx context.Context, b *Browsers, p *browserProc, id string, want int) {
+	t.Helper()
+	prefix := windowLabel(b.labelFor(id))
+	deadline := time.Now().Add(10 * time.Second)
+	for len(b.labelledTargets(ctx, p, prefix)) != want {
+		if time.Now().After(deadline) {
+			t.Fatalf("%d pages with the label %s, want %d", len(b.labelledTargets(ctx, p, prefix)), prefix, want)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
