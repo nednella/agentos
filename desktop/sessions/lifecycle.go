@@ -1314,7 +1314,7 @@ func (l *Lifecycle) otherPR(ctx context.Context, dir, branch string) (*PR, strin
 // unsafe says why removing the worktree and branch could lose work, or "".
 func (l *Lifecycle) unsafe(ctx context.Context, dir, worktree, branch string, branchExists bool, pr *PR) string {
 	if worktree != "" {
-		out, err := l.git(ctx, dir, "-C", worktree, "status", "--porcelain")
+		out, err := l.worktreeStatus(ctx, dir, worktree)
 		switch {
 		case err != nil:
 			return fmt.Sprintf("git could not read the worktree of %s: %v", branch, err)
@@ -1356,6 +1356,12 @@ func (l *Lifecycle) afterMergedHead(ctx context.Context, dir, branch, head strin
 		return branch + " has commits that are not in the merged pull request"
 	}
 	return ""
+}
+
+// worktreeStatus lists the worktree's changes. It takes no index lock, so the agent's own git
+// commands in the worktree never find one held by this read.
+func (l *Lifecycle) worktreeStatus(ctx context.Context, dir, worktree string) ([]byte, error) {
+	return l.git(ctx, dir, "--no-optional-locks", "-C", worktree, "status", "--porcelain")
 }
 
 // commitsNotIn counts the commits on branch that ref lacks.
@@ -1403,7 +1409,7 @@ func (l *Lifecycle) branchStatus(ctx context.Context, dir, base, branch, worktre
 		st.NotInMain, _ = l.commitsNotIn(ctx, dir, pr.HeadOid, branch)
 	}
 	if worktree != "" {
-		if out, err := l.git(ctx, dir, "-C", worktree, "status", "--porcelain"); err == nil {
+		if out, err := l.worktreeStatus(ctx, dir, worktree); err == nil {
 			st.Uncommitted = strings.Count(string(out), "\n")
 		}
 	}
