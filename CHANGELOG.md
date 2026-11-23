@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.54.0](https://github.com/nednella/agentos/compare/v0.53.1...v0.54.0) (2026-11-23)
+
+
+### Features
+
+* **desktop:** send when a session's conversation began ([61ea8d9](https://github.com/nednella/agentos/commit/61ea8d9238504cce96db3f3e9de26ecc54afde64))
+* **ui:** show session age on session row ([f5d3d51](https://github.com/nednella/agentos/commit/f5d3d5165d2edd0d260a64228629d0d71a635863))
+
+
+### Bug Fixes
+
+* **desktop:** read worktree status without index lock ([3322e26](https://github.com/nednella/agentos/commit/3322e2697ad8af0e5e4aaa5e9d7c623bf585d0fb))
+* **desktop:** skip news requests that hit their own timeout ([7bb219d](https://github.com/nednella/agentos/commit/7bb219dd2e23b1ec79d2a92450bb7202a9e01027))
+* **ui:** follow only app's network event for offline splash ([a2c79d9](https://github.com/nednella/agentos/commit/a2c79d9c15bde4524719e25f1d57c7485b097723))
+
 ## [0.53.1](https://github.com/nednella/agentos/compare/v0.53.0...v0.53.1) (2026-11-22)
 
 
