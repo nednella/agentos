@@ -21,6 +21,7 @@ const (
 	webhookRetry  = 30 * time.Second
 	repoRetry     = 30 * time.Second
 	payloadCap    = 4 << 20
+	pullsPage     = 100
 )
 
 // watcher follows one project's pull requests between reconciles: a webhook stream where
@@ -157,6 +158,7 @@ func (l *Lifecycle) onEvent(ctx context.Context, proj project.Project, payload [
 		}
 		only = append(only, branch)
 	}
+	l.expire(proj, only)
 	l.refreshOnly(ctx, proj, targets, only)
 }
 
@@ -218,61 +220,104 @@ func (l *Lifecycle) pollPRs(ctx context.Context, proj project.Project, repo stri
 			continue
 		}
 		// Checks do not touch a PR's updated_at, so pending ones are looked at every time.
-		l.refreshOnly(ctx, proj, targets, append(changed, l.pendingBranches(targets)...))
+		pending := l.pendingBranches(targets)
+		l.expire(proj, pending)
+		l.refreshOnly(ctx, proj, targets, append(changed, pending...))
 	}
 }
 
-// changedBranches are the tracked branches whose pull request was updated since the last fetch,
-// as the repo's PR list says. A list GitHub reports unchanged (304) names none.
+// changedBranches are the tracked branches whose pull request the repo's PR list shows changed
+// since it was last looked up.
 func (l *Lifecycle) changedBranches(ctx context.Context, proj project.Project, repo string, targets []target) ([]string, error) {
+	list, err := l.pulls(ctx, proj, repo)
+	if err != nil {
+		return nil, err
+	}
 	key := proj.Key()
 	l.mu.Lock()
-	etag := l.etags[key]
+	defer l.mu.Unlock()
+	changed := []string{}
+	for _, t := range targets {
+		for _, branch := range t.branches {
+			seen, listed := list.heads[branch]
+			if listed && l.lookups[key+" "+branch].seen != seen && !slices.Contains(changed, branch) {
+				changed = append(changed, branch)
+			}
+		}
+	}
+	return changed, nil
+}
+
+// pullList is the repo's pull request list: the PRs updated last, newest first.
+type pullList struct {
+	etag   string
+	heads  map[string]listed // by head branch: its newest PR whose branch is ours
+	full   bool              // the list holds only the PRs updated last, not every PR of the repo
+	oldest int64             // when the last PR in a full list was updated
+}
+
+// listed is what the repo's PR list says of the PR of a branch.
+type listed struct {
+	number  int
+	updated int64
+}
+
+// pulls asks GitHub for the repo's pull request list, with the ETag of the last answer so an unchanged
+// list costs nothing. A PR's branch is ours when it is in the repo or in the gh user's fork: a stranger's
+// fork may have a branch of the same name.
+func (l *Lifecycle) pulls(ctx context.Context, proj project.Project, repo string) (*pullList, error) {
+	me, err := l.login(ctx, proj.Dir)
+	if err != nil {
+		return nil, fmt.Errorf("finding the gh user: %w", err)
+	}
+	key := proj.Key()
+	l.mu.Lock()
+	last := l.lists[key]
 	l.mu.Unlock()
-	args := []string{"api", "-i", fmt.Sprintf("repos/%s/pulls?state=all&sort=updated&direction=desc&per_page=100", repo)}
-	if etag != "" {
-		args = append(args, "-H", "If-None-Match: "+etag)
+	args := []string{"api", "-i", fmt.Sprintf("repos/%s/pulls?state=all&sort=updated&direction=desc&per_page=%d", repo, pullsPage)}
+	if last != nil && last.etag != "" {
+		args = append(args, "-H", "If-None-Match: "+last.etag)
 	}
 	ctx, cancel := context.WithTimeout(ctx, run.GHTimeout)
 	defer cancel()
 	out, err := l.run(ctx, proj.Dir, "gh", args...)
 	if err != nil {
-		if strings.Contains(err.Error(), "HTTP 304") {
-			return []string{}, nil
+		if last != nil && strings.Contains(err.Error(), "HTTP 304") {
+			return last, nil
 		}
 		return nil, fmt.Errorf("listing the pull requests of %s: %w", repo, err)
 	}
 	etag, body := splitResponse(out)
-	var list []struct {
-		Head      struct{ Ref string } `json:"head"`
-		UpdatedAt time.Time            `json:"updated_at"`
+	var raw []struct {
+		Number int `json:"number"`
+		Head   struct {
+			Ref  string `json:"ref"`
+			Repo *struct {
+				Owner author `json:"owner"`
+			} `json:"repo"`
+		} `json:"head"`
+		UpdatedAt time.Time `json:"updated_at"`
 	}
-	if err := json.Unmarshal(body, &list); err != nil {
+	if err := json.Unmarshal(body, &raw); err != nil {
 		return nil, fmt.Errorf("reading the pull request list of %s: %w", repo, err)
 	}
-	updated := map[string]int64{}
-	for _, pr := range slices.Backward(list) { // the newest PR of a branch wins
-		updated[pr.Head.Ref] = util.Millis(pr.UpdatedAt)
-	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
-	l.etags[key] = etag
-	changed := []string{}
-	for _, t := range targets {
-		tr := l.tracks[t.id]
-		for _, branch := range slices.Backward(t.branches) { // the newest branch with a PR is the one tracked
-			at, listed := updated[branch]
-			if !listed {
-				continue
-			}
-			known := tr != nil && tr.pr != nil && tr.branch == branch
-			if (!known || tr.pr.UpdatedAt != at) && !slices.Contains(changed, branch) {
-				changed = append(changed, branch)
-			}
-			break
+	owner, _, _ := strings.Cut(repo, "/")
+	list := &pullList{etag: etag, heads: map[string]listed{}, full: len(raw) >= pullsPage}
+	for _, pr := range raw {
+		if pr.Head.Repo == nil || (pr.Head.Repo.Owner.Login != owner && pr.Head.Repo.Owner.Login != me) {
+			continue
+		}
+		if pr.Number > list.heads[pr.Head.Ref].number {
+			list.heads[pr.Head.Ref] = listed{number: pr.Number, updated: util.Millis(pr.UpdatedAt)}
 		}
 	}
-	return changed, nil
+	if list.full {
+		list.oldest = util.Millis(raw[len(raw)-1].UpdatedAt)
+	}
+	l.mu.Lock()
+	l.lists[key] = list
+	l.mu.Unlock()
+	return list, nil
 }
 
 // splitResponse takes the ETag and the body out of what gh api -i printed: the headers, a blank line, the body.

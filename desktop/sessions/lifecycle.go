@@ -32,6 +32,7 @@ const (
 	reconcileEvery = time.Minute // a full look at every pull request: for what a watcher missed, and for conflicts, which no watcher sees
 	cleanupsKept   = 100
 	gitTimeout     = 30 * time.Second
+	clockMargin    = time.Minute // how far the clocks of GitHub and this Mac may be apart
 
 	closedReason = "app closed during clean-up"
 )
@@ -162,14 +163,17 @@ type Lifecycle struct {
 	pollMu sync.Mutex // one reconcile at a time
 	logMu  sync.Mutex // the clean-up log files
 
-	mu       sync.Mutex
-	tracks   map[string]*track
-	gone     map[string]bool     // forgotten ids: a poll that was waiting on gh must not write for them
-	files    map[string]*prsFile // by project key
-	etags    map[string]string   // by project key: the ETag of the last pull request list
-	watchers map[string]*watcher // by project key
-	finished map[string]bool     // session id and branch: an older branch whose clean-up a poll started
-	logins   map[string]string   // by project folder: the gh user's login
+	mu         sync.Mutex
+	tracks     map[string]*track
+	gone       map[string]bool        // forgotten ids: a poll that was waiting on gh must not write for them
+	files      map[string]*prsFile    // by project key
+	lists      map[string]*pullList   // by project key: the last pull request list
+	lookups    map[string]lookup      // by project key and branch: what gh pr list --head said last
+	round      int                    // the reconciles so far
+	refreshing map[string]*sync.Mutex // by project key: one refresh at a time
+	watchers   map[string]*watcher    // by project key
+	finished   map[string]bool        // session id and branch: an older branch whose clean-up a poll started
+	logins     map[string]string      // by project folder: the gh user's login
 
 	cleanMu   sync.Mutex // guards stopping against cleanups starting
 	stopping  bool
@@ -182,7 +186,7 @@ func newLifecycle(runner run.Runner, stream run.Streamer, dataDir, stateDir stri
 	stopped, stop := context.WithCancel(context.Background())
 	return &Lifecycle{
 		run: runner, stream: stream, dataDir: dataDir, stateDir: stateDir, sessions: s, activity: activity, emit: emit, warn: warn.New(emit), repos: noRepos{},
-		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, etags: map[string]string{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{},
+		tracks: map[string]*track{}, gone: map[string]bool{}, files: map[string]*prsFile{}, lists: map[string]*pullList{}, lookups: map[string]lookup{}, refreshing: map[string]*sync.Mutex{}, watchers: map[string]*watcher{}, finished: map[string]bool{}, logins: map[string]string{},
 		stopped: stopped, stopClean: stop,
 	}
 }
@@ -333,6 +337,9 @@ func groups(targets []target) []group {
 func (l *Lifecycle) Poll(ctx context.Context) {
 	l.pollMu.Lock()
 	defer l.pollMu.Unlock()
+	l.mu.Lock()
+	l.round++
+	l.mu.Unlock()
 	var treeFailure, prFailure string
 	for _, g := range groups(l.sessions.workTargets()) {
 		treeErr, prErr := l.refresh(ctx, g.proj, g.targets, nil)
@@ -353,7 +360,14 @@ func (l *Lifecycle) Poll(ctx context.Context) {
 // refresh fetches the pull requests of the project's sessions, all of them or only those on
 // the branches named, and acts on what changed: clean-ups, a fresh queue, and wakes.
 func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets []target, only []string) (treeErr, prErr error) {
+	lock := l.refreshLock(proj.Key())
+	lock.Lock()
+	defer lock.Unlock()
 	trees, treeErr := l.worktrees(ctx, proj.Dir)
+	var list *pullList
+	if repo := l.repos.Repo(ctx, proj.Dir); repo != "" {
+		list, _ = l.pulls(ctx, proj, repo) // without the list each branch is looked up, and that lookup reports what fails
+	}
 	prs := map[string]*PR{} // by branch: two sessions of one issue share its PR
 	var fetched []done
 	var older []done
@@ -361,10 +375,10 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 	var wakes []wake
 	reload := false
 	for _, t := range sharing(targets, only) {
-		branch, pr, err := l.latestPR(ctx, t, prs)
+		branch, pr, err := l.latestPR(ctx, t, list, prs)
 		if err == nil {
 			var d, gone []done
-			d, gone, err = l.olderDone(ctx, t, branch, prs)
+			d, gone, err = l.olderDone(ctx, t, branch, list, prs)
 			older = append(older, d...)
 			dropped = append(dropped, gone...)
 		}
@@ -410,6 +424,18 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		l.repos.Reload(ctx, proj)
 	}
 	return treeErr, prErr
+}
+
+// refreshLock keeps a project's refreshes one at a time, so a branch that many hooks ask about at once is looked up once.
+func (l *Lifecycle) refreshLock(key string) *sync.Mutex {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	m := l.refreshing[key]
+	if m == nil {
+		m = &sync.Mutex{}
+		l.refreshing[key] = m
+	}
+	return m
 }
 
 // sharing are the targets on a branch named in only, with every target that shares a branch with
@@ -463,9 +489,9 @@ func hearer(fetched []done, branch string) string {
 
 // latestPR is the session's PR on the newest of its branches that has one, with its branch; without
 // one it is nil, with the newest branch. found caches the lookups by branch.
-func (l *Lifecycle) latestPR(ctx context.Context, t target, found map[string]*PR) (string, *PR, error) {
+func (l *Lifecycle) latestPR(ctx context.Context, t target, list *pullList, found map[string]*PR) (string, *PR, error) {
 	for _, branch := range slices.Backward(t.branches) {
-		pr, err := l.cachedPR(ctx, t.proj.Dir, branch, found)
+		pr, err := l.cachedPR(ctx, t.proj, branch, list, found)
 		if err != nil {
 			return "", nil, err
 		}
@@ -476,16 +502,78 @@ func (l *Lifecycle) latestPR(ctx context.Context, t target, found map[string]*PR
 	return t.newest(), nil, nil
 }
 
-func (l *Lifecycle) cachedPR(ctx context.Context, dir, branch string, found map[string]*PR) (*PR, error) {
+// cachedPR is the PR of the branch, looked up with gh only when what is known of it may be out of date.
+func (l *Lifecycle) cachedPR(ctx context.Context, proj project.Project, branch string, list *pullList, found map[string]*PR) (*PR, error) {
 	if pr, ok := found[branch]; ok {
 		return pr, nil
 	}
-	pr, err := l.findPR(ctx, dir, branch)
-	if err == nil {
+	key := proj.Key() + " " + branch
+	if pr, ok := l.known(key, branch, list); ok {
 		found[branch] = pr
+		return pr, nil
 	}
-	return pr, err
+	at := time.Now().Add(-clockMargin).UnixMilli()
+	pr, err := l.findPR(ctx, proj.Dir, branch)
+	if err != nil {
+		return nil, err
+	}
+	found[branch] = pr
+	if list != nil {
+		l.mu.Lock()
+		l.lookups[key] = lookup{pr: pr, seen: list.heads[branch], at: at, round: l.round}
+		l.mu.Unlock()
+	}
+	return pr, nil
 }
+
+// lookup is what gh pr list --head said of a branch, with what the repo's PR list said of it then.
+type lookup struct {
+	pr    *PR
+	seen  listed // zero when the list held no PR of the branch
+	at    int64  // when, less clockMargin
+	round int    // the reconcile it ran in
+}
+
+// known is what is known of the branch's PR without asking gh. A list that holds every PR of the repo
+// and none of the branch says it has none. Else the last lookup holds while the list shows no change to
+// the PR, and a list of only the PRs updated last also holds for a PR it lacks when the lookup came after
+// them all. A live PR is looked up again each reconcile anyway, for its checks and whether it merges.
+// key is the project key and the branch.
+func (l *Lifecycle) known(key, branch string, list *pullList) (*PR, bool) {
+	if list == nil {
+		return nil, false
+	}
+	seen, listed := list.heads[branch]
+	if !listed && !list.full {
+		return nil, true
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	c, ok := l.lookups[key]
+	switch {
+	case !ok || c.seen != seen:
+		return nil, false
+	case !listed && c.at <= list.oldest:
+		return nil, false
+	case isLive(c.pr) && c.round != l.round:
+		return nil, false
+	}
+	return c.pr, true
+}
+
+// expire forgets what is known of the live PRs on the branches, whose checks can change while the repo's PR list does not.
+func (l *Lifecycle) expire(proj project.Project, branches []string) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	for _, branch := range branches {
+		key := proj.Key() + " " + branch
+		if isLive(l.lookups[key].pr) {
+			delete(l.lookups, key)
+		}
+	}
+}
+
+func isLive(pr *PR) bool { return pr != nil && (pr.State == "draft" || pr.State == "open") }
 
 // done is an older branch of a session whose PR merged or closed.
 type done struct {
@@ -497,12 +585,12 @@ type done struct {
 // olderDone are the branches the session moved on from whose PR merged or closed and that the project
 // cleans up on its own, each once. The branch of the session's PR is left to the session's own clean-up.
 // gone are those the session only saw and whose PR it never saw open: they were never its work.
-func (l *Lifecycle) olderDone(ctx context.Context, t target, prBranch string, found map[string]*PR) (out, gone []done, err error) {
+func (l *Lifecycle) olderDone(ctx context.Context, t target, prBranch string, list *pullList, found map[string]*PR) (out, gone []done, err error) {
 	for _, branch := range t.branches[:len(t.branches)-1] {
 		if branch == prBranch {
 			continue
 		}
-		pr, err := l.cachedPR(ctx, t.proj.Dir, branch, found)
+		pr, err := l.cachedPR(ctx, t.proj, branch, list, found)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -1637,6 +1725,7 @@ func (l *Lifecycle) track(ctx context.Context, id string, proj project.Project, 
 	if len(known) > 0 && known[len(known)-1] == branch {
 		l.mu.Unlock()
 		if turnEnded {
+			l.expire(proj, []string{branch})
 			l.refreshOnly(ctx, proj, l.targetsOf(proj), []string{branch})
 		}
 		return

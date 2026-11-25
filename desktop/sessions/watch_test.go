@@ -15,7 +15,12 @@ import (
 
 // pulls is what the repo's pull request list says of one branch.
 func pulls(branch, updatedAt string) string {
-	return fmt.Sprintf(`[{"number":12,"head":{"ref":%q},"updated_at":%q}]`, branch, updatedAt)
+	return "[" + pull(12, branch, "acme", updatedAt) + "]"
+}
+
+// pull is one entry of the repo's pull request list, from a branch in the repo of owner.
+func pull(number int, branch, owner, updatedAt string) string {
+	return fmt.Sprintf(`{"number":%d,"head":{"ref":%q,"repo":{"owner":{"login":%q}}},"updated_at":%q}`, number, branch, owner, updatedAt)
 }
 
 func TestEndedSessionKeepsItsPRAndIsCleanedUpOnMerge(t *testing.T) {
@@ -482,7 +487,7 @@ func TestPollWatcherKeepsLookingWhileChecksRun(t *testing.T) {
 }
 
 func TestWebhookWatcherRefreshesThePRAnEventNames(t *testing.T) {
-	h := newHarness(t)
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_poll_interval: 1s\n"})
 	h.GH.WebhookWorks()
 	s := issueSession(h, t, 12)
 	eventually(t, "the forward to start", func() bool { return h.GH.Forwards() == 1 })
@@ -498,13 +503,15 @@ func TestWebhookWatcherRefreshesThePRAnEventNames(t *testing.T) {
 	h.GH.Event(`{"action":"created","issue":{"number":12,"pull_request":{"url":"x"}},"comment":{"body":"hi"}}`)
 	eventually(t, "the comment after the issue_comment event", func() bool { got, _ := h.Session(s.ID); return got.PR.Comments == 1 })
 	h.GH.Event(`{"action":"created","issue":{"number":99},"comment":{"body":"not a PR"}}`)
-	if h.GH.Calls("api -i") != 0 {
+	listed := h.GH.Calls("api -i")
+	time.Sleep(2500 * time.Millisecond)
+	if h.GH.Calls("api -i") != listed {
 		t.Error("the webhook watcher polled the list")
 	}
 }
 
 func TestWebhookAskedForButDownIsWarnedAbout(t *testing.T) {
-	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: webhook\n"})
+	h := apptest.NewWith(t, apptest.Options{ProjectExtra: "    pr_watch_method: webhook\n    pr_poll_interval: 1s\n"})
 	issueSession(h, t, 12)
 	eventually(t, "a warning that the stream is down", func() bool {
 		for _, w := range h.Rec.Warnings() {
@@ -514,7 +521,9 @@ func TestWebhookAskedForButDownIsWarnedAbout(t *testing.T) {
 		}
 		return false
 	})
-	if h.GH.Calls("api -i") != 0 {
+	listed := h.GH.Calls("api -i")
+	time.Sleep(2500 * time.Millisecond)
+	if h.GH.Calls("api -i") != listed {
 		t.Error("pr_watch: webhook fell back to polling")
 	}
 }
@@ -547,5 +556,70 @@ func TestNoWakeWithoutACommand(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 	if pane := h.Pane(t, s.ID); strings.Contains(pane, "PR") || strings.Contains(pane, "12") {
 		t.Errorf("a project with no wake settings typed into the session:\n%s", pane)
+	}
+}
+
+// lookups counts the gh pr list calls for the PR of branch.
+func lookups(h *apptest.Harness, branch string) int {
+	return h.GH.Calls("pr list --head " + branch + " ")
+}
+
+// branchTrees adds a worktree on each of br-1 to br-n.
+func branchTrees(t *testing.T, h *apptest.Harness, n int) []string {
+	t.Helper()
+	repoFixture(t, h)
+	var trees []string
+	for i := 1; i <= n; i++ {
+		trees = append(trees, branchWorktree(t, h, fmt.Sprintf("br-%d", i)))
+	}
+	return trees
+}
+
+func TestBranchesTheListHoldsNoPROfAreNotLookedUp(t *testing.T) {
+	h := newHarness(t)
+	trees := branchTrees(t, h, 5)
+	h.GH.SetPulls(`W/"one"`, "["+pull(21, "br-4", "stranger", "2026-10-01T12:00:00Z")+"]")
+	h.GH.SetPRFor("br-4", numberedPR(21, "OPEN"))
+	s := issueSession(h, t, 7)
+	for range 2 {
+		for i, wt := range trees {
+			worksIn(h, t, s, wt)
+			eventually(t, "the session on its branch", onBranch(h, s.ID, fmt.Sprintf("br-%d", i+1)))
+		}
+	}
+	h.RefreshPRs()
+	if n := h.GH.Calls("pr list"); n != 0 {
+		t.Errorf("%d gh pr list calls for branches with no PR of ours, want none", n)
+	}
+
+	h.GH.SetPulls(`W/"two"`, "["+pull(20, "br-5", "acme", "2026-10-02T12:00:00Z")+","+pull(21, "br-4", "stranger", "2026-10-01T12:00:00Z")+"]")
+	h.GH.SetPRFor("br-5", numberedPR(20, "OPEN"))
+	h.RefreshPRs()
+	h.RefreshPRs()
+	if got, _ := h.Session(s.ID); got.PR == nil || got.PR.Number != 20 {
+		t.Errorf("session = %+v, want the PR of br-5 and not the stranger's", got)
+	}
+	if n, other := lookups(h, "br-5"), h.GH.Calls("pr list")-lookups(h, "br-5"); n != 2 || other != 0 {
+		t.Errorf("br-5 looked up %d times in two reconciles, want 2; other branches %d times, want none", n, other)
+	}
+}
+
+func TestBranchMissingFromAFullListIsLookedUpOnce(t *testing.T) {
+	h := newHarness(t)
+	trees := branchTrees(t, h, 2)
+	var page []string
+	for i := range 100 {
+		page = append(page, pull(100+i, fmt.Sprintf("old-%d", i), "acme", "2026-01-01T12:00:00Z"))
+	}
+	h.GH.SetPulls(`W/"full"`, "["+strings.Join(page, ",")+"]")
+	s := issueSession(h, t, 7)
+	for i, wt := range trees {
+		worksIn(h, t, s, wt)
+		eventually(t, "the session on its branch", onBranch(h, s.ID, fmt.Sprintf("br-%d", i+1)))
+	}
+	h.RefreshPRs()
+	h.RefreshPRs()
+	if a, b := lookups(h, "br-1"), lookups(h, "br-2"); a != 1 || b != 1 {
+		t.Errorf("br-1 looked up %d times, br-2 %d times, want once each", a, b)
 	}
 }
