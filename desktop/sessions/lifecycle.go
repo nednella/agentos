@@ -407,6 +407,9 @@ func (l *Lifecycle) refresh(ctx context.Context, proj project.Project, targets [
 		}
 		reload = reload || o.queue
 	}
+	if treeErr == nil {
+		dropped = append(dropped, abandoned(fetched, prs, trees)...)
+	}
 	for _, id := range auto {
 		l.autoCleanup(ctx, id)
 	}
@@ -436,6 +439,22 @@ func (l *Lifecycle) refreshLock(key string) *sync.Mutex {
 		l.refreshing[key] = m
 	}
 	return m
+}
+
+// abandoned are the branches of the sessions that have no PR and that no worktree has checked out any
+// more. A branch the session owns stays: its worktree may not be made yet.
+func abandoned(fetched []done, prs map[string]*PR, trees worktrees) []done {
+	var out []done
+	for _, f := range fetched {
+		for _, branch := range f.branches {
+			pr, looked := prs[branch]
+			_, checkedOut := trees.byBranch[branch]
+			if looked && pr == nil && !checkedOut && !f.owns(branch) {
+				out = append(out, done{f.target, branch, nil})
+			}
+		}
+	}
+	return out
 }
 
 // sharing are the targets on a branch named in only, with every target that shares a branch with

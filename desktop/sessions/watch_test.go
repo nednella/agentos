@@ -623,3 +623,23 @@ func TestBranchMissingFromAFullListIsLookedUpOnce(t *testing.T) {
 		t.Errorf("br-1 looked up %d times, br-2 %d times, want once each", a, b)
 	}
 }
+
+func TestBranchWithNoPRIsDroppedOnceItsWorktreeIsGone(t *testing.T) {
+	h := newHarness(t)
+	trees := branchTrees(t, h, 2)
+	s := issueSession(h, t, 7)
+	for i, wt := range trees {
+		worksIn(h, t, s, wt)
+		eventually(t, "the session on its branch", onBranch(h, s.ID, fmt.Sprintf("br-%d", i+1)))
+	}
+	gitIn(t, h.Dir, "worktree", "remove", trees[0])
+	h.RefreshPRs()
+	gone, kept := lookups(h, "br-1"), lookups(h, "br-2")
+	h.RefreshPRs()
+	if lookups(h, "br-1") != gone {
+		t.Error("a branch with no PR and no worktree is still looked up")
+	}
+	if lookups(h, "br-2") == kept {
+		t.Error("the branch that still has its worktree is no longer looked up")
+	}
+}
