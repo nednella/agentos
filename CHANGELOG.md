@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.54.1](https://github.com/nednella/agentos/compare/v0.54.0...v0.54.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **desktop:** ask GitHub for PR comment authors, not their bodies ([7d1700c](https://github.com/nednella/agentos/commit/7d1700c4600c4bf9e3f5e4a993358c6de62ddf88))
+* **desktop:** drop seen branch with no PR once its worktree is gone ([29c18af](https://github.com/nednella/agentos/commit/29c18afce7e02f44b4ab87a9821099dd1959e48f))
+* **desktop:** look at a session's branch in the order of its hooks ([8521536](https://github.com/nednella/agentos/commit/8521536a42978e7eb91a6eb6b4d9ef3236a161b1))
+* **desktop:** look only for a new PR when a turn ends on the same branch ([22e66f1](https://github.com/nednella/agentos/commit/22e66f161f134a48bdbeb9faa8043414df15d512))
+* **desktop:** read branch PRs from repo's PR list ([50a8554](https://github.com/nednella/agentos/commit/50a85543d620de993d97f19a1db42c8fa960d78c))
+* **desktop:** read each folder's default branch and git folders once ([f36ad3d](https://github.com/nednella/agentos/commit/f36ad3d9d6ac7c387b95aa8e32d5aa967141ca28))
+* **desktop:** stop following ended sessions without an open PR ([16d9919](https://github.com/nednella/agentos/commit/16d991966ccc903675d9195dddb5cfcec2d56ce7))
+
 ## [0.54.0](https://github.com/nednella/agentos/compare/v0.53.1...v0.54.0) (2026-11-23)
 
 
